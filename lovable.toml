@@ -1,2 +1,2 @@
 [run]
-dev = "cd app && npm run dev -- --host 0.0.0.0"
+dev = "npm --prefix app run dev -- --host 0.0.0.0"
