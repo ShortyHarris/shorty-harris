@@ -1,0 +1,28 @@
+/* Admin "control desk" palette — ink-blue, structured, authoritative */
+.theme-admin {
+  --paper: #f6f4ef;
+  --paper-raised: #fffdf9;
+  --ink: #1c2433;
+  --ink-soft: #5b6473;
+  --ink-faint: #8a909c;
+  --line: #e4e0d7;
+  --line-strong: #d4cfc3;
+
+  --brand: #2f4a7c;
+  --brand-tint: #eaeff7;
+  --approve: #1f7a52;
+  --approve-tint: #e3f3ea;
+  --reject: #9d3b3b;
+  --reject-tint: #f6e9e7;
+  --pending: #9a6b16;
+  --pending-tint: #f7eed8;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgba(28, 36, 51, 0.04), 0 6px 20px rgba(28, 36, 51, 0.06);
+
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.theme-admin ::selection { background: var(--brand-tint); }

@@ -1,0 +1,33 @@
+.page { min-height: 100vh; }
+
+/* Topbar */
+.topbar { background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+.topbar-inner { max-width: 920px; margin: 0 auto; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark {
+  width: 40px; height: 40px; border-radius: 11px; background: var(--leaf); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 17px; text-transform: uppercase;
+}
+.brand-name { font-weight: 650; font-size: 15px; }
+.brand-sub { font-size: 12px; color: var(--ink-faint); }
+
+.top-nav { display: flex; gap: 4px; }
+.top-nav a {
+  text-decoration: none;
+  background: none; padding: 8px 14px; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 600; color: var(--ink-soft);
+}
+.top-nav a:hover { background: var(--bg); color: var(--ink); }
+.top-nav a.on { background: var(--leaf-tint); color: var(--leaf); }
+
+.topbar-right { display: flex; align-items: center; gap: 14px; }
+.credits { text-align: right; background: var(--amber-tint); padding: 8px 16px; border-radius: var(--radius-sm); }
+.credits-num { font-size: 20px; font-weight: 720; color: var(--amber); line-height: 1; font-variant-numeric: tabular-nums; }
+.credits-label { font-size: 11px; color: var(--amber); opacity: 0.85; }
+.signout-btn { background: none; border: 1px solid var(--line-strong); color: var(--ink-soft); padding: 8px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 550; }
+.signout-btn:hover { background: var(--bg); color: var(--ink); }
+
+@media (max-width: 680px) {
+  .topbar-inner { flex-wrap: wrap; gap: 12px; }
+  .top-nav { order: 3; width: 100%; }
+}

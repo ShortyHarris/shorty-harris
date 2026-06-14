@@ -1,0 +1,26 @@
+/* Client "good news feed" palette — warm, calm, rewarding */
+.theme-client {
+  --bg: #fbf9f5;
+  --surface: #ffffff;
+  --ink: #20211c;
+  --ink-soft: #62655c;
+  --ink-faint: #9a9d92;
+  --line: #ece8df;
+  --line-strong: #ddd8cb;
+
+  --leaf: #2f6b4f;
+  --leaf-tint: #e6f1ea;
+  --amber: #b9831f;
+  --amber-tint: #f8efdb;
+  --clay: #a8533a;
+  --clay-tint: #f6e8e2;
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(32, 33, 28, 0.04), 0 8px 28px rgba(32, 33, 28, 0.07);
+
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.theme-client ::selection { background: var(--leaf-tint); }
