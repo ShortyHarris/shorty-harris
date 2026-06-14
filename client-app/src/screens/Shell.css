@@ -1,0 +1,8 @@
+.top-nav { display: flex; gap: 4px; }
+.top-nav button { background: none; border: none; padding: 8px 14px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; color: var(--ink-soft); }
+.top-nav button:hover { background: var(--bg); color: var(--ink); }
+.top-nav button.on { background: var(--leaf-tint); color: var(--leaf); }
+@media (max-width: 680px) {
+  .topbar-inner { flex-wrap: wrap; gap: 12px; }
+  .top-nav { order: 3; width: 100%; }
+}
