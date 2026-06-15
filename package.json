@@ -1,0 +1,11 @@
+{
+  "name": "shorty-harris-root",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "npm --prefix app run dev",
+    "build": "npm --prefix app run build",
+    "build:dev": "npm --prefix app run build",
+    "preview": "npm --prefix app run preview"
+  }
+}
