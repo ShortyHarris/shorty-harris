@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:undraw.co)",
+      "WebFetch(domain:cdn.undraw.co)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.google.com)",
+      "WebFetch(domain:app.popsy.co)",
+      "WebFetch(domain:dev.popsy.co)"
+    ]
+  }
+}
