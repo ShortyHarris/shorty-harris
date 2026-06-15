@@ -19,7 +19,7 @@ export function Dashboard({ clientId }: { clientId: string }) {
       <section className="kpi-strip">
         <article className="kpi kpi-credits">
           <div className="kpi-label">AVAILABLE CREDITS</div>
-          <div className="kpi-num">{summary?.credits ?? '—'}<span className="kpi-unit">Remaining</span></div>
+          <div className="kpi-num">{summary?.credits_remaining ?? '—'}<span className="kpi-unit">Remaining</span></div>
           <a className="kpi-cta" href="/app/billing">Top Up Credits</a>
           <div className="kpi-watermark" aria-hidden>
             <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>
