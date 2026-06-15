@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
 
 interface Profile {
   id: string;
@@ -14,10 +13,47 @@ interface AuthState {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+  ) => Promise<{ error: string | null; needsConfirm: boolean }>;
   signOut: () => Promise<void>;
 }
 
 const AuthCtx = createContext<AuthState | undefined>(undefined);
+
+const DEMO_CLIENT_ID =
+  (import.meta.env.VITE_DEMO_CLIENT_ID as string | undefined) ?? '11111111-1111-1111-1111-111111111111';
+
+const STORAGE_KEY = 'sh-fake-auth';
+
+function makeFakeSession(email: string): { session: Session; profile: Profile } {
+  const isAdmin = /admin/i.test(email);
+  const id = `fake-${email.toLowerCase()}`;
+  const session = {
+    access_token: 'fake',
+    refresh_token: 'fake',
+    token_type: 'bearer',
+    expires_in: 3600,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    user: {
+      id,
+      email,
+      app_metadata: {},
+      user_metadata: { full_name: email.split('@')[0] },
+      aud: 'authenticated',
+      created_at: new Date().toISOString(),
+    },
+  } as unknown as Session;
+  const profile: Profile = {
+    id,
+    role: isAdmin ? 'admin' : 'client',
+    full_name: email.split('@')[0],
+    client_id: isAdmin ? null : DEMO_CLIENT_ID,
+  };
+  return { session, profile };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -25,43 +61,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (data.session) loadProfile(data.session.user.id);
-      else setLoading(false);
-    });
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSession(s);
-      if (s) loadProfile(s.user.id);
-      else { setProfile(null); setLoading(false); }
-    });
-    return () => sub.subscription.unsubscribe();
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const { email } = JSON.parse(raw) as { email: string };
+        const fake = makeFakeSession(email);
+        setSession(fake.session);
+        setProfile(fake.profile);
+      }
+    } catch {
+      /* ignore */
+    }
+    setLoading(false);
   }, []);
 
-  async function loadProfile(userId: string) {
-    setLoading(true);
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, role, full_name, client_id')
-      .eq('id', userId)
-      .single();
-    setProfile((data as Profile) ?? null);
-    setLoading(false);
-  }
+  const signIn = async (email: string, _password: string) => {
+    if (!email.trim()) return { error: 'Please enter an email.' };
+    const fake = makeFakeSession(email.trim());
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ email: email.trim() }));
+    setSession(fake.session);
+    setProfile(fake.profile);
+    return { error: null };
+  };
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+  const signUp = async (email: string, _password: string, fullName: string) => {
+    if (!email.trim()) return { error: 'Please enter an email.', needsConfirm: false };
+    const fake = makeFakeSession(email.trim());
+    if (fullName.trim()) fake.profile.full_name = fullName.trim();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ email: email.trim() }));
+    setSession(fake.session);
+    setProfile(fake.profile);
+    return { error: null, needsConfirm: false };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    localStorage.removeItem(STORAGE_KEY);
+    setSession(null);
     setProfile(null);
   };
 
   return (
-    <AuthCtx.Provider value={{ session, profile, loading, signIn, signOut }}>
+    <AuthCtx.Provider value={{ session, profile, loading, signIn, signUp, signOut }}>
       {children}
     </AuthCtx.Provider>
   );

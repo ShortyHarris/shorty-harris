@@ -21,6 +21,17 @@
     font-size: 12.5px;
     color: var(--ink-soft);
   }
+/* Analytics — chart cards */
+
+.metric-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+.metric {
+  background: #fff; border: 1px solid #e3e2e2; border-radius: 12px;
+  padding: 18px 20px; display: flex; flex-direction: column; gap: 4px;
+}
+.metric[data-tone='green'] { background: #0a0a0a; color: #fff; border-color: #0a0a0a; }
+.metric[data-tone='green'] .metric-label { color: rgba(255,255,255,.65); }
+.metric-value { font-size: 28px; font-weight: 700; letter-spacing: -.02em; font-feature-settings: 'tnum'; line-height: 1.05; }
+.metric-label { font-size: 11px; letter-spacing: .08em; color: #8a8a8a; font-weight: 700; text-transform: uppercase; }
 
   .chart-grid {
     @apply grid grid-cols-2 gap-4 mb-4;
@@ -38,6 +49,13 @@
   .chart-card h3 {
     @apply text-[14.5px] font-[650] m-0 mb-3.5;
   }
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.chart-card {
+  background: #fff; border: 1px solid #e3e2e2; border-radius: 12px;
+  padding: 18px 20px;
+}
+.chart-card.full { grid-column: 1 / -1; }
+.chart-card h3 { font-size: 14px; font-weight: 700; margin: 0 0 12px; color: #0a0a0a; }
 
   .ab-variants {
     @apply grid grid-cols-2 gap-3 mt-3.5;
@@ -69,10 +87,25 @@
     @apply text-xs;
     color: var(--ink-faint);
   }
+.ab-variants { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+.ab-variant {
+  background: #fafafa; border: 1px solid #e3e2e2; border-radius: 10px;
+  padding: 14px 16px;
+}
+.ab-variant.winning { border-color: #0a0a0a; background: #fff; box-shadow: 0 0 0 1px #0a0a0a inset; }
+.ab-key { font-size: 11px; letter-spacing: .08em; font-weight: 700; color: #5e5e5e; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.ab-lead { background: #0a0a0a; color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 10px; }
+.ab-rate { font-size: 22px; font-weight: 700; color: #0a0a0a; margin: 4px 0; font-feature-settings: 'tnum'; }
+.ab-detail { font-size: 12px; color: #5e5e5e; }
 
   @media (max-width: 760px) {
     .metric-row  { @apply grid-cols-2; }
     .chart-grid  { @apply grid-cols-1; }
     .ab-variants { @apply grid-cols-1; }
   }
+@media (max-width: 880px) {
+  .metric-row, .chart-grid, .ab-variants { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 520px) {
+  .metric-row, .chart-grid, .ab-variants { grid-template-columns: 1fr; }
 }

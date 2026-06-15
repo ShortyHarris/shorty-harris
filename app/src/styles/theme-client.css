@@ -20,7 +20,14 @@
   --shadow: 0 1px 2px rgba(32, 33, 28, 0.04), 0 8px 28px rgba(32, 33, 28, 0.07);
 
   background: var(--bg);
-  color: var(--ink);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv11', 'ss01', 'tnum';
 }
 
-.theme-client ::selection { background: var(--leaf-tint); }
+.theme-client * { box-sizing: border-box; }
+.theme-client a { color: inherit; }
+
+/* shared atoms used across client screens */
+.theme-client .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }

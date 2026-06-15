@@ -6,10 +6,10 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import './Screens.css';
 import './Analytics.css';
 
-const FUNNEL_COLORS = ['#2f4a7c', '#3f7cae', '#1f7a52', '#155c3d'];
+const FUNNEL_COLORS = ['#0a0a0a', '#3a3a3a', '#6a6a6a', '#a0a0a0'];
 const INTENT_COLORS: Record<string, string> = {
-  interested: '#1f7a52', maybe: '#9a6b16', not_interested: '#9d3b3b',
-  stop: '#6b2f2f', wrong_person: '#7a6a3a', out_of_office: '#5b6473',
+  interested: '#0a0a0a', maybe: '#5e5e5e', not_interested: '#a0a0a0',
+  stop: '#ba1a1a', wrong_person: '#c4c7c7', out_of_office: '#8a8a8a',
 };
 
 export function Analytics() {
@@ -72,9 +72,9 @@ export function Analytics() {
                 <YAxis tick={{ fontSize: 12, fill: '#8a909c' }} axisLine={false} tickLine={false} />
                 <Tooltip cursor={{ fill: '#f0ede6' }} contentStyle={{ borderRadius: 10, border: '1px solid #e4e0d7', fontSize: 13 }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="sent" name="Sent" fill="#9db4d4" radius={[5, 5, 0, 0]} />
-                <Bar dataKey="hotLeads" name="Hot leads" fill="#2f4a7c" radius={[5, 5, 0, 0]} />
-                <Bar dataKey="won" name="Won" fill="#1f7a52" radius={[5, 5, 0, 0]} />
+                <Bar dataKey="sent" name="Sent" fill="#c4c7c7" radius={[5, 5, 0, 0]} />
+                <Bar dataKey="hotLeads" name="Hot leads" fill="#5e5e5e" radius={[5, 5, 0, 0]} />
+                <Bar dataKey="won" name="Won" fill="#0a0a0a" radius={[5, 5, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

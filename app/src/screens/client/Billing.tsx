@@ -191,7 +191,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
               </div>
             ))}
           </div>
-        </>
+        </section>
       )}
     </main>
   );
