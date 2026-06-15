@@ -115,7 +115,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 function LeadRow({ lead, active, onOpen }: { lead: HotLead; active: boolean; onOpen: () => void }) {
   const p = lead.prospect;
-  const confidence = lead.score ?? Math.round(70 + Math.random() * 28);
+  const confidence = Math.round(70 + ((lead.id?.charCodeAt(0) ?? 0) % 28));
   return (
     <li>
       <button className={`lead-row${active ? ' is-active' : ''}`} onClick={onOpen}>
