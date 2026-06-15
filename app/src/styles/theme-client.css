@@ -1,26 +1,56 @@
-/* Client "good news feed" palette — warm, calm, rewarding */
-.theme-client {
-  --bg: #fbf9f5;
-  --surface: #ffffff;
-  --ink: #20211c;
-  --ink-soft: #62655c;
-  --ink-faint: #9a9d92;
-  --line: #ece8df;
-  --line-strong: #ddd8cb;
+/* ─────────────────────────────────────────────────────────────────────────────
+   Shorty Harris — Client theme · "The Cockpit"
+   Monochromatic precision instrument. White surfaces, Action Black for primary
+   actions, Inter type, 8px grid.
+   ──────────────────────────────────────────────────────────────────────────── */
 
-  --leaf: #1f2329;
-  --leaf-tint: #ece8df;
-  --amber: #b9831f;
-  --amber-tint: #f8efdb;
-  --clay: #a8533a;
-  --clay-tint: #f6e8e2;
-
-  --radius: 16px;
-  --radius-sm: 10px;
-  --shadow: 0 1px 2px rgba(32, 33, 28, 0.04), 0 8px 28px rgba(32, 33, 28, 0.07);
-
-  background: var(--bg);
-  color: var(--ink);
+:root {
+  --sh-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.theme-client ::selection { background: var(--leaf-tint); }
+.theme-client {
+  /* surfaces */
+  --bg:           #ffffff;
+  --bg-soft:      #fafafa;
+  --bg-sunken:    #f5f5f5;
+  --surface:      #ffffff;
+  --surface-2:    #fafafa;
+
+  /* ink / type */
+  --ink:          #0a0a0a;
+  --ink-2:        #1b1c1c;
+  --ink-soft:     #5e5e5e;
+  --ink-muted:    #8a8a8a;
+  --ink-faint:    #b5b5b5;
+
+  /* lines / borders */
+  --line:         #ececec;
+  --line-strong:  #d8d8d8;
+  --line-stark:   #0a0a0a;
+
+  /* action / brand */
+  --action:       #0a0a0a;
+  --action-hover: #1f1f1f;
+  --on-action:    #ffffff;
+
+  /* state */
+  --danger:       #ba1a1a;
+  --warn:         #b16d00;
+  --ok:           #1a1a1a;       /* won = bold ink */
+  --pending-bg:   #ececec;
+  --pending-fg:   #444748;
+
+  font-family: var(--sh-font);
+  color: var(--ink);
+  background: var(--bg);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv11', 'ss01', 'tnum';
+}
+
+.theme-client * { box-sizing: border-box; }
+.theme-client a { color: inherit; }
+
+/* shared atoms used across client screens */
+.theme-client .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }

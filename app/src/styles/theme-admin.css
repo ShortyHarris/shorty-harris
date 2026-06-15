@@ -1,28 +1,44 @@
-/* Admin "control desk" palette — ink-blue, structured, authoritative */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Shorty Harris — Admin theme · "The Engine Room"
+   High data density. Light-gray surfaces, tight grid, structural borders.
+   ──────────────────────────────────────────────────────────────────────────── */
+
 .theme-admin {
-  --paper: #f6f4ef;
-  --paper-raised: #fffdf9;
-  --ink: #1c2433;
-  --ink-soft: #5b6473;
-  --ink-faint: #8a909c;
-  --line: #e4e0d7;
-  --line-strong: #d4cfc3;
+  --bg:           #f5f5f5;
+  --bg-soft:      #fafafa;
+  --bg-sunken:    #efeded;
+  --surface:      #ffffff;
+  --surface-2:    #fafafa;
 
-  --brand: #2f4a7c;
-  --brand-tint: #eaeff7;
-  --approve: #1f7a52;
-  --approve-tint: #e3f3ea;
-  --reject: #9d3b3b;
-  --reject-tint: #f6e9e7;
-  --pending: #9a6b16;
-  --pending-tint: #f7eed8;
+  --ink:          #0a0a0a;
+  --ink-2:        #1b1c1c;
+  --ink-soft:     #5e5e5e;
+  --ink-muted:    #8a8a8a;
+  --ink-faint:    #b5b5b5;
 
-  --radius: 12px;
-  --radius-sm: 8px;
-  --shadow: 0 1px 2px rgba(28, 36, 51, 0.04), 0 6px 20px rgba(28, 36, 51, 0.06);
+  --line:         #e3e2e2;
+  --line-strong:  #c4c7c7;
+  --line-stark:   #0a0a0a;
 
-  background: var(--paper);
+  --action:       #0a0a0a;
+  --action-hover: #1f1f1f;
+  --on-action:    #ffffff;
+
+  --danger:       #ba1a1a;
+  --warn:         #b16d00;
+  --ok:           #1a1a1a;
+  --pending-bg:   #e3e2e2;
+  --pending-fg:   #444748;
+
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: var(--ink);
+  background: var(--bg);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv11', 'ss01', 'tnum';
 }
 
-.theme-admin ::selection { background: var(--brand-tint); }
+.theme-admin * { box-sizing: border-box; }
+.theme-admin a { color: inherit; }
+.theme-admin .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
