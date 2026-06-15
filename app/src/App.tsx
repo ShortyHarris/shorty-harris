@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
 import { Login } from './screens/Login';
+import { Home } from './screens/Home';
 import { AdminLayout } from './screens/admin/Layout';
 import { Shell } from './screens/client/Shell';
 import { Dashboard } from './screens/client/Dashboard';
@@ -114,8 +115,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* / is reserved for the future public landing page */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Home />} />
 
         <Route path="/login" element={<LoginRoute />} />
 
