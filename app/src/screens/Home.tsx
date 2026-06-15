@@ -101,8 +101,8 @@ export function Home() {
       <section className="home-hero">
         <h1>Turn Local Data Into Paying Customers</h1>
         <p>
-          Find and score qualified leads across Zambia. Get instant access to business contact data, reach prospects
-          faster, and close more deals.
+          Find and score qualified leads across. Get instant access to business contact data, reach prospects faster,
+          and close more deals.
         </p>
         <form className="home-search" onSubmit={onSubmit}>
           <input
