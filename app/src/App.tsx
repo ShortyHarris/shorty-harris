@@ -32,19 +32,18 @@ function RequireClient({ children }: { children: ReactNode }) {
 // ── Login route: redirect away if already signed in ──────────────────────────
 
 function LoginRoute() {
-  const { session, profile, loading, signOut } = useAuth();
+  const { session, profile, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (loading || !session || !profile) return;
     if (profile.role === 'admin') navigate('/admin/approvals', { replace: true });
     else if (profile.client_id) navigate('/app', { replace: true });
-    // profile exists but has neither admin role nor client_id — sign out and show login
-    else signOut();
-  }, [loading, session, profile, navigate, signOut]);
+  }, [loading, session, profile, navigate]);
 
-  if (loading || (session && profile)) return <Spinner />;
-  return <Login />;
+  if (loading) return <Spinner />;
+  if (session && profile && (profile.role === 'admin' || profile.client_id)) return <Spinner />;
+  return <Login notice={session && profile && !profile.client_id ? 'Your account is signed in but not yet linked to a business. Ask Shorty Harris to link your account.' : null} />;
 }
 
 // ── Client zone — topbar shell + nested routes ───────────────────────────────
