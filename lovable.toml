@@ -1,4 +1,4 @@
 [run]
-dev = "npm --prefix app run dev -- --host 0.0.0.0 --port 8080"
-build = "npm --prefix app run build"
-"build:dev" = "npm --prefix app run build"
+dev = "npm --prefix app run dev --silent -- --host 0.0.0.0 --port 8080"
+build = "npm --prefix app run build --silent"
+"build:dev" = "npm --prefix app run build --silent"
