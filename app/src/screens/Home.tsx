@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './Home.css';
 
 const ChevronDown = () => (
@@ -16,9 +16,54 @@ const SendIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
 );
 
+const TYPEWRITER_PHRASES = [
+  'Start a campaign for hotels in your city…',
+  'Find logistics companies near you…',
+  'Reach clinics and healthcare providers…',
+  'Outreach to gyms and fitness studios…',
+  'Target restaurants and hospitality businesses…',
+  'Connect with retail stores in your area…',
+  'Find cleaning companies ready to scale…',
+];
+
 export function Home() {
   const [query, setQuery] = useState('');
+  const [placeholder, setPlaceholder] = useState('Start a campaign for hotels in your city…');
   const navigate = useNavigate();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let phraseIndex = 0;
+    let charIndex = 0;
+    let deleting = false;
+
+    const tick = () => {
+      const phrase = TYPEWRITER_PHRASES[phraseIndex];
+      if (!deleting) {
+        charIndex++;
+        setPlaceholder(phrase.slice(0, charIndex));
+        if (charIndex === phrase.length) {
+          deleting = true;
+          timeoutRef.current = setTimeout(tick, 1500);
+          return;
+        }
+        timeoutRef.current = setTimeout(tick, 55);
+      } else {
+        charIndex--;
+        setPlaceholder(phrase.slice(0, charIndex));
+        if (charIndex === 0) {
+          deleting = false;
+          phraseIndex = (phraseIndex + 1) % TYPEWRITER_PHRASES.length;
+        }
+        timeoutRef.current = setTimeout(tick, 25);
+      }
+    };
+
+    timeoutRef.current = setTimeout(tick, 55);
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,15 +87,16 @@ export function Home() {
       </header>
 
       <section className="home-hero">
-        <h1>Turn Local Data Into Paying Customers</h1>
+        <h1>Every day you don't send, a competitor does.</h1>
         <p>
-          Find and score qualified leads across Zambia. Get instant access to
-          business contact data, reach prospects faster, and close more deals.
+          Shorty Harris is an AI-powered outbound agent that finds your ideal
+          customers, starts conversations, follows up automatically, and
+          delivers qualified leads straight to your pipeline.
         </p>
         <form className="home-search" onSubmit={onSubmit}>
           <input
             type="text"
-            placeholder="Extract restaurant data in Lusaka…"
+            placeholder={placeholder}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
