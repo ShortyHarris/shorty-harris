@@ -2,22 +2,45 @@ import { useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import './Login.css';
 
-export function Login() {
-  const { signIn } = useAuth();
+type Mode = 'signin' | 'signup';
+
+export function Login({ notice }: { notice?: string | null } = {}) {
+  const { signIn, signUp } = useAuth();
+  const [mode, setMode] = useState<Mode>('signin');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setErr(null);
+    setInfo(null);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+    setInfo(null);
     setBusy(true);
-    const { error } = await signIn(email.trim(), password);
-    if (error) setErr(error);
-    setBusy(false);
+    try {
+      if (mode === 'signin') {
+        const { error } = await signIn(email.trim(), password);
+        if (error) setErr(error);
+      } else {
+        const { error, needsConfirm } = await signUp(email.trim(), password, fullName.trim());
+        if (error) setErr(error);
+        else if (needsConfirm) setInfo('Check your inbox to confirm your email, then sign in.');
+      }
+    } finally {
+      setBusy(false);
+    }
   }
+
+  const isSignup = mode === 'signup';
 
   return (
     <div className="theme-client auth-shell">
@@ -29,12 +52,36 @@ export function Login() {
         </div>
 
         <div className="auth-form-wrap">
-          <h1 className="auth-title">Sign in</h1>
+          <h1 className="auth-title">{isSignup ? 'Create your account' : 'Sign in'}</h1>
           <p className="auth-sub">
-            New to Shorty Harris? <a href="mailto:hello@shortyharris.com">Request access</a>
+            {isSignup ? (
+              <>Already have an account?{' '}
+                <button type="button" className="auth-link-btn" onClick={() => switchMode('signin')}>Sign in</button>
+              </>
+            ) : (
+              <>New to Shorty Harris?{' '}
+                <button type="button" className="auth-link-btn" onClick={() => switchMode('signup')}>Sign up</button>
+              </>
+            )}
           </p>
 
+          {notice && <div className="auth-notice">{notice}</div>}
+
           <form onSubmit={submit} className="auth-form" noValidate>
+            {isSignup && (
+              <label className="auth-field">
+                <span>Full name</span>
+                <input
+                  type="text"
+                  placeholder="Jane Doe"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  autoComplete="name"
+                  required
+                />
+              </label>
+            )}
+
             <label className="auth-field">
               <span>E-mail</span>
               <input
@@ -55,7 +102,8 @@ export function Login() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
+                  autoComplete={isSignup ? 'new-password' : 'current-password'}
+                  minLength={6}
                   required
                 />
                 <button
@@ -69,17 +117,20 @@ export function Login() {
               </div>
             </label>
 
-            <div className="auth-row">
-              <label className="auth-remember">
-                <input type="checkbox" /> Remember me
-              </label>
-              <a className="auth-forgot" href="#">Forgot password?</a>
-            </div>
+            {!isSignup && (
+              <div className="auth-row">
+                <label className="auth-remember">
+                  <input type="checkbox" /> Remember me
+                </label>
+                <a className="auth-forgot" href="#">Forgot password?</a>
+              </div>
+            )}
 
             {err && <div className="auth-err">{err}</div>}
+            {info && <div className="auth-info">{info}</div>}
 
             <button className="auth-btn" disabled={busy}>
-              {busy ? 'Signing in…' : 'Sign in'}
+              {busy ? (isSignup ? 'Creating account…' : 'Signing in…') : (isSignup ? 'Create account' : 'Sign in')}
             </button>
           </form>
         </div>
