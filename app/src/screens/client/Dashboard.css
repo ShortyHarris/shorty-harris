@@ -40,7 +40,7 @@
 
   .filter-bar {
     @apply flex items-center border-b overflow-x-auto sticky;
-    top: 62px;
+    top: 53px;
     z-index: 5;
     background: var(--surface);
     border-color: var(--line);
@@ -271,6 +271,10 @@
     from { transform: translateY(52px); opacity: 0.6; }
     to   { transform: none; opacity: 1; }
   }
+  @keyframes panel-pop {
+    from { transform: scale(0.97); opacity: 0.6; }
+    to   { transform: none; opacity: 1; }
+  }
 
   .panel-overlay {
     @apply fixed inset-0 flex items-end justify-center;
@@ -451,11 +455,22 @@
   ═══════════════════════════════════════ */
 
   @media (min-width: 768px) {
-    .dash-head   { max-width: 800px; padding: 28px 32px 22px; }
-    .filter-bar  { max-width: 800px; top: 0; padding: 0 32px; }
+    /* Plain, full-width, left-aligned page title — no card/border */
+    .dash-head   { max-width: none; margin: 0; padding: 32px 32px 0; background: transparent; border-bottom: none; }
+    .filter-bar  { max-width: none; top: 0; padding: 0; }
     .lead-list   { max-width: 800px; }
     .lead-row    { margin-left: 20px; margin-right: 20px; width: calc(100% - 40px); }
-    .panel       { max-width: 520px; }
+
+    /* Lead detail: a big centered landscape modal, not a bottom-sheet drawer */
+    .panel-overlay { align-items: center; padding: 32px; }
+    .panel {
+      max-width: 920px;
+      max-height: 85vh;
+      border-radius: 20px;
+      animation: panel-pop 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .panel-handle { display: none; }
+    .panel-scroll { padding: 32px 40px 40px; }
   }
 
 

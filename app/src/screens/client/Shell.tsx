@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { Inbox, CreditCard } from 'lucide-react';
+import { Inbox, CreditCard, LogOut } from 'lucide-react';
 import './Shell.css';
 
 export function Shell({
@@ -24,10 +24,11 @@ export function Shell({
       {/* ═══ DESKTOP SIDEBAR ═══ */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="brand-mark">{initial}</div>
+          
           <span className="sidebar-biz-name">{businessName}</span>
         </div>
 
+        <div className="sidebar-section-label">Main</div>
         <nav className="sidebar-nav">
           <NavLink
             to="/app"
@@ -47,12 +48,19 @@ export function Shell({
         </nav>
 
         <div className="sidebar-footer">
-          <Link to="/app/billing" className="sidebar-credits">
+          <Link to="/app/billing" className="sidebar-credits-card">
             <span className="sidebar-credits-num">{credits}</span>
             <span className="sidebar-credits-label">credits remaining</span>
+            <span className="sidebar-credits-link">Add credits →</span>
           </Link>
-          <button className="sidebar-signout" onClick={onSignOut} title={displayName}>
-            Sign out
+
+          <button className="sidebar-profile" onClick={onSignOut}>
+           
+            <span className="sidebar-profile-info">
+              <span className="sidebar-profile-name">{displayName}</span>
+              <span className="sidebar-profile-role">Sign out</span>
+            </span>
+            <LogOut size={15} strokeWidth={1.8} />
           </button>
         </div>
       </aside>
@@ -61,7 +69,7 @@ export function Shell({
       <header className="topbar">
         <div className="topbar-inner">
           <div className="brand">
-            <div className="brand-mark">{initial}</div>
+            
             <span className="brand-name">{businessName}</span>
           </div>
           <div className="topbar-right">

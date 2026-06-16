@@ -82,7 +82,14 @@ export function Home() {
 
       {/* HERO */}
       <section className="hero">
-        <span className="eyebrow">Trusted by 500+ high-growth teams</span>
+        <div className="trust-row">
+          <span className="avatar-stack">
+            <span style={{ background: '#3c7a5b' }}>J</span>
+            <span style={{ background: '#5e5e5e' }}>M</span>
+            <span style={{ background: '#0a0a0a' }}>R</span>
+          </span>
+          <span className="eyebrow">Trusted by 500+ high-growth teams</span>
+        </div>
         <h1>
           Every day you don't send,<br />
           <em>a competitor does.</em>
@@ -153,25 +160,59 @@ export function Home() {
         </div>
       </section>
 
-      {/* STATS STRIP */}
-      <section className="stats-strip">
-        <div className="stat-tile">
-          <div className="stat-num">92%</div>
-          <div className="stat-title">Data Accuracy</div>
-          <div className="stat-body">
-            Our AI models verify business contacts across every territory daily,
-            ensuring your outreach never bounces.
+      {/* TRUST STRIP */}
+      <section className="trust-strip">
+        <span className="trust-strip-label">Trusted by teams at</span>
+        <div className="trust-logos">
+          <span>Northwind Logistics</span>
+          <span>Bluepeak Clinics</span>
+          <span>Anchor Hospitality</span>
+          <span>Fernbridge Retail</span>
+          <span>Solace Fitness</span>
+        </div>
+      </section>
+
+      {/* PROOF — bento grid of social proof */}
+      <section className="proof" id="solutions">
+        <h2>Trusted by fast-growing teams</h2>
+        <p className="proof-sub">
+          Real results from revenue teams using Shorty Harris to fill their pipeline.
+        </p>
+
+        <div className="proof-grid">
+          <div className="proof-tile proof-quote">
+            <p>
+              "Shorty Harris helped us triple the qualified meetings booked
+              per week — without adding a single rep to the team."
+            </p>
+            <div className="proof-quote-meta">
+              <span className="proof-quote-name">Dana Whitfield</span>
+              <span className="proof-quote-role">Head of Growth, Northwind Logistics</span>
+            </div>
           </div>
-        </div>
-        <div className="stat-tile is-dark">
-          <div className="stat-icon"><PeopleIcon /></div>
-          <div className="stat-num white">1.2M+</div>
-          <div className="stat-title white">Business Contacts</div>
-        </div>
-        <div className="stat-tile is-soft">
-          <div className="stat-icon"><LineUpIcon /></div>
-          <div className="stat-num">4.5x</div>
-          <div className="stat-title">Avg. ROI per Campaign</div>
+
+          <div className="proof-tile proof-rating">
+            <div className="proof-stars">★★★★★</div>
+            <div className="proof-num">4.9</div>
+            <div className="proof-label">Average customer satisfaction</div>
+          </div>
+
+          <div className="proof-tile proof-dark">
+            <div className="proof-icon"><PeopleIcon /></div>
+            <div className="proof-num white">1.2M+</div>
+            <div className="proof-label white">Business contacts verified</div>
+          </div>
+
+          <div className="proof-tile proof-stat">
+            <div className="proof-num">92%</div>
+            <div className="proof-label">Data accuracy</div>
+          </div>
+
+          <div className="proof-tile proof-soft">
+            <div className="proof-icon"><LineUpIcon /></div>
+            <div className="proof-num">4.5x</div>
+            <div className="proof-label">Avg. ROI per campaign</div>
+          </div>
         </div>
       </section>
 
@@ -185,15 +226,81 @@ export function Home() {
         </div>
       </section>
 
-      <footer className="hfoot">
-        <span>© {new Date().getFullYear()} Shorty Harris AI</span>
-        <span className="hfoot-links">
-          <a href="#privacy">Privacy</a>
-          <a href="#terms">Terms</a>
-          <a href="#contact">Contact</a>
-        </span>
-      </footer>
+      <Footer />
     </div>
+  );
+}
+
+/* ───── footer ───── */
+function Footer() {
+  const [subscribed, setSubscribed] = useState(false);
+
+  const onSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubscribed(true);
+  };
+
+  return (
+    <footer className="hfoot">
+      <div className="hfoot-top">
+        <div className="hfoot-brand">
+          <span className="hnav-brand">
+            <span className="hnav-mark">S.H.</span>
+            <span className="hnav-mark-suffix">AI</span>
+          </span>
+          <p>
+            AI-powered outbound that finds your ideal customers, starts
+            conversations, and delivers qualified leads straight to your pipeline.
+          </p>
+          <form className="hfoot-newsletter" onSubmit={onSubscribe}>
+            <input type="email" placeholder="Enter your email" required disabled={subscribed} />
+            <button className="btn-primary" type="submit" disabled={subscribed}>
+              {subscribed ? 'Subscribed' : 'Subscribe'}
+            </button>
+          </form>
+        </div>
+
+        <div className="hfoot-cols">
+          <div className="hfoot-col">
+            <div className="hfoot-col-title">Product</div>
+            <a href="#product">Features</a>
+            <a href="#product">Lead Scoring</a>
+            <a href="#product">Integrations</a>
+            <a href="#product">Analytics</a>
+          </div>
+          <div className="hfoot-col">
+            <div className="hfoot-col-title">Resources</div>
+            <a href="#">Blog</a>
+            <a href="#">Documentation</a>
+            <a href="#">Help Center</a>
+            <a href="#">API</a>
+          </div>
+          <div className="hfoot-col">
+            <div className="hfoot-col-title">Company</div>
+            <a href="#">About</a>
+            <a href="#">Careers</a>
+            <a href="#contact">Contact</a>
+            <a href="#privacy">Privacy</a>
+          </div>
+          <div className="hfoot-col">
+            <div className="hfoot-col-title">Solutions</div>
+            <a href="#">Agencies</a>
+            <a href="#">Consultants</a>
+            <a href="#">Freelancers</a>
+            <a href="#">Service Teams</a>
+          </div>
+        </div>
+      </div>
+
+      <div className="hfoot-bottom">
+        <span>© {new Date().getFullYear()} Shorty Harris AI. All rights reserved.</span>
+        <span className="hfoot-socials">
+          <a href="#" aria-label="Facebook"><FacebookIcon /></a>
+          <a href="#" aria-label="Instagram"><InstagramIcon /></a>
+          <a href="#" aria-label="X"><XIcon /></a>
+        </span>
+      </div>
+    </footer>
   );
 }
 
@@ -256,4 +363,13 @@ function PeopleIcon() { return (
 ); }
 function LineUpIcon() { return (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 17 9 11 13 15 21 7" /></svg>
+); }
+function FacebookIcon() { return (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5 3.66 9.15 8.44 9.94v-7.03H7.9v-2.91h2.54V9.41c0-2.5 1.49-3.89 3.78-3.89 1.1 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56v1.87h2.78l-.44 2.91h-2.34V22c4.78-.79 8.44-4.94 8.44-9.94Z" /></svg>
+); }
+function InstagramIcon() { return (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none" /></svg>
+); }
+function XIcon() { return (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-7.4 8.46L23 22h-6.8l-5.3-6.9L5 22H2l8-9.1L1.4 2h6.9l4.8 6.3L18.9 2Z" /></svg>
 ); }

@@ -1,8 +1,33 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @theme {
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, 'Cascadia Code', monospace;
+
+  /* shadcn/ui tokens — bridged to the existing client/admin theme variables
+     so shadcn components pick up brand colors automatically. Falls back to
+     the client theme's defaults outside a themed scope. */
+  --color-background: var(--bg, #fbf9f5);
+  --color-foreground: var(--ink, #20211c);
+  --color-border: var(--line, #ece8df);
+  --color-input: var(--line-strong, #ddd8cb);
+  --color-ring: var(--leaf, #3c7a5b);
+  --color-popover: var(--surface, #ffffff);
+  --color-popover-foreground: var(--ink, #20211c);
+  --color-card: var(--surface, #ffffff);
+  --color-card-foreground: var(--ink, #20211c);
+  --color-accent: var(--leaf-tint, #edf4ef);
+  --color-accent-foreground: var(--leaf, #3c7a5b);
+  --color-muted: var(--bg, #fbf9f5);
+  --color-muted-foreground: var(--ink-faint, #9a9d92);
+  --color-primary: var(--leaf, #3c7a5b);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--bg, #fbf9f5);
+  --color-secondary-foreground: var(--ink, #20211c);
+  --color-destructive: var(--clay, #a8533a);
+  --color-destructive-foreground: #ffffff;
+  --radius: var(--radius-sm, 10px);
 }
 
 /* Global base — unlayered so these win over Preflight */

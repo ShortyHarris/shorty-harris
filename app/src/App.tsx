@@ -9,6 +9,7 @@ import { Billing } from './screens/client/Billing';
 import { useClientHeader } from './hooks/useClientHeader';
 import './styles/theme-admin.css';
 import './styles/theme-client.css';
+import { Home } from './screens/Home';
 
 // ── Guards ──────────────────────────────────────────────────────────────────
 
@@ -115,9 +116,17 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* / is reserved for the future public landing page */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Home/>} />
 
         <Route path="/login" element={<LoginRoute />} />
+
+        <Route path="/__preview-dashboard" element={
+          <div className="theme-client">
+            <Shell businessName="Acme Roofing" credits={42} displayName="Preview" onSignOut={() => {}}>
+              <Dashboard clientId="__preview__" />
+            </Shell>
+          </div>
+        } />
 
         <Route
           path="/admin/*"

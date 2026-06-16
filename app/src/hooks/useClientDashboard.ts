@@ -2,13 +2,36 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { HotLead, ClientSummary, HotLeadStatus } from '../types';
 
+function mockLeads(): HotLead[] {
+  const statuses: HotLeadStatus[] = ['new', 'new', 'viewed', 'contacted', 'contacted', 'won', 'won', 'lost', 'new', 'contacted'];
+  return statuses.map((status, i) => ({
+    id: `mock-${i}`,
+    prospect_id: `p-${i}`,
+    ai_summary: 'Replied with clear buying intent: asked for pricing and availability, mentioned their current provider is unreliable.',
+    suggested_action: 'Call to confirm pricing and close.',
+    status,
+    routed_at: new Date().toISOString(),
+    prospect: {
+      id: `p-${i}`,
+      business_name: `Eastpark Dental #0${i + 1}`,
+      contact_name: 'Jordan Lee',
+      email: 'jordan@example.com',
+      phone: '+260971234567',
+      category: 'Dental Clinic',
+      location: 'Lusaka, ZM',
+    },
+    reply: { body: 'Sounds great, can you send pricing?' },
+  })) as unknown as HotLead[];
+}
+
 export function useClientDashboard(CLIENT_ID: string) {
   const [summary, setSummary] = useState<ClientSummary | null>(null);
-  const [leads, setLeads] = useState<HotLead[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [leads, setLeads] = useState<HotLead[]>(CLIENT_ID === '__preview__' ? mockLeads() : []);
+  const [loading, setLoading] = useState(CLIENT_ID !== '__preview__');
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (CLIENT_ID === '__preview__') return;
     setError(null);
 
     const [clientRes, billingRes, sentRes, repliesRes, leadsRes] = await Promise.all([

@@ -189,11 +189,20 @@
       min-width: 0;
     }
 
+    .sidebar-section-label {
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      padding: 14px 18px 4px;
+    }
+
     .sidebar-nav {
       display: flex;
       flex-direction: column;
       flex: 1;
-      padding: 12px 10px;
+      padding: 6px 10px 12px;
       gap: 2px;
     }
     .sidebar-link {
@@ -222,41 +231,92 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      padding: 14px 18px 20px;
+      padding: 14px 14px 16px;
       border-top: 1px solid var(--line);
     }
-    .sidebar-credits {
+
+    /* Credits card */
+    .sidebar-credits-card {
       display: flex;
       flex-direction: column;
       gap: 2px;
       text-decoration: none;
+      background: var(--leaf-tint);
+      border-radius: 12px;
+      padding: 14px 16px;
+      transition: opacity 0.12s;
     }
-    .sidebar-credits:hover .sidebar-credits-num { opacity: 0.8; }
+    .sidebar-credits-card:hover { opacity: 0.88; }
     .sidebar-credits-num {
-      font-size: 30px;
+      font-size: 26px;
       font-weight: 800;
       letter-spacing: -0.03em;
       color: var(--leaf);
       font-variant-numeric: tabular-nums;
       line-height: 1;
-      transition: opacity 0.12s;
     }
     .sidebar-credits-label {
       font-size: 12px;
+      color: var(--ink-soft);
+      margin-top: 2px;
+    }
+    .sidebar-credits-link {
+      font-size: 12px;
+      font-weight: 650;
+      color: var(--leaf);
+      margin-top: 6px;
+    }
+
+    /* Profile card */
+    .sidebar-profile {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: none;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 9px 10px;
+      text-align: left;
+      color: var(--ink-faint);
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .sidebar-profile:hover {
+      background: var(--bg);
+      border-color: var(--line-strong);
+      color: var(--ink-soft);
+    }
+    .sidebar-profile-avatar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .sidebar-profile-info {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      flex: 1;
+    }
+    .sidebar-profile-name {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sidebar-profile-role {
+      font-size: 11.5px;
       color: var(--ink-faint);
     }
-    .sidebar-signout {
-      border: 1px solid var(--line-strong);
-      border-radius: 8px;
-      background: none;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--ink-soft);
-      padding: 7px 12px;
-      text-align: left;
-      transition: background 0.1s;
-    }
-    .sidebar-signout:hover { background: var(--bg); color: var(--ink); }
 
     /* ─── Content area ─── */
     .page-body {
