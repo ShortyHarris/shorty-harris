@@ -96,14 +96,14 @@ export function Shell({
           end
           className={({ isActive }) => `bnav-item${isActive ? ' active' : ''}`}
         >
-          <Inbox size={23} strokeWidth={1.6} />
+          <span className="bnav-icon"><Inbox size={21} strokeWidth={1.8} /></span>
           <span>Hot Leads</span>
         </NavLink>
         <NavLink
           to="/app/billing"
           className={({ isActive }) => `bnav-item${isActive ? ' active' : ''}`}
         >
-          <CreditCard size={23} strokeWidth={1.6} />
+          <span className="bnav-icon"><CreditCard size={21} strokeWidth={1.8} /></span>
           <span>Billing</span>
         </NavLink>
       </nav>

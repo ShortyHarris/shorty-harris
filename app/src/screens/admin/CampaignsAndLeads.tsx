@@ -6,9 +6,16 @@ const CAMP_TONE: Record<string, string> = {
   draft: 'neutral', active: 'green', paused: 'amber', completed: 'blue',
 };
 
+const PAGE_SIZE = 10;
+
 export function Campaigns() {
   const { rows, loading, error, reload, setStatus } = useCampaigns();
   const [showNew, setShowNew] = useState(false);
+  const [page, setPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages);
+  const paged      = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <div className="screen">
@@ -23,37 +30,43 @@ export function Campaigns() {
         </div>
       </header>
       {error && <div className="error-banner">{error}</div>}
-      {loading ? <div className="empty">Loading…</div> : (
-        <div className="card-col">
-          {rows.map((c) => {
-            const paused = c.status === 'paused';
-            const active = c.status === 'active';
-            return (
-              <div className="row-card" key={c.id}>
-                <div className="row-card-main">
-                  <div className="row-card-title">{c.name}</div>
-                  <div className="row-card-meta">
-                    {c.client?.business_name ?? '—'} <span className="dot">·</span> {c.channel}
-                    <span className="dot">·</span> {c.prospectCount} prospects
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span className={`pill ${CAMP_TONE[c.status] ?? 'neutral'}`}>{c.status}</span>
-                  {(active || paused) && (
-                    <button
-                      className={`toggle ${active ? 'on' : 'off'}`}
-                      onClick={() => setStatus(c.id, active ? 'paused' : 'active')}
-                      title={active ? 'Pause — stops new prospects being pulled in' : 'Activate'}
-                    >
-                      <span className="toggle-knob" />
-                      <span className="toggle-text">{active ? 'Active' : 'Paused'}</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-          {rows.length === 0 && <div className="empty">No campaigns yet.</div>}
+      {loading ? <div className="empty">Loading…</div> : rows.length === 0 ? (
+        <div className="empty">No campaigns yet.</div>
+      ) : (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr><th>Campaign</th><th>Client</th><th>Channel</th><th>Prospects</th><th>Status</th><th /></tr>
+            </thead>
+            <tbody>
+              {paged.map((c) => {
+                const paused = c.status === 'paused';
+                const active = c.status === 'active';
+                return (
+                  <tr key={c.id}>
+                    <td className="strong">{c.name}</td>
+                    <td>{c.client?.business_name ?? '—'}</td>
+                    <td>{c.channel}</td>
+                    <td>{c.prospectCount}</td>
+                    <td><span className={`pill ${CAMP_TONE[c.status] ?? 'neutral'}`}>{c.status}</span></td>
+                    <td>
+                      {(active || paused) && (
+                        <button
+                          className={`toggle ${active ? 'on' : 'off'}`}
+                          onClick={() => setStatus(c.id, active ? 'paused' : 'active')}
+                          title={active ? 'Pause — stops new prospects being pulled in' : 'Activate'}
+                        >
+                          <span className="toggle-knob" />
+                          <span className="toggle-text">{active ? 'Active' : 'Paused'}</span>
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
         </div>
       )}
 
@@ -160,6 +173,12 @@ const LEAD_TONE: Record<string, string> = {
 
 export function HotLeads() {
   const { rows, loading, error, reload } = useAdminHotLeads();
+  const [page, setPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages);
+  const paged      = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   return (
     <div className="screen">
       <header className="screen-head">
@@ -170,24 +189,47 @@ export function HotLeads() {
         <button className="ghost-btn" onClick={reload}>Refresh</button>
       </header>
       {error && <div className="error-banner">{error}</div>}
-      {loading ? <div className="empty">Loading…</div> : (
-        <div className="card-col">
-          {rows.map((l) => (
-            <div className="row-card lead" key={l.id}>
-              <div className="row-card-main">
-                <div className="row-card-title">
-                  {l.prospect?.business_name ?? 'Unknown'}
-                  <span className="for-tag">for {l.client?.business_name ?? '—'}</span>
-                </div>
-                <p className="lead-text">{l.ai_summary ?? 'Replied with interest.'}</p>
-                {l.suggested_action && <div className="lead-suggest">→ {l.suggested_action}</div>}
-              </div>
-              <span className={`pill ${LEAD_TONE[l.status] ?? 'neutral'}`}>{l.status}</span>
-            </div>
-          ))}
-          {rows.length === 0 && <div className="empty">No hot leads yet.</div>}
+      {loading ? <div className="empty">Loading…</div> : rows.length === 0 ? (
+        <div className="empty">No hot leads yet.</div>
+      ) : (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr><th>Business</th><th>Client</th><th>Summary</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {paged.map((l) => (
+                <tr key={l.id}>
+                  <td className="strong">{l.prospect?.business_name ?? 'Unknown'}</td>
+                  <td>{l.client?.business_name ?? '—'}</td>
+                  <td className="lead-summary-cell">
+                    {l.ai_summary ?? 'Replied with interest.'}
+                    {l.suggested_action && <div className="lead-suggest">→ {l.suggested_action}</div>}
+                  </td>
+                  <td><span className={`pill ${LEAD_TONE[l.status] ?? 'neutral'}`}>{l.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
         </div>
       )}
+    </div>
+  );
+}
+
+/* ───── shared admin pagination ───── */
+function Pagination({
+  page, totalPages, onChange,
+}: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="table-pagination">
+      <span>Page {page} of {totalPages}</span>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="ghost-btn" onClick={() => onChange(page - 1)} disabled={page <= 1}>Previous</button>
+        <button className="ghost-btn" onClick={() => onChange(page + 1)} disabled={page >= totalPages}>Next</button>
+      </div>
     </div>
   );
 }

@@ -111,17 +111,20 @@
   }
 
 
-  /* ─── Mobile bottom nav ─── */
+  /* ─── Mobile bottom nav — Apple/Airbnb-style tab bar ─── */
   .bottom-nav {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     display: flex;
+    gap: 4px;
     border-top: 1px solid var(--line);
-    background: var(--surface);
+    background: rgba(255, 255, 255, 0.86);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     z-index: 20;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding: 7px 10px calc(7px + env(safe-area-inset-bottom, 0px));
   }
   .bnav-item {
     flex: 1;
@@ -129,17 +132,32 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    padding: 10px 0 12px;
+    gap: 3px;
+    padding: 4px 0;
     text-decoration: none;
     color: var(--ink-faint);
     font-size: 11px;
     font-weight: 500;
-    transition: color 0.14s;
+    border-radius: 14px;
+    transition: color 0.15s;
   }
-  .bnav-item:hover { color: var(--ink-soft); }
+  .bnav-item:active { transform: scale(0.94); }
+  .bnav-item:not(.active):hover { color: var(--ink-soft); }
+  .bnav-item span { line-height: 1; letter-spacing: 0.01em; transition: color 0.15s, font-weight 0.15s; }
+
+  .bnav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 30px;
+    border-radius: 11px;
+    color: inherit;
+    transition: background 0.18s, color 0.18s;
+  }
   .bnav-item.active { color: var(--leaf); }
-  .bnav-item span { line-height: 1; letter-spacing: 0.01em; }
+  .bnav-item.active .bnav-icon { background: var(--leaf-tint); }
+  .bnav-item.active span { font-weight: 650; }
 
 
   /* ═══════════════════════════════════════

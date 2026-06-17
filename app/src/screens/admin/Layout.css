@@ -11,6 +11,10 @@
 .aside-brand-name { font-size: 18px; font-weight: 800; letter-spacing: -.02em; color: #0a0a0a; }
 .aside-brand-sub { font-size: 12px; color: #5e5e5e; letter-spacing: .04em; }
 
+.aside-section-label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: #a0a0a0; padding: 0 12px 8px;
+}
 .aside-nav { display: flex; flex-direction: column; gap: 4px; }
 .aside-nav-item {
   display: flex; align-items: center; gap: 12px;
@@ -80,7 +84,7 @@
 
 @media (max-width: 880px) {
   .ashell { grid-template-columns: 64px 1fr; }
-  .aside-brand-sub, .aside-nav-item span:not(.aside-nav-icon), .aside-user-info, .aside-new { display: none; }
+  .aside-brand-sub, .aside-nav-item span:not(.aside-nav-icon), .aside-user-info, .aside-new, .aside-section-label { display: none; }
   .aside { padding: 18px 8px; }
   .aside-brand-name { font-size: 0; }
   .aside-brand-name::after { content: 'SH'; font-size: 14px; }

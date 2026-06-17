@@ -45,6 +45,7 @@ export function AdminLayout() {
             <div className="aside-brand-sub">Engine Room</div>
           </div>
 
+          <div className="aside-section-label">Operations</div>
           <nav className="aside-nav">
             {NAV.map((n) => (
               <NavLink

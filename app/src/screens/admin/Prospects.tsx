@@ -6,11 +6,14 @@ const STATUS_TONE: Record<string, string> = {
   new: 'neutral', contacted: 'blue', replied: 'amber', hot_lead: 'green', won: 'green-solid', lost: 'faint',
 };
 
+const PAGE_SIZE = 15;
+
 export function Prospects() {
   const { rows, loading, error, reload } = useProspects();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('all');
   const [cat, setCat] = useState('all');
+  const [page, setPage] = useState(1);
 
   const categories = useMemo(
     () => Array.from(new Set(rows.map((r) => r.category).filter(Boolean))) as string[],
@@ -27,6 +30,14 @@ export function Prospects() {
     return true;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages);
+  const paged      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  function updateQ(v: string) { setQ(v); setPage(1); }
+  function updateStatus(v: string) { setStatus(v); setPage(1); }
+  function updateCat(v: string) { setCat(v); setPage(1); }
+
   return (
     <div className="screen">
       <header className="screen-head">
@@ -38,12 +49,12 @@ export function Prospects() {
       </header>
 
       <div className="toolbar">
-        <input className="search" placeholder="Search name, email, contact…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+        <input className="search" placeholder="Search name, email, contact…" value={q} onChange={(e) => updateQ(e.target.value)} />
+        <select value={status} onChange={(e) => updateStatus(e.target.value)}>
           <option value="all">All statuses</option>
           {['new','contacted','replied','hot_lead','won','lost'].map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select value={cat} onChange={(e) => setCat(e.target.value)}>
+        <select value={cat} onChange={(e) => updateCat(e.target.value)}>
           <option value="all">All categories</option>
           {categories.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
@@ -58,7 +69,7 @@ export function Prospects() {
               <tr><th>Business</th><th>Contact</th><th>Client</th><th>Category</th><th>Location</th><th>Status</th></tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
+              {paged.map((r) => (
                 <tr key={r.id}>
                   <td className="strong">{r.business_name}</td>
                   <td>{r.contact_name ?? '—'}<div className="sub mono">{r.email ?? ''}</div></td>
@@ -70,9 +81,29 @@ export function Prospects() {
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && <div className="empty">No prospects match those filters.</div>}
+          {filtered.length === 0 ? (
+            <div className="empty">No prospects match those filters.</div>
+          ) : (
+            <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ───── pagination ───── */
+function Pagination({
+  page, totalPages, onChange,
+}: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="table-pagination">
+      <span>Page {page} of {totalPages}</span>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="ghost-btn" onClick={() => onChange(page - 1)} disabled={page <= 1}>Previous</button>
+        <button className="ghost-btn" onClick={() => onChange(page + 1)} disabled={page >= totalPages}>Next</button>
+      </div>
     </div>
   );
 }

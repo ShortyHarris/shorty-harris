@@ -200,7 +200,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
           {/* Mobile: card list (unchanged) */}
           <div className="payment-list lg:hidden">
             {data!.payments.map((p) => (
-              <div className="payment-item" key={p.id}>
+              <div className="payment-item rounded-lg" key={p.id}>
                 <div className="payment-item-left">
                   <span className="payment-item-credits">
                     {p.credits_purchased > 0 ? `+${p.credits_purchased} credits` : '—'}
@@ -257,7 +257,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
           {/* Mobile: card list (unchanged) */}
           <div className="activity-list lg:hidden">
             {data!.ledger.map((l) => (
-              <div className="activity-item" key={l.id}>
+              <div className="activity-item rounded-lg" key={l.id}>
                 <div className="activity-item-info">
                   <span className="activity-desc">
                     {l.description ?? l.type.replace(/_/g, ' ')}
