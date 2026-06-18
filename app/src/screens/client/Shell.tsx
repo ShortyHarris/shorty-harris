@@ -16,8 +16,6 @@ export function Shell({
   onSignOut: () => void;
   children: ReactNode;
 }) {
-  const initial = (businessName ?? 'S')[0];
-
   return (
     <div className="page">
 

@@ -393,13 +393,6 @@ function ActivityTable({ ledger }: { ledger: LedgerRow[] }) {
 }
 
 /* ───── icons ───── */
-function CreditCardIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 576 512" fill="currentColor">
-      <path d="M0 112C0 85.5 21.5 64 48 64H528c26.5 0 48 21.5 48 48v32H0V112zM0 224H576V400c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V224zM64 352c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16H64zm128 0c-8.8 0-16 7.2-16 16s7.2 16 16 16H320c8.8 0 16-7.2 16-16s-7.2-16-16-16H192z" />
-    </svg>
-  );
-}
 function LockIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 448 512" fill="currentColor" className="inline-block mr-1.5 -mt-0.5">
