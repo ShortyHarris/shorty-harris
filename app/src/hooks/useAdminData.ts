@@ -134,6 +134,7 @@ export interface AdminHotLead {
   routed_at: string;
   prospect: { business_name: string; category: string | null; location: string | null } | null;
   client: { business_name: string } | null;
+  reply: { body: string } | null;
 }
 
 export function useAdminHotLeads() {
@@ -147,20 +148,27 @@ export function useAdminHotLeads() {
       .from('hot_leads')
       .select(`id, ai_summary, suggested_action, status, routed_at,
                prospect:prospects ( business_name, category, location ),
-               client:clients ( business_name )`)
+               client:clients ( business_name ),
+               reply:replies ( body )`)
       .order('routed_at', { ascending: false });
     if (error) { setError(error.message); setLoading(false); return; }
     const norm = (data ?? []).map((r: Record<string, unknown>) => ({
       ...r,
       prospect: Array.isArray(r.prospect) ? r.prospect[0] ?? null : r.prospect ?? null,
-      client: Array.isArray(r.client) ? r.client[0] ?? null : r.client ?? null,
+      client:   Array.isArray(r.client)   ? r.client[0]   ?? null : r.client   ?? null,
+      reply:    Array.isArray(r.reply)    ? r.reply[0]    ?? null : r.reply    ?? null,
     })) as AdminHotLead[];
     setRows(norm);
     setLoading(false);
   }, []);
 
+  const setStatus = useCallback(async (id: string, status: string) => {
+    await supabase.from('hot_leads').update({ status }).eq('id', id);
+    setRows((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
+  }, []);
+
   useEffect(() => { load(); }, [load]);
-  return { rows, loading, error, reload: load };
+  return { rows, loading, error, reload: load, setStatus };
 }
 
 // ---------- Error monitoring ----------

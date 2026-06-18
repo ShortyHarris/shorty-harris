@@ -85,8 +85,46 @@ function ClientZone() {
 
 function Spinner() {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8a909c' }}>
-      Loading…
+    <div style={{
+      position: 'fixed', inset: 0,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      background: '#f5f2ec',
+      fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+    }}>
+      <style>{`@keyframes sh-spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* Wordmark */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+        <span style={{
+          fontSize: 10.5,
+          fontWeight: 700,
+          letterSpacing: '0.26em',
+          textTransform: 'uppercase',
+          color: '#3c7a5b',
+        }}>
+          Shorty
+        </span>
+        <span style={{
+          fontSize: 40,
+          fontWeight: 800,
+          letterSpacing: '-0.045em',
+          lineHeight: 1,
+          color: '#20211c',
+        }}>
+          Harris
+        </span>
+      </div>
+
+      {/* Spinner */}
+      <div style={{
+        marginTop: 28,
+        width: 18,
+        height: 18,
+        borderRadius: '50%',
+        border: '2px solid #ddd8cb',
+        borderTopColor: '#3c7a5b',
+        animation: 'sh-spin 0.7s linear infinite',
+      }} />
     </div>
   );
 }

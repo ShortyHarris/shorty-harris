@@ -189,7 +189,38 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
       {error && <div className="bill-error">{error}</div>}
 
       {loading ? (
-        <div className="bill-empty"><span>Loading…</span></div>
+        <>
+          {/* Mobile: skeleton payment cards */}
+          <div className="payment-list lg:hidden" aria-hidden>
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="payment-item rounded-lg">
+                <div className="flex flex-col gap-2">
+                  <div className="h-4 w-28 rounded animate-pulse bg-[#ddd8cb]" />
+                  <div className="h-3 w-20 rounded animate-pulse bg-[#ece8df]" />
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="h-4 w-16 rounded animate-pulse bg-[#ddd8cb]" />
+                  <div className="h-5 w-14 rounded-full animate-pulse bg-[#ece8df]" />
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Desktop: skeleton table */}
+          <div className="hidden lg:block lg:bg-white lg:border lg:border-[var(--line)] lg:rounded-lg lg:p-4" aria-hidden>
+            <table className="w-full">
+              <tbody>
+                {[...Array(4)].map((_, i) => (
+                  <tr key={i} className="border-b border-[var(--line)]">
+                    <td className="py-3.5 px-2"><div className="h-4 w-10 rounded animate-pulse bg-[#ddd8cb]" /></td>
+                    <td className="py-3.5 px-2"><div className="h-3 w-24 rounded animate-pulse bg-[#ece8df]" /></td>
+                    <td className="py-3.5 px-2"><div className="h-4 w-16 rounded animate-pulse bg-[#ddd8cb]" /></td>
+                    <td className="py-3.5 px-2"><div className="h-5 w-14 rounded-full animate-pulse bg-[#ece8df]" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       ) : (data?.payments.length ?? 0) === 0 ? (
         <div className="bill-empty">
           <strong>No payments yet</strong>

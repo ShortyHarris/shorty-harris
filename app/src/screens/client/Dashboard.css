@@ -263,24 +263,10 @@
      LEAD PANEL (bottom sheet)
   ═══════════════════════════════════════ */
 
-  @keyframes panel-fade {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-  }
-  @keyframes panel-rise {
-    from { transform: translateY(52px); opacity: 0.6; }
-    to   { transform: none; opacity: 1; }
-  }
-  @keyframes panel-pop {
-    from { transform: scale(0.97); opacity: 0.6; }
-    to   { transform: none; opacity: 1; }
-  }
-
   .panel-overlay {
     @apply fixed inset-0 flex items-end justify-center;
     background: rgba(28, 30, 25, 0.45);
     z-index: 30;
-    animation: panel-fade 0.16s ease-out;
   }
 
   .panel {
@@ -289,7 +275,6 @@
     max-height: 90vh;
     background: var(--bg);
     border-radius: 20px 20px 0 0;
-    animation: panel-rise 0.22s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   /* Drag handle */

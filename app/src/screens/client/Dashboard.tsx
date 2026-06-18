@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useClientDashboard } from '../../hooks/useClientDashboard';
 import type { HotLead, HotLeadStatus } from '../../types';
 import { RefreshCw, ChevronRight } from 'lucide-react';
@@ -136,9 +137,7 @@ export function Dashboard({ clientId }: { clientId: string }) {
         {error && <div className="lead-error-msg">{error}</div>}
 
         {loading ? (
-          <div className="leads-empty">
-            <span>Loading your leads…</span>
-          </div>
+          <LeadsSkeleton />
         ) : filtered.length === 0 ? (
           <EmptyLeads filter={filter} leads={leads} onSwitchFilter={selectFilter} />
         ) : (
@@ -159,13 +158,16 @@ export function Dashboard({ clientId }: { clientId: string }) {
         )}
       </div>
 
-      {openLead && (
-        <LeadPanel
-          lead={openLead}
-          onClose={() => setOpenId(null)}
-          onStatus={setStatus}
-        />
-      )}
+      <AnimatePresence>
+        {openLead && (
+          <LeadPanel
+            key={openLead.id}
+            lead={openLead}
+            onClose={() => setOpenId(null)}
+            onStatus={setStatus}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 }
@@ -374,8 +376,22 @@ function LeadPanel({
 }) {
   const p = lead.prospect;
   return (
-    <div className="panel-overlay " onClick={onClose}>
-      <aside className="panel rounded-lg" onClick={(e) => e.stopPropagation()}>
+    <motion.div
+      className="panel-overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+      onClick={onClose}
+    >
+      <motion.aside
+        className="panel rounded-lg"
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="panel-handle" />
 
         <div className="panel-scroll">
@@ -470,8 +486,60 @@ function LeadPanel({
             </div>
           </div>
         </div>
-      </aside>
-    </div>
+      </motion.aside>
+    </motion.div>
+  );
+}
+
+/* ───── skeleton loading ───── */
+function LeadsSkeleton() {
+  return (
+    <>
+      {/* Mobile skeleton rows */}
+      <div className="lead-list md:hidden" aria-hidden>
+        {[...Array(5)].map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-3 border border-(--line) bg-(--surface)"
+            style={{ borderRadius: 14, padding: '16px 18px', margin: '0 16px 10px', width: 'calc(100% - 32px)', minHeight: 72 }}
+          >
+            <div className="h-[9px] w-[9px] shrink-0 rounded-full bg-[#ddd8cb] animate-pulse" />
+            <div className="flex-1 min-w-0 flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="h-4 w-2/5 rounded bg-[#ddd8cb] animate-pulse" />
+                <div className="h-5 w-14 rounded-full bg-[#ddd8cb] animate-pulse" />
+              </div>
+              <div className="h-3 w-1/3 rounded bg-[#ece8df] animate-pulse" />
+              <div className="h-3 w-5/6 rounded bg-[#ece8df] animate-pulse" />
+            </div>
+            <div className="w-2 h-3 shrink-0 rounded bg-[#ece8df] animate-pulse" />
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop skeleton table */}
+      <div className="hidden md:block md:bg-white md:border md:border-(--line) md:rounded-b-lg md:p-4" aria-hidden>
+        <table className="w-full">
+          <tbody>
+            {[...Array(6)].map((_, i) => (
+              <tr key={i} className="border-b border-(--line)">
+                <td className="py-4 px-2">
+                  <div className="h-4 w-40 rounded bg-[#ddd8cb] animate-pulse" />
+                  <div className="mt-1.5 h-3 w-24 rounded bg-[#ece8df] animate-pulse" />
+                </td>
+                <td className="py-4 px-2 max-w-[420px]">
+                  <div className="h-3 w-4/5 rounded bg-[#ece8df] animate-pulse" />
+                </td>
+                <td className="py-4 px-2">
+                  <div className="h-5 w-16 rounded-full bg-[#ddd8cb] animate-pulse" />
+                </td>
+                <td className="py-4 px-2 w-10" />
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
