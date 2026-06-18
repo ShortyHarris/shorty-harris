@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import './Login.css';
 
@@ -26,7 +27,7 @@ export function Login() {
       <div className="login-left">
         <div className="login-form-wrap">
 
-          <div className="login-wordmark">Shorty Harris</div>
+          <Link to="/" className="login-wordmark" style={{ textDecoration: 'none', color: 'inherit' }}>Shorty Harris</Link>
 
           <h1 className="login-title">Welcome back</h1>
           <p className="login-sub">Sign in to your account to continue</p>

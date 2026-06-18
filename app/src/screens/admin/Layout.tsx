@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Routes, Route, Navigate } from 'react-router-dom';
+import { NavLink, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, LogOut } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
@@ -45,7 +45,7 @@ export function AdminLayout() {
 
           {/* Mobile top bar */}
           <div className="amobile-bar">
-            <span className="amobile-brand">Shorty Harris</span>
+            <Link to="/" className="amobile-brand" style={{ textDecoration: 'none', color: 'inherit' }}>Shorty Harris</Link>
             <button className="ahamburger" onClick={() => setMobileOpen(true)} aria-label="Open menu">
               <span /><span /><span />
             </button>
@@ -78,7 +78,7 @@ export function AdminLayout() {
             {/* Brand + close */}
             <div className="amobile-nav-top">
               <div>
-                <div className="amobile-nav-brand">Shorty Harris</div>
+                <Link to="/" className="amobile-nav-brand" style={{ textDecoration: 'none', color: 'inherit' }}>Shorty Harris</Link>
                 <div className="amobile-nav-sub">Admin Dashboard</div>
               </div>
               <motion.button
@@ -145,7 +145,7 @@ function SidebarInner({
   return (
     <>
       <div className="aside-brand">
-        <div className="aside-brand-name">Shorty Harris</div>
+        <Link to="/" className="aside-brand-name" style={{ textDecoration: 'none', color: 'inherit' }}>Shorty Harris</Link>
         <div className="aside-brand-sub">Admin Dashboard</div>
       </div>
 

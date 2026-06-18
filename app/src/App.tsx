@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from './auth/AuthProvider';
 import { Login } from './screens/Login';
 import { AdminLayout } from './screens/admin/Layout';
@@ -149,44 +150,59 @@ function NoClientAccount() {
 
 // ── Root ─────────────────────────────────────────────────────────────────────
 
+function AppRoutes() {
+  const location = useLocation();
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={location.pathname}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.18, ease: 'easeInOut' }}
+        style={{ minHeight: '100vh' }}
+      >
+        <Routes location={location}>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<LoginRoute />} />
+
+          <Route path="/__preview-dashboard" element={
+            <div className="theme-client">
+              <Shell businessName="Acme Roofing" credits={42} displayName="Preview" onSignOut={() => {}}>
+                <Dashboard clientId="__preview__" />
+              </Shell>
+            </div>
+          } />
+
+          <Route
+            path="/admin/*"
+            element={
+              <RequireAdmin>
+                <AdminLayout />
+              </RequireAdmin>
+            }
+          />
+
+          <Route
+            path="/app/*"
+            element={
+              <RequireClient>
+                <ClientZone />
+              </RequireClient>
+            }
+          />
+
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* / is reserved for the future public landing page */}
-        <Route path="/" element={<Home/>} />
-
-        <Route path="/login" element={<LoginRoute />} />
-
-        <Route path="/__preview-dashboard" element={
-          <div className="theme-client">
-            <Shell businessName="Acme Roofing" credits={42} displayName="Preview" onSignOut={() => {}}>
-              <Dashboard clientId="__preview__" />
-            </Shell>
-          </div>
-        } />
-
-        <Route
-          path="/admin/*"
-          element={
-            <RequireAdmin>
-              <AdminLayout />
-            </RequireAdmin>
-          }
-        />
-
-        <Route
-          path="/app/*"
-          element={
-            <RequireClient>
-              <ClientZone />
-            </RequireClient>
-          }
-        />
-
-        {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      <AppRoutes />
     </BrowserRouter>
   );
 }

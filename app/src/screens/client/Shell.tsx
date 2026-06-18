@@ -23,10 +23,9 @@ export function Shell({
 
       {/* ═══ DESKTOP SIDEBAR ═══ */}
       <aside className="sidebar">
-        <div className="sidebar-brand">
-          
+        <Link to="/" className="sidebar-brand" style={{ textDecoration: 'none', color: 'inherit' }}>
           <span className="sidebar-biz-name">{businessName}</span>
-        </div>
+        </Link>
 
         <div className="sidebar-section-label">Main</div>
         <nav className="sidebar-nav">
@@ -68,10 +67,9 @@ export function Shell({
       {/* ═══ MOBILE TOPBAR ═══ */}
       <header className="topbar">
         <div className="topbar-inner">
-          <div className="brand">
-            
+          <Link to="/" className="brand" style={{ textDecoration: 'none', color: 'inherit' }}>
             <span className="brand-name">{businessName}</span>
-          </div>
+          </Link>
           <div className="topbar-right">
             <Link to="/app/billing" className="credits-chip">
               <span className="credits-num">{credits}</span>
