@@ -84,7 +84,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
     setCheckoutBusy(true);
     setCheckoutError(null);
     try {
- const endpoint = 'https://shortyharris.app.n8n.cloud/webhook/wf7-create-checkout';
+ const endpoint = 'https://n8n.shortyharris.com/webhook/wf7-create-checkout';
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
