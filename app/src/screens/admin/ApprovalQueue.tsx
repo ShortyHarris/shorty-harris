@@ -2,7 +2,22 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApprovalQueue } from '../../hooks/useApprovalQueue';
 import { SkeletonTable } from '../../components/Skeleton';
+import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import type { QueueItem } from '../../types';
+import { Clock, CheckCircle2, Send, Ban } from 'lucide-react';
+
+const HELP: HelpContent = {
+  title: 'Approval Queue',
+  body: [
+    { type: 'p', text: "Every email the AI drafts lands here before it goes anywhere. Nothing sends until you approve it." },
+    { type: 'p', text: "Read the draft, edit the copy if you want to tweak it, then Approve or Reject." },
+    { type: 'ul', items: [
+      "Approve — sends the message exactly as written",
+      "Edit then approve — change the copy first, then send",
+      "Reject — discards the draft; the prospect receives nothing",
+    ]},
+  ],
+};
 
 const TYPE_LABEL: Record<string, string> = {
   initial: 'First touch',
@@ -37,20 +52,52 @@ export function ApprovalQueue() {
             Nothing sends until you approve it. Review each draft, edit if needed, then approve or reject.
           </p>
         </div>
-        <button
-          onClick={reload}
-          className="cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <HelpButton content={HELP} />
+          <button
+            onClick={reload}
+            className="cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]"
+          >
+            Refresh
+          </button>
+        </div>
       </header>
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile label="Awaiting review" value={stats.pending} />
-        <StatTile label="Approved today"  value={stats.approvedToday} />
-        <StatTile label="Sent today"      value={stats.sentToday} accent />
-        <StatTile label="Rejected"        value={stats.rejected} />
+        <StatTile
+          icon={Clock}
+          iconColor="#d4870f"
+          label="Awaiting Review"
+          value={stats.pending}
+          sub={stats.pending > 0 ? 'needs your decision' : 'queue is clear'}
+          subColor={stats.pending > 0 ? '#d4870f' : '#9a9d92'}
+        />
+        <StatTile
+          icon={CheckCircle2}
+          iconColor="#3c7a5b"
+          label="Approved Today"
+          value={stats.approvedToday}
+          sub="emails approved"
+          subColor="#9a9d92"
+        />
+        <StatTile
+          icon={Send}
+          iconColor="#3c7a5b"
+          label="Sent Today"
+          value={stats.sentToday}
+          sub="emails delivered"
+          subColor="rgba(255,255,255,0.55)"
+          accent
+        />
+        <StatTile
+          icon={Ban}
+          iconColor="#a8533a"
+          label="Rejected"
+          value={stats.rejected}
+          sub="drafts discarded"
+          subColor="#9a9d92"
+        />
       </div>
 
       {error && (
@@ -70,42 +117,34 @@ export function ApprovalQueue() {
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden md:block overflow-hidden rounded-lg border border-[#ece8df] bg-white">
-            <table className="w-full border-collapse text-[13px]">
+          <div className="atbl hidden md:block">
+            <table>
               <thead>
-                <tr className="border-b border-[#ece8df] bg-[#fbf9f5]">
+                <tr>
                   {(['Prospect', 'Client', 'Type', 'Subject', ''] as const).map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[.08em] text-[#9a9d92]"
-                    >
-                      {h}
-                    </th>
+                    <th key={h}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {paged.map((item, i) => (
-                  <tr
-                    key={item.id}
-                    className={`transition-colors hover:bg-[#fbf9f5] ${i < paged.length - 1 ? 'border-b border-[#f5f2ec]' : ''}`}
-                  >
-                    <td className="px-4 py-3">
+                {paged.map((item) => (
+                  <tr key={item.id}>
+                    <td>
                       <div className="font-bold text-[#20211c]">{item.prospect?.business_name ?? 'Unknown'}</div>
                       {item.prospect?.contact_name && (
                         <div className="mt-0.5 text-[11px] text-[#9a9d92]">{item.prospect.contact_name}</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-[#62655c]">{item.client?.business_name ?? '—'}</td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center whitespace-nowrap rounded-full bg-[#edf4ef] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em] text-[#3c7a5b]">
+                    <td className="text-[#62655c]">{item.client?.business_name ?? '—'}</td>
+                    <td>
+                      <span className="atbl-pill" style={{ background: '#edf4ef', color: '#3c7a5b' }}>
                         {TYPE_LABEL[item.message_type] ?? item.message_type}
                       </span>
                     </td>
-                    <td className="max-w-[240px] truncate px-4 py-3 text-[#62655c]">
+                    <td className="max-w-[240px] truncate text-[#62655c]">
                       {item.subject ?? <span className="italic text-[#c4bfb5]">No subject</span>}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => approve(item.id)}
@@ -217,14 +256,59 @@ export function ApprovalQueue() {
   );
 }
 
-function StatTile({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+function StatTile({
+  icon: Icon,
+  iconColor,
+  label,
+  value,
+  sub,
+  subColor,
+  accent,
+}: {
+  icon: React.ElementType;
+  iconColor: string;
+  label: string;
+  value: number;
+  sub: string;
+  subColor: string;
+  accent?: boolean;
+}) {
+  const bg   = accent ? '#3c7a5b' : '#ffffff';
+  const bdr  = accent ? '#3c7a5b' : '#ece8df';
+  const inkC = accent ? '#ffffff' : '#20211c';
+  const lblC = accent ? 'rgba(255,255,255,0.65)' : '#9a9d92';
+  const icnC = accent ? 'rgba(255,255,255,0.7)' : iconColor;
+
   return (
-    <div className={`flex flex-col gap-1 rounded-lg border px-5 py-[18px] ${accent ? 'border-[#3c7a5b] bg-[#3c7a5b]' : 'border-[#ece8df] bg-white'}`}>
-      <span className={`text-[28px] font-extrabold leading-none tracking-tight tabular-nums ${accent ? 'text-white' : 'text-[#20211c]'}`}>
+    <div
+      style={{ background: bg, borderColor: bdr }}
+      className="flex flex-col rounded-lg border px-5 py-[18px] gap-0 transition-shadow hover:shadow-sm"
+    >
+      {/* Icon + label row */}
+      <div className="flex items-center gap-[5px] mb-[10px]">
+        <Icon size={13} strokeWidth={2} style={{ color: icnC, flexShrink: 0 }} />
+        <span
+          style={{ color: lblC }}
+          className="text-[11px] font-bold uppercase tracking-[.08em] leading-none"
+        >
+          {label}
+        </span>
+      </div>
+
+      {/* Big number */}
+      <span
+        style={{ color: inkC }}
+        className="text-[30px] font-extrabold leading-none tracking-[-0.04em] tabular-nums mb-[7px]"
+      >
         {value}
       </span>
-      <span className={`text-[11px] font-bold uppercase tracking-[.08em] ${accent ? 'text-white/60' : 'text-[#9a9d92]'}`}>
-        {label}
+
+      {/* Secondary text */}
+      <span
+        style={{ color: subColor }}
+        className="text-[11px] font-semibold leading-none"
+      >
+        {sub}
       </span>
     </div>
   );

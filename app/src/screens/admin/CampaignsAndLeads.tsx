@@ -1,12 +1,38 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
-import { useCampaigns, useAdminHotLeads, useClientsList, createCampaign } from '../../hooks/useAdminData';
-import type { AdminHotLead } from '../../hooks/useAdminData';
+import {
+  useCampaigns, useAdminHotLeads, useClientsList,
+  createCampaign, updateCampaign, getCampaignDeleteCounts, deleteCampaign,
+} from '../../hooks/useAdminData';
+import type { AdminHotLead, CampaignRow, CampaignDeleteCounts } from '../../hooks/useAdminData';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
 import { SkeletonTable } from '../../components/Skeleton';
+import { RowMenu } from '../../components/RowMenu';
+import { HelpButton, type HelpContent } from '../../components/HelpButton';
+
+const HELP_CAMPAIGNS: HelpContent = {
+  title: 'Campaigns',
+  body: [
+    { type: 'p', text: "Each campaign belongs to a client and controls who gets targeted and how. The search terms and target locations tell the scraper where to find new prospects." },
+    { type: 'p', text: "A ⚠ Needs setup badge means the campaign is missing search terms or locations — it won't find new prospects until those are filled in." },
+    { type: 'ul', items: [
+      "Edit — update campaign settings, search terms, or locations",
+      "Pause / Activate — stop or resume outreach for this campaign",
+      "Scrape — trigger a fresh prospect search right now",
+    ]},
+  ],
+};
+
+const HELP_HOT_LEADS: HelpContent = {
+  title: 'Hot Leads',
+  body: [
+    { type: 'p', text: "Prospects across all clients who replied to outreach with genuine buying interest. The AI reads their reply and routes serious ones here with a summary." },
+    { type: 'p', text: "Each lead shows what the prospect said and a suggested next action. Update the status as the sales conversation progresses." },
+  ],
+};
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
@@ -46,10 +72,40 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
 }
 
 /* ══════════════════════════════════════════════════════════════════ */
+type ScrapeResult = { total_scraped: number; total_with_email: number };
+
+async function runWF0(campaignId: string): Promise<ScrapeResult | null> {
+  try {
+    const res = await fetch('https://n8n.shortyharris.com/webhook/wf0-discover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaign_id: campaignId }),
+    });
+    const data = await res.json();
+    if (data.total_scraped != null) {
+      return { total_scraped: data.total_scraped, total_with_email: data.total_with_email ?? 0 };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function Campaigns() {
   const { rows, loading, error, reload, setStatus } = useCampaigns();
-  const [showNew, setShowNew] = useState(false);
-  const [page, setPage]       = useState(1);
+  const [showNew, setShowNew]         = useState(false);
+  const [editCampaign, setEditCampaign]     = useState<CampaignRow | null>(null);
+  const [deleteCampaignTarget, setDeleteCampaignTarget] = useState<CampaignRow | null>(null);
+  const [page, setPage]               = useState(1);
+  const [scraping, setScraping]       = useState<Set<string>>(new Set());
+  const [scrapeResults, setScrapeResults] = useState<Record<string, ScrapeResult | 'error'>>({});
+
+  async function handleScrape(campaignId: string) {
+    setScraping((prev) => new Set(prev).add(campaignId));
+    const result = await runWF0(campaignId);
+    setScraping((prev) => { const s = new Set(prev); s.delete(campaignId); return s; });
+    setScrapeResults((prev) => ({ ...prev, [campaignId]: result ?? 'error' }));
+  }
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -63,6 +119,7 @@ export function Campaigns() {
           <p className="m-0 mt-1 text-[13px] text-[#62655c]">{rows.length} campaigns across all clients</p>
         </div>
         <div className="flex items-center gap-2 md:gap-2.5 shrink-0">
+          <HelpButton content={HELP_CAMPAIGNS} />
           <button onClick={reload} className={ghostCls}>Refresh</button>
           <button onClick={() => setShowNew(true)} className={`${primaryCls} hidden md:inline-flex`}>+ New campaign</button>
         </div>
@@ -81,47 +138,59 @@ export function Campaigns() {
       ) : (
         <>
           {/* Desktop table — hidden on mobile */}
-          <div className="hidden md:block overflow-hidden rounded-lg border border-[#ece8df] bg-white">
-            <table className="w-full border-collapse text-[13px]">
+          <div className="atbl hidden md:block">
+            <table>
               <thead>
-                <tr className="border-b border-[#ece8df] bg-[#fbf9f5]">
-                  {['Campaign', 'Client', 'Channel', 'Prospects', 'Status', ''].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">{h}</th>
+                <tr>
+                  {['Campaign', 'Client', 'Channel', 'Prospects', 'Status', 'Scrape', ''].map((h) => (
+                    <th key={h}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {paged.map((c, i) => {
-                  const pill   = CAMP_PILL[c.status] ?? CAMP_PILL.draft;
-                  const active = c.status === 'active';
-                  const paused = c.status === 'paused';
+                {paged.map((c) => {
+                  const pill       = CAMP_PILL[c.status] ?? CAMP_PILL.draft;
+                  const active     = c.status === 'active';
+                  const paused     = c.status === 'paused';
+                  const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
                   return (
-                    <tr key={c.id} className={`transition-colors hover:bg-[#fbf9f5] ${i < paged.length - 1 ? 'border-b border-[#f5f2ec]' : ''}`}>
-                      <td className="px-4 py-3 font-bold text-[#20211c]">{c.name}</td>
-                      <td className="px-4 py-3 text-[#62655c]">{c.client?.business_name ?? '—'}</td>
-                      <td className="px-4 py-3 text-[#62655c]">{c.channel}</td>
-                      <td className="px-4 py-3 text-[#62655c]">{c.prospectCount}</td>
-                      <td className="px-4 py-3">
-                        <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-                          className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
+                    <tr key={c.id}>
+                      <td>
+                        <div className="font-bold text-[#20211c]">{c.name}</div>
+                        {needsSetup && (
+                          <span className="atbl-pill mt-1" style={{ background: '#f8efdb', color: '#b9831f' }}>
+                            ⚠ Needs setup
+                          </span>
+                        )}
+                      </td>
+                      <td className="text-[#62655c]">{c.client?.business_name ?? '—'}</td>
+                      <td className="text-[#62655c] capitalize">{c.channel}</td>
+                      <td className="text-[#62655c]">{c.prospectCount}</td>
+                      <td>
+                        <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
                           {c.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        {(active || paused) && (
-                          <button
-                            onClick={() => setStatus(c.id, active ? 'paused' : 'active')}
-                            title={active ? 'Pause campaign' : 'Activate campaign'}
-                            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[.04em] transition-colors ${
-                              active
-                                ? 'border-[#3c7a5b] bg-[#3c7a5b] text-white hover:bg-[#2d5e46]'
-                                : 'border-[#ddd8cb] bg-white text-[#62655c] hover:border-[#b9831f] hover:text-[#b9831f]'
-                            }`}
-                          >
-                            <span className={`h-2 w-2 rounded-full ${active ? 'bg-white' : 'bg-[#c4bfb5]'}`} />
-                            {active ? 'Active' : 'Paused'}
-                          </button>
-                        )}
+                      <td>
+                        <ScrapeCell
+                          campaignId={c.id}
+                          isScraping={scraping.has(c.id)}
+                          result={scrapeResults[c.id]}
+                          lastScrapedAt={c.last_scraped_at}
+                          onScrape={() => handleScrape(c.id)}
+                        />
+                      </td>
+                      <td className="px-3 text-right">
+                        <RowMenu items={[
+                          { type: 'action', label: 'Edit campaign',  onClick: () => setEditCampaign(c) },
+                          ...(active || paused ? [{
+                            type: 'action' as const,
+                            label: active ? 'Pause campaign' : 'Activate campaign',
+                            onClick: () => setStatus(c.id, active ? 'paused' : 'active'),
+                          }] : []),
+                          { type: 'separator' },
+                          { type: 'action', label: 'Delete campaign', destructive: true, onClick: () => setDeleteCampaignTarget(c) },
+                        ]} />
                       </td>
                     </tr>
                   );
@@ -133,13 +202,23 @@ export function Campaigns() {
           {/* Mobile cards — shown below md */}
           <div className="md:hidden flex flex-col gap-3">
             {paged.map((c) => {
-              const pill   = CAMP_PILL[c.status] ?? CAMP_PILL.draft;
-              const active = c.status === 'active';
-              const paused = c.status === 'paused';
+              const pill       = CAMP_PILL[c.status] ?? CAMP_PILL.draft;
+              const active     = c.status === 'active';
+              const paused     = c.status === 'paused';
+              const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
               return (
                 <div key={c.id} className="rounded-xl border border-[#ece8df] bg-white p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="font-bold text-[#20211c] text-[14px]">{c.name}</span>
+                    <div>
+                      <span className="font-bold text-[#20211c] text-[14px]">{c.name}</span>
+                      {needsSetup && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#f8efdb] px-2 py-0.5 text-[10.5px] font-bold text-[#b9831f]">
+                            ⚠ Needs setup
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
                       className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
                       {c.status}
@@ -149,8 +228,8 @@ export function Campaigns() {
                     {c.client?.business_name ?? '—'} · {c.channel}
                   </p>
                   <p className="mt-0.5 text-[12px] text-[#9a9d92]">{c.prospectCount} prospects</p>
-                  {(active || paused) && (
-                    <div className="border-t border-[#f5f2ec] pt-3 mt-2">
+                  <div className="border-t border-[#f5f2ec] pt-3 mt-2 flex flex-wrap items-center gap-2">
+                    {(active || paused) && (
                       <button
                         onClick={() => setStatus(c.id, active ? 'paused' : 'active')}
                         title={active ? 'Pause campaign' : 'Activate campaign'}
@@ -163,8 +242,27 @@ export function Campaigns() {
                         <span className={`h-2 w-2 rounded-full ${active ? 'bg-white' : 'bg-[#c4bfb5]'}`} />
                         {active ? 'Active' : 'Paused'}
                       </button>
-                    </div>
-                  )}
+                    )}
+                    <ScrapeCell
+                      campaignId={c.id}
+                      isScraping={scraping.has(c.id)}
+                      result={scrapeResults[c.id]}
+                      lastScrapedAt={c.last_scraped_at}
+                      onScrape={() => handleScrape(c.id)}
+                    />
+                    <button
+                      onClick={() => setEditCampaign(c)}
+                      className="cursor-pointer rounded-lg border border-[#ece8df] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setDeleteCampaignTarget(c)}
+                      className="cursor-pointer rounded-lg border border-transparent bg-transparent px-3 py-1.5 text-[12px] font-semibold text-[#c4bfb5] transition-colors hover:border-[#a8533a]/30 hover:bg-[#fdf0ec] hover:text-[#a8533a]"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -192,7 +290,79 @@ export function Campaigns() {
             onCreated={() => { setShowNew(false); reload(); }}
           />
         )}
+        {editCampaign && (
+          <EditCampaignModal
+            key={`edit-camp-${editCampaign.id}`}
+            campaign={editCampaign}
+            onClose={() => setEditCampaign(null)}
+            onSaved={() => { setEditCampaign(null); reload(); }}
+          />
+        )}
+        {deleteCampaignTarget && (
+          <DeleteCampaignModal
+            key={`del-camp-${deleteCampaignTarget.id}`}
+            campaign={deleteCampaignTarget}
+            onClose={() => setDeleteCampaignTarget(null)}
+            onDeleted={() => { setDeleteCampaignTarget(null); reload(); }}
+          />
+        )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/* ── Scrape cell ───────────────────────────────────────────────────── */
+function ScrapeCell({
+  campaignId: _campaignId,
+  isScraping,
+  result,
+  lastScrapedAt,
+  onScrape,
+}: {
+  campaignId: string;
+  isScraping: boolean;
+  result: ScrapeResult | 'error' | undefined;
+  lastScrapedAt: string | null;
+  onScrape: () => void;
+}) {
+  if (isScraping) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[12px] text-[#9a9d92]">
+        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#ddd8cb] border-t-[#3c7a5b]" />
+        Scraping…
+      </span>
+    );
+  }
+  if (result && result !== 'error') {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[12px] font-semibold text-[#20211c]">{result.total_scraped.toLocaleString()} scraped</span>
+        <span className="text-[11px] text-[#3c7a5b]">{result.total_with_email.toLocaleString()} with email</span>
+        <button onClick={onScrape} className="mt-0.5 cursor-pointer text-left text-[11px] text-[#9a9d92] underline hover:text-[#62655c]">Re-run</button>
+      </div>
+    );
+  }
+  if (result === 'error') {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[11px] text-[#a8533a]">Scrape failed</span>
+        <button onClick={onScrape} className="cursor-pointer text-left text-[11px] text-[#9a9d92] underline hover:text-[#62655c]">Retry</button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-0.5">
+      <button
+        onClick={onScrape}
+        className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-[#ece8df] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b] whitespace-nowrap"
+      >
+        ↻ Run scrape
+      </button>
+      {lastScrapedAt && (
+        <span className="text-[10.5px] text-[#c4bfb5]">
+          Last: {new Date(lastScrapedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </span>
+      )}
     </div>
   );
 }
@@ -320,6 +490,197 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
   );
 }
 
+/* ── Modal shell ───────────────────────────────────────────────────── */
+function CampModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClose}
+    >
+      <motion.div
+        style={FONT}
+        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[540px] md:rounded-2xl md:shadow-2xl"
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+const campFieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
+const campInputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+
+/* ── Edit Campaign Modal ───────────────────────────────────────────── */
+function EditCampaignModal({
+  campaign, onClose, onSaved,
+}: { campaign: CampaignRow; onClose: () => void; onSaved: () => void }) {
+  const [name, setName]               = useState(campaign.name);
+  const [description, setDescription] = useState(campaign.description ?? '');
+  const [channel, setChannel]         = useState(campaign.channel);
+  const [queries, setQueries]         = useState(campaign.search_queries.join(', '));
+  const [locations, setLocations]     = useState(campaign.target_locations.join(', '));
+  const [maxResults, setMaxResults]   = useState(campaign.max_results);
+  const [scrapeEnabled, setScrapeEnabled] = useState(campaign.scrape_enabled);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState<string | null>(null);
+
+  async function submit() {
+    if (!name.trim()) { setErr('Campaign name is required.'); return; }
+    setBusy(true); setErr(null);
+    const { error } = await updateCampaign(campaign.id, {
+      name: name.trim(),
+      description: description.trim(),
+      channel,
+      search_queries: queries.split(',').map((s) => s.trim()).filter(Boolean),
+      target_locations: locations.split(',').map((s) => s.trim()).filter(Boolean),
+      max_results: maxResults,
+      scrape_enabled: scrapeEnabled,
+    });
+    setBusy(false);
+    if (error) setErr(error.message); else onSaved();
+  }
+
+  return (
+    <CampModalShell onClose={onClose}>
+      <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
+        <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Edit campaign</h2>
+        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+        <div>
+          <label className={campFieldLbl}>Campaign name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} style={FONT} className={campInputCls} />
+        </div>
+        <div>
+          <label className={campFieldLbl}>Description</label>
+          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" style={FONT} className={campInputCls} />
+        </div>
+        <div>
+          <label className={campFieldLbl}>Channel</label>
+          <Select value={channel} onValueChange={setChannel}>
+            <SelectTrigger style={FONT} className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]"><SelectValue /></SelectTrigger>
+            <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="sms">SMS</SelectItem>
+              <SelectItem value="whatsapp">WhatsApp</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="border-t border-[#f0ede6] pt-3">
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Prospect discovery (Apify)</p>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className={campFieldLbl}>Search terms <span className="normal-case font-normal">(comma-separated)</span></label>
+              <input value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="hotels, lodges, guesthouses" style={FONT} className={campInputCls} />
+            </div>
+            <div>
+              <label className={campFieldLbl}>Locations <span className="normal-case font-normal">(comma-separated)</span></label>
+              <input value={locations} onChange={(e) => setLocations(e.target.value)} placeholder="Austin TX, Round Rock TX" style={FONT} className={campInputCls} />
+            </div>
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <label className={campFieldLbl}>Max results per run</label>
+                <input type="number" min={1} max={500} value={maxResults} onChange={(e) => setMaxResults(Number(e.target.value))} style={FONT} className={campInputCls} />
+              </div>
+              <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[13px] text-[#62655c]">
+                <input type="checkbox" checked={scrapeEnabled} onChange={(e) => setScrapeEnabled(e.target.checked)} className="accent-[#3c7a5b]" />
+                Enable scraping
+              </label>
+            </div>
+          </div>
+        </div>
+        {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
+      </div>
+      <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+        <button onClick={onClose} className={ghostCls}>Cancel</button>
+        <button onClick={submit} disabled={busy} className={primaryCls}>{busy ? 'Saving…' : 'Save changes'}</button>
+      </div>
+    </CampModalShell>
+  );
+}
+
+/* ── Delete Campaign Modal ─────────────────────────────────────────── */
+function DeleteCampaignModal({
+  campaign, onClose, onDeleted,
+}: { campaign: CampaignRow; onClose: () => void; onDeleted: () => void }) {
+  const [counts, setCounts] = useState<CampaignDeleteCounts | null>(null);
+  const [busy, setBusy]     = useState(false);
+  const [err, setErr]       = useState<string | null>(null);
+
+  useEffect(() => {
+    getCampaignDeleteCounts(campaign.id).then(setCounts);
+  }, [campaign.id]);
+
+  async function confirm() {
+    setBusy(true); setErr(null);
+    const { error } = await deleteCampaign(campaign.id);
+    setBusy(false);
+    if (error) setErr(error); else onDeleted();
+  }
+
+  const blastItems = counts
+    ? [
+        counts.prospects > 0 && `${counts.prospects} prospect${counts.prospects !== 1 ? 's' : ''}`,
+        counts.messages  > 0 && `${counts.messages} message${counts.messages !== 1 ? 's' : ''}`,
+      ].filter(Boolean)
+    : [];
+
+  return (
+    <CampModalShell onClose={onClose}>
+      <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
+        <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Delete campaign</h2>
+        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+        <div className="rounded-xl border border-[#a8533a]/20 bg-[#fdf0ec] px-4 py-4">
+          <p className="m-0 text-[14px] font-bold text-[#a8533a]">
+            Permanently delete "{campaign.name}"?
+          </p>
+          <p className="m-0 mt-1.5 text-[13px] text-[#a8533a]/80">
+            This cannot be undone. All prospects, messages, and replies tied to this campaign will be deleted.
+          </p>
+        </div>
+        <div>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">This will permanently delete:</p>
+          {!counts ? (
+            <div className="flex items-center gap-2 text-[13px] text-[#9a9d92]">
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#ddd8cb] border-t-[#a8533a]" />
+              Counting affected records…
+            </div>
+          ) : blastItems.length === 0 ? (
+            <p className="text-[13px] text-[#62655c]">No associated records — the campaign row only.</p>
+          ) : (
+            <ul className="m-0 list-none p-0 flex flex-col gap-1">
+              {blastItems.map((item) => (
+                <li key={String(item)} className="flex items-center gap-2 text-[13px] text-[#62655c]">
+                  <span className="text-[#a8533a]">✕</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
+      </div>
+      <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+        <button onClick={onClose} className={ghostCls}>Cancel</button>
+        <button
+          onClick={confirm}
+          disabled={busy || !counts}
+          className="cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#a8533a] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#8a3f2b] disabled:opacity-50"
+        >
+          {busy ? 'Deleting…' : `Delete campaign and all prospects`}
+        </button>
+      </div>
+    </CampModalShell>
+  );
+}
+
 /* ── Hot Leads filter helpers ──────────────────────────────────────── */
 type LeadFilter = 'new' | 'active' | 'all' | 'closed';
 
@@ -366,7 +727,10 @@ export function HotLeads() {
           </h1>
           <p className="m-0 mt-1 text-[13px] text-[#62655c]">{rows.length} qualified opportunities, all clients</p>
         </div>
-        <button onClick={reload} className={ghostCls}>Refresh</button>
+        <div className="flex items-center gap-2 shrink-0">
+          <HelpButton content={HELP_HOT_LEADS} />
+          <button onClick={reload} className={ghostCls}>Refresh</button>
+        </div>
       </header>
 
       {error && (
@@ -381,9 +745,9 @@ export function HotLeads() {
           <span className="text-[13px] text-[#62655c]">Leads appear here when prospects reply with buying intent.</span>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-[#ece8df] bg-white">
+        <div className="atbl">
           {/* Filter tabs */}
-          <div className="flex items-center border-b border-[#ece8df] px-1">
+          <div className="atbl-tabs">
             {HL_TABS.map((tab) => {
               const cnt    = rows.filter((r) => matchesHL(r, tab.key)).length;
               const active = filter === tab.key;
@@ -412,24 +776,24 @@ export function HotLeads() {
             <>
               {/* Desktop table */}
               <div className="hidden md:block">
-                <table className="w-full border-collapse text-[13px]">
+                <table>
                   <thead>
-                    <tr className="bg-[#fbf9f5]">
+                    <tr>
                       {['Business', 'Client', 'Summary', 'Status', ''].map((h) => (
-                        <th key={h} className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">{h}</th>
+                        <th key={h}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {paged.map((lead, i) => {
+                    {paged.map((lead) => {
                       const pill = LEAD_PILL[lead.status] ?? LEAD_PILL.new;
                       return (
                         <tr
                           key={lead.id}
                           onClick={() => setOpenId(lead.id)}
-                          className={`cursor-pointer transition-colors hover:bg-[#fbf9f5] ${i < paged.length - 1 ? 'border-t border-[#f5f2ec]' : ''}`}
+                          className="cursor-pointer"
                         >
-                          <td className="px-4 py-3.5 align-top">
+                          <td className="align-top">
                             <div className="font-semibold text-[#20211c]">{lead.prospect?.business_name ?? 'Unknown'}</div>
                             {lead.prospect?.category && (
                               <div className="mt-0.5 text-[12px] text-[#9a9d92]">
@@ -437,17 +801,16 @@ export function HotLeads() {
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-3.5 align-top text-[#62655c]">{lead.client?.business_name ?? '—'}</td>
-                          <td className="max-w-[340px] px-4 py-3.5 align-top">
+                          <td className="align-top text-[#62655c]">{lead.client?.business_name ?? '—'}</td>
+                          <td className="max-w-[340px] align-top">
                             <p className="m-0 line-clamp-1 text-[#62655c]">{lead.ai_summary ?? '—'}</p>
                           </td>
-                          <td className="px-4 py-3.5 align-top">
-                            <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-                              className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
+                          <td className="align-top">
+                            <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
                               {HL_STATUS_LABEL[lead.status] ?? lead.status}
                             </span>
                           </td>
-                          <td className="px-4 py-3.5 align-top text-right">
+                          <td className="px-3 align-top text-right">
                             <ChevronRight size={15} className="text-[#c4bfb5]" />
                           </td>
                         </tr>

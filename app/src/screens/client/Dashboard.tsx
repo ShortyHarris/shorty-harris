@@ -2,8 +2,24 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useClientDashboard } from '../../hooks/useClientDashboard';
 import type { HotLead, HotLeadStatus } from '../../types';
-import { RefreshCw, ChevronRight } from 'lucide-react';
+import { RefreshCw, ChevronRight, Zap, MessageSquare, Trophy, XCircle, TrendingUp, Minus } from 'lucide-react';
+import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import './Dashboard.css';
+
+const HELP: HelpContent = {
+  title: 'Hot Leads',
+  body: [
+    { type: 'p', text: "Here you'll find every business that replied to your outreach with genuine interest. We contact them on your behalf — when one sounds serious, they appear here as a Hot Lead." },
+    { type: 'p', text: "Tap any lead to read what they said and see our suggested next step. Update the status as your conversation progresses." },
+    { type: 'ul', items: [
+      "New — just arrived, call or email them first",
+      "In Progress — you're already in conversation",
+      "Won — deal closed",
+      "Lost — didn't work out this time",
+    ]},
+    { type: 'p', text: "Credits are only deducted when a Hot Lead is confirmed — not for every email we send on your behalf." },
+  ],
+};
 
 const PAGE_SIZE = 8;
 
@@ -56,6 +72,8 @@ export function Dashboard({ clientId }: { clientId: string }) {
   const inProgressCount = leads.filter((l) => l.status === 'viewed' || l.status === 'contacted').length;
   const wonCount = leads.filter((l) => l.status === 'won').length;
   const lostCount = leads.filter((l) => l.status === 'lost').length;
+  const closedTotal = wonCount + lostCount;
+  const closeRate = closedTotal > 0 ? Math.round((wonCount / closedTotal) * 100) : null;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -73,47 +91,37 @@ export function Dashboard({ clientId }: { clientId: string }) {
 
   return (
     <>
-      {/* ─── Header greeting — plain text, left aligned, no card ─── */}
+      {/* ─── Header ─── */}
       <div className="dash-head">
-
-        <div className="bill-section-head">
-          <h2 className='text-2xl font-bold flex items-center gap-2'><img src='https://cdn-icons-png.flaticon.com/128/9679/9679459.png' className='w-10' /><span className='text-2xl tracking-tight'>Hot Leads</span></h2>
-        </div>
-        <div className="dash-greeting text-lg">
-          {newCount > 0 ? (
-            <>
-              <span className="greeting-hl">
-                {newCount} {newCount === 1 ? 'business' : 'businesses'} already said yes
-              </span>
-            </>
-          ) : (
-            <>You're all caught up</>
-          )}
-        </div>
-        <p className="dash-sub">
-          {newCount > 0
-            ? 'We reached out on your behalf. They replied with interest and are waiting for your call. Tap any lead below to reach out.'
-            : 'We\'re still doing outreach. New leads will appear here as businesses reply with interest.'}
-        </p>
-      </div>
-
-      {/* ─── Desktop metrics strip — plain numbers, no cards ─── */}
-      <div className="hidden mx-8 bg-white border-b border-[var(--line)] my-4 md:flex md:px-8 md:py-5 rounded-lg">
-        {[
-          { value: newCount, label: 'New leads' },
-          { value: inProgressCount, label: 'In progress' },
-          { value: wonCount, label: 'Won' },
-          { value: lostCount, label: 'Lost' },
-        ].map((s, i) => (
-          <div key={s.label} className={`flex-1 px-6 first:pl-0 last:pr-0 ${i !== 0 ? 'border-l border-[var(--line)]' : ''}`}>
-            <div className="text-[13px] text-[var(--ink-faint)] mb-1">{s.label}</div>
-            <div className="text-2xl font-bold tracking-[-0.02em] text-[var(--ink)]">{s.value}</div>
+        <div className="dash-head-row">
+          <div>
+            <h1 className="dash-title">
+              <Zap size={18} className="dash-title-icon" />
+              Hot Leads
+            </h1>
+            <p className="dash-sub">
+              {newCount > 0
+                ? `${newCount} ${newCount === 1 ? 'business' : 'businesses'} replied - ready for your call`
+                : 'We\'re doing outreach on your behalf. New leads appear here when businesses reply.'}
+            </p>
           </div>
-        ))}
+          <HelpButton content={HELP} />
+        </div>
       </div>
 
-      <div className="md:px-8 md:pb-10">
-        <div className="filter-bar px-2 rounded-t-lg bg-white border border-[var(--line)]">
+      {/* ─── Stat cards ─── */}
+      <StatGrid
+        newCount={newCount}
+        inProgressCount={inProgressCount}
+        wonCount={wonCount}
+        lostCount={lostCount}
+        closeRate={closeRate}
+        onFilter={selectFilter}
+      />
+
+      {/* ─── Leads section ─── */}
+      <div className="dash-leads">
+        <div className="filter-bar">
           {FILTER_TABS.map((tab) => {
             const count = leads.filter((l) => matchesFilter(l, tab.key)).length;
             return (
@@ -123,9 +131,7 @@ export function Dashboard({ clientId }: { clientId: string }) {
                 onClick={() => selectFilter(tab.key)}
               >
                 {tab.label}
-                {count > 0 && (
-                  <span className="filter-badge">{count}</span>
-                )}
+                {count > 0 && <span className="filter-badge">{count}</span>}
               </button>
             );
           })}
@@ -142,15 +148,15 @@ export function Dashboard({ clientId }: { clientId: string }) {
           <EmptyLeads filter={filter} leads={leads} onSwitchFilter={selectFilter} />
         ) : (
           <>
-            {/* Mobile: card-style rows (unchanged) */}
+            {/* Mobile card list */}
             <div className="lead-list md:hidden">
-              {filtered.map((lead) => (
+              {paged.map((lead) => (
                 <LeadRow key={lead.id} lead={lead} onOpen={() => openLead_(lead)} />
               ))}
             </div>
 
-            {/* Desktop: full-width table with pagination, contained in one bordered card */}
-            <div className="hidden md:block md:bg-white md:border md:border-[var(--line)] md:rounded-b-lg md:p-4">
+            {/* Desktop table */}
+            <div className="hidden md:block">
               <LeadsTable leads={paged} onOpen={openLead_} />
               <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
             </div>
@@ -175,42 +181,36 @@ export function Dashboard({ clientId }: { clientId: string }) {
 /* ───── desktop leads table ───── */
 function LeadsTable({ leads, onOpen }: { leads: HotLead[]; onOpen: (lead: HotLead) => void }) {
   return (
-    <table className="w-full  rounded-b-lg border-b-0 text-left ">
+    <table>
       <thead>
-        <tr className="border-b border-[var(--line)]">
-          <th className="py-3 px-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-faint)]">Business</th>
-          <th className="py-3 px-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-faint)]">Summary</th>
-          <th className="py-3 px-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-faint)]">Status</th>
-          <th className="py-3 px-2 w-10" />
+        <tr>
+          <th>Business</th>
+          <th>Summary</th>
+          <th>Status</th>
+          <th />
         </tr>
       </thead>
       <tbody>
         {leads.map((lead) => {
           const p = lead.prospect;
           return (
-            <tr
-              key={lead.id}
-              className="border-t border-[var(--line)]  cursor-pointer hover:bg-[var(--bg)] transition-colors"
-              onClick={() => onOpen(lead)}
-            >
-              <td className="py-3.5 px-2 align-top">
-                <div className="font-semibold text-[14.5px] text-[var(--ink)]">{p?.business_name ?? 'Unknown business'}</div>
+            <tr key={lead.id} onClick={() => onOpen(lead)} style={{ cursor: 'pointer' }}>
+              <td className="align-top">
+                <div className="font-semibold text-[14px] text-(--ink)">{p?.business_name ?? 'Unknown business'}</div>
                 {p?.category && (
-                  <div className="text-[12.5px] text-[var(--ink-faint)] mt-0.5">
+                  <div className="text-[12.5px] text-(--ink-faint) mt-0.5">
                     {p.category}{p.location ? ` · ${p.location}` : ''}
                   </div>
                 )}
               </td>
-              <td className="py-3.5 px-2 align-top max-w-[420px]">
-                <p className="m-0 text-[13.5px] text-[var(--ink-soft)] line-clamp-1">
-                  {lead.ai_summary ?? '—'}
-                </p>
+              <td className="align-top max-w-105">
+                <p className="m-0 text-[13px] text-(--ink-soft) line-clamp-1">{lead.ai_summary ?? '—'}</p>
               </td>
-              <td className="py-3.5 px-2 align-top">
+              <td className="align-top">
                 <span className={`status-pill pill-${lead.status}`}>{STATUS_LABEL[lead.status]}</span>
               </td>
-              <td className="py-3.5 px-2 align-top text-right">
-                <ChevronRight size={16} className="text-[var(--line-strong)]" />
+              <td className="align-top px-3 text-right">
+                <ChevronRight size={15} className="text-(--line-strong)" />
               </td>
             </tr>
           );
@@ -226,23 +226,11 @@ function Pagination({
 }: { page: number; totalPages: number; onChange: (p: number) => void }) {
   if (totalPages <= 1) return null;
   return (
-    <div className="flex items-center justify-between pt-4 mt-2 border-t border-[var(--line)]">
-      <span className="text-[13px] text-[var(--ink-faint)]">Page {page} of {totalPages}</span>
+    <div className="dash-pagination">
+      <span className="text-[12.5px] text-(--ink-faint)">Page {page} of {totalPages}</span>
       <div className="flex gap-2">
-        <button
-          className="text-[13px] font-medium px-3 py-1.5 rounded-[8px] border border-[var(--line-strong)] text-[var(--ink-soft)] disabled:opacity-40"
-          onClick={() => onChange(page - 1)}
-          disabled={page <= 1}
-        >
-          Previous
-        </button>
-        <button
-          className="text-[13px] font-medium px-3 py-1.5 rounded-[8px] border border-[var(--line-strong)] text-[var(--ink-soft)] disabled:opacity-40"
-          onClick={() => onChange(page + 1)}
-          disabled={page >= totalPages}
-        >
-          Next
-        </button>
+        <button className="dash-page-btn" onClick={() => onChange(page - 1)} disabled={page <= 1}>Previous</button>
+        <button className="dash-page-btn" onClick={() => onChange(page + 1)} disabled={page >= totalPages}>Next</button>
       </div>
     </div>
   );
@@ -269,7 +257,7 @@ function EmptyLeads({
       return (
         <div className="leads-empty">
           <strong>No new leads right now</strong>
-          <span>We're still reaching out — new leads will appear here when businesses reply.</span>
+          <span>We're still reaching out - new leads will appear here when businesses reply.</span>
 
           <button
             className="empty-nudge-btn"
@@ -283,14 +271,14 @@ function EmptyLeads({
     }
     return (
       <div className="leads-empty">
-        <strong>No new leads yet — we're on it</strong>
+        <strong>No new leads yet - we're on it</strong>
         <span>
           We're reaching out to businesses on your behalf right now.
           As soon as one replies with interest, they'll show up here.
         </span>
         {closedCount > 0 && (
           <span className="leads-empty-note">
-            You've closed {closedCount} lead{closedCount !== 1 ? 's' : ''} so far — great work!
+            You've closed {closedCount} lead{closedCount !== 1 ? 's' : ''} so far - great work!
           </span>
         )}
       </div>
@@ -503,7 +491,7 @@ function LeadsSkeleton() {
             className="flex items-center gap-3 border border-(--line) bg-(--surface)"
             style={{ borderRadius: 14, padding: '16px 18px', margin: '0 16px 10px', width: 'calc(100% - 32px)', minHeight: 72 }}
           >
-            <div className="h-[9px] w-[9px] shrink-0 rounded-full bg-[#ddd8cb] animate-pulse" />
+            <div className="h-2.25 w-2.25 shrink-0 rounded-full bg-[#ddd8cb] animate-pulse" />
             <div className="flex-1 min-w-0 flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="h-4 w-2/5 rounded bg-[#ddd8cb] animate-pulse" />
@@ -518,28 +506,103 @@ function LeadsSkeleton() {
       </div>
 
       {/* Desktop skeleton table */}
-      <div className="hidden md:block md:bg-white md:border md:border-(--line) md:rounded-b-lg md:p-4" aria-hidden>
-        <table className="w-full">
+      <div className="hidden md:block" aria-hidden>
+        <table>
           <tbody>
             {[...Array(6)].map((_, i) => (
-              <tr key={i} className="border-b border-(--line)">
-                <td className="py-4 px-2">
+              <tr key={i}>
+                <td>
                   <div className="h-4 w-40 rounded bg-[#ddd8cb] animate-pulse" />
                   <div className="mt-1.5 h-3 w-24 rounded bg-[#ece8df] animate-pulse" />
                 </td>
-                <td className="py-4 px-2 max-w-[420px]">
+                <td className="max-w-105">
                   <div className="h-3 w-4/5 rounded bg-[#ece8df] animate-pulse" />
                 </td>
-                <td className="py-4 px-2">
+                <td>
                   <div className="h-5 w-16 rounded-full bg-[#ddd8cb] animate-pulse" />
                 </td>
-                <td className="py-4 px-2 w-10" />
+                <td className="w-10" />
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     </>
+  );
+}
+
+/* ───── stat cards ───── */
+function StatGrid({
+  newCount, inProgressCount, wonCount, lostCount, closeRate, onFilter,
+}: {
+  newCount: number; inProgressCount: number;
+  wonCount: number; lostCount: number;
+  closeRate: number | null;
+  onFilter: (f: Filter) => void;
+}) {
+  const cards = [
+    {
+      icon: Zap,
+      iconColor: 'var(--amber)',
+      label: 'New Leads',
+      value: newCount,
+      TrendIcon: newCount > 0 ? TrendingUp : Minus,
+      trendText: newCount > 0 ? 'needs your call' : 'all caught up',
+      trendColor: newCount > 0 ? 'var(--amber)' : 'var(--ink-faint)',
+      filter: 'new' as Filter,
+    },
+    {
+      icon: MessageSquare,
+      iconColor: 'var(--leaf)',
+      label: 'In Progress',
+      value: inProgressCount,
+      TrendIcon: Minus,
+      trendText: 'active conversations',
+      trendColor: 'var(--ink-faint)',
+      filter: 'active' as Filter,
+    },
+    {
+      icon: Trophy,
+      iconColor: 'var(--leaf)',
+      label: 'Won',
+      value: wonCount,
+      TrendIcon: closeRate !== null ? TrendingUp : Minus,
+      trendText: closeRate !== null ? `${closeRate}% close rate` : '—',
+      trendColor: closeRate !== null && closeRate > 0 ? 'var(--leaf)' : 'var(--ink-faint)',
+      filter: 'closed' as Filter,
+    },
+    {
+      icon: XCircle,
+      iconColor: 'var(--clay)',
+      label: 'Lost',
+      value: lostCount,
+      TrendIcon: Minus,
+      trendText: lostCount > 0 ? 'closed without deal' : '—',
+      trendColor: 'var(--ink-faint)',
+      filter: 'closed' as Filter,
+    },
+  ];
+
+  return (
+    <div className="stat-grid">
+      {cards.map((c) => {
+        const Icon = c.icon;
+        const TIcon = c.TrendIcon;
+        return (
+          <button key={c.label} className="stat-card" onClick={() => onFilter(c.filter)}>
+            <div className="stat-card-header">
+              <Icon size={13} style={{ color: c.iconColor, flexShrink: 0 }} />
+              <span className="stat-label">{c.label}</span>
+            </div>
+            <div className="stat-value">{c.value}</div>
+            <div className="stat-trend" style={{ color: c.trendColor }}>
+              <TIcon size={12} strokeWidth={2.5} />
+              <span>{c.trendText}</span>
+            </div>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

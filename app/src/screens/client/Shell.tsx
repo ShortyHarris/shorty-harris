@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { Inbox, CreditCard, LogOut } from 'lucide-react';
+import '../../styles/admin-tables.css';
 import './Shell.css';
 
 export function Shell({
@@ -16,92 +17,82 @@ export function Shell({
   onSignOut: () => void;
   children: ReactNode;
 }) {
+  const bizInitial  = (businessName || 'B')[0].toUpperCase();
+  const nameInitial = (displayName  || 'U')[0].toUpperCase();
+
   return (
-    <div className="page">
+    <div className="cpage">
 
       {/* ═══ DESKTOP SIDEBAR ═══ */}
-      <aside className="sidebar">
-        <Link to="/" className="sidebar-brand" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <span className="sidebar-biz-name">{businessName}</span>
-        </Link>
+      <aside className="cside">
+        <div className="cside-brand">
+        
+          <div>
+            <div className="cside-biz-name">{businessName}</div>
+            <div className="cside-biz-sub">Dashboard</div>
+          </div>
+        </div>
 
-        <div className="sidebar-section-label">Main</div>
-        <nav className="sidebar-nav">
-          <NavLink
-            to="/app"
-            end
-            className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-          >
-            <Inbox size={17} strokeWidth={1.7} />
+        <p className="cside-section-label">Menu</p>
+        <nav className="cside-nav">
+          <NavLink to="/app" end className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <Inbox size={16} strokeWidth={1.9} className="cside-link-icon" />
             Hot Leads
           </NavLink>
-          <NavLink
-            to="/app/billing"
-            className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-          >
-            <CreditCard size={17} strokeWidth={1.7} />
+          <NavLink to="/app/billing" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <CreditCard size={16} strokeWidth={1.9} className="cside-link-icon" />
             Billing
           </NavLink>
         </nav>
 
-        <div className="sidebar-footer">
-          <Link to="/app/billing" className="sidebar-credits-card">
-            <span className="sidebar-credits-num">{credits}</span>
-            <span className="sidebar-credits-label">credits remaining</span>
-            <span className="sidebar-credits-link">Add credits →</span>
+        <div className="cside-bottom">
+          <Link to="/app/billing" className="cside-credits">
+            <span className="cside-credits-num">{credits}</span>
+            <span className="cside-credits-label">credits remaining</span>
+            <span className="cside-credits-cta">Add credits </span>
           </Link>
-
-          <button className="sidebar-profile" onClick={onSignOut}>
-           
-            <span className="sidebar-profile-info">
-              <span className="sidebar-profile-name">{displayName}</span>
-              <span className="sidebar-profile-role">Sign out</span>
-            </span>
-            <LogOut size={15} strokeWidth={1.8} />
-          </button>
+          <div className="cside-user">
+            <div className="cside-user-avatar">{nameInitial}</div>
+            <div className="cside-user-info">
+              <div className="cside-user-name">{displayName}</div>
+              <div className="cside-user-role">Account</div>
+            </div>
+            <button className="cside-signout" onClick={onSignOut} title="Sign out">
+              <LogOut size={14} />
+            </button>
+          </div>
         </div>
       </aside>
 
       {/* ═══ MOBILE TOPBAR ═══ */}
-      <header className="topbar">
-        <div className="topbar-inner">
-          <Link to="/" className="brand" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <span className="brand-name">{businessName}</span>
-          </Link>
-          <div className="topbar-right">
-            <Link to="/app/billing" className="credits-chip">
-              <span className="credits-num">{credits}</span>
-              <span className="credits-label"> credits</span>
-            </Link>
-            <button className="signout-btn" onClick={onSignOut} title={displayName}>
-              Sign out
-            </button>
-          </div>
-        </div>
+      <header className="ctopbar">
+      
+        <span className="ctopbar-biz">{businessName}</span>
+        <Link to="/app/billing" className="ctopbar-credits">
+          <span className="ctopbar-credits-num">{credits}</span>
+          <span className="ctopbar-credits-label"> cr</span>
+        </Link>
       </header>
 
       {/* ═══ CONTENT ═══ */}
-      <div className="page-body">
+      <div className="cpage-body">
         {children}
       </div>
 
       {/* ═══ MOBILE BOTTOM NAV ═══ */}
-      <nav className="bottom-nav">
-        <NavLink
-          to="/app"
-          end
-          className={({ isActive }) => `bnav-item${isActive ? ' active' : ''}`}
-        >
-          <span className="bnav-icon"><Inbox size={21} strokeWidth={1.8} /></span>
-          <span>Hot Leads</span>
+      <nav className="cbnav">
+        <NavLink to="/app" end className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
+          <span className="cbnav-icon"><Inbox size={20} strokeWidth={1.8} /></span>
+          <span>Leads</span>
         </NavLink>
-        <NavLink
-          to="/app/billing"
-          className={({ isActive }) => `bnav-item${isActive ? ' active' : ''}`}
-        >
-          <span className="bnav-icon"><CreditCard size={21} strokeWidth={1.8} /></span>
+        <NavLink to="/app/billing" className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
+          <span className="cbnav-icon"><CreditCard size={20} strokeWidth={1.8} /></span>
           <span>Billing</span>
         </NavLink>
+        <button className="cbnav-item" onClick={onSignOut}>
+          <span className="cbnav-icon"><LogOut size={20} strokeWidth={1.8} /></span>
+          <span>Sign out</span>
+        </button>
       </nav>
     </div>
   );

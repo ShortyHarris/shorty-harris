@@ -1,37 +1,62 @@
 import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
-import { useProspects } from '../../hooks/useAdminData';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useProspects, useClientsList, useClientCampaigns } from '../../hooks/useAdminData';
 import { SkeletonTable } from '../../components/Skeleton';
+import { RowMenu } from '../../components/RowMenu';
+import { HelpButton, type HelpContent } from '../../components/HelpButton';
+
+const HELP: HelpContent = {
+  title: 'Prospects',
+  body: [
+    { type: 'p', text: "Every contact added to the outreach pipeline, across all clients and campaigns. The scraper finds and adds them automatically." },
+    { type: 'p', text: "Use the ⋮ menu on each row to update their pipeline status or copy their email. Use the filters at the top to narrow by client, status, or category." },
+    { type: 'ul', items: [
+      "New — just added, no contact yet",
+      "Contacted — email sent",
+      "Replied — they responded",
+      "Hot Lead — showed buying interest",
+      "Won / Lost — deal resolved",
+    ]},
+  ],
+};
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
-const STATUS_OPTIONS = ['all', 'new', 'contacted', 'replied', 'hot_lead', 'won', 'lost'] as const;
+const STATUS_OPTIONS = ['all', 'new', 'contacted', 'replied', 'hot_lead', 'won', 'lost', 'generation_failed', 'message_pending'] as const;
 
 const STATUS_LABEL: Record<string, string> = {
   all: 'All statuses', new: 'New', contacted: 'Contacted',
   replied: 'Replied', hot_lead: 'Hot lead', won: 'Won', lost: 'Lost',
+  generation_failed: 'Gen. failed', message_pending: 'Msg. pending',
 };
 
 const STATUS_PILL: Record<string, { bg: string; text: string; border?: string }> = {
-  new:       { bg: '#edf4ef', text: '#3c7a5b' },
-  contacted: { bg: '#f8efdb', text: '#b9831f' },
-  replied:   { bg: '#f8efdb', text: '#b9831f' },
-  hot_lead:  { bg: '#3c7a5b', text: '#fff' },
-  won:       { bg: '#3c7a5b', text: '#fff' },
-  lost:      { bg: 'transparent', text: '#9a9d92', border: '1px solid #ddd8cb' },
+  new:                { bg: '#edf4ef', text: '#3c7a5b' },
+  contacted:          { bg: '#f8efdb', text: '#b9831f' },
+  replied:            { bg: '#f8efdb', text: '#b9831f' },
+  hot_lead:           { bg: '#3c7a5b', text: '#fff' },
+  won:                { bg: '#3c7a5b', text: '#fff' },
+  lost:               { bg: 'transparent', text: '#9a9d92', border: '1px solid #ddd8cb' },
+  generation_failed:  { bg: '#f6e8e2', text: '#a8533a', border: '1px solid rgba(168,83,58,0.2)' },
+  message_pending:    { bg: '#f0ecf8', text: '#6b4fa0', border: '1px solid rgba(107,79,160,0.2)' },
 };
 
 const PAGE_SIZE = 15;
 
+const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]';
+const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50';
+
 export function Prospects() {
-  const { rows, loading, error, reload } = useProspects();
+  const { rows, loading, error, reload, updateStatus } = useProspects();
   const [q, setQ]           = useState('');
   const [status, setStatus] = useState('all');
   const [cat, setCat]       = useState('all');
   const [page, setPage]     = useState(1);
+  const [showAdd, setShowAdd] = useState(false);
 
   const categories = useMemo(
     () => Array.from(new Set(rows.map((r) => r.category).filter(Boolean))) as string[],
@@ -52,9 +77,9 @@ export function Prospects() {
   const safePage   = Math.min(page, totalPages);
   const paged      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  function updateQ(v: string)      { setQ(v);      setPage(1); }
-  function updateStatus(v: string) { setStatus(v); setPage(1); }
-  function updateCat(v: string)    { setCat(v);    setPage(1); }
+  function updateQ(v: string)         { setQ(v);      setPage(1); }
+  function updateFilterStatus(v: string) { setStatus(v); setPage(1); }
+  function updateCat(v: string)       { setCat(v);    setPage(1); }
 
   const pagBtnCls = 'cursor-pointer rounded-lg border border-[#ddd8cb] bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-[#20211c] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-40';
 
@@ -62,17 +87,16 @@ export function Prospects() {
     <div style={FONT} className="flex flex-col gap-6">
 
       {/* Header */}
-      <header className="flex items-start justify-between gap-4">
+      <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-[#20211c]"> <img src="https://cdn-icons-png.flaticon.com/128/143/143438.png" alt="Prospects" className="w-10 h-10" />Prospects</h1>
           <p className="m-0 mt-1 text-[13px] text-[#62655c]">{rows.length} total across all clients</p>
         </div>
-        <button
-          onClick={reload}
-          className="cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <HelpButton content={HELP} />
+          <button onClick={reload} className={ghostCls}>Refresh</button>
+          <button onClick={() => setShowAdd(true)} className={`${primaryCls} hidden md:inline-flex`}>+ Add prospect</button>
+        </div>
       </header>
 
       {/* Toolbar */}
@@ -88,7 +112,7 @@ export function Prospects() {
           />
         </div>
 
-        <Select value={status} onValueChange={updateStatus}>
+        <Select value={status} onValueChange={updateFilterStatus}>
           <SelectTrigger
             style={FONT}
             className="h-9 w-[155px] rounded-lg border-[#ece8df] bg-white text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]"
@@ -135,49 +159,57 @@ export function Prospects() {
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden md:block overflow-hidden rounded-lg border border-[#ece8df] bg-white">
-            <table className="w-full border-collapse text-[13px]">
+          <div className="atbl hidden md:block">
+            <table>
               <thead>
-                <tr className="border-b border-[#ece8df] bg-[#fbf9f5]">
-                  {['Business', 'Contact', 'Client', 'Category', 'Location', 'Status'].map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[.08em] text-[#9a9d92]"
-                    >
-                      {h}
-                    </th>
+                <tr>
+                  {['Business', 'Contact', 'Client', 'Category', 'Location', 'Status', ''].map((h) => (
+                    <th key={h}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {paged.map((r, i) => {
+                {paged.map((r) => {
                   const pill = STATUS_PILL[r.pipeline_status] ?? STATUS_PILL.new;
+                  const statusMenuItems = (
+                    [
+                      { type: 'header' as const, label: 'Set status' },
+                      ...(['new','contacted','replied','hot_lead','won','lost'] as const).map((s) => ({
+                        type: 'action' as const,
+                        label: STATUS_LABEL[s],
+                        dot: STATUS_PILL[s]?.text ?? '#9a9d92',
+                        checked: r.pipeline_status === s,
+                        onClick: () => updateStatus(r.id, s),
+                      })),
+                    ]
+                  );
+                  const copyEmailItem = r.email
+                    ? [
+                        { type: 'separator' as const },
+                        {
+                          type: 'action' as const,
+                          label: 'Copy email',
+                          onClick: () => navigator.clipboard.writeText(r.email!),
+                        },
+                      ]
+                    : [];
                   return (
-                    <tr
-                      key={r.id}
-                      className={`transition-colors hover:bg-[#fbf9f5] ${i < paged.length - 1 ? 'border-b border-[#f5f2ec]' : ''}`}
-                    >
-                      <td className="px-4 py-3 font-bold text-[#20211c]">{r.business_name}</td>
-                      <td className="px-4 py-3">
+                    <tr key={r.id}>
+                      <td className="font-bold text-[#20211c]">{r.business_name}</td>
+                      <td>
                         <div className="text-[#20211c]">{r.contact_name ?? '—'}</div>
-                        {r.email && (
-                          <div className="mt-0.5 font-mono text-[11px] text-[#9a9d92]">{r.email}</div>
-                        )}
+                        {r.email && <div className="mt-0.5 font-mono text-[11px] text-[#9a9d92]">{r.email}</div>}
                       </td>
-                      <td className="px-4 py-3 text-[#62655c]">{r.client?.business_name ?? '—'}</td>
-                      <td className="px-4 py-3 text-[#62655c]">{r.category ?? '—'}</td>
-                      <td className="px-4 py-3 text-[#62655c]">{r.location ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          style={{
-                            background: pill.bg,
-                            color: pill.text,
-                            border: pill.border ?? 'none',
-                          }}
-                          className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]"
-                        >
-                          {r.pipeline_status.replace('_', ' ')}
+                      <td className="text-[#62655c]">{r.client?.business_name ?? '—'}</td>
+                      <td className="text-[#62655c]">{r.category ?? '—'}</td>
+                      <td className="text-[#62655c]">{r.location ?? '—'}</td>
+                      <td>
+                        <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
+                          {r.pipeline_status.replace(/_/g, ' ')}
                         </span>
+                      </td>
+                      <td className="px-3 text-right">
+                        <RowMenu items={[...statusMenuItems, ...copyEmailItem]} />
                       </td>
                     </tr>
                   );
@@ -261,6 +293,195 @@ export function Prospects() {
           )}
         </>
       )}
+
+      {/* Mobile FAB */}
+      <button
+        onClick={() => setShowAdd(true)}
+        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-[#3c7a5b] text-white shadow-[0_4px_20px_rgba(60,122,91,0.35)] text-[28px] leading-none transition-colors hover:bg-[#2d5e46]"
+        aria-label="Add prospect"
+      >
+        +
+      </button>
+
+      <AnimatePresence>
+        {showAdd && (
+          <NewProspectModal
+            key="new-prospect-modal"
+            onClose={() => setShowAdd(false)}
+            onCreated={() => { setShowAdd(false); reload(); }}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+/* ── Add Prospect Modal (WF1) ──────────────────────────────────────── */
+function NewProspectModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const clients = useClientsList();
+  const [clientId, setClientId]         = useState('');
+  const [campaignId, setCampaignId]     = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [contactName, setContactName]   = useState('');
+  const [email, setEmail]               = useState('');
+  const [phone, setPhone]               = useState('');
+  const [category, setCategory]         = useState('');
+  const [location, setLocation]         = useState('');
+  const [busy, setBusy]                 = useState(false);
+  const [err, setErr]                   = useState<string | null>(null);
+  const [successId, setSuccessId]       = useState<string | null>(null);
+
+  const campaigns = useClientCampaigns(clientId);
+
+  function handleClientChange(id: string) {
+    setClientId(id);
+    setCampaignId('');
+  }
+
+  async function submit() {
+    if (!clientId)             { setErr('Select a client.'); return; }
+    if (!campaignId)           { setErr('Select a campaign.'); return; }
+    if (!businessName.trim())  { setErr('Business name is required.'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const res = await fetch('https://n8n.shortyharris.com/webhook/wf1-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaign_id:   campaignId,
+          client_id:     clientId,
+          business_name: businessName.trim(),
+          contact_name:  contactName.trim(),
+          email:         email.trim(),
+          phone:         phone.trim(),
+          category:      category.trim(),
+          location:      location.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (json.prospect_id || json.status === 'imported') {
+        setSuccessId(json.prospect_id ?? '—');
+        onCreated();
+      } else {
+        setErr(json.message ?? 'Import failed — check the response from WF1.');
+      }
+    } catch {
+      setErr('Could not reach the import endpoint. Check your connection.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
+  const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClose}
+    >
+      <motion.div
+        style={FONT}
+        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[540px] md:rounded-2xl md:shadow-2xl"
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
+          <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Add prospect</h2>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        </div>
+
+        {/* Form body */}
+        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+          {successId && (
+            <div className="rounded-xl border border-[#3c7a5b]/20 bg-[#edf4ef] px-4 py-3 text-[13px] text-[#3c7a5b]">
+              Prospect imported successfully.
+            </div>
+          )}
+
+          <div>
+            <label className={fieldLbl}>Client <span className="text-[#a8533a]">*</span></label>
+            <Select value={clientId} onValueChange={handleClientChange}>
+              <SelectTrigger style={FONT} className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]">
+                <SelectValue placeholder="Select a client…" />
+              </SelectTrigger>
+              <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+                {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.business_name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className={fieldLbl}>Campaign <span className="text-[#a8533a]">*</span></label>
+            <Select value={campaignId} onValueChange={setCampaignId} disabled={!clientId}>
+              <SelectTrigger style={FONT} className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b] disabled:opacity-50">
+                <SelectValue placeholder={clientId ? 'Select a campaign…' : 'Select a client first'} />
+              </SelectTrigger>
+              <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+                {campaigns.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className={fieldLbl}>Business name <span className="text-[#a8533a]">*</span></label>
+            <input value={businessName} onChange={(e) => setBusinessName(e.target.value)}
+              placeholder="e.g. Sunrise Plumbing" style={FONT} className={inputCls} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={fieldLbl}>Contact name</label>
+              <input value={contactName} onChange={(e) => setContactName(e.target.value)}
+                placeholder="e.g. Jane Smith" style={FONT} className={inputCls} />
+            </div>
+            <div>
+              <label className={fieldLbl}>Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="jane@example.com" style={FONT} className={inputCls} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={fieldLbl}>Phone</label>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+                placeholder="+1 512 000 0000" style={FONT} className={inputCls} />
+            </div>
+            <div>
+              <label className={fieldLbl}>Category</label>
+              <input value={category} onChange={(e) => setCategory(e.target.value)}
+                placeholder="e.g. Plumbing" style={FONT} className={inputCls} />
+            </div>
+          </div>
+
+          <div>
+            <label className={fieldLbl}>Location</label>
+            <input value={location} onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. Austin TX" style={FONT} className={inputCls} />
+          </div>
+
+          {err && (
+            <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+          <button onClick={onClose} className={ghostCls}>Cancel</button>
+          <button onClick={submit} disabled={busy} className={primaryCls}>
+            {busy ? 'Importing…' : 'Import prospect'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -1,13 +1,16 @@
 import { useEffect, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
 import { Login } from './screens/Login';
+import { SetPassword } from './screens/SetPassword';
 import { AdminLayout } from './screens/admin/Layout';
 import { Shell } from './screens/client/Shell';
 import { Dashboard } from './screens/client/Dashboard';
 import { Billing } from './screens/client/Billing';
-import { useClientHeader } from './hooks/useClientHeader';
+import { useClientHeader, clientHeaderKey } from './hooks/useClientHeader';
+import { dashboardKey } from './hooks/useClientDashboard';
+import { billingKey } from './hooks/useBilling';
+import { queryClient } from './lib/queryClient';
 import './styles/theme-admin.css';
 import './styles/theme-client.css';
 import { Home } from './screens/Home';
@@ -53,16 +56,20 @@ function LoginRoute() {
 function ClientZone() {
   const { profile, signOut } = useAuth();
   const clientId = profile!.client_id!;
-  const { businessName, credits, reloadHeader } = useClientHeader(clientId);
+  const { businessName, credits } = useClientHeader(clientId);
 
-  // Refresh credits after a successful Stripe checkout redirect
+  // After Stripe checkout redirect, invalidate header + billing + dashboard
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('status') === 'success') {
-      const t = setTimeout(() => reloadHeader(), 2600);
+      const t = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: clientHeaderKey(clientId) });
+        queryClient.invalidateQueries({ queryKey: billingKey(clientId) });
+        queryClient.invalidateQueries({ queryKey: dashboardKey(clientId) });
+      }, 2600);
       return () => clearTimeout(t);
     }
-  }, [reloadHeader]);
+  }, [clientId]);
 
   return (
     <div className="theme-client">
@@ -74,7 +81,11 @@ function ClientZone() {
       >
         <Routes>
           <Route index element={<Dashboard clientId={clientId} />} />
-          <Route path="billing" element={<Billing clientId={clientId} onCreditsChanged={reloadHeader} />} />
+          <Route path="billing" element={<Billing clientId={clientId} onCreditsChanged={() => {
+            queryClient.invalidateQueries({ queryKey: clientHeaderKey(clientId) });
+            queryClient.invalidateQueries({ queryKey: billingKey(clientId) });
+            queryClient.invalidateQueries({ queryKey: dashboardKey(clientId) });
+          }} />} />
           <Route path="*" element={<Navigate to="" replace />} />
         </Routes>
       </Shell>
@@ -151,51 +162,40 @@ function NoClientAccount() {
 // ── Root ─────────────────────────────────────────────────────────────────────
 
 function AppRoutes() {
-  const location = useLocation();
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={location.pathname}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        transition={{ duration: 0.18, ease: 'easeInOut' }}
-        style={{ minHeight: '100vh' }}
-      >
-        <Routes location={location}>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<LoginRoute />} />
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/login" element={<LoginRoute />} />
+      <Route path="/auth/set-password" element={<SetPassword />} />
 
-          <Route path="/__preview-dashboard" element={
-            <div className="theme-client">
-              <Shell businessName="Acme Roofing" credits={42} displayName="Preview" onSignOut={() => {}}>
-                <Dashboard clientId="__preview__" />
-              </Shell>
-            </div>
-          } />
+      <Route path="/__preview-dashboard" element={
+        <div className="theme-client">
+          <Shell businessName="Acme Roofing" credits={42} displayName="Preview" onSignOut={() => {}}>
+            <Dashboard clientId="__preview__" />
+          </Shell>
+        </div>
+      } />
 
-          <Route
-            path="/admin/*"
-            element={
-              <RequireAdmin>
-                <AdminLayout />
-              </RequireAdmin>
-            }
-          />
+      <Route
+        path="/admin/*"
+        element={
+          <RequireAdmin>
+            <AdminLayout />
+          </RequireAdmin>
+        }
+      />
 
-          <Route
-            path="/app/*"
-            element={
-              <RequireClient>
-                <ClientZone />
-              </RequireClient>
-            }
-          />
+      <Route
+        path="/app/*"
+        element={
+          <RequireClient>
+            <ClientZone />
+          </RequireClient>
+        }
+      />
 
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </motion.div>
-    </AnimatePresence>
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
   );
 }
 

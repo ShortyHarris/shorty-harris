@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { useErrorLogs } from '../../hooks/useAdminData';
 import { SkeletonTable } from '../../components/Skeleton';
+import { HelpButton, type HelpContent } from '../../components/HelpButton';
+
+const HELP: HelpContent = {
+  title: 'Monitoring',
+  body: [
+    { type: 'p', text: "Errors and failures from the background automation — scrapers, AI calls, email sends, and everything else running under the hood." },
+    { type: 'p', text: "When something breaks, it appears here with a description of what went wrong. Once you've investigated or the issue cleared on its own, mark it as Resolved." },
+    { type: 'p', text: "Unresolved errors show by default. Toggle 'Show resolved' to see the full history." },
+  ],
+};
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
@@ -30,7 +40,8 @@ export function Monitoring() {
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-[#20211c]"> <img src="https://cdn-icons-png.flaticon.com/128/15525/15525396.png" alt="Monitoring" className="w-8 h-8" />Monitoring</h1>
           <p className="m-0 mt-1 text-[13px] text-[#62655c]">System errors and workflow failures</p>
         </div>
-        <div className="flex gap-2 md:gap-2.5 shrink-0">
+        <div className="flex items-center gap-2 md:gap-2.5 shrink-0">
+          <HelpButton content={HELP} />
           <button
             onClick={() => { setShowResolved(!showResolved); setPage(1); }}
             className={`cursor-pointer whitespace-nowrap rounded-xl border px-4 py-2 text-[13px] font-semibold transition-colors ${
@@ -59,40 +70,39 @@ export function Monitoring() {
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden md:block overflow-hidden rounded-lg border border-[#ece8df] bg-white">
-            <table className="w-full border-collapse text-[13px]">
+          <div className="atbl hidden md:block">
+            <table>
               <thead>
-                <tr className="border-b border-[#ece8df] bg-[#fbf9f5]">
+                <tr>
                   {['Severity', 'Source', 'Type', 'Message', 'When', ''].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">{h}</th>
+                    <th key={h}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {paged.map((e, i) => {
+                {paged.map((e) => {
                   const pill = SEV_PILL[e.severity] ?? { bg: '#f5f2ec', text: '#62655c' };
                   return (
-                    <tr key={e.id} className={`transition-colors hover:bg-[#fbf9f5] ${i < paged.length - 1 ? 'border-b border-[#f5f2ec]' : ''}`}>
-                      <td className="px-4 py-3">
-                        <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-                          className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
+                    <tr key={e.id}>
+                      <td>
+                        <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
                           {e.severity}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="rounded border border-[#ece8df] bg-[#fbf9f5] px-2 py-0.5 font-mono text-[11px] text-[#62655c]">{e.source}</span>
+                      <td>
+                        <span className="rounded-sm border border-[#ece8df] bg-[#fbf9f5] px-2 py-0.5 font-mono text-[11px] text-[#62655c]">{e.source}</span>
                       </td>
-                      <td className="px-4 py-3 text-[12px] font-medium text-[#62655c]">{e.error_type}</td>
-                      <td className="max-w-[360px] px-4 py-3 text-[#20211c]">
+                      <td className="text-[12px] font-medium text-[#62655c]">{e.error_type}</td>
+                      <td className="max-w-90 text-[#20211c]">
                         <div className="leading-relaxed">{e.message}</div>
                         {e.retry_count > 0 && (
                           <div className="mt-0.5 text-[12px] text-[#9a9d92]">{e.retry_count} retries</div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-[12px] text-[#9a9d92] whitespace-nowrap">
+                      <td className="text-[12px] text-[#9a9d92] whitespace-nowrap">
                         {new Date(e.created_at).toLocaleString()}
                       </td>
-                      <td className="px-4 py-3">
+                      <td>
                         {!e.resolved && (
                           <button
                             onClick={() => resolve(e.id)}

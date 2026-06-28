@@ -6,6 +6,15 @@ import {
 } from 'recharts';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { SkeletonTiles, SkeletonChart } from '../../components/Skeleton';
+import { HelpButton, type HelpContent } from '../../components/HelpButton';
+
+const HELP: HelpContent = {
+  title: 'Analytics',
+  body: [
+    { type: 'p', text: "Top-level performance across every client and campaign — how many emails went out, how many got a reply, how many became Hot Leads, and how many closed as Won." },
+    { type: 'p', text: "Use the per-client breakdown on the right to compare results across accounts. Click a client name to see their individual numbers." },
+  ],
+};
 
 const CLIENT_COLORS = ['#ddd8cb', '#b9831f', '#3c7a5b'];
 
@@ -54,12 +63,15 @@ export function Analytics() {
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-[#20211c]"> <img src="https://cdn-icons-png.flaticon.com/128/5581/5581350.png" alt="Analytics" className="w-10 h-10" />Analytics</h1>
           <p className="m-0 mt-1 text-[13px] text-[#62655c]">Outreach performance across all clients</p>
         </div>
-        <button
-          onClick={reload}
-          className="cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <HelpButton content={HELP} />
+          <button
+            onClick={reload}
+            className="cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]"
+          >
+            Refresh
+          </button>
+        </div>
       </header>
 
       {error && (

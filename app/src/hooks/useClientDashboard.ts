@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { queryClient } from '../lib/queryClient';
 import type { HotLead, ClientSummary, HotLeadStatus } from '../types';
 
 function mockLeads(): HotLead[] {
@@ -24,65 +26,99 @@ function mockLeads(): HotLead[] {
   })) as unknown as HotLead[];
 }
 
-export function useClientDashboard(CLIENT_ID: string) {
-  const [summary, setSummary] = useState<ClientSummary | null>(null);
-  const [leads, setLeads] = useState<HotLead[]>(CLIENT_ID === '__preview__' ? mockLeads() : []);
-  const [loading, setLoading] = useState(CLIENT_ID !== '__preview__');
-  const [error, setError] = useState<string | null>(null);
+interface DashboardData {
+  summary: ClientSummary;
+  leads: HotLead[];
+}
 
-  const load = useCallback(async () => {
-    if (CLIENT_ID === '__preview__') return;
-    setError(null);
+async function fetchDashboard(clientId: string): Promise<DashboardData> {
+  const [clientRes, billingRes, sentRes, repliesRes, leadsRes] = await Promise.all([
+    supabase.from('clients').select('business_name').eq('id', clientId).single(),
+    supabase.from('billing_profiles').select('credits_remaining').eq('client_id', clientId).single(),
+    supabase.from('messages').select('id', { count: 'exact', head: true }).eq('client_id', clientId).eq('send_status', 'sent'),
+    supabase.from('replies').select('id', { count: 'exact', head: true }).eq('client_id', clientId),
+    supabase
+      .from('hot_leads')
+      .select(
+        `id, prospect_id, ai_summary, suggested_action, status, routed_at,
+         prospect:prospects ( id, business_name, contact_name, email, phone, category, location ),
+         reply:replies ( body )`
+      )
+      .eq('client_id', clientId)
+      .order('routed_at', { ascending: false }),
+  ]);
 
-    const [clientRes, billingRes, sentRes, repliesRes, leadsRes] = await Promise.all([
-      supabase.from('clients').select('business_name').eq('id', CLIENT_ID).single(),
-      supabase.from('billing_profiles').select('credits_remaining').eq('client_id', CLIENT_ID).single(),
-      supabase.from('messages').select('id', { count: 'exact', head: true }).eq('client_id', CLIENT_ID).eq('send_status', 'sent'),
-      supabase.from('replies').select('id', { count: 'exact', head: true }).eq('client_id', CLIENT_ID),
-      supabase
-        .from('hot_leads')
-        .select(
-          `id, prospect_id, ai_summary, suggested_action, status, routed_at,
-           prospect:prospects ( id, business_name, contact_name, email, phone, category, location ),
-           reply:replies ( body )`
-        )
-        .eq('client_id', CLIENT_ID)
-        .order('routed_at', { ascending: false }),
-    ]);
+  if (leadsRes.error) throw new Error(leadsRes.error.message);
 
-    if (leadsRes.error) {
-      setError(leadsRes.error.message);
-      setLoading(false);
-      return;
-    }
+  const leads = (leadsRes.data ?? []).map((row: Record<string, unknown>) => ({
+    ...row,
+    prospect: Array.isArray(row.prospect) ? row.prospect[0] ?? null : row.prospect ?? null,
+    reply:    Array.isArray(row.reply)    ? row.reply[0]    ?? null : row.reply    ?? null,
+  })) as HotLead[];
 
-    const normalized = (leadsRes.data ?? []).map((row: Record<string, unknown>) => ({
-      ...row,
-      prospect: Array.isArray(row.prospect) ? row.prospect[0] ?? null : row.prospect ?? null,
-      reply: Array.isArray(row.reply) ? row.reply[0] ?? null : row.reply ?? null,
-    })) as HotLead[];
-
-    setSummary({
-      business_name: clientRes.data?.business_name ?? 'Your business',
+  return {
+    summary: {
+      business_name:     clientRes.data?.business_name ?? 'Your business',
       credits_remaining: billingRes.data?.credits_remaining ?? 0,
-      messagesSent: sentRes.count ?? 0,
-      replies: repliesRes.count ?? 0,
-      hotLeads: normalized.length,
-    });
-    setLeads(normalized);
-    setLoading(false);
-  }, [CLIENT_ID]);
+      messagesSent:      sentRes.count ?? 0,
+      replies:           repliesRes.count ?? 0,
+      hotLeads:          leads.length,
+    },
+    leads,
+  };
+}
 
-  useEffect(() => { load(); }, [load]);
+export const dashboardKey = (clientId: string) => ['client-dashboard', clientId] as const;
+
+export function useClientDashboard(clientId: string) {
+  const isPreview = clientId === '__preview__';
+
+  const { data, isLoading: loading, error } = useQuery({
+    queryKey: dashboardKey(clientId),
+    queryFn: () => fetchDashboard(clientId),
+    enabled: !isPreview,
+    staleTime: 2 * 60 * 1000,
+    // For preview mode, use initialData so no fetch is ever made
+    ...(isPreview ? { initialData: { summary: null as unknown as ClientSummary, leads: mockLeads() } } : {}),
+  });
+
+  // Realtime: refresh when a hot lead changes for this client
+  useEffect(() => {
+    if (isPreview) return;
+    const channel = supabase
+      .channel(`client-hot-leads-${clientId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'hot_leads',
+        filter: `client_id=eq.${clientId}`,
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: dashboardKey(clientId) });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [clientId, isPreview]);
 
   const setStatus = useCallback(async (id: string, status: HotLeadStatus) => {
-    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
+    queryClient.setQueryData<DashboardData>(dashboardKey(clientId), (prev) => {
+      if (!prev) return prev;
+      return { ...prev, leads: prev.leads.map((l) => (l.id === id ? { ...l, status } : l)) };
+    });
     const { error } = await supabase
       .from('hot_leads')
       .update({ status, status_updated_at: new Date().toISOString() })
       .eq('id', id);
-    if (error) { setError(error.message); load(); }
-  }, [load]);
+    if (error) {
+      queryClient.invalidateQueries({ queryKey: dashboardKey(clientId) });
+    }
+  }, [clientId]);
 
-  return { summary, leads, loading, error, setStatus, reload: load };
+  return {
+    summary: data?.summary ?? null,
+    leads:   data?.leads   ?? (isPreview ? mockLeads() : []),
+    loading: isPreview ? false : loading,
+    error:   (error as Error)?.message ?? null,
+    setStatus,
+    reload: () => queryClient.invalidateQueries({ queryKey: dashboardKey(clientId) }),
+  };
 }

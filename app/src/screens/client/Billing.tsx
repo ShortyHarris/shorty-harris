@@ -4,7 +4,17 @@ import { useBilling, type PaymentRow, type LedgerRow } from '../../hooks/useBill
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
+import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import './Billing.css';
+
+const HELP: HelpContent = {
+  title: 'Billing & Credits',
+  body: [
+    { type: 'p', text: "Credits are how you pay for Hot Leads. Each confirmed Hot Lead costs one credit from your balance." },
+    { type: 'p', text: "Your balance is shown at the top of every page. When you're running low, choose a pack below, pay by card, and credits are added instantly." },
+    { type: 'p', text: "This page also shows your full payment history and a line-by-line breakdown of every credit spent." },
+  ],
+};
 
 interface Pack { credits: number; priceUsd: number; tag?: string; }
 const PACKS: Pack[] = [
@@ -120,6 +130,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
 
           <div className="bill-section-head">
              <h2 className='text-2xl font-bold flex items-center gap-2'> <img src='https://cdn-icons-png.flaticon.com/128/1052/1052815.png' className='w-8' /> Billing & Activity</h2>
+             <HelpButton content={HELP} />
           </div>
 
         <div className="credit-hero mb-4 rounded-lg">

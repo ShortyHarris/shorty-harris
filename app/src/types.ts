@@ -2,7 +2,7 @@
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'edited';
 export type SendStatus = 'not_sent' | 'queued' | 'scheduled' | 'sent' | 'failed' | 'blocked_dnc';
 export type MessageType = 'initial' | 'follow_up_d3' | 'follow_up_d7' | 'follow_up_d14';
-export type PipelineStatus = 'new' | 'contacted' | 'replied' | 'hot_lead' | 'won' | 'lost';
+export type PipelineStatus = 'new' | 'contacted' | 'replied' | 'hot_lead' | 'won' | 'lost' | 'generation_failed' | 'message_pending';
 
 export interface MessageRow {
   id: string;
