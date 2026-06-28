@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Plus } from 'lucide-react';
 import {
   useCampaigns, useAdminHotLeads, useClientsList,
   createCampaign, updateCampaign, getCampaignDeleteCounts, deleteCampaign,
@@ -276,10 +276,10 @@ export function Campaigns() {
       {/* Mobile FAB — replaces the header button on small screens */}
       <button
         onClick={() => setShowNew(true)}
-        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-[#3c7a5b] text-white shadow-[0_4px_20px_rgba(60,122,91,0.35)] text-[28px] leading-none transition-colors hover:bg-[#2d5e46]"
+        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-[#3c7a5b] text-white shadow-[0_6px_24px_rgba(60,122,91,0.4)] transition-all hover:bg-[#2d5e46] active:scale-95"
         aria-label="New campaign"
       >
-        +
+        <Plus size={24} strokeWidth={2.5} />
       </button>
 
       <AnimatePresence>
@@ -745,37 +745,115 @@ export function HotLeads() {
           <span className="text-[13px] text-[#62655c]">Leads appear here when prospects reply with buying intent.</span>
         </div>
       ) : (
-        <div className="atbl">
-          {/* Filter tabs */}
-          <div className="atbl-tabs">
-            {HL_TABS.map((tab) => {
-              const cnt    = rows.filter((r) => matchesHL(r, tab.key)).length;
-              const active = filter === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => selectFilter(tab.key)}
-                  className={`-mb-px cursor-pointer border-b-2 px-4 py-3 text-[13px] font-semibold transition-colors ${
-                    active ? 'border-[#3c7a5b] text-[#3c7a5b]' : 'border-transparent text-[#9a9d92] hover:text-[#62655c]'
-                  }`}
-                >
-                  {tab.label}
-                  {cnt > 0 && (
-                    <span className={`ml-1.5 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10.5px] font-bold ${
-                      active ? 'bg-[#edf4ef] text-[#3c7a5b]' : 'bg-[#f5f2ec] text-[#9a9d92]'
-                    }`}>{cnt}</span>
-                  )}
-                </button>
-              );
-            })}
+        <>
+          {/* ── MOBILE ─────────────────────────────────────────────── */}
+          <div className="md:hidden flex flex-col gap-3">
+            {/* Pill filter tabs — horizontally scrollable */}
+            <div className="flex items-center gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+              {HL_TABS.map((tab) => {
+                const cnt    = rows.filter((r) => matchesHL(r, tab.key)).length;
+                const active = filter === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => selectFilter(tab.key)}
+                    className={`shrink-0 cursor-pointer inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] whitespace-nowrap transition-all ${
+                      active
+                        ? 'bg-[#edf4ef] border-transparent text-[#3c7a5b] font-bold'
+                        : 'bg-white border-[#ddd8cb] text-[#62655c] font-semibold hover:border-[#3c7a5b]'
+                    }`}
+                  >
+                    {tab.label}
+                    {cnt > 0 && (
+                      <span className={`inline-flex items-center justify-center rounded-full px-1.5 min-w-[18px] h-[18px] text-[10.5px] font-bold ${
+                        active ? 'bg-[#3c7a5b]/10 text-[#3c7a5b]' : 'bg-[#f5f2ec] text-[#9a9d92]'
+                      }`}>{cnt}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="py-10 text-center text-[13px] text-[#9a9d92] rounded-xl border border-[#e8e3da] bg-white">
+                No leads in this category.
+              </div>
+            ) : (
+              <div className="rounded-xl border border-[#e8e3da] bg-white overflow-hidden">
+                <div className="divide-y divide-[#f5f2ec]">
+                  {paged.map((lead) => {
+                    const pill = LEAD_PILL[lead.status] ?? LEAD_PILL.new;
+                    const dotColor = lead.status === 'won' ? '#3c7a5b'
+                      : lead.status === 'new' ? '#3c7a5b'
+                      : lead.status === 'contacted' ? '#b9831f'
+                      : '#c4bfb5';
+                    return (
+                      <button
+                        key={lead.id}
+                        onClick={() => setOpenId(lead.id)}
+                        className="flex w-full cursor-pointer items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-[#fbf9f5]"
+                      >
+                        <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: dotColor }} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-semibold text-[14px] text-[#20211c]">{lead.prospect?.business_name ?? 'Unknown'}</span>
+                            <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
+                              className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
+                              {HL_STATUS_LABEL[lead.status] ?? lead.status}
+                            </span>
+                          </div>
+                          {lead.prospect?.category && (
+                            <p className="mt-0.5 text-[12px] text-[#9a9d92]">
+                              {lead.prospect.category}{lead.prospect.location ? ` · ${lead.prospect.location}` : ''}
+                            </p>
+                          )}
+                          {lead.client?.business_name && (
+                            <p className="mt-0.5 text-[12px] text-[#62655c]">{lead.client.business_name}</p>
+                          )}
+                          {lead.ai_summary && (
+                            <p className="mt-1.5 line-clamp-2 text-[13px] text-[#62655c]">{lead.ai_summary}</p>
+                          )}
+                        </div>
+                        <ChevronRight size={15} className="mt-1.5 shrink-0 text-[#c4bfb5]" />
+                      </button>
+                    );
+                  })}
+                </div>
+                <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
+              </div>
+            )}
           </div>
 
-          {filtered.length === 0 ? (
-            <div className="py-10 text-center text-[13px] text-[#9a9d92]">No leads in this category.</div>
-          ) : (
-            <>
-              {/* Desktop table */}
-              <div className="hidden md:block">
+          {/* ── DESKTOP ────────────────────────────────────────────── */}
+          <div className="atbl hidden md:block">
+            {/* Underline filter tabs */}
+            <div className="atbl-tabs">
+              {HL_TABS.map((tab) => {
+                const cnt    = rows.filter((r) => matchesHL(r, tab.key)).length;
+                const active = filter === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => selectFilter(tab.key)}
+                    className={`-mb-px cursor-pointer border-b-2 px-4 py-3 text-[13px] font-semibold transition-colors ${
+                      active ? 'border-[#3c7a5b] text-[#3c7a5b]' : 'border-transparent text-[#9a9d92] hover:text-[#62655c]'
+                    }`}
+                  >
+                    {tab.label}
+                    {cnt > 0 && (
+                      <span className={`ml-1.5 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10.5px] font-bold ${
+                        active ? 'bg-[#edf4ef] text-[#3c7a5b]' : 'bg-[#f5f2ec] text-[#9a9d92]'
+                      }`}>{cnt}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="py-10 text-center text-[13px] text-[#9a9d92]">No leads in this category.</div>
+            ) : (
+              <>
                 <table>
                   <thead>
                     <tr>
@@ -818,53 +896,11 @@ export function HotLeads() {
                     })}
                   </tbody>
                 </table>
-              </div>
-
-              {/* Mobile card list */}
-              <div className="md:hidden divide-y divide-[#f5f2ec]">
-                {paged.map((lead) => {
-                  const pill    = LEAD_PILL[lead.status] ?? LEAD_PILL.new;
-                  const dotColor = lead.status === 'won' ? '#3c7a5b'
-                    : lead.status === 'new' ? '#3c7a5b'
-                    : lead.status === 'contacted' ? '#b9831f'
-                    : '#c4bfb5';
-                  return (
-                    <button
-                      key={lead.id}
-                      onClick={() => setOpenId(lead.id)}
-                      className="flex w-full cursor-pointer items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-[#fbf9f5]"
-                    >
-                      <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: dotColor }} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="font-semibold text-[14px] text-[#20211c]">{lead.prospect?.business_name ?? 'Unknown'}</span>
-                          <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-                            className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
-                            {HL_STATUS_LABEL[lead.status] ?? lead.status}
-                          </span>
-                        </div>
-                        {lead.prospect?.category && (
-                          <p className="mt-0.5 text-[12px] text-[#9a9d92]">
-                            {lead.prospect.category}{lead.prospect.location ? ` · ${lead.prospect.location}` : ''}
-                          </p>
-                        )}
-                        {lead.client?.business_name && (
-                          <p className="mt-0.5 text-[12px] text-[#62655c]">{lead.client.business_name}</p>
-                        )}
-                        {lead.ai_summary && (
-                          <p className="mt-1.5 line-clamp-2 text-[13px] text-[#62655c]">{lead.ai_summary}</p>
-                        )}
-                      </div>
-                      <ChevronRight size={15} className="mt-1.5 shrink-0 text-[#c4bfb5]" />
-                    </button>
-                  );
-                })}
-              </div>
-
-              <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
-            </>
-          )}
-        </div>
+                <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
+              </>
+            )}
+          </div>
+        </>
       )}
 
       <AnimatePresence>

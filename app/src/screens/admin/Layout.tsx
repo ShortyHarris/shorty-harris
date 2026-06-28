@@ -32,7 +32,6 @@ const NAV_OPS: NavItem[] = [
   { to: '/admin/analytics',  label: 'Analytics',  icon: BarChart2  },
   { to: '/admin/monitoring', label: 'Monitoring', icon: Activity   },
 ];
-const ALL_NAV: NavItem[] = [...NAV_DAILY, ...NAV_OPS];
 
 /* ── Root layout ─────────────────────────────────────────────────── */
 export function AdminLayout() {

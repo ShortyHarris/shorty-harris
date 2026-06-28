@@ -17,7 +17,6 @@ export function Shell({
   onSignOut: () => void;
   children: ReactNode;
 }) {
-  const bizInitial  = (businessName || 'B')[0].toUpperCase();
   const nameInitial = (displayName  || 'U')[0].toUpperCase();
 
   return (
