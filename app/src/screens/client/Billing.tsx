@@ -18,9 +18,9 @@ const HELP: HelpContent = {
 
 interface Pack { credits: number; priceUsd: number; tag?: string; }
 const PACKS: Pack[] = [
-  { credits: 20,  priceUsd: 49 },
-  { credits: 50,  priceUsd: 99,  tag: 'Most popular' },
-  { credits: 100, priceUsd: 179, tag: 'Best value' },
+  { credits: 2,  priceUsd: 49 },
+  { credits: 5,  priceUsd: 99,  tag: 'Most popular' },
+  { credits: 10, priceUsd: 179, tag: 'Best value' },
 ];
 
 const PAGE_SIZE = 5;
@@ -167,9 +167,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
                     {p.credits} credits
                     {p.tag && <span className="pack-tag">{p.tag}</span>}
                   </div>
-                  <div className="pack-row-per">
-                    ${(p.priceUsd / p.credits).toFixed(2)} per lead
-                  </div>
+                  
                 </div>
                 <div className="pack-row-price">${p.priceUsd}</div>
               </button>
