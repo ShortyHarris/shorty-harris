@@ -53,7 +53,7 @@ function date(iso: string) {
 
 export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCreditsChanged?: () => void }) {
   const { data, loading, error, reload } = useBilling(clientId);
-  const [selected, setSelected]           = useState<number>(50);
+  const [selected, setSelected]           = useState<number>(5);
   const [checkoutBusy, setCheckoutBusy]   = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [searchParams, setSearchParams]   = useSearchParams();
