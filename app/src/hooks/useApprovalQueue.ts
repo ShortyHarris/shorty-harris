@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
@@ -42,7 +42,7 @@ async function fetchQueueStats(): Promise<Stats> {
   const [pending, approvedToday, sentToday, rejected] = await Promise.all([
     supabase.from('messages').select('id', { count: 'exact', head: true }).eq('approval_status', 'pending'),
     supabase.from('messages').select('id', { count: 'exact', head: true }).eq('approval_status', 'approved').gte('approved_at', iso),
-    supabase.from('messages').select('id', { count: 'exact', head: true }).eq('send_status', 'sent').gte('created_at', iso),
+    supabase.from('messages').select('id', { count: 'exact', head: true }).eq('send_status', 'sent').gte('sent_at', iso),
     supabase.from('messages').select('id', { count: 'exact', head: true }).eq('approval_status', 'rejected'),
   ]);
   return {
@@ -63,8 +63,28 @@ export function useApprovalQueue() {
   const { data: stats = { pending: 0, approvedToday: 0, sentToday: 0, rejected: 0 } } = useQuery({
     queryKey: AQ_KEYS.stats,
     queryFn: fetchQueueStats,
-    staleTime: 60 * 1000, // stats recompute every minute or on invalidation
+    staleTime: 60 * 1000, // fallback if realtime ever drops
   });
+
+  // Live updates: any insert/update on messages (e.g. WF2.5/WF3 approving or
+  // sending) invalidates the cache so items/stats refetch immediately.
+  useEffect(() => {
+    const channel = supabase
+      .channel('messages-approval-queue')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
+          queryClient.invalidateQueries({ queryKey: AQ_KEYS.stats });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const approve = useCallback(async (id: string, editedBody?: string) => {
     queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) => prev.filter((i) => i.id !== id));
