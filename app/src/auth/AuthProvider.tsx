@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const loadedProfileId = useRef<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -31,15 +32,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       else setLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
-      if (s) loadProfile(s.user.id);
-      else { setProfile(null); setLoading(false); }
+
+      if (!s) {
+        setProfile(null);
+        loadedProfileId.current = null;
+        setLoading(false);
+        return;
+      }
+
+      // Supabase fires TOKEN_REFRESHED whenever the tab regains focus/visibility
+      // and the session gets silently revalidated. This is NOT a real sign-in
+      // event, so we must not re-trigger loading state or refetch the profile
+      // here — doing so causes `loading` to flip back to true every time the
+      // user switches tabs, which unmounts anything gated on it (e.g. modals).
+      if (event === 'TOKEN_REFRESHED') {
+        return;
+      }
+
+      loadProfile(s.user.id);
     });
+
     return () => sub.subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadProfile(userId: string) {
+    // Already have this exact user's profile loaded — skip the redundant
+    // setLoading(true)/refetch cycle entirely.
+    if (loadedProfileId.current === userId) return;
+
     setLoading(true);
     const { data } = await supabase
       .from('profiles')
@@ -47,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('id', userId)
       .single();
     setProfile((data as Profile) ?? null);
+    loadedProfileId.current = userId;
     setLoading(false);
   }
 
@@ -58,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
+    loadedProfileId.current = null;
   };
 
   return (
