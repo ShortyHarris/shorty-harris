@@ -249,9 +249,14 @@ export function Prospects() {
                       {r.contact_name && (
                         <div className="text-[12px] text-[#20211c]">{r.contact_name}</div>
                       )}
-                      {r.email && (
-                        <div className="font-mono text-[11px] text-[#9a9d92]">{r.email}</div>
-                      )}
+                     {r.email && (
+  <div
+    className="mt-0.5 font-mono text-[11px] text-[#9a9d92] truncate max-w-[220px]"
+    title={r.email}
+  >
+    {r.email}
+  </div>
+)}
                     </div>
                   )}
                   <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[#62655c]">
