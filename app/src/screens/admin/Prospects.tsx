@@ -198,7 +198,14 @@ export function Prospects() {
                       <td className="font-bold text-[#20211c]">{r.business_name}</td>
                       <td>
                         <div className="text-[#20211c]">{r.contact_name ?? '—'}</div>
-                        {r.email && <div className="mt-0.5 font-mono text-[11px] text-[#9a9d92]">{r.email}</div>}
+                        {r.email && (
+  <div
+    className="mt-0.5 font-mono text-[11px] text-[#9a9d92] truncate max-w-[220px]"
+    title={r.email}
+  >
+    {r.email}
+  </div>
+)}
                       </td>
                       <td className="text-[#62655c]">{r.client?.business_name ?? '—'}</td>
                       <td className="text-[#62655c]">{r.category ?? '—'}</td>
