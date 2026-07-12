@@ -32,6 +32,7 @@ create table public.profiles (
   full_name text,
   role text not null default 'client' check (role in ('admin','client')),
   phone text,
+  activated_at timestamptz,
   created_at timestamptz not null default now()
 );
 

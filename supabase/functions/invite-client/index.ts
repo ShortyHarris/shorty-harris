@@ -73,17 +73,62 @@ Deno.serve(async (req: Request) => {
 
   if (inviteErr) {
     const msg = inviteErr.message.toLowerCase()
-    const alreadyActive =
+    const alreadyRegistered =
       msg.includes('already been registered') ||
       msg.includes('user already registered') ||
       msg.includes('email address has already been registered')
 
-    return json({
-      error: alreadyActive ? 'user_already_active' : inviteErr.message,
-      message: alreadyActive
-        ? 'This email already has an active Shorty Harris account. The client can log in directly.'
-        : inviteErr.message,
-    }, alreadyActive ? 409 : 400)
+    if (!alreadyRegistered) {
+      return json({ error: inviteErr.message, message: inviteErr.message }, 400)
+    }
+
+    // inviteUserByEmail only works once per email — Supabase creates the
+    // auth user on the first call, so every subsequent "resend" click hits
+    // this branch even if the client never opened the original email and
+    // never set a password. We need to tell those two cases apart instead
+    // of always reporting "already active":
+    //   - already signed in at least once  -> genuinely active, nothing to resend
+    //   - never signed in                  -> still mid-setup, send a fresh
+    //                                          password-set link via the
+    //                                          recovery flow (works for any
+    //                                          existing user regardless of
+    //                                          confirmation state)
+    const { data: existingProfile } = await adminClient
+      .from('profiles')
+      .select('id')
+      .eq('client_id', client_id)
+      .maybeSingle()
+
+    let lastSignInAt: string | null = null
+    if (existingProfile) {
+      const { data: existingUser } = await adminClient.auth.admin.getUserById(existingProfile.id)
+      lastSignInAt = existingUser?.user?.last_sign_in_at ?? null
+    }
+
+    if (lastSignInAt) {
+      // Persist the discovery onto the profiles row (readable by the admin
+      // frontend via normal RLS) so the invite button can be pre-disabled on
+      // future page loads instead of only finding out after another wasted click.
+      await adminClient
+        .from('profiles')
+        .update({ activated_at: lastSignInAt })
+        .eq('id', existingProfile.id)
+
+      return json({
+        error: 'user_already_active',
+        message: 'This email already has an active Shorty Harris account. The client can log in directly.',
+      }, 409)
+    }
+
+    // Not yet activated — resend a working link instead of dead-ending.
+    const { error: resendErr } = await adminClient.auth.resetPasswordForEmail(email, {
+      redirectTo: redirect_to,
+    })
+    if (resendErr) {
+      return json({ error: resendErr.message, message: resendErr.message }, 400)
+    }
+
+    return json({ success: true, resent: true })
   }
 
   const userId = inviteData.user.id

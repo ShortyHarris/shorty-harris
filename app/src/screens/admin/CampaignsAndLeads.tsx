@@ -375,7 +375,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
   const [channel, setChannel]           = useState('email');
   const [queries, setQueries]           = useState('');
   const [locations, setLocations]       = useState('');
-  const [maxResults, setMaxResults]     = useState(50);
+  const [maxResults, setMaxResults]     = useState(1000);
   const [scrapeEnabled, setScrapeEnabled] = useState(true);
   const [busy, setBusy]                 = useState(false);
   const [err, setErr]                   = useState<string | null>(null);
@@ -386,7 +386,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
     const { error } = await createCampaign({
       client_id: clientId, name: name.trim(), channel,
       search_queries: queries.split(',').map((s) => s.trim()).filter(Boolean),
-      target_locations: locations.split(',').map((s) => s.trim()).filter(Boolean),
+      target_locations: locations.split(';').map((s) => s.trim()).filter(Boolean),
       max_results: maxResults, scrape_enabled: scrapeEnabled,
     });
     setBusy(false);
@@ -461,13 +461,14 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
                 <input value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="hotels, lodges, guesthouses" style={FONT} className={inputCls} />
               </div>
               <div>
-                <label className={fieldLbl}>Locations <span className="normal-case font-normal">(comma-separated)</span></label>
-                <input value={locations} onChange={(e) => setLocations(e.target.value)} placeholder="Austin TX, Round Rock TX" style={FONT} className={inputCls} />
+                <label className={fieldLbl}>Locations <span className="normal-case font-normal">(semicolon-separated; use commas for City, State)</span></label>
+                <input value={locations} onChange={(e) => setLocations(e.target.value)} placeholder="Bloomington, IL; Normal, IL; Springfield, IL" style={FONT} className={inputCls} />
               </div>
               <div className="flex items-end gap-3">
                 <div className="flex-1">
                   <label className={fieldLbl}>Max results per run</label>
-                  <input type="number" min={1} max={500} value={maxResults} onChange={(e) => setMaxResults(Number(e.target.value))} style={FONT} className={inputCls} />
+                  <input type="number" min={1} max={1000} value={maxResults} onChange={(e) => setMaxResults(Math.min(1000, Number(e.target.value)))} style={FONT} className={inputCls} />
+                  <p className="mt-1 text-[11px] text-[#9a9d92]">Higher counts tend to yield more replies. Capped at 1,000 per campaign.</p>
                 </div>
                 <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[13px] text-[#62655c]">
                   <input type="checkbox" checked={scrapeEnabled} onChange={(e) => setScrapeEnabled(e.target.checked)} className="accent-[#3c7a5b]" />
@@ -523,7 +524,7 @@ function EditCampaignModal({
   const [description, setDescription] = useState(campaign.description ?? '');
   const [channel, setChannel]         = useState(campaign.channel);
   const [queries, setQueries]         = useState(campaign.search_queries.join(', '));
-  const [locations, setLocations]     = useState(campaign.target_locations.join(', '));
+  const [locations, setLocations]     = useState(campaign.target_locations.join('; '));
   const [maxResults, setMaxResults]   = useState(campaign.max_results);
   const [scrapeEnabled, setScrapeEnabled] = useState(campaign.scrape_enabled);
   const [busy, setBusy] = useState(false);
@@ -537,7 +538,7 @@ function EditCampaignModal({
       description: description.trim(),
       channel,
       search_queries: queries.split(',').map((s) => s.trim()).filter(Boolean),
-      target_locations: locations.split(',').map((s) => s.trim()).filter(Boolean),
+      target_locations: locations.split(';').map((s) => s.trim()).filter(Boolean),
       max_results: maxResults,
       scrape_enabled: scrapeEnabled,
     });
@@ -579,13 +580,14 @@ function EditCampaignModal({
               <input value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="hotels, lodges, guesthouses" style={FONT} className={campInputCls} />
             </div>
             <div>
-              <label className={campFieldLbl}>Locations <span className="normal-case font-normal">(comma-separated)</span></label>
-              <input value={locations} onChange={(e) => setLocations(e.target.value)} placeholder="Austin TX, Round Rock TX" style={FONT} className={campInputCls} />
+              <label className={campFieldLbl}>Locations <span className="normal-case font-normal">(semicolon-separated; use commas for City, State)</span></label>
+              <input value={locations} onChange={(e) => setLocations(e.target.value)} placeholder="Bloomington, IL; Normal, IL; Springfield, IL" style={FONT} className={campInputCls} />
             </div>
             <div className="flex items-end gap-3">
               <div className="flex-1">
                 <label className={campFieldLbl}>Max results per run</label>
-                <input type="number" min={1} max={500} value={maxResults} onChange={(e) => setMaxResults(Number(e.target.value))} style={FONT} className={campInputCls} />
+                <input type="number" min={1} max={1000} value={maxResults} onChange={(e) => setMaxResults(Math.min(1000, Number(e.target.value)))} style={FONT} className={campInputCls} />
+                <p className="mt-1 text-[11px] text-[#9a9d92]">Higher counts tend to yield more replies. Capped at 1,000 per campaign.</p>
               </div>
               <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[13px] text-[#62655c]">
                 <input type="checkbox" checked={scrapeEnabled} onChange={(e) => setScrapeEnabled(e.target.checked)} className="accent-[#3c7a5b]" />

@@ -4,7 +4,7 @@ import { useApprovalQueue } from '../../hooks/useApprovalQueue';
 import { SkeletonTable } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import type { QueueItem } from '../../types';
-import { Clock, CheckCircle2, Send, Ban } from 'lucide-react';
+import { Clock, CheckCircle2, Send, Ban, Eye } from 'lucide-react';
 
 const HELP: HelpContent = {
   title: 'Approval Queue',
@@ -27,6 +27,13 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 const PAGE_SIZE = 10;
+
+function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  const ten = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  if (ten.length !== 10) return raw;
+  return `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}`;
+}
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
@@ -134,6 +141,7 @@ export function ApprovalQueue() {
                       {item.prospect?.contact_name && (
                         <div className="mt-0.5 text-[11px] text-[#9a9d92]">{item.prospect.contact_name}</div>
                       )}
+                      <ProspectMeta item={item} className="mt-0.5" />
                     </td>
                     <td className="text-[#62655c]">{item.client?.business_name ?? '—'}</td>
                     <td>
@@ -141,8 +149,11 @@ export function ApprovalQueue() {
                         {TYPE_LABEL[item.message_type] ?? item.message_type}
                       </span>
                     </td>
-                    <td className="max-w-[240px] truncate text-[#62655c]">
-                      {item.subject ?? <span className="italic text-[#c4bfb5]">No subject</span>}
+                    <td className="max-w-[240px] text-[#62655c]">
+                      <div className="truncate">
+                        {item.subject ?? <span className="italic text-[#c4bfb5]">No subject</span>}
+                      </div>
+                      <OpenBadge item={item} />
                     </td>
                     <td className="px-3">
                       <div className="flex items-center justify-end gap-2">
@@ -182,6 +193,7 @@ export function ApprovalQueue() {
                     {item.prospect?.contact_name && (
                       <div className="mt-0.5 text-[11px] text-[#9a9d92]">{item.prospect.contact_name}</div>
                     )}
+                    <ProspectMeta item={item} className="mt-0.5" />
                   </div>
                   <span className="flex-shrink-0 inline-flex items-center whitespace-nowrap rounded-full bg-[#edf4ef] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em] text-[#3c7a5b]">
                     {TYPE_LABEL[item.message_type] ?? item.message_type}
@@ -193,6 +205,7 @@ export function ApprovalQueue() {
                 {item.subject && (
                   <div className="mt-1 truncate text-[12px] text-[#9a9d92]">{item.subject}</div>
                 )}
+                <OpenBadge item={item} className="mt-1" />
                 <div className="mt-3 border-t border-[#f5f2ec] pt-3 flex gap-2">
                   <button
                     onClick={() => approve(item.id)}
@@ -248,11 +261,40 @@ export function ApprovalQueue() {
             key="edit-modal"
             item={editItem}
             onClose={() => setEditItem(null)}
-            onApprove={(id, body) => { approve(id, body); setEditItem(null); }}
+            onApprove={(id, body, subject) => { approve(id, body, subject); setEditItem(null); }}
           />
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function ProspectMeta({ item, className = '' }: { item: QueueItem; className?: string }) {
+  const location = item.prospect?.location;
+  const phone    = item.prospect?.phone;
+  if (!location && !phone) return null;
+  return (
+    <div className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#9a9d92] ${className}`}>
+      {location && <span>{location}</span>}
+      {location && phone && <span className="text-[#c4bfb5]">·</span>}
+      {phone && <span className="font-mono">{formatPhone(phone)}</span>}
+    </div>
+  );
+}
+
+function OpenBadge({ item, className = '' }: { item: QueueItem; className?: string }) {
+  if (item.message_type === 'initial' || item.originalOpenCount <= 0) return null;
+  const title = item.originalOpenedAt
+    ? `Original message last opened ${new Date(item.originalOpenedAt).toLocaleString()}`
+    : undefined;
+  return (
+    <span
+      title={title}
+      className={`inline-flex items-center gap-1 text-[11px] font-semibold text-[#b9831f] ${className}`}
+    >
+      <Eye size={11} strokeWidth={2.2} />
+      Opened {item.originalOpenCount}x
+    </span>
   );
 }
 
@@ -321,10 +363,13 @@ function EditModal({
 }: {
   item: QueueItem;
   onClose: () => void;
-  onApprove: (id: string, body?: string) => void;
+  onApprove: (id: string, body?: string, subject?: string) => void;
 }) {
   const [draft, setDraft] = useState(item.body);
-  const dirty = draft.trim() !== item.body.trim();
+  const [subjectDraft, setSubjectDraft] = useState(item.subject ?? '');
+  const bodyDirty    = draft.trim() !== item.body.trim();
+  const subjectDirty = subjectDraft.trim() !== (item.subject ?? '').trim();
+  const dirty = bodyDirty || subjectDirty;
 
   return (
     <motion.div
@@ -359,10 +404,15 @@ function EditModal({
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
-          {item.subject && (
+          {item.subject !== null && (
             <div>
               <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">Subject</div>
-              <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] font-bold text-[#20211c]">{item.subject}</div>
+              <input
+                value={subjectDraft}
+                onChange={(e) => setSubjectDraft(e.target.value)}
+                style={{ ...FONT, boxShadow: '0 0 0 3px rgba(60,122,91,0.12)' }}
+                className="w-full rounded-xl border border-[#3c7a5b] bg-white px-3.5 py-2.5 text-[13px] font-bold text-[#20211c] outline-none"
+              />
             </div>
           )}
           <div>
@@ -387,7 +437,10 @@ function EditModal({
           <button onClick={onClose} className="cursor-pointer rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:bg-[#fbf9f5]">
             Cancel
           </button>
-          <button onClick={() => onApprove(item.id, dirty ? draft : undefined)} className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46]">
+          <button
+            onClick={() => onApprove(item.id, bodyDirty ? draft : undefined, subjectDirty ? subjectDraft : undefined)}
+            className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46]"
+          >
             {dirty ? 'Save & approve' : 'Approve'}
           </button>
         </div>

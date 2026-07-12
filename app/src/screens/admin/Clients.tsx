@@ -71,6 +71,10 @@ export function Clients() {
     if (err) {
       setInvitePhase((p) => ({ ...p, [c.id]: alreadyActive ? 'active' : 'error' }));
       if (!alreadyActive) setInviteErrors((e) => ({ ...e, [c.id]: err }));
+      // The edge function persists activated_at once it discovers a genuinely
+      // active account — reload so future page loads skip the round trip and
+      // show the disabled state up front instead of only finding out on click.
+      if (alreadyActive) reload();
     } else {
       setInvitePhase((p) => ({ ...p, [c.id]: 'sent' }));
     }
@@ -162,7 +166,10 @@ export function Clients() {
                             type: 'action',
                             label: phase === 'sent' || c.has_profile ? 'Resend invite' : 'Send invite',
                             onClick: () => handleInvite(c),
-                            disabled: !c.contact_email || phase === 'sending' || phase === 'active',
+                            disabled: !c.contact_email || phase === 'sending' || phase === 'active' || !!c.activated_at,
+                            title: (phase === 'active' || c.activated_at)
+                              ? "This client can already sign in — resending won't do anything. Have them log in directly, or use “Forgot password” on the login screen if they've lost access."
+                              : undefined,
                           },
                           { type: 'separator' },
                           { type: 'action', label: 'Delete client', destructive: true, onClick: () => setDeleteTarget(c) },
@@ -304,11 +311,15 @@ function InviteCell({
   if (phase === 'sent') {
     return <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#3c7a5b]">✓ Invite sent</span>;
   }
-  if (phase === 'active') {
+  if (phase === 'active' || client.activated_at) {
     return (
-      <span className="inline-flex items-center whitespace-nowrap rounded-full bg-[#f5f2ec] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em] text-[#62655c]">
+      <button
+        disabled
+        title="This client can already sign in — resending an invite won't do anything. Have them log in directly, or use “Forgot password” on the login screen if they've lost access."
+        className="cursor-not-allowed inline-flex items-center whitespace-nowrap rounded-full border border-[#ece8df] bg-[#f5f2ec] px-2 py-1 text-[8px] font-bold uppercase tracking-[.04em] text-[#9a9d92]"
+      >
         Account active
-      </span>
+      </button>
     );
   }
   return (
@@ -352,18 +363,82 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
   );
 }
 
+interface EnrichResult {
+  status: string;
+  business_type?: string;
+  location?: string;
+  services?: string[];
+  target_customer_profiles?: string[];
+  summary?: string;
+}
+
 /* ── New Client Modal ──────────────────────────────────────────────── */
 function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [businessName, setBusinessName]       = useState('');
   const [businessType, setBusinessType]       = useState('');
   const [location, setLocation]               = useState('');
+  const [websiteUrl, setWebsiteUrl]           = useState('');
   const [contactEmail, setContactEmail]       = useState('');
   const [contactPhone, setContactPhone]       = useState('');
   const [notifChannel, setNotifChannel]       = useState<NewClientInput['notification_channel']>('whatsapp');
   const [startingCredits, setStartingCredits] = useState(0);
   const [busy, setBusy]                       = useState(false);
   const [err, setErr]                         = useState<string | null>(null);
+  const [enriching, setEnriching]             = useState(false);
+  const [enrichErr, setEnrichErr]             = useState<string | null>(null);
+  const [enrichResult, setEnrichResult]       = useState<EnrichResult | null>(null);
   const reqStar = <span className="ml-0.5 text-[#a8533a]">*</span>;
+
+  async function handleEnrich() {
+    const url = websiteUrl.trim();
+    if (!url) return;
+    setEnriching(true); setEnrichErr(null);
+
+    let res: Response;
+    try {
+      res = await fetch('https://n8n.shortyharris.com/webhook/wf9-enrich-client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ website_url: url }),
+      });
+    } catch (e) {
+      // fetch() only throws for network-level failures — most commonly the n8n
+      // webhook not sending CORS headers back to this origin, or DNS/offline.
+      console.error('Enrich webhook unreachable:', e);
+      setEnrichErr('Could not reach the enrichment service — this usually means the n8n webhook isn\'t allowing requests from this site (CORS), or the workflow isn\'t active.');
+      setEnriching(false);
+      return;
+    }
+
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => '');
+      console.error('Enrich webhook returned an error:', res.status, bodyText);
+      setEnrichErr(`Enrichment service returned an error (HTTP ${res.status}). Check that the wf9-enrich-client workflow is active in n8n.`);
+      setEnriching(false);
+      return;
+    }
+
+    let json: EnrichResult;
+    try {
+      json = await res.json();
+    } catch (e) {
+      console.error('Enrich webhook returned non-JSON response:', e);
+      setEnrichErr('Enrichment service returned an unexpected response.');
+      setEnriching(false);
+      return;
+    }
+
+    if (json.status && json.status !== 'ok' && json.status !== 'success') {
+      setEnrichErr('Could not enrich from that website — fill in the details manually.');
+      setEnriching(false);
+      return;
+    }
+
+    setEnrichResult(json);
+    if (json.business_type) setBusinessType(json.business_type);
+    if (json.location) setLocation(json.location);
+    setEnriching(false);
+  }
 
   async function submit() {
     if (!businessName.trim()) { setErr('Business name is required.'); return; }
@@ -390,6 +465,41 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
         <div>
           <label className={fieldLbl}>Business name{reqStar}</label>
           <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. Acme Roofing" style={FONT} className={inputCls} />
+        </div>
+        <div>
+          <label className={fieldLbl}>Website URL</label>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value)}
+              onBlur={handleEnrich}
+              placeholder="https://acmeroofing.com"
+              style={FONT}
+              className={inputCls}
+            />
+            <button
+              type="button"
+              onClick={handleEnrich}
+              disabled={!websiteUrl.trim() || enriching}
+              className={`${ghostCls} shrink-0`}
+            >
+              {enriching ? 'Looking up…' : 'Enrich'}
+            </button>
+          </div>
+          <p className="mt-1 text-[11px] text-[#9a9d92]">Optional — auto-fills business type and location from the site.</p>
+          {enrichErr && <p className="mt-1 text-[11px] text-[#a8533a]">{enrichErr}</p>}
+          {enrichResult && (enrichResult.services?.length || enrichResult.target_customer_profiles?.length || enrichResult.summary) && (
+            <div className="mt-2 rounded-xl border border-[#3c7a5b]/20 bg-[#edf4ef] px-3.5 py-3 text-[12px] text-[#20211c] flex flex-col gap-1.5">
+              {enrichResult.summary && <p className="m-0 text-[#3c7a5b]">{enrichResult.summary}</p>}
+              {!!enrichResult.services?.length && (
+                <p className="m-0"><strong className="font-bold">Services:</strong> {enrichResult.services.join(', ')}</p>
+              )}
+              {!!enrichResult.target_customer_profiles?.length && (
+                <p className="m-0"><strong className="font-bold">Target customers:</strong> {enrichResult.target_customer_profiles.join(', ')}</p>
+              )}
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>

@@ -1,7 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useProspects, useClientsList, useClientCampaigns } from '../../hooks/useAdminData';
+import {
+  useProspects, useClientsList, useClientCampaigns,
+  updateProspect, getProspectDeleteCounts, deleteProspect,
+} from '../../hooks/useAdminData';
+import type { ProspectListRow, UpdateProspectInput, ProspectDeleteCounts } from '../../hooks/useAdminData';
 import { SkeletonTable } from '../../components/Skeleton';
 import { RowMenu } from '../../components/RowMenu';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
@@ -49,6 +53,7 @@ const PAGE_SIZE = 15;
 
 const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]';
 const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50';
+const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#a8533a] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#8a3f2b] disabled:opacity-50';
 
 export function Prospects() {
   const { rows, loading, error, reload, updateStatus } = useProspects();
@@ -57,6 +62,8 @@ export function Prospects() {
   const [cat, setCat]       = useState('all');
   const [page, setPage]     = useState(1);
   const [showAdd, setShowAdd] = useState(false);
+  const [editProspect, setEditProspect]   = useState<ProspectListRow | null>(null);
+  const [deleteTarget, setDeleteTarget]   = useState<ProspectListRow | null>(null);
 
   const categories = useMemo(
     () => Array.from(new Set(rows.map((r) => r.category).filter(Boolean))) as string[],
@@ -174,7 +181,7 @@ export function Prospects() {
                   const statusMenuItems = (
                     [
                       { type: 'header' as const, label: 'Set status' },
-                      ...(['new','contacted','replied','hot_lead','won','lost'] as const).map((s) => ({
+                      ...(['won','lost'] as const).map((s) => ({
                         type: 'action' as const,
                         label: STATUS_LABEL[s],
                         dot: STATUS_PILL[s]?.text ?? '#9a9d92',
@@ -193,6 +200,11 @@ export function Prospects() {
                         },
                       ]
                     : [];
+                  const editDeleteItems = [
+                    { type: 'separator' as const },
+                    { type: 'action' as const, label: 'Edit prospect', onClick: () => setEditProspect(r) },
+                    { type: 'action' as const, label: 'Delete prospect', destructive: true, onClick: () => setDeleteTarget(r) },
+                  ];
                   return (
                     <tr key={r.id}>
                       <td className="font-bold text-[#20211c]">{r.business_name}</td>
@@ -216,7 +228,7 @@ export function Prospects() {
                         </span>
                       </td>
                       <td className="px-3 text-right">
-                        <RowMenu items={[...statusMenuItems, ...copyEmailItem]} />
+                        <RowMenu items={[...statusMenuItems, ...copyEmailItem, ...editDeleteItems]} />
                       </td>
                     </tr>
                   );
@@ -276,6 +288,20 @@ export function Prospects() {
                       </>
                     )}
                   </div>
+                  <div className="mt-3 border-t border-[#f5f2ec] pt-3 flex gap-2">
+                    <button
+                      onClick={() => setEditProspect(r)}
+                      className="cursor-pointer rounded-lg border border-[#ece8df] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(r)}
+                      className="cursor-pointer rounded-lg border border-transparent bg-transparent px-3 py-1.5 text-[12px] font-semibold text-[#c4bfb5] transition-colors hover:border-[#a8533a]/30 hover:bg-[#fdf0ec] hover:text-[#a8533a]"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -321,6 +347,22 @@ export function Prospects() {
             key="new-prospect-modal"
             onClose={() => setShowAdd(false)}
             onCreated={() => { setShowAdd(false); reload(); }}
+          />
+        )}
+        {editProspect && (
+          <EditProspectModal
+            key={`edit-${editProspect.id}`}
+            prospect={editProspect}
+            onClose={() => setEditProspect(null)}
+            onSaved={() => { setEditProspect(null); reload(); }}
+          />
+        )}
+        {deleteTarget && (
+          <DeleteProspectModal
+            key={`delete-${deleteTarget.id}`}
+            prospect={deleteTarget}
+            onClose={() => setDeleteTarget(null)}
+            onDeleted={() => { setDeleteTarget(null); reload(); }}
           />
         )}
       </AnimatePresence>
@@ -491,6 +533,212 @@ function NewProspectModal({ onClose, onCreated }: { onClose: () => void; onCreat
           <button onClick={onClose} className={ghostCls}>Cancel</button>
           <button onClick={submit} disabled={busy} className={primaryCls}>
             {busy ? 'Importing…' : 'Import prospect'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ── Edit Prospect Modal ────────────────────────────────────────────── */
+function EditProspectModal({
+  prospect, onClose, onSaved,
+}: { prospect: ProspectListRow; onClose: () => void; onSaved: () => void }) {
+  const [businessName, setBusinessName] = useState(prospect.business_name);
+  const [contactName, setContactName]   = useState(prospect.contact_name ?? '');
+  const [email, setEmail]               = useState(prospect.email ?? '');
+  const [phone, setPhone]               = useState(prospect.phone ?? '');
+  const [category, setCategory]         = useState(prospect.category ?? '');
+  const [location, setLocation]         = useState(prospect.location ?? '');
+  const [busy, setBusy]                 = useState(false);
+  const [err, setErr]                   = useState<string | null>(null);
+
+  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
+  const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+
+  async function submit() {
+    if (!businessName.trim()) { setErr('Business name is required.'); return; }
+    setBusy(true); setErr(null);
+    const input: UpdateProspectInput = {
+      business_name: businessName.trim(),
+      contact_name:  contactName.trim(),
+      email:         email.trim(),
+      phone:         phone.trim(),
+      category:      category.trim(),
+      location:      location.trim(),
+    };
+    const { error } = await updateProspect(prospect.id, input);
+    setBusy(false);
+    if (error) setErr(error.message); else onSaved();
+  }
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClose}
+    >
+      <motion.div
+        style={FONT}
+        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[540px] md:rounded-2xl md:shadow-2xl"
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
+          <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Edit prospect</h2>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        </div>
+
+        {/* Form body */}
+        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+          <div>
+            <label className={fieldLbl}>Business name <span className="text-[#a8533a]">*</span></label>
+            <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} style={FONT} className={inputCls} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={fieldLbl}>Contact name</label>
+              <input value={contactName} onChange={(e) => setContactName(e.target.value)} style={FONT} className={inputCls} />
+            </div>
+            <div>
+              <label className={fieldLbl}>Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={FONT} className={inputCls} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={fieldLbl}>Phone</label>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={FONT} className={inputCls} />
+            </div>
+            <div>
+              <label className={fieldLbl}>Category</label>
+              <input value={category} onChange={(e) => setCategory(e.target.value)} style={FONT} className={inputCls} />
+            </div>
+          </div>
+
+          <div>
+            <label className={fieldLbl}>Location</label>
+            <input value={location} onChange={(e) => setLocation(e.target.value)} style={FONT} className={inputCls} />
+          </div>
+
+          {err && (
+            <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+          <button onClick={onClose} className={ghostCls}>Cancel</button>
+          <button onClick={submit} disabled={busy} className={primaryCls}>
+            {busy ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ── Delete Prospect Modal ─────────────────────────────────────────── */
+function DeleteProspectModal({
+  prospect, onClose, onDeleted,
+}: { prospect: ProspectListRow; onClose: () => void; onDeleted: () => void }) {
+  const [counts, setCounts] = useState<ProspectDeleteCounts | null>(null);
+  const [busy, setBusy]     = useState(false);
+  const [err, setErr]       = useState<string | null>(null);
+
+  useEffect(() => {
+    getProspectDeleteCounts(prospect.id).then(setCounts);
+  }, [prospect.id]);
+
+  async function confirm() {
+    setBusy(true); setErr(null);
+    const { error } = await deleteProspect(prospect.id);
+    setBusy(false);
+    if (error) setErr(error); else onDeleted();
+  }
+
+  const blastItems = counts
+    ? [
+        counts.messages  > 0 && `${counts.messages} message${counts.messages !== 1 ? 's' : ''}`,
+        counts.hot_leads > 0 && `${counts.hot_leads} hot lead${counts.hot_leads !== 1 ? 's' : ''}`,
+        counts.replies   > 0 && `${counts.replies} repl${counts.replies !== 1 ? 'ies' : 'y'}`,
+      ].filter(Boolean)
+    : [];
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClose}
+    >
+      <motion.div
+        style={FONT}
+        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[540px] md:rounded-2xl md:shadow-2xl"
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
+          <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Delete prospect</h2>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+          <div className="rounded-xl border border-[#a8533a]/20 bg-[#fdf0ec] px-4 py-4">
+            <p className="m-0 text-[14px] font-bold text-[#a8533a]">
+              Permanently delete "{prospect.business_name}"?
+            </p>
+            <p className="m-0 mt-1.5 text-[13px] text-[#a8533a]/80">
+              This action cannot be undone. All data associated with this prospect will be permanently deleted.
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">This will permanently delete:</p>
+            {!counts ? (
+              <div className="flex items-center gap-2 text-[13px] text-[#9a9d92]">
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#ddd8cb] border-t-[#a8533a]" />
+                Counting affected records…
+              </div>
+            ) : blastItems.length === 0 ? (
+              <p className="text-[13px] text-[#62655c]">No associated records — the prospect row only.</p>
+            ) : (
+              <ul className="m-0 list-none p-0 flex flex-col gap-1">
+                {blastItems.map((item) => (
+                  <li key={String(item)} className="flex items-center gap-2 text-[13px] text-[#62655c]">
+                    <span className="text-[#a8533a]">✕</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {err && (
+            <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+          <button onClick={onClose} className={ghostCls}>Cancel</button>
+          <button onClick={confirm} disabled={busy || !counts} className={dangerCls}>
+            {busy ? 'Deleting…' : `Delete ${prospect.business_name}`}
           </button>
         </div>
       </motion.div>

@@ -46,7 +46,10 @@ export function Login() {
             </label>
 
             <label className="login-field">
-              <span>Password</span>
+              <div className="login-field-head">
+                <span>Password</span>
+                <Link to="/forgot-password" className="login-forgot-link">Forgot password?</Link>
+              </div>
               <div className="login-pw-wrap">
                 <input
                   type={showPw ? 'text' : 'password'}

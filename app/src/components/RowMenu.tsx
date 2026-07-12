@@ -2,27 +2,36 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 export type MenuItem =
-  | { type: 'action'; label: string; onClick: () => void; destructive?: boolean; dot?: string; checked?: boolean; disabled?: boolean }
+  | { type: 'action'; label: string; onClick: () => void; destructive?: boolean; dot?: string; checked?: boolean; disabled?: boolean; title?: string }
   | { type: 'separator' }
   | { type: 'header'; label: string };
 
+const MARGIN = 8;
+
 export function RowMenu({ items }: { items: MenuItem[] }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos]   = useState({ top: 0, left: 0 });
+  const [pos, setPos]   = useState({ left: 0, top: undefined as number | undefined, bottom: undefined as number | undefined, maxHeight: 320 });
   const btnRef  = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   function handleOpen(e: React.MouseEvent) {
     e.stopPropagation();
     if (!btnRef.current) return;
-    const rect   = btnRef.current.getBoundingClientRect();
-    const menuW  = 192;
-    // right-align to button, but don't go off left edge
-    const left   = Math.max(8, rect.right - menuW);
-    // flip above if near bottom
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const top = spaceBelow < 240 ? rect.top - 8 - Math.min(spaceBelow < 100 ? 220 : 180, 220) : rect.bottom + 4;
-    setPos({ top, left });
+    const rect  = btnRef.current.getBoundingClientRect();
+    const menuW = 192;
+    // right-align to button, clamped within the viewport
+    const left = Math.max(MARGIN, Math.min(rect.right - menuW, window.innerWidth - menuW - MARGIN));
+
+    const spaceBelow = window.innerHeight - rect.bottom - MARGIN;
+    const spaceAbove = rect.top - MARGIN;
+    // prefer opening below; flip above only when below is cramped and above has more room
+    const openAbove = spaceBelow < 160 && spaceAbove > spaceBelow;
+
+    if (openAbove) {
+      setPos({ left, top: undefined, bottom: window.innerHeight - rect.top + 4, maxHeight: Math.max(120, spaceAbove) });
+    } else {
+      setPos({ left, top: rect.bottom + 4, bottom: undefined, maxHeight: Math.max(120, spaceBelow) });
+    }
     setOpen((v) => !v);
   }
 
@@ -58,8 +67,15 @@ export function RowMenu({ items }: { items: MenuItem[] }) {
       {open && createPortal(
         <div
           ref={menuRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
-          className="w-48 overflow-hidden rounded-xl border border-[#ece8df] bg-white py-1 shadow-[0_8px_28px_rgba(0,0,0,0.12)]"
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            bottom: pos.bottom,
+            left: pos.left,
+            maxHeight: pos.maxHeight,
+            zIndex: 9999,
+          }}
+          className="w-48 overflow-y-auto overscroll-contain rounded-xl border border-[#ece8df] bg-white py-1 shadow-[0_8px_28px_rgba(0,0,0,0.12)]"
         >
           {items.map((item, i) => {
             if (item.type === 'separator') {
@@ -76,6 +92,7 @@ export function RowMenu({ items }: { items: MenuItem[] }) {
               <button
                 key={i}
                 disabled={item.disabled}
+                title={item.title}
                 onClick={(e) => { e.stopPropagation(); item.onClick(); setOpen(false); }}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                   item.disabled ? 'cursor-not-allowed' : 'cursor-pointer'

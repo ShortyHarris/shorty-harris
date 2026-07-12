@@ -229,7 +229,7 @@ export function Analytics() {
                                 )}
                               </div>
                               <div className="mt-1 text-[26px] font-extrabold tabular-nums text-[#20211c]">{v.replyRate}%</div>
-                              <div className="text-[12px] text-[#9a9d92]">{v.replies} replies / {v.visits} sent</div>
+                              <div className="text-[12px] text-[#9a9d92]">{v.replies} replies / {v.sent} sent</div>
                             </div>
                           );
                         })}

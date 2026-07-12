@@ -47,6 +47,19 @@
     @apply block text-[13px] font-semibold mb-1.5;
     color: #4d5247;
   }
+  .login-field-head {
+    @apply flex items-center justify-between mb-1.5;
+  }
+  .login-field-head > span {
+    @apply text-[13px] font-semibold m-0;
+    color: #4d5247;
+  }
+
+  .login-forgot-link {
+    @apply text-[12.5px] font-semibold no-underline;
+    color: #3c7a5b;
+  }
+  .login-forgot-link:hover { text-decoration: underline; }
   .login-field input {
     @apply w-full text-sm outline-none;
     border: 1px solid #e0ddd6;

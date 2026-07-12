@@ -39,6 +39,27 @@ async function fetchQueueItems(): Promise<QueueItem[]> {
 
   if (error) throw new Error(error.message);
 
+  const prospectIds = Array.from(
+    new Set((data ?? []).map((row: Record<string, unknown>) => row.prospect_id as string))
+  );
+
+  const originalOpens: Record<string, { opened_at: string | null; open_count: number }> = {};
+  if (prospectIds.length > 0) {
+    const { data: originals } = await supabase
+      .from('messages')
+      .select('prospect_id, opened_at, open_count')
+      .in('prospect_id', prospectIds)
+      .eq('message_type', 'initial')
+      .eq('send_status', 'sent');
+
+    (originals ?? []).forEach((o: Record<string, unknown>) => {
+      originalOpens[o.prospect_id as string] = {
+        opened_at: o.opened_at as string | null,
+        open_count: (o.open_count as number) ?? 0,
+      };
+    });
+  }
+
   return (data ?? []).map((row: Record<string, unknown>) => ({
     ...row,
     prospect: Array.isArray(row.prospect)
@@ -47,6 +68,8 @@ async function fetchQueueItems(): Promise<QueueItem[]> {
     client: Array.isArray(row.client)
       ? row.client[0] ?? null
       : row.client ?? null,
+    originalOpenedAt: originalOpens[row.prospect_id as string]?.opened_at ?? null,
+    originalOpenCount: originalOpens[row.prospect_id as string]?.open_count ?? 0,
   })) as QueueItem[];
 }
 
@@ -123,7 +146,7 @@ export function useApprovalQueue() {
     };
   }, []);
 
-  const approve = useCallback(async (id: string, editedBody?: string) => {
+  const approve = useCallback(async (id: string, editedBody?: string, editedSubject?: string) => {
     queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) =>
       prev.filter((i) => i.id !== id)
     );
@@ -136,6 +159,10 @@ export function useApprovalQueue() {
 
     if (editedBody !== undefined) {
       patch.body = editedBody;
+    }
+
+    if (editedSubject !== undefined) {
+      patch.subject = editedSubject;
     }
 
     const { error } = await supabase

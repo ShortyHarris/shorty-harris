@@ -16,6 +16,8 @@ export interface MessageRow {
   approval_status: ApprovalStatus;
   approved_at: string | null;
   send_status: SendStatus;
+  opened_at: string | null;
+  open_count: number;
   created_at: string;
 }
 
@@ -39,6 +41,8 @@ export interface ClientRow {
 export interface QueueItem extends MessageRow {
   prospect: ProspectRow | null;
   client: ClientRow | null;
+  originalOpenedAt: string | null;
+  originalOpenCount: number;
 }
 
 // ---- Client types ----

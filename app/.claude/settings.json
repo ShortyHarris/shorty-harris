@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find .. -iname \"*.sql\" 2>/dev/null | grep -v node_modules; echo \"---\"; find / -maxdepth 3 -iname \"*supabase*\" 2>/dev/null | grep -v node_modules | head -20)",
+      "Read(//c//**)",
+      "Bash(git grep *)",
+      "Bash(npx eslint *)",
+      "Bash(grep -o \"\\\\.max-h-\\\\\\\\\\\\\\\\\\\\[--radix-select-content-available-height\\\\\\\\\\\\\\\\\\\\][^}]*}\" dist/assets/*.css)",
+      "Bash(git stash *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\user\\Desktop\\shorty-harris-repo\\shorty-harris-repo\\supabase\\functions\\invite-client",
+      "c:\\Users\\user\\Desktop\\shorty-harris-repo\\shorty-harris-repo\\docs"
+    ]
+  }
+}

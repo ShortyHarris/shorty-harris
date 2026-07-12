@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
 import { Login } from './screens/Login';
+import { ForgotPassword } from './screens/ForgotPassword';
 import { SetPassword } from './screens/SetPassword';
 import { AdminLayout } from './screens/admin/Layout';
 import { Shell } from './screens/client/Shell';
@@ -166,6 +167,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<LoginRoute />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/auth/set-password" element={<SetPassword />} />
 
       <Route path="/__preview-dashboard" element={

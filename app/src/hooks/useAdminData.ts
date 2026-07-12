@@ -20,6 +20,7 @@ export interface ProspectListRow {
   business_name: string;
   contact_name: string | null;
   email: string | null;
+  phone: string | null;
   category: string | null;
   location: string | null;
   pipeline_status: string;
@@ -29,7 +30,7 @@ export interface ProspectListRow {
 async function fetchProspects(): Promise<ProspectListRow[]> {
   const { data, error } = await supabase
     .from('prospects')
-    .select(`id, business_name, contact_name, email, category, location, pipeline_status,
+    .select(`id, business_name, contact_name, email, phone, category, location, pipeline_status,
              client:clients ( business_name )`)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
@@ -68,6 +69,51 @@ export function useProspects() {
     reload: () => queryClient.invalidateQueries({ queryKey: QK.prospects }),
     updateStatus,
   };
+}
+
+export interface UpdateProspectInput {
+  business_name: string;
+  contact_name: string;
+  email: string;
+  phone: string;
+  category: string;
+  location: string;
+}
+
+export async function updateProspect(id: string, input: UpdateProspectInput) {
+  return supabase.from('prospects').update({
+    business_name: input.business_name,
+    contact_name: input.contact_name || null,
+    email: input.email || null,
+    phone: input.phone || null,
+    category: input.category || null,
+    location: input.location || null,
+    updated_at: new Date().toISOString(),
+  }).eq('id', id);
+}
+
+export interface ProspectDeleteCounts {
+  messages: number;
+  hot_leads: number;
+  replies: number;
+}
+
+export async function getProspectDeleteCounts(prospectId: string): Promise<ProspectDeleteCounts> {
+  const [msgs, hls, reps] = await Promise.all([
+    supabase.from('messages').select('id', { count: 'exact', head: true }).eq('prospect_id', prospectId),
+    supabase.from('hot_leads').select('id', { count: 'exact', head: true }).eq('prospect_id', prospectId),
+    supabase.from('replies').select('id', { count: 'exact', head: true }).eq('prospect_id', prospectId),
+  ]);
+  return {
+    messages:  msgs.count ?? 0,
+    hot_leads: hls.count ?? 0,
+    replies:   reps.count ?? 0,
+  };
+}
+
+export async function deleteProspect(prospectId: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('prospects').delete().eq('id', prospectId);
+  return { error: error?.message ?? null };
 }
 
 // ─── Campaigns ───────────────────────────────────────────────────────────────
@@ -242,6 +288,7 @@ export interface ClientListRow {
   status: string;
   created_at: string;
   has_profile: boolean;
+  activated_at: string | null;
 }
 
 async function fetchClients(): Promise<ClientListRow[]> {
@@ -251,16 +298,22 @@ async function fetchClients(): Promise<ClientListRow[]> {
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
-  const base = (data ?? []) as Omit<ClientListRow, 'has_profile'>[];
+  const base = (data ?? []) as Omit<ClientListRow, 'has_profile' | 'activated_at'>[];
   if (base.length === 0) return [];
 
   const { data: profileData } = await supabase
     .from('profiles')
-    .select('client_id')
+    .select('client_id, activated_at')
     .in('client_id', base.map((c) => c.id));
-  const profiled = new Set((profileData ?? []).map((p: { client_id: string }) => p.client_id));
+  const profileByClient = new Map(
+    (profileData ?? []).map((p: { client_id: string; activated_at: string | null }) => [p.client_id, p.activated_at]),
+  );
 
-  return base.map((c) => ({ ...c, has_profile: profiled.has(c.id) }));
+  return base.map((c) => ({
+    ...c,
+    has_profile: profileByClient.has(c.id),
+    activated_at: profileByClient.get(c.id) ?? null,
+  }));
 }
 
 export function useClients() {

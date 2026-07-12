@@ -14,7 +14,7 @@ export interface ABTestView {
   id: string;
   name: string;
   status: string;
-  variants: { key: string; visits: number; replies: number; replyRate: number }[];
+  variants: { key: string; sent: number; replies: number; replyRate: number }[];
 }
 
 async function fetchAnalytics(): Promise<Analytics> {
@@ -59,13 +59,13 @@ async function fetchAnalytics(): Promise<Analytics> {
     return {
       id: t.id, name: t.name, status: t.status,
       variants: tvs.map((v: Record<string, unknown>) => {
-        const visits = metrics
-          .filter((m: Record<string, unknown>) => m.variant_id === v.id && m.metric === 'visit')
+        const sent = metrics
+          .filter((m: Record<string, unknown>) => m.variant_id === v.id && m.metric === 'sent')
           .reduce((a, m: Record<string, unknown>) => a + Number(m.value), 0);
         const reps = metrics
           .filter((m: Record<string, unknown>) => m.variant_id === v.id && m.metric === 'reply')
           .reduce((a, m: Record<string, unknown>) => a + Number(m.value), 0);
-        return { key: v.variant_key as string, visits, replies: reps, replyRate: visits ? Math.round((reps / visits) * 100) : 0 };
+        return { key: v.variant_key as string, sent, replies: reps, replyRate: sent ? Math.round((reps / sent) * 100) : 0 };
       }),
     };
   });

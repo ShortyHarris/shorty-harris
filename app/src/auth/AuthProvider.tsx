@@ -15,6 +15,7 @@ interface AuthState {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: string | null }>;
 }
 
 const AuthCtx = createContext<AuthState | undefined>(undefined);
@@ -85,8 +86,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadedProfileId.current = null;
   };
 
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/set-password`,
+    });
+    return { error: error?.message ?? null };
+  };
+
   return (
-    <AuthCtx.Provider value={{ session, profile, loading, signIn, signOut }}>
+    <AuthCtx.Provider value={{ session, profile, loading, signIn, signOut, resetPassword }}>
       {children}
     </AuthCtx.Provider>
   );
