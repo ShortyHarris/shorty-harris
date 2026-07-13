@@ -9,6 +9,7 @@ import type { ProspectListRow, UpdateProspectInput, ProspectDeleteCounts } from 
 import { SkeletonTable } from '../../components/Skeleton';
 import { RowMenu } from '../../components/RowMenu';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
+import { isValidEmail, isValidPhone, normalizePhone } from '../../lib/validation';
 
 const HELP: HelpContent = {
   title: 'Prospects',
@@ -396,6 +397,8 @@ function NewProspectModal({ onClose, onCreated }: { onClose: () => void; onCreat
     if (!clientId)             { setErr('Select a client.'); return; }
     if (!campaignId)           { setErr('Select a campaign.'); return; }
     if (!businessName.trim())  { setErr('Business name is required.'); return; }
+    if (email.trim() && !isValidEmail(email))    { setErr('Enter a valid email address.'); return; }
+    if (phone.trim() && !isValidPhone(phone))    { setErr('Enter a valid phone number.'); return; }
     setBusy(true); setErr(null);
     try {
       const res = await fetch('https://n8n.shortyharris.com/webhook/wf1-import', {
@@ -407,7 +410,7 @@ function NewProspectModal({ onClose, onCreated }: { onClose: () => void; onCreat
           business_name: businessName.trim(),
           contact_name:  contactName.trim(),
           email:         email.trim(),
-          phone:         phone.trim(),
+          phone:         phone.trim() ? normalizePhone(phone) : '',
           category:      category.trim(),
           location:      location.trim(),
         }),
@@ -558,12 +561,14 @@ function EditProspectModal({
 
   async function submit() {
     if (!businessName.trim()) { setErr('Business name is required.'); return; }
+    if (email.trim() && !isValidEmail(email)) { setErr('Enter a valid email address.'); return; }
+    if (phone.trim() && !isValidPhone(phone)) { setErr('Enter a valid phone number.'); return; }
     setBusy(true); setErr(null);
     const input: UpdateProspectInput = {
       business_name: businessName.trim(),
       contact_name:  contactName.trim(),
       email:         email.trim(),
-      phone:         phone.trim(),
+      phone:         phone.trim() ? normalizePhone(phone) : '',
       category:      category.trim(),
       location:      location.trim(),
     };

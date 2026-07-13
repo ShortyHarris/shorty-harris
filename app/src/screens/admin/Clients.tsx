@@ -10,6 +10,7 @@ import type {
 import { SkeletonTable } from '../../components/Skeleton';
 import { RowMenu } from '../../components/RowMenu';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
+import { isValidEmail, isValidPhone, normalizePhone } from '../../lib/validation';
 
 const HELP: HelpContent = {
   title: 'Clients',
@@ -443,12 +444,14 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
   async function submit() {
     if (!businessName.trim()) { setErr('Business name is required.'); return; }
     if (!contactEmail.trim()) { setErr('Contact email is required.'); return; }
+    if (!isValidEmail(contactEmail)) { setErr('Enter a valid contact email address.'); return; }
     if (!contactPhone.trim()) { setErr('Contact phone is required.'); return; }
+    if (!isValidPhone(contactPhone)) { setErr('Enter a valid contact phone number.'); return; }
     setBusy(true); setErr(null);
     const { error } = await createClient({
       business_name: businessName.trim(), business_type: businessType.trim(),
       location: location.trim(), contact_email: contactEmail.trim(),
-      contact_phone: contactPhone.trim(), notification_channel: notifChannel,
+      contact_phone: normalizePhone(contactPhone), notification_channel: notifChannel,
       starting_credits: startingCredits,
     });
     setBusy(false);
@@ -568,12 +571,14 @@ function EditClientModal({
   async function submit() {
     if (!businessName.trim()) { setErr('Business name is required.'); return; }
     if (!contactEmail.trim()) { setErr('Contact email is required.'); return; }
+    if (!isValidEmail(contactEmail)) { setErr('Enter a valid contact email address.'); return; }
     if (!contactPhone.trim()) { setErr('Contact phone is required.'); return; }
+    if (!isValidPhone(contactPhone)) { setErr('Enter a valid contact phone number.'); return; }
     setBusy(true); setErr(null);
     const { error } = await updateClient(client.id, {
       business_name: businessName.trim(), business_type: businessType.trim(),
       location: location.trim(), contact_email: contactEmail.trim(),
-      contact_phone: contactPhone.trim(), notification_channel: notifChannel, status,
+      contact_phone: normalizePhone(contactPhone), notification_channel: notifChannel, status,
     });
     setBusy(false);
     if (error) setErr(error.message); else onSaved();
