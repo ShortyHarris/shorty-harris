@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build && node scripts/generate-blog-static.mjs",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "blog:generate": "node scripts/generate-blog-static.mjs",
+    "blog:preview": "npm run build && npx serve dist"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.3.1",
