@@ -182,11 +182,28 @@ export function usePublishedBlogPosts() {
     queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published });
   }, []);
 
+  // Permanently removes a live post from the public site — distinct from
+  // useBlogQueue's deleteForRegeneration, which is for pending drafts WF12
+  // will redraft. There's no "regenerate" implication for something that
+  // already went live.
+  const deletePublished = useCallback(async (id: string) => {
+    queryClient.setQueryData<BlogPost[]>(BLOG_KEYS.published, (prev = []) =>
+      prev.filter((p) => p.id !== id)
+    );
+
+    const { error } = await supabase.from('blog_posts').delete().eq('id', id);
+    if (error) {
+      queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published });
+      throw new Error(error.message);
+    }
+  }, []);
+
   return {
     posts,
     loading,
     error: (error as Error)?.message ?? null,
     saveEdits,
+    deletePublished,
     reload: () => queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published }),
   };
 }

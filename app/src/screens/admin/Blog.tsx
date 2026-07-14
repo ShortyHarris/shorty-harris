@@ -49,7 +49,7 @@ export function Blog() {
     approveAndPublish, reject, deleteForRegeneration, reload,
   } = useBlogQueue();
   const {
-    posts: published, loading: publishedLoading, saveEdits, reload: reloadPublished,
+    posts: published, loading: publishedLoading, saveEdits, deletePublished, reload: reloadPublished,
   } = usePublishedBlogPosts();
 
   const [view, setView]           = useState<'pending' | 'published'>('pending');
@@ -97,7 +97,11 @@ export function Blog() {
     if (!deleteTarget) return;
     setBusyId(deleteTarget.id);
     try {
-      await deleteForRegeneration(deleteTarget.id);
+      if (deleteTarget.status === 'published') {
+        await deletePublished(deleteTarget.id);
+      } else {
+        await deleteForRegeneration(deleteTarget.id);
+      }
       setDeleteTarget(null);
     } finally {
       setBusyId(null);
@@ -634,13 +638,22 @@ function ReviewModal({
               </button>
             </>
           ) : (
-            <button
-              onClick={submitSave}
-              disabled={busy || !title.trim()}
-              className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50"
-            >
-              {busy ? 'Saving…' : 'Save changes'}
-            </button>
+            <>
+              <button
+                onClick={onDelete}
+                disabled={busy}
+                className="cursor-pointer rounded-xl border border-transparent bg-transparent px-4 py-2 text-[13px] font-semibold text-[#c4bfb5] transition-colors hover:border-[#a8533a]/30 hover:bg-[#fdf0ec] hover:text-[#a8533a] disabled:opacity-50"
+              >
+                Delete
+              </button>
+              <button
+                onClick={submitSave}
+                disabled={busy || !title.trim()}
+                className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50"
+              >
+                {busy ? 'Saving…' : 'Save changes'}
+              </button>
+            </>
           )}
         </div>
       </motion.div>
@@ -726,6 +739,8 @@ function RejectModal({
 function DeleteModal({
   post, busy, onClose, onConfirm,
 }: { post: BlogPost; busy: boolean; onClose: () => void; onConfirm: () => void }) {
+  const isPublished = post.status === 'published';
+
   return (
     <motion.div
       className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
@@ -741,14 +756,16 @@ function DeleteModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Delete draft</h2>
+          <h2 className="m-0 text-[18px] font-bold text-[#20211c]">{isPublished ? 'Delete post' : 'Delete draft'}</h2>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-3">
           <div className="rounded-xl border border-[#a8533a]/20 bg-[#fdf0ec] px-4 py-4">
             <p className="m-0 text-[14px] font-bold text-[#a8533a]">Delete "{post.title}"?</p>
             <p className="m-0 mt-1.5 text-[13px] text-[#a8533a]/80">
-              This isn't a rejection — WF12 will treat the topic as still needing a post and draft a fresh one on its next scheduled run.
+              {isPublished
+                ? 'This permanently removes it from the public site. This cannot be undone.'
+                : "This isn't a rejection — WF12 will treat the topic as still needing a post and draft a fresh one on its next scheduled run."}
             </p>
           </div>
         </div>
@@ -759,7 +776,7 @@ function DeleteModal({
             disabled={busy}
             className="cursor-pointer rounded-xl border-0 bg-[#a8533a] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#8a3f2b] disabled:opacity-50"
           >
-            {busy ? 'Deleting…' : 'Delete draft'}
+            {busy ? 'Deleting…' : isPublished ? 'Delete post' : 'Delete draft'}
           </button>
         </div>
       </motion.div>
