@@ -94,6 +94,35 @@ function ClientZone() {
   );
 }
 
+// ── Blog dev notice ──────────────────────────────────────────────────────────
+// /blog is generated as static HTML at build time (see
+// scripts/generate-blog-static.mjs) — it isn't a React page. In production,
+// Vercel serves the real static file directly and this route is never
+// reached. It only renders when `npm run dev` (which has no knowledge of the
+// generated static files) falls back to the SPA for an unmatched path —
+// replacing what would otherwise be a confusing redirect to /login.
+
+function BlogDevNotice() {
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: '#f7f4ee', padding: 24, textAlign: 'center',
+      fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+    }}>
+      <div style={{ maxWidth: 440 }}>
+        <h1 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 800, color: '#20211c' }}>
+          Blog isn't served by npm run dev
+        </h1>
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: '#62655c' }}>
+          The public blog is generated as static HTML at build time, not rendered by this app.
+          Run <code>npm run blog:preview</code> in a terminal to build and view it locally,
+          or visit the deployed site directly.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Shared UI ────────────────────────────────────────────────────────────────
 
 function Spinner() {
@@ -169,6 +198,9 @@ function AppRoutes() {
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/auth/set-password" element={<SetPassword />} />
+
+      <Route path="/blog" element={<BlogDevNotice />} />
+      <Route path="/blog/*" element={<BlogDevNotice />} />
 
       <Route path="/__preview-dashboard" element={
         <div className="theme-client">
