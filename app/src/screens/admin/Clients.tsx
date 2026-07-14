@@ -36,6 +36,7 @@ const CHANNEL_PILL: Record<string, { bg: string; text: string }> = {
 };
 
 const STATUS_PILL: Record<string, { bg: string; text: string }> = {
+  draft:   { bg: '#f5f2ec', text: '#62655c' },
   active:  { bg: '#edf4ef', text: '#3c7a5b' },
   paused:  { bg: '#f8efdb', text: '#b9831f' },
   churned: { bg: '#f5f2ec', text: '#9a9d92' },
@@ -364,14 +365,39 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
   );
 }
 
+interface EnrichTargetProfile {
+  segment: string;
+  reasoning: string;
+  priority: string;
+}
+
 interface EnrichResult {
-  status: string;
+  status: 'ok' | 'error' | string;
+  reason?: string;
+  detail?: string;
+  website_url?: string;
+  business_name?: string;
   business_type?: string;
   location?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  founder_name?: string;
   services?: string[];
-  target_customer_profiles?: string[];
+  target_customer_profiles?: EnrichTargetProfile[];
   summary?: string;
+  limited_data?: boolean;
 }
+
+const ENRICH_ERROR_MESSAGES: Record<string, string> = {
+  could_not_fetch_website: "Couldn't reach that website — check the URL.",
+  'website_url is required': 'Website URL is required.',
+  enrichment_generation_failed: 'Enrichment temporarily unavailable — try again.',
+};
+
+// Fields the enrichment call can fill — used to fill gaps only (never
+// overwrite what the admin already typed) and to track which of them came
+// back genuinely empty (AI searched but found nothing) vs never asked about.
+type EnrichableField = 'businessName' | 'businessType' | 'location' | 'contactEmail' | 'contactPhone';
 
 /* ── New Client Modal ──────────────────────────────────────────────── */
 function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
@@ -383,12 +409,23 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
   const [contactPhone, setContactPhone]       = useState('');
   const [notifChannel, setNotifChannel]       = useState<NewClientInput['notification_channel']>('whatsapp');
   const [startingCredits, setStartingCredits] = useState(0);
+  const [saveAsDraft, setSaveAsDraft]         = useState(false);
   const [busy, setBusy]                       = useState(false);
   const [err, setErr]                         = useState<string | null>(null);
   const [enriching, setEnriching]             = useState(false);
   const [enrichErr, setEnrichErr]             = useState<string | null>(null);
   const [enrichResult, setEnrichResult]       = useState<EnrichResult | null>(null);
+  const [notFoundFields, setNotFoundFields]   = useState<Set<EnrichableField>>(new Set());
   const reqStar = <span className="ml-0.5 text-[#a8533a]">*</span>;
+
+  function clearNotFound(field: EnrichableField) {
+    setNotFoundFields((prev) => {
+      if (!prev.has(field)) return prev;
+      const next = new Set(prev);
+      next.delete(field);
+      return next;
+    });
+  }
 
   async function handleEnrich() {
     const url = websiteUrl.trim();
@@ -400,13 +437,13 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
       res = await fetch('https://n8n.shortyharris.com/webhook/wf9-enrich-client', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ website_url: url }),
+        body: JSON.stringify({ website_url: url, business_name: businessName.trim() }),
       });
     } catch (e) {
       // fetch() only throws for network-level failures — most commonly the n8n
       // webhook not sending CORS headers back to this origin, or DNS/offline.
       console.error('Enrich webhook unreachable:', e);
-      setEnrichErr('Could not reach the enrichment service — this usually means the n8n webhook isn\'t allowing requests from this site (CORS), or the workflow isn\'t active.');
+      setEnrichErr("Couldn't reach the enrichment service — check your connection, or the n8n workflow may not be active.");
       setEnriching(false);
       return;
     }
@@ -414,7 +451,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
     if (!res.ok) {
       const bodyText = await res.text().catch(() => '');
       console.error('Enrich webhook returned an error:', res.status, bodyText);
-      setEnrichErr(`Enrichment service returned an error (HTTP ${res.status}). Check that the wf9-enrich-client workflow is active in n8n.`);
+      setEnrichErr(`Enrichment service returned an error (HTTP ${res.status}).`);
       setEnriching(false);
       return;
     }
@@ -429,30 +466,63 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
       return;
     }
 
-    if (json.status && json.status !== 'ok' && json.status !== 'success') {
-      setEnrichErr('Could not enrich from that website — fill in the details manually.');
+    if (json.status === 'error') {
+      setEnrichErr(
+        ENRICH_ERROR_MESSAGES[json.reason ?? ''] ??
+        json.detail ??
+        'Could not enrich from that website — fill in the details manually.'
+      );
       setEnriching(false);
       return;
     }
 
     setEnrichResult(json);
-    if (json.business_type) setBusinessType(json.business_type);
-    if (json.location) setLocation(json.location);
+
+    // Fill gaps only — a field the admin already typed into is left alone,
+    // and an empty string from the API means "searched, genuinely not found"
+    // rather than an error, so it's tracked (not written) for the inline hint.
+    const notFound = new Set<EnrichableField>();
+    const applyField = (
+      field: EnrichableField,
+      value: string | undefined,
+      current: string,
+      setter: (v: string) => void,
+    ) => {
+      if (current.trim()) return;
+      if (value) setter(value);
+      else if (value === '') notFound.add(field);
+    };
+    applyField('businessName', json.business_name, businessName, setBusinessName);
+    applyField('businessType', json.business_type, businessType, setBusinessType);
+    applyField('location', json.location, location, setLocation);
+    applyField('contactEmail', json.contact_email, contactEmail, setContactEmail);
+    applyField('contactPhone', json.contact_phone, contactPhone, setContactPhone);
+    setNotFoundFields(notFound);
+
     setEnriching(false);
   }
 
   async function submit() {
     if (!businessName.trim()) { setErr('Business name is required.'); return; }
-    if (!contactEmail.trim()) { setErr('Contact email is required.'); return; }
-    if (!isValidEmail(contactEmail)) { setErr('Enter a valid contact email address.'); return; }
-    if (!contactPhone.trim()) { setErr('Contact phone is required.'); return; }
-    if (!isValidPhone(contactPhone)) { setErr('Enter a valid contact phone number.'); return; }
+    if (!saveAsDraft) {
+      if (!contactEmail.trim()) { setErr('Contact email is required.'); return; }
+      if (!contactPhone.trim()) { setErr('Contact phone is required.'); return; }
+    }
+    if (contactEmail.trim() && !isValidEmail(contactEmail)) { setErr('Enter a valid contact email address.'); return; }
+    if (contactPhone.trim() && !isValidPhone(contactPhone)) { setErr('Enter a valid contact phone number.'); return; }
     setBusy(true); setErr(null);
     const { error } = await createClient({
       business_name: businessName.trim(), business_type: businessType.trim(),
       location: location.trim(), contact_email: contactEmail.trim(),
-      contact_phone: normalizePhone(contactPhone), notification_channel: notifChannel,
+      contact_phone: contactPhone.trim() ? normalizePhone(contactPhone) : '', notification_channel: notifChannel,
       starting_credits: startingCredits,
+      status: saveAsDraft ? 'draft' : 'active',
+      // Pre-fill the auto-created default campaign from whatever we know:
+      // the enrichment's services become search terms (no editable field of
+      // their own to fall back on), and the location uses whatever ended up
+      // in the Location field — enriched or hand-typed/corrected, either way.
+      search_queries: enrichResult?.services ?? [],
+      target_locations: location.trim() ? [location.trim()] : [],
     });
     setBusy(false);
     if (error) setErr(error.message); else onCreated();
@@ -467,7 +537,16 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
         <div>
           <label className={fieldLbl}>Business name{reqStar}</label>
-          <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. Acme Roofing" style={FONT} className={inputCls} />
+          <input
+            value={businessName}
+            onChange={(e) => { setBusinessName(e.target.value); clearNotFound('businessName'); }}
+            placeholder="e.g. Acme Roofing"
+            style={FONT}
+            className={inputCls}
+          />
+          {notFoundFields.has('businessName') && (
+            <p className="mt-1 text-[11px] text-[#b9831f]">Not found on the site — please fill in.</p>
+          )}
         </div>
         <div>
           <label className={fieldLbl}>Website URL</label>
@@ -490,7 +569,11 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
               {enriching ? 'Looking up…' : 'Enrich'}
             </button>
           </div>
-          <p className="mt-1 text-[11px] text-[#9a9d92]">Optional — auto-fills business type and location from the site.</p>
+          <p className="mt-1 text-[11px] text-[#9a9d92]">
+            {enriching
+              ? 'Fetching the site and running AI extraction — this can take up to 15 seconds…'
+              : 'Optional — auto-fills business name, type, location, and contact details from the site (won\'t overwrite anything you\'ve already typed).'}
+          </p>
           {enrichErr && <p className="mt-1 text-[11px] text-[#a8533a]">{enrichErr}</p>}
           {enrichResult && (enrichResult.services?.length || enrichResult.target_customer_profiles?.length || enrichResult.summary) && (
             <div className="mt-2 rounded-xl border border-[#3c7a5b]/20 bg-[#edf4ef] px-3.5 py-3 text-[12px] text-[#20211c] flex flex-col gap-1.5">
@@ -499,7 +582,14 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
                 <p className="m-0"><strong className="font-bold">Services:</strong> {enrichResult.services.join(', ')}</p>
               )}
               {!!enrichResult.target_customer_profiles?.length && (
-                <p className="m-0"><strong className="font-bold">Target customers:</strong> {enrichResult.target_customer_profiles.join(', ')}</p>
+                <p className="m-0">
+                  <strong className="font-bold">Target customers:</strong>{' '}
+                  {enrichResult.target_customer_profiles.map((p, i) => (
+                    <span key={p.segment ?? i} title={p.reasoning}>
+                      {i > 0 && ', '}{p.segment}{p.priority ? ` (${p.priority})` : ''}
+                    </span>
+                  ))}
+                </p>
               )}
             </div>
           )}
@@ -507,20 +597,58 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={fieldLbl}>Business type</label>
-            <input value={businessType} onChange={(e) => setBusinessType(e.target.value)} placeholder="e.g. Roofing" style={FONT} className={inputCls} />
+            <input
+              value={businessType}
+              onChange={(e) => { setBusinessType(e.target.value); clearNotFound('businessType'); }}
+              placeholder="e.g. Roofing"
+              style={FONT}
+              className={inputCls}
+            />
+            {notFoundFields.has('businessType') && (
+              <p className="mt-1 text-[11px] text-[#b9831f]">Not found — please fill in.</p>
+            )}
           </div>
           <div>
             <label className={fieldLbl}>Location</label>
-            <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Austin TX" style={FONT} className={inputCls} />
+            <input
+              value={location}
+              onChange={(e) => { setLocation(e.target.value); clearNotFound('location'); }}
+              placeholder="e.g. Austin TX"
+              style={FONT}
+              className={inputCls}
+            />
+            {notFoundFields.has('location') && (
+              <p className="mt-1 text-[11px] text-[#b9831f]">Not found — please fill in.</p>
+            )}
           </div>
         </div>
         <div>
           <label className={fieldLbl}>Contact email{reqStar}</label>
-          <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="owner@example.com" style={FONT} className={inputCls} />
+          <input
+            type="email"
+            value={contactEmail}
+            onChange={(e) => { setContactEmail(e.target.value); clearNotFound('contactEmail'); }}
+            placeholder="owner@example.com"
+            style={FONT}
+            className={inputCls}
+          />
+          {notFoundFields.has('contactEmail') && (
+            <p className="mt-1 text-[11px] text-[#b9831f]">Not found — please fill in.</p>
+          )}
         </div>
         <div>
           <label className={fieldLbl}>Contact phone{reqStar}</label>
-          <input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="+1 512 000 0000" style={FONT} className={inputCls} />
+          <input
+            type="tel"
+            value={contactPhone}
+            onChange={(e) => { setContactPhone(e.target.value); clearNotFound('contactPhone'); }}
+            placeholder="+1 512 000 0000"
+            style={FONT}
+            className={inputCls}
+          />
+          {notFoundFields.has('contactPhone') && (
+            <p className="mt-1 text-[11px] text-[#b9831f]">Not found — please fill in.</p>
+          )}
           <p className="mt-1 text-[11px] text-[#9a9d92]">Required for hot-lead WhatsApp / SMS notifications.</p>
         </div>
         <div>
@@ -539,11 +667,22 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
             onChange={(e) => setStartingCredits(Math.max(0, Number(e.target.value)))} style={FONT} className={inputCls} />
           <p className="mt-1 text-[11px] text-[#9a9d92]">Added to the billing profile on creation. A default campaign is also created automatically.</p>
         </div>
+
+        <div className="border-t border-[#f0ede6] pt-3">
+          <label className="flex cursor-pointer items-center gap-2 text-[13px] text-[#62655c]">
+            <input type="checkbox" checked={saveAsDraft} onChange={(e) => setSaveAsDraft(e.target.checked)} className="accent-[#3c7a5b]" />
+            Save as draft
+          </label>
+          <p className="mt-1 text-[11px] text-[#9a9d92]">Contact email and phone become optional — finish the profile later.</p>
+        </div>
+
         {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
       </div>
       <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
         <button onClick={onClose} className={ghostCls}>Cancel</button>
-        <button onClick={submit} disabled={busy} className={primaryCls}>{busy ? 'Creating…' : 'Create client'}</button>
+        <button onClick={submit} disabled={busy} className={primaryCls}>
+          {busy ? 'Creating…' : saveAsDraft ? 'Save as draft' : 'Create client'}
+        </button>
       </div>
     </ModalShell>
   );
@@ -629,6 +768,7 @@ function EditClientModal({
             <Select value={status} onValueChange={(v) => setStatus(v as UpdateClientInput['status'])}>
               <SelectTrigger style={FONT} className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]"><SelectValue /></SelectTrigger>
               <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+                <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="paused">Paused</SelectItem>
                 <SelectItem value="churned">Churned</SelectItem>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
@@ -97,23 +97,11 @@ export function useBlogQueue() {
     staleTime: Infinity,
   });
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('blog-posts-queue')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'blog_posts' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: BLOG_KEYS.pending });
-          queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+  // Realtime invalidation for the `blog_posts` table is handled once,
+  // centrally, by useRealtimeSync() in AdminLayout — not here. A second
+  // per-hook channel subscription with a fixed name breaks the moment this
+  // hook is mounted more than once at a time (e.g. the sidebar badge + the
+  // page itself).
 
   const approveAndPublish = useCallback(async (
     id: string,
@@ -185,10 +173,20 @@ export function usePublishedBlogPosts() {
     staleTime: 60 * 1000,
   });
 
+  const saveEdits = useCallback(async (
+    id: string,
+    edits: Partial<Pick<BlogPost, 'title' | 'body_md' | 'excerpt' | 'seo_title' | 'meta_description'>>,
+  ) => {
+    const { error } = await supabase.from('blog_posts').update(edits).eq('id', id);
+    if (error) throw new Error(error.message);
+    queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published });
+  }, []);
+
   return {
     posts,
     loading,
     error: (error as Error)?.message ?? null,
+    saveEdits,
     reload: () => queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published }),
   };
 }

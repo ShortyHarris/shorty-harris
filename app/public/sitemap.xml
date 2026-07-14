@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Static routes only. Individual /blog/:slug URLs are intentionally not
+  listed here: posts are published live through the admin dashboard, and a
+  static sitemap can't track that without a build-time generation step.
+  Google can still find and index individual posts by following the links
+  from /blog and from each post's own "Keep reading" section.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://shortyharris.com/</loc></url>
+  <url><loc>https://shortyharris.com/blog</loc></url>
+</urlset>

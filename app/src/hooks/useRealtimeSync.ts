@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
 import { QK } from './useAdminData';
 import { AQ_KEYS } from './useApprovalQueue';
+import { BLOG_KEYS } from './useBlogPosts';
 
 /**
  * Sets up Supabase Realtime subscriptions for all tables that change via
@@ -35,6 +36,12 @@ export function useRealtimeSync() {
       // Error logs written by any workflow
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'error_logs' }, () => {
         queryClient.invalidateQueries({ queryKey: ['error-logs'] });
+      })
+
+      // Blog posts drafted/approved/published via n8n WF12
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'blog_posts' }, () => {
+        queryClient.invalidateQueries({ queryKey: BLOG_KEYS.pending });
+        queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published });
       })
 
       .subscribe();

@@ -377,6 +377,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
   const [locations, setLocations]       = useState('');
   const [maxResults, setMaxResults]     = useState(1000);
   const [scrapeEnabled, setScrapeEnabled] = useState(true);
+  const [saveAsDraft, setSaveAsDraft]   = useState(false);
   const [busy, setBusy]                 = useState(false);
   const [err, setErr]                   = useState<string | null>(null);
 
@@ -388,6 +389,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
       search_queries: queries.split(',').map((s) => s.trim()).filter(Boolean),
       target_locations: locations.split(';').map((s) => s.trim()).filter(Boolean),
       max_results: maxResults, scrape_enabled: scrapeEnabled,
+      status: saveAsDraft ? 'draft' : 'active',
     });
     setBusy(false);
     if (error) setErr(error.message); else onCreated();
@@ -478,13 +480,23 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
             </div>
           </div>
 
+          <div className="border-t border-[#f0ede6] pt-3">
+            <label className="flex cursor-pointer items-center gap-2 text-[13px] text-[#62655c]">
+              <input type="checkbox" checked={saveAsDraft} onChange={(e) => setSaveAsDraft(e.target.checked)} className="accent-[#3c7a5b]" />
+              Save as draft
+            </label>
+            <p className="mt-1 text-[11px] text-[#9a9d92]">Saved with status "Draft" instead of "Active" — switch its status here later when it's ready.</p>
+          </div>
+
           {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
         </div>
 
         {/* Footer */}
         <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
           <button onClick={onClose} className={ghostCls}>Cancel</button>
-          <button onClick={submit} disabled={busy} className={primaryCls}>{busy ? 'Creating…' : 'Create campaign'}</button>
+          <button onClick={submit} disabled={busy} className={primaryCls}>
+            {busy ? 'Creating…' : saveAsDraft ? 'Save as draft' : 'Create campaign'}
+          </button>
         </div>
       </motion.div>
     </motion.div>

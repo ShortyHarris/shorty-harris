@@ -1,9 +1,9 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { MenuToggleIcon } from "@/components/ui/menu-toggle-icon";
 import { LogoCloud } from "@/components/ui/logo-cloud-3";
+import { PublicNav } from "@/components/PublicNav";
+import { PublicFooter } from "@/components/PublicFooter";
+import { useSeo } from "@/hooks/useSeo";
 import "./Home.css";
 
 const FONT: React.CSSProperties = {
@@ -20,9 +20,15 @@ const VIEW = { once: true, margin: "-60px" } as const;
 // ── Root ─────────────────────────────────────────────────────────────────────
 
 export function Home() {
+  useSeo({
+    title: 'Shorty Harris — AI-Powered Outbound for Small & Family Businesses',
+    description: "Shorty Harris finds ideal customers, writes outreach, follows up, and routes hot leads to your team — outbound prospecting on autopilot for small and family businesses.",
+    path: '/',
+  });
+
   return (
     <div className="min-h-screen flex flex-col bg-[#f7f4ee] text-[#1a1b17] antialiased" style={FONT}>
-      <Nav />
+      <PublicNav />
       <Hero />
       <Logos />
       <Features />
@@ -30,134 +36,11 @@ export function Home() {
       <StatsBar />
       <BigQuote />
       <CtaBand />
-      <Foot />
+      <PublicFooter />
     </div>
   );
 }
 
-// ── Nav ───────────────────────────────────────────────────────────────────────
-
-const NAV_LINKS = [
-  { label: "How it works", id: "how"     },
-  { label: "Results",      id: "results" },
-];
-
-function smoothScrollTo(id: string, done?: () => void) {
-  document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-  done?.();
-}
-
-function Nav() {
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 24);
-    window.addEventListener("scroll", fn, { passive: true });
-    return () => window.removeEventListener("scroll", fn);
-  }, []);
-
-  useEffect(() => {
-    document.body.style.overflow = menuOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
-  }, [menuOpen]);
-
-  return (
-    <header
-      className={`sticky top-0 z-50 transition-all duration-200 ${
-        scrolled ? "bg-white/95 backdrop-blur-xl border-b border-[#e8e3da] shadow-[0_1px_0_rgba(0,0,0,0.04)]" : "bg-white"
-      }`}
-    >
-      {/* Inner row — matches body max-width so nav aligns with content */}
-      <div className="max-w-300 mx-auto w-full px-6 lg:px-12 py-4 flex items-center">
-
-        {/* Logo */}
-        <Link to="/" className="flex-1 text-[18px] tracking-tight leading-none no-underline select-none">
-          <span className="font-medium text-[#54574e]">Shorty</span>
-          <span className="font-extrabold text-[#1a1b17]"> Harris</span>
-        </Link>
-
-        {/* Desktop nav links — smooth scroll */}
-        <nav className="hidden md:flex items-center gap-8">
-          {NAV_LINKS.map((l) => (
-            <button
-              key={l.id}
-              onClick={() => smoothScrollTo(l.id)}
-              className="text-[14px] font-medium text-[#54574e] bg-transparent border-none p-0 cursor-pointer hover:text-[#1a1b17] transition-colors"
-            >
-              {l.label}
-            </button>
-          ))}
-          <Link to="/blog" className="text-[14px] font-medium text-[#54574e] no-underline hover:text-[#1a1b17] transition-colors">
-            Blog
-          </Link>
-        </nav>
-
-        {/* Right — Log in + CTA + hamburger */}
-        <div className="flex flex-1 items-center justify-end gap-3">
-          <Link to="/login" className="hidden md:block text-[14px] font-medium text-[#54574e] no-underline hover:text-[#1a1b17] transition-colors">
-            Log in
-          </Link>
-          <Link
-            to="/login"
-            className="hidden md:inline-flex items-center bg-[#1a1b17] text-white px-5 py-2.5 rounded-[10px] text-[14px] font-semibold no-underline hover:bg-[#3c7a5b] transition-colors whitespace-nowrap"
-          >
-            Get started
-          </Link>
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Toggle menu"
-            aria-expanded={menuOpen}
-            className="flex md:hidden h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-[#e8e3da] bg-transparent text-[#54574e] hover:bg-[#f5f2ec] transition-colors"
-          >
-            <MenuToggleIcon open={menuOpen} className="size-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile menu portal */}
-      {menuOpen && typeof window !== "undefined" && createPortal(
-        <div className="fixed inset-0 top-14.25 z-40 flex flex-col bg-white/95 backdrop-blur-xl border-t border-[#e8e3da] md:hidden">
-          <div className="flex flex-col gap-1 p-4">
-            {NAV_LINKS.map((l) => (
-              <button
-                key={l.id}
-                onClick={() => smoothScrollTo(l.id, () => setMenuOpen(false))}
-                className="rounded-lg px-4 py-3 text-[15px] font-medium text-[#54574e] bg-transparent border-none cursor-pointer text-left hover:bg-[#f5f2ec] hover:text-[#1a1b17] transition-colors"
-              >
-                {l.label}
-              </button>
-            ))}
-            <Link
-              to="/blog"
-              onClick={() => setMenuOpen(false)}
-              className="rounded-lg px-4 py-3 text-[15px] font-medium text-[#54574e] no-underline hover:bg-[#f5f2ec] hover:text-[#1a1b17] transition-colors"
-            >
-              Blog
-            </Link>
-          </div>
-          <div className="mt-auto flex flex-col gap-2 border-t border-[#e8e3da] p-4">
-            <Link
-              to="/login"
-              onClick={() => setMenuOpen(false)}
-              className="flex items-center justify-center rounded-[10px] border border-[#e8e3da] bg-transparent px-4 py-3 text-[15px] font-semibold text-[#1a1b17] no-underline hover:bg-[#f5f2ec] transition-colors"
-            >
-              Log in
-            </Link>
-            <Link
-              to="/login"
-              onClick={() => setMenuOpen(false)}
-              className="flex items-center justify-center rounded-[10px] bg-[#1a1b17] px-4 py-3 text-[15px] font-semibold text-white no-underline hover:bg-[#3c7a5b] transition-colors"
-            >
-              Get started
-            </Link>
-          </div>
-        </div>,
-        document.body,
-      )}
-    </header>
-  );
-}
 
 // ── Hero ─────────────────────────────────────────────────────────────────────
 
@@ -681,62 +564,3 @@ function CtaBand() {
   );
 }
 
-// ── Footer ────────────────────────────────────────────────────────────────────
-
-const FOOT_LINKS = [
-  { title: "Product", links: [["How it works", "#how"], ["Results", "#results"], ["Pricing", "#"]] as const },
-  { title: "Company", links: [["About", "#"],    ["Blog", "/blog"],   ["Contact", "#"],    ["Privacy", "#"]]  as const },
-  { title: "Connect", links: [["Instagram", "#"], ["X / Twitter", "#"], ["WhatsApp", "#"]] as const },
-];
-
-function Foot() {
-  const [done, setDone] = useState(false);
-
-  return (
-    <footer className="border-t border-[#e5ddd3] max-w-[1200px] mx-auto w-full px-6 lg:px-12 pt-14 pb-10">
-      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_2fr] gap-10 lg:gap-16 pb-12">
-        <div className="flex flex-col gap-3.5 max-w-full lg:max-w-[300px]">
-          <div className="text-[17px] tracking-[-0.025em] leading-none">
-            <span className="font-medium text-[#54574e]">Shorty</span>
-            <span className="font-extrabold text-[#1a1b17]"> Harris</span>
-          </div>
-          <p className="text-[13.5px] leading-[1.55] text-[#54574e] m-0">
-            AI-powered outbound that finds ideal customers and delivers warm, qualified leads straight to your inbox.
-          </p>
-          <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); setDone(true); }}>
-            <input
-              type="email"
-              placeholder="Your email"
-              required
-              disabled={done}
-              className="flex-1 min-w-0 px-3.5 py-2.5 border border-[#e5ddd3] rounded-[10px] text-[13px] bg-white text-[#1a1b17] outline-none focus:border-[#3c7a5b] placeholder:text-[#9b9e96] disabled:opacity-60"
-            />
-            <button
-              type="submit"
-              disabled={done}
-              className="px-4 py-2.5 bg-[#1a1b17] text-white text-[13px] font-semibold rounded-[10px] hover:bg-[#3c7a5b] disabled:opacity-60 transition-colors whitespace-nowrap cursor-pointer border-0"
-            >
-              {done ? "✓ Done" : "Subscribe"}
-            </button>
-          </form>
-        </div>
-        <div className="grid grid-cols-3 gap-6">
-          {FOOT_LINKS.map((col) => (
-            <div key={col.title} className="flex flex-col gap-2.5">
-              <div className="text-[12px] font-bold tracking-[0.05em] uppercase text-[#1a1b17] mb-1">{col.title}</div>
-              {col.links.map(([label, href]) => (
-                <a key={label} href={href} className="text-[14px] text-[#54574e] no-underline hover:text-[#3c7a5b] transition-colors">{label}</a>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-t border-[#e5ddd3] pt-6 text-[13px] text-[#9b9e96]">
-        <span>© {new Date().getFullYear()} Shorty Harris. All rights reserved.</span>
-        <Link to="/login" className="text-[13px] text-[#54574e] no-underline font-semibold hover:text-[#3c7a5b] transition-colors">
-          Sign in
-        </Link>
-      </div>
-    </footer>
-  );
-}

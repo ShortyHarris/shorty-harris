@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
@@ -128,23 +128,10 @@ export function useApprovalQueue() {
       staleTime: 60 * 1000,
     });
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('messages-approval-queue')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'messages' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
-          queryClient.invalidateQueries({ queryKey: AQ_KEYS.stats });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+  // Realtime invalidation for the `messages` table is handled once, centrally,
+  // by useRealtimeSync() in AdminLayout — not here. A second per-hook channel
+  // subscription with a fixed name breaks the moment this hook is mounted
+  // more than once at a time (e.g. the sidebar badge + the page itself).
 
   const approve = useCallback(async (id: string, editedBody?: string, editedSubject?: string) => {
     queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) =>

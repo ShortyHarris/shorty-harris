@@ -197,6 +197,7 @@ export interface NewCampaignInput {
   target_locations: string[];
   max_results: number;
   scrape_enabled: boolean;
+  status?: 'draft' | 'active';
 }
 
 export function useClientsList() {
@@ -216,7 +217,7 @@ export async function createCampaign(input: NewCampaignInput) {
     client_id: input.client_id,
     name: input.name,
     channel: input.channel,
-    status: 'active',
+    status: input.status ?? 'active',
     search_queries: input.search_queries,
     target_locations: input.target_locations,
     max_results: input.max_results,
@@ -339,6 +340,12 @@ export interface NewClientInput {
   contact_phone: string;
   notification_channel: 'whatsapp' | 'sms';
   starting_credits: number;
+  status?: 'draft' | 'active';
+  // Pre-fills the auto-created default campaign's prospect-discovery fields —
+  // typically sourced from the website-enrichment result (services -> search
+  // terms, location -> target location) so the campaign isn't created blank.
+  search_queries?: string[];
+  target_locations?: string[];
 }
 
 export async function createClient(input: NewClientInput) {
@@ -348,9 +355,10 @@ export async function createClient(input: NewClientInput) {
       business_name: input.business_name,
       business_type: input.business_type || null,
       location: input.location || null,
-      contact_email: input.contact_email,
-      contact_phone: input.contact_phone,
+      contact_email: input.contact_email || null,
+      contact_phone: input.contact_phone || null,
       notification_channel: input.notification_channel,
+      status: input.status ?? 'active',
     })
     .select('id')
     .single();
@@ -370,8 +378,8 @@ export async function createClient(input: NewClientInput) {
       name: `${input.business_name} — Campaign 1`,
       channel: 'email',
       status: 'active',
-      search_queries: [],
-      target_locations: [],
+      search_queries: input.search_queries ?? [],
+      target_locations: input.target_locations ?? [],
       max_results: 1000,
       scrape_enabled: false,
     });
@@ -406,7 +414,7 @@ export interface UpdateClientInput {
   contact_email: string;
   contact_phone: string;
   notification_channel: 'whatsapp' | 'sms';
-  status: 'active' | 'paused' | 'churned';
+  status: 'draft' | 'active' | 'paused' | 'churned';
 }
 
 export async function updateClient(id: string, input: UpdateClientInput) {
