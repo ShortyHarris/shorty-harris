@@ -1,8 +1,6 @@
 {
   "outputDirectory": "app/dist",
   "rewrites": [
-    { "source": "/blog", "destination": "/blog/index.html" },
-    { "source": "/blog/:path*", "destination": "/blog/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

@@ -135,16 +135,6 @@ export function useBlogQueue() {
     }
 
     queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published });
-
-    // Fire the static-site rebuild so the new post actually appears on the
-    // public /blog pages — the public site is pre-rendered at build time,
-    // it isn't reading Supabase live.
-    try {
-      await supabase.functions.invoke('trigger-blog-deploy');
-    } catch {
-      // Non-fatal: the post is published either way; the next scheduled or
-      // manual deploy will pick it up if this ping happens to fail.
-    }
   }, []);
 
   const reject = useCallback(async (id: string, reason: string) => {
@@ -200,5 +190,42 @@ export function usePublishedBlogPosts() {
     loading,
     error: (error as Error)?.message ?? null,
     reload: () => queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published }),
+  };
+}
+
+// Public post detail page — RLS only allows reading status = 'published'
+// rows anyway, so this is safe to call with the anon key straight from the
+// browser like the rest of the public site.
+async function fetchPublishedPostBySlug(slug: string): Promise<BlogPost | null> {
+  const { data, error } = await supabase
+    .from('blog_posts')
+    .select(
+      `id, title, slug, category, body_md, excerpt, cover_image_url,
+       seo_title, meta_description, target_keywords, status, author,
+       rejection_reason, created_at, approved_at, published_at`
+    )
+    .eq('slug', slug)
+    .eq('status', 'published')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return {
+    ...data,
+    target_keywords: (data.target_keywords as string[] | null) ?? [],
+  } as BlogPost;
+}
+
+export function useBlogPost(slug: string) {
+  const { data: post, isLoading: loading, error } = useQuery({
+    queryKey: ['blog-posts', 'by-slug', slug],
+    queryFn: () => fetchPublishedPostBySlug(slug),
+    enabled: !!slug,
+    staleTime: 60 * 1000,
+  });
+
+  return {
+    post: post ?? null,
+    loading,
+    error: (error as Error)?.message ?? null,
   };
 }

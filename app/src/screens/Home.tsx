@@ -88,11 +88,9 @@ function Nav() {
               {l.label}
             </button>
           ))}
-          {/* Plain <a>, not <Link> — /blog is a statically-generated page outside
-              the React Router route table, so this must be a real navigation. */}
-          <a href="/blog" className="text-[14px] font-medium text-[#54574e] no-underline hover:text-[#1a1b17] transition-colors">
+          <Link to="/blog" className="text-[14px] font-medium text-[#54574e] no-underline hover:text-[#1a1b17] transition-colors">
             Blog
-          </a>
+          </Link>
         </nav>
 
         {/* Right — Log in + CTA + hamburger */}
@@ -130,12 +128,13 @@ function Nav() {
                 {l.label}
               </button>
             ))}
-            <a
-              href="/blog"
+            <Link
+              to="/blog"
+              onClick={() => setMenuOpen(false)}
               className="rounded-lg px-4 py-3 text-[15px] font-medium text-[#54574e] no-underline hover:bg-[#f5f2ec] hover:text-[#1a1b17] transition-colors"
             >
               Blog
-            </a>
+            </Link>
           </div>
           <div className="mt-auto flex flex-col gap-2 border-t border-[#e8e3da] p-4">
             <Link
