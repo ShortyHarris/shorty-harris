@@ -3,12 +3,13 @@ import { NavLink, Routes, Route, Navigate, Link, useNavigate } from 'react-route
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, LogOut,
-  ClipboardCheck, Flame,
+  ClipboardCheck, Flame, Newspaper,
   Building2, Users, Megaphone, BarChart2, Activity,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { ApprovalQueue } from './ApprovalQueue';
+import { Blog } from './Blog';
 import { Clients } from './Clients';
 import { Prospects } from './Prospects';
 import { Campaigns, HotLeads } from './CampaignsAndLeads';
@@ -24,6 +25,7 @@ type NavItem = { to: string; label: string; icon: React.ElementType };
 const NAV_DAILY: NavItem[] = [
   { to: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
   { to: '/admin/hot-leads', label: 'Hot Leads', icon: Flame          },
+  { to: '/admin/blog',      label: 'Blog',      icon: Newspaper      },
 ];
 const NAV_OPS: NavItem[] = [
   { to: '/admin/clients',    label: 'Clients',    icon: Building2  },
@@ -65,6 +67,7 @@ export function AdminLayout() {
           <main className="apage">
             <Routes>
               <Route path="approvals"  element={<ApprovalQueue />} />
+              <Route path="blog"       element={<Blog />} />
               <Route path="clients"    element={<Clients />} />
               <Route path="prospects"  element={<Prospects />} />
               <Route path="campaigns"  element={<Campaigns />} />

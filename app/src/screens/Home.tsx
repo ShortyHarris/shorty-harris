@@ -88,6 +88,11 @@ function Nav() {
               {l.label}
             </button>
           ))}
+          {/* Plain <a>, not <Link> — /blog is a statically-generated page outside
+              the React Router route table, so this must be a real navigation. */}
+          <a href="/blog" className="text-[14px] font-medium text-[#54574e] no-underline hover:text-[#1a1b17] transition-colors">
+            Blog
+          </a>
         </nav>
 
         {/* Right — Log in + CTA + hamburger */}
@@ -125,6 +130,12 @@ function Nav() {
                 {l.label}
               </button>
             ))}
+            <a
+              href="/blog"
+              className="rounded-lg px-4 py-3 text-[15px] font-medium text-[#54574e] no-underline hover:bg-[#f5f2ec] hover:text-[#1a1b17] transition-colors"
+            >
+              Blog
+            </a>
           </div>
           <div className="mt-auto flex flex-col gap-2 border-t border-[#e8e3da] p-4">
             <Link
@@ -675,7 +686,7 @@ function CtaBand() {
 
 const FOOT_LINKS = [
   { title: "Product", links: [["How it works", "#how"], ["Results", "#results"], ["Pricing", "#"]] as const },
-  { title: "Company", links: [["About", "#"],    ["Contact", "#"],    ["Privacy", "#"]]  as const },
+  { title: "Company", links: [["About", "#"],    ["Blog", "/blog"],   ["Contact", "#"],    ["Privacy", "#"]]  as const },
   { title: "Connect", links: [["Instagram", "#"], ["X / Twitter", "#"], ["WhatsApp", "#"]] as const },
 ];
 
