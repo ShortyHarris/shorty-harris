@@ -36,6 +36,36 @@
 
 
   /* ═══════════════════════════════════════
+     PENDING APPROVALS BANNER
+  ═══════════════════════════════════════ */
+
+  .appr-nudge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 18px 14px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: var(--amber-tint);
+    text-decoration: none;
+    transition: opacity 0.12s;
+  }
+  .appr-nudge:hover { opacity: 0.85; }
+  .appr-nudge-icon {
+    display: flex;
+    flex-shrink: 0;
+    color: var(--amber);
+  }
+  .appr-nudge-text {
+    flex: 1;
+    font-size: 13.5px;
+    color: var(--ink);
+  }
+  .appr-nudge-text strong { font-weight: 800; }
+  .appr-nudge-arrow { flex-shrink: 0; color: var(--amber); }
+
+
+  /* ═══════════════════════════════════════
      STAT CARDS
   ═══════════════════════════════════════ */
 
@@ -531,6 +561,7 @@
 
   @media (min-width: 768px) {
     .dash-head  { padding: 32px 28px 20px; }
+    .appr-nudge { margin: 0 28px 20px; }
     .stat-grid  { grid-template-columns: repeat(4, 1fr); padding: 0 28px 24px; }
 
     /* Leads card */

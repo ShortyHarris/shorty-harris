@@ -125,6 +125,24 @@
     color: inherit;
     transition: background 0.18s;
   }
+  .cbnav-icon-badge { position: relative; overflow: visible; }
+  .cbnav-badge-dot {
+    position: absolute;
+    top: -2px;
+    right: -4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    border-radius: 99px;
+    background: var(--amber);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1;
+  }
 
 
   /* ── Desktop  ≥ 768px ──────────────────────────────────────────────── */
@@ -238,6 +256,21 @@
     }
     .cside-link.is-active .cside-link-icon { color: var(--leaf); }
     .cside-link-icon { color: #a8aba0; flex-shrink: 0; transition: color 0.1s; }
+    .cside-nav-badge {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 99px;
+      background: var(--amber);
+      color: #fff;
+      font-size: 10.5px;
+      font-weight: 800;
+      line-height: 1;
+    }
 
     /* Bottom: credits + user */
     .cside-bottom {

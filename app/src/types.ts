@@ -74,3 +74,23 @@ export interface ClientSummary {
   replies: number;
   hotLeads: number;
 }
+
+export interface ClientMessageItem {
+  id: string;
+  prospect_id: string;
+  channel: string;
+  subject: string | null;
+  body: string;
+  message_type: MessageType;
+  approval_status: ApprovalStatus;
+  created_at: string;
+  prospect: {
+    id: string;
+    business_name: string;
+    contact_name: string | null;
+    email: string | null;
+    phone: string | null;
+    category: string | null;
+    location: string | null;
+  } | null;
+}

@@ -8,9 +8,12 @@ import { AdminLayout } from './screens/admin/Layout';
 import { Shell } from './screens/client/Shell';
 import { Dashboard } from './screens/client/Dashboard';
 import { Billing } from './screens/client/Billing';
+import { Approvals } from './screens/client/Approvals';
 import { useClientHeader, clientHeaderKey } from './hooks/useClientHeader';
 import { dashboardKey } from './hooks/useClientDashboard';
 import { billingKey } from './hooks/useBilling';
+import { useClientApprovals } from './hooks/useClientApprovals';
+import { useClientRealtimeSync } from './hooks/useClientRealtimeSync';
 import { queryClient } from './lib/queryClient';
 import './styles/theme-admin.css';
 import './styles/theme-client.css';
@@ -60,6 +63,8 @@ function ClientZone() {
   const { profile, signOut } = useAuth();
   const clientId = profile!.client_id!;
   const { businessName, credits } = useClientHeader(clientId);
+  const { items: pendingApprovals } = useClientApprovals(clientId);
+  useClientRealtimeSync(clientId);
 
   // After Stripe checkout redirect, invalidate header + billing + dashboard
   useEffect(() => {
@@ -80,10 +85,12 @@ function ClientZone() {
         businessName={businessName}
         credits={credits}
         displayName={profile!.full_name ?? 'Account'}
+        pendingApprovals={pendingApprovals.length}
         onSignOut={signOut}
       >
         <Routes>
           <Route index element={<Dashboard clientId={clientId} />} />
+          <Route path="approvals" element={<Approvals clientId={clientId} />} />
           <Route path="billing" element={<Billing clientId={clientId} onCreditsChanged={() => {
             queryClient.invalidateQueries({ queryKey: clientHeaderKey(clientId) });
             queryClient.invalidateQueries({ queryKey: billingKey(clientId) });

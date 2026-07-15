@@ -344,13 +344,12 @@ function InviteCell({
 }
 
 /* ── Modal shell ───────────────────────────────────────────────────── */
-function ModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function ModalShell({ children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <motion.div
       className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
     >
       <motion.div
         style={FONT}

@@ -21,7 +21,7 @@ create table public.clients (
   location text,
   contact_email text,
   contact_phone text,
-  status text not null default 'active' check (status in ('active','paused','churned')),
+  status text not null default 'active' check (status in ('draft','active','paused','churned')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -449,6 +449,7 @@ create policy client_own_hot_leads_read on public.hot_leads for select using (cl
 create policy client_own_hot_leads_update on public.hot_leads for update using (client_id = public.current_client_id()) with check (client_id = public.current_client_id());
 create policy client_own_replies on public.replies for select using (client_id = public.current_client_id());
 create policy client_own_messages on public.messages for select using (client_id = public.current_client_id());
+create policy client_own_messages_update on public.messages for update using (client_id = public.current_client_id()) with check (client_id = public.current_client_id());
 create policy client_own_notifications on public.notifications for select using (client_id = public.current_client_id());
 create policy client_own_prospects on public.prospects for select using (client_id = public.current_client_id());
 

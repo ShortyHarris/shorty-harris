@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { Inbox, CreditCard, LogOut } from 'lucide-react';
+import { Inbox, CreditCard, LogOut, ClipboardCheck } from 'lucide-react';
 import '../../styles/admin-tables.css';
 import './Shell.css';
 
@@ -8,12 +8,14 @@ export function Shell({
   businessName,
   credits,
   displayName,
+  pendingApprovals = 0,
   onSignOut,
   children,
 }: {
   businessName: string;
   credits: number | string;
   displayName: string;
+  pendingApprovals?: number;
   onSignOut: () => void;
   children: ReactNode;
 }) {
@@ -37,6 +39,11 @@ export function Shell({
           <NavLink to="/app" end className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
             <Inbox size={16} strokeWidth={1.9} className="cside-link-icon" />
             Hot Leads
+          </NavLink>
+          <NavLink to="/app/approvals" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <ClipboardCheck size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Approvals
+            {pendingApprovals > 0 && <span className="cside-nav-badge">{pendingApprovals > 99 ? '99+' : pendingApprovals}</span>}
           </NavLink>
           <NavLink to="/app/billing" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
             <CreditCard size={16} strokeWidth={1.9} className="cside-link-icon" />
@@ -83,6 +90,13 @@ export function Shell({
         <NavLink to="/app" end className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
           <span className="cbnav-icon"><Inbox size={20} strokeWidth={1.8} /></span>
           <span>Leads</span>
+        </NavLink>
+        <NavLink to="/app/approvals" className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
+          <span className="cbnav-icon cbnav-icon-badge">
+            <ClipboardCheck size={20} strokeWidth={1.8} />
+            {pendingApprovals > 0 && <span className="cbnav-badge-dot">{pendingApprovals > 99 ? '99+' : pendingApprovals}</span>}
+          </span>
+          <span>Approvals</span>
         </NavLink>
         <NavLink to="/app/billing" className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
           <span className="cbnav-icon"><CreditCard size={20} strokeWidth={1.8} /></span>

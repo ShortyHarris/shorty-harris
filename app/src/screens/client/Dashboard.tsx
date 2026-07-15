@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useClientDashboard } from '../../hooks/useClientDashboard';
+import { useClientApprovals } from '../../hooks/useClientApprovals';
 import type { HotLead, HotLeadStatus } from '../../types';
-import { RefreshCw, ChevronRight, Zap, MessageSquare, Trophy, XCircle, TrendingUp, Minus } from 'lucide-react';
+import { RefreshCw, ChevronRight, Zap, MessageSquare, Trophy, XCircle, TrendingUp, Minus, ClipboardCheck } from 'lucide-react';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import './Dashboard.css';
 
@@ -58,6 +60,7 @@ function matchesFilter(lead: HotLead, filter: Filter): boolean {
 
 export function Dashboard({ clientId }: { clientId: string }) {
   const { leads, loading, error, setStatus, reload } = useClientDashboard(clientId);
+  const { items: pendingApprovals } = useClientApprovals(clientId);
   const [openId, setOpenId] = useState<string | null>(clientId === '__preview__' ? 'mock-0' : null);
   const [filter, setFilter] = useState<Filter>('new');
   const [page, setPage] = useState(1);
@@ -108,6 +111,17 @@ export function Dashboard({ clientId }: { clientId: string }) {
           <HelpButton content={HELP} />
         </div>
       </div>
+
+      {/* ─── Pending approvals banner ─── */}
+      {pendingApprovals.length > 0 && (
+        <Link to="/app/approvals" className="appr-nudge">
+          <span className="appr-nudge-icon"><ClipboardCheck size={16} strokeWidth={2} /></span>
+          <span className="appr-nudge-text">
+            <strong>{pendingApprovals.length} message{pendingApprovals.length === 1 ? '' : 's'}</strong> waiting for your approval
+          </span>
+          <ChevronRight size={16} className="appr-nudge-arrow" />
+        </Link>
+      )}
 
       {/* ─── Stat cards ─── */}
       <StatGrid

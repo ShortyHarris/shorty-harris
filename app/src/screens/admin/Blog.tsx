@@ -487,10 +487,10 @@ function LinkedPostsPreview({ postId }: { postId: string }) {
   return (
     <div className="flex flex-col gap-1.5">
       {links.map((l) => (
-        <div key={l.id} className="flex items-center gap-2 text-[12.5px] text-[#62655c]">
+        <div key={l.id} className="flex min-w-0 items-center gap-2 text-[12.5px] text-[#62655c]">
           <Link2 size={12} className="shrink-0 text-[#9a9d92]" />
-          <span className="truncate">{l.title}</span>
-          {l.anchor_text && <span className="shrink-0 text-[11px] italic text-[#9a9d92]">"{l.anchor_text}"</span>}
+          <span className="min-w-0 flex-1 truncate">{l.title}</span>
+          {l.anchor_text && <span className="max-w-[40%] shrink-0 truncate text-[11px] italic text-[#9a9d92]">"{l.anchor_text}"</span>}
         </div>
       ))}
     </div>
