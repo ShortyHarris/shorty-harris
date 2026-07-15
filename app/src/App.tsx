@@ -9,6 +9,7 @@ import { Shell } from './screens/client/Shell';
 import { Dashboard } from './screens/client/Dashboard';
 import { Billing } from './screens/client/Billing';
 import { Approvals } from './screens/client/Approvals';
+import { Settings } from './screens/client/Settings';
 import { useClientHeader, clientHeaderKey } from './hooks/useClientHeader';
 import { dashboardKey } from './hooks/useClientDashboard';
 import { billingKey } from './hooks/useBilling';
@@ -91,6 +92,7 @@ function ClientZone() {
         <Routes>
           <Route index element={<Dashboard clientId={clientId} />} />
           <Route path="approvals" element={<Approvals clientId={clientId} />} />
+          <Route path="settings" element={<Settings clientId={clientId} />} />
           <Route path="billing" element={<Billing clientId={clientId} onCreditsChanged={() => {
             queryClient.invalidateQueries({ queryKey: clientHeaderKey(clientId) });
             queryClient.invalidateQueries({ queryKey: billingKey(clientId) });

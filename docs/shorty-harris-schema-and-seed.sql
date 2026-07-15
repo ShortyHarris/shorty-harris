@@ -166,6 +166,18 @@ create table public.messages (
   updated_at timestamptz not null default now()
 );
 
+-- Per-client Gmail OAuth, so each client sends outreach from their own address
+-- (google-oauth-callback + gmail-client edge functions).
+create table public.client_email_credentials (
+  client_id uuid primary key references public.clients(id) on delete cascade,
+  email_address text,
+  status text not null default 'pending' check (status in ('active','revoked','error','pending')),
+  error_message text,
+  last_used_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table public.replies (
   id uuid primary key default gen_random_uuid(),
   prospect_id uuid not null references public.prospects(id) on delete cascade,
@@ -396,6 +408,7 @@ alter table public.campaigns enable row level security;
 alter table public.prospect_imports enable row level security;
 alter table public.prospects enable row level security;
 alter table public.do_not_contact enable row level security;
+alter table public.client_email_credentials enable row level security;
 alter table public.messages enable row level security;
 alter table public.replies enable row level security;
 alter table public.follow_up_schedules enable row level security;
@@ -422,6 +435,7 @@ create policy admin_all_campaigns on public.campaigns for all using (public.is_a
 create policy admin_all_imports on public.prospect_imports for all using (public.is_admin()) with check (public.is_admin());
 create policy admin_all_prospects on public.prospects for all using (public.is_admin()) with check (public.is_admin());
 create policy admin_all_dnc on public.do_not_contact for all using (public.is_admin()) with check (public.is_admin());
+create policy admin_all_email_credentials on public.client_email_credentials for all using (public.is_admin()) with check (public.is_admin());
 create policy admin_all_messages on public.messages for all using (public.is_admin()) with check (public.is_admin());
 create policy admin_all_replies on public.replies for all using (public.is_admin()) with check (public.is_admin());
 create policy admin_all_fus on public.follow_up_schedules for all using (public.is_admin()) with check (public.is_admin());
@@ -450,6 +464,8 @@ create policy client_own_hot_leads_update on public.hot_leads for update using (
 create policy client_own_replies on public.replies for select using (client_id = public.current_client_id());
 create policy client_own_messages on public.messages for select using (client_id = public.current_client_id());
 create policy client_own_messages_update on public.messages for update using (client_id = public.current_client_id()) with check (client_id = public.current_client_id());
+create policy client_own_email_credentials on public.client_email_credentials for select using (client_id = public.current_client_id());
+create policy client_own_email_credentials_update on public.client_email_credentials for update using (client_id = public.current_client_id()) with check (client_id = public.current_client_id());
 create policy client_own_notifications on public.notifications for select using (client_id = public.current_client_id());
 create policy client_own_prospects on public.prospects for select using (client_id = public.current_client_id());
 

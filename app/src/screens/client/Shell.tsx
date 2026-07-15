@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { Inbox, CreditCard, LogOut, ClipboardCheck } from 'lucide-react';
+import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings } from 'lucide-react';
 import '../../styles/admin-tables.css';
 import './Shell.css';
 
@@ -48,6 +48,10 @@ export function Shell({
           <NavLink to="/app/billing" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
             <CreditCard size={16} strokeWidth={1.9} className="cside-link-icon" />
             Billing
+          </NavLink>
+          <NavLink to="/app/settings" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <Settings size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Settings
           </NavLink>
         </nav>
 
@@ -101,6 +105,10 @@ export function Shell({
         <NavLink to="/app/billing" className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
           <span className="cbnav-icon"><CreditCard size={20} strokeWidth={1.8} /></span>
           <span>Billing</span>
+        </NavLink>
+        <NavLink to="/app/settings" className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
+          <span className="cbnav-icon"><Settings size={20} strokeWidth={1.8} /></span>
+          <span>Settings</span>
         </NavLink>
         <button className="cbnav-item" onClick={onSignOut}>
           <span className="cbnav-icon"><LogOut size={20} strokeWidth={1.8} /></span>
