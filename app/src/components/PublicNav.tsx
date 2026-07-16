@@ -22,6 +22,8 @@ function smoothScrollTo(id: string, done?: () => void) {
 export function PublicNav() {
   const location = useLocation();
   const isHome = location.pathname === '/';
+  const isBlogActive = location.pathname === '/blog' || location.pathname.startsWith('/blog/');
+  const isLegalPage = location.pathname === '/privacy' || location.pathname === '/terms';
 
   const { session, profile } = useAuth();
   const isAuthed = !!session && !!profile;
@@ -63,9 +65,16 @@ export function PublicNav() {
               {l.label}
             </button>
           ))}
-          <Link to="/blog" className="text-[14px] font-medium text-[#54574e] no-underline hover:text-[#1a1b17] transition-colors">
-            Blog
-          </Link>
+          {!isLegalPage && (
+            <Link
+              to="/blog"
+              className={`text-[14px] font-medium no-underline transition-colors ${
+                isBlogActive ? 'text-[#1a1b17] font-semibold' : 'text-[#54574e] hover:text-[#1a1b17]'
+              }`}
+            >
+              Blog
+            </Link>
+          )}
         </nav>
 
         <div className="flex flex-1 items-center justify-end gap-3">
@@ -112,13 +121,17 @@ export function PublicNav() {
                 {l.label}
               </button>
             ))}
-            <Link
-              to="/blog"
-              onClick={() => setMenuOpen(false)}
-              className="rounded-lg px-4 py-3 text-[15px] font-medium text-[#54574e] no-underline hover:bg-[#f5f2ec] hover:text-[#1a1b17] transition-colors"
-            >
-              Blog
-            </Link>
+            {!isLegalPage && (
+              <Link
+                to="/blog"
+                onClick={() => setMenuOpen(false)}
+                className={`rounded-lg px-4 py-3 text-[15px] font-medium no-underline transition-colors ${
+                  isBlogActive ? 'bg-[#f5f2ec] text-[#1a1b17] font-semibold' : 'text-[#54574e] hover:bg-[#f5f2ec] hover:text-[#1a1b17]'
+                }`}
+              >
+                Blog
+              </Link>
+            )}
           </div>
           <div className="mt-auto flex flex-col gap-2 border-t border-[#e8e3da] p-4">
             {isAuthed ? (

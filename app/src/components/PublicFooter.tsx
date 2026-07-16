@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 // Shared footer for every public-facing page (Home, Blog, BlogPost, …).
@@ -7,14 +6,11 @@ import { Link } from 'react-router-dom';
 // any page, not just from "/" itself.
 
 const FOOT_LINKS = [
-  { title: "Product", links: [["How it works", "/#how"], ["Results", "/#results"], ["Pricing", "#"]] as const },
-  { title: "Company", links: [["About", "#"],    ["Blog", "/blog"],   ["Contact", "#"],    ["Privacy", "#"]]  as const },
-  { title: "Connect", links: [["Instagram", "#"], ["X / Twitter", "#"], ["WhatsApp", "#"]] as const },
+  { title: "Product", links: [["How it works", "/#how"], ["Results", "/#results"]] as const },
+  { title: "Company", links: [["Blog", "/blog"], ["Privacy", "/privacy"], ["Terms", "/terms"]] as const },
 ];
 
 export function PublicFooter() {
-  const [done, setDone] = useState(false);
-
   return (
     <footer className="border-t border-[#e5ddd3] max-w-[1200px] mx-auto w-full px-6 lg:px-12 pt-14 pb-10">
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_2fr] gap-10 lg:gap-16 pb-12">
@@ -26,24 +22,8 @@ export function PublicFooter() {
           <p className="text-[13.5px] leading-[1.55] text-[#54574e] m-0">
             AI-powered outbound that finds ideal customers and delivers warm, qualified leads straight to your inbox.
           </p>
-          <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); setDone(true); }}>
-            <input
-              type="email"
-              placeholder="Your email"
-              required
-              disabled={done}
-              className="flex-1 min-w-0 px-3.5 py-2.5 border border-[#e5ddd3] rounded-[10px] text-[13px] bg-white text-[#1a1b17] outline-none focus:border-[#3c7a5b] placeholder:text-[#9b9e96] disabled:opacity-60"
-            />
-            <button
-              type="submit"
-              disabled={done}
-              className="px-4 py-2.5 bg-[#1a1b17] text-white text-[13px] font-semibold rounded-[10px] hover:bg-[#3c7a5b] disabled:opacity-60 transition-colors whitespace-nowrap cursor-pointer border-0"
-            >
-              {done ? "✓ Done" : "Subscribe"}
-            </button>
-          </form>
         </div>
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 gap-6">
           {FOOT_LINKS.map((col) => (
             <div key={col.title} className="flex flex-col gap-2.5">
               <div className="text-[12px] font-bold tracking-[0.05em] uppercase text-[#1a1b17] mb-1">{col.title}</div>

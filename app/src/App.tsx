@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
 import { Login } from './screens/Login';
 import { ForgotPassword } from './screens/ForgotPassword';
@@ -21,6 +21,8 @@ import './styles/theme-client.css';
 import { Home } from './screens/Home';
 import { Blog } from './screens/Blog';
 import { BlogPost } from './screens/BlogPost';
+import { Privacy } from './screens/Privacy';
+import { Terms } from './screens/Terms';
 
 // ── Guards ──────────────────────────────────────────────────────────────────
 
@@ -183,6 +185,8 @@ function AppRoutes() {
 
       <Route path="/blog" element={<Blog />} />
       <Route path="/blog/:slug" element={<BlogPost />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
 
       <Route path="/__preview-dashboard" element={
         <div className="theme-client">
@@ -215,9 +219,23 @@ function AppRoutes() {
   );
 }
 
+// Scrolls to the top of the page on every route change, since browsers
+// otherwise keep the previous scroll position on client-side navigation.
+// Skipped when the URL has a hash (e.g. "/#how") so in-page anchor
+// navigation isn't fought.
+function ScrollToTop() {
+  const { pathname, hash } = useLocation();
+  useEffect(() => {
+    if (hash) return;
+    window.scrollTo(0, 0);
+  }, [pathname, hash]);
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <AppRoutes />
     </BrowserRouter>
   );
