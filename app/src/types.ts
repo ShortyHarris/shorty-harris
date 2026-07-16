@@ -19,6 +19,8 @@ export interface MessageRow {
   opened_at: string | null;
   open_count: number;
   created_at: string;
+  sender_email: string | null;
+  sender_status: string | null;
 }
 
 export interface ProspectRow {

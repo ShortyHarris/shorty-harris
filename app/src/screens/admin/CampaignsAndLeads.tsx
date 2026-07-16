@@ -53,6 +53,35 @@ const LEAD_PILL: Record<string, { bg: string; text: string; border?: string }> =
 
 const PAGE_SIZE = 10;
 
+const LANGUAGE_OPTIONS = [
+  'English', 'Czech', 'French', 'Spanish', 'Portuguese', 'German', 'Italian',
+  'Dutch', 'Polish', 'Slovak', 'Arabic', 'Chinese', 'Swahili', 'Bemba', 'Nyanja',
+];
+
+/* Text input + datalist (combobox) — not a Select, since the admin should be
+   able to type any language, not just pick from the suggestion list. */
+function LanguageField({ value, onChange, listId }: { value: string; onChange: (v: string) => void; listId: string }) {
+  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
+  const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+  return (
+    <div>
+      <label className={fieldLbl}>Outreach Language</label>
+      <input
+        list={listId}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="English"
+        style={FONT}
+        className={inputCls}
+      />
+      <datalist id={listId}>
+        {LANGUAGE_OPTIONS.map((l) => <option key={l} value={l} />)}
+      </datalist>
+      <p className="mt-1 text-[11px] text-[#9a9d92]">Messages and follow-ups will be written in this language.</p>
+    </div>
+  );
+}
+
 /* ── Ghost / primary button helpers ───────────────────────────────── */
 const ghostCls = 'cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]';
 const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50';
@@ -130,7 +159,7 @@ export function Campaigns() {
       )}
 
       {loading ? (
-        <SkeletonTable rows={PAGE_SIZE} cols={6} />
+        <SkeletonTable rows={PAGE_SIZE} cols={8} />
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
           <strong className="text-[15px] font-bold text-[#20211c]">No campaigns yet.</strong>
@@ -142,7 +171,7 @@ export function Campaigns() {
             <table>
               <thead>
                 <tr>
-                  {['Campaign', 'Client', 'Channel', 'Prospects', 'Status', 'Scrape', ''].map((h) => (
+                  {['Campaign', 'Client', 'Channel', 'Language', 'Prospects', 'Status', 'Scrape', ''].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -165,6 +194,7 @@ export function Campaigns() {
                       </td>
                       <td className="text-[#62655c]">{c.client?.business_name ?? '—'}</td>
                       <td className="text-[#62655c] capitalize">{c.channel}</td>
+                      <td className="text-[#62655c]">{c.language}</td>
                       <td className="text-[#62655c]">{c.prospectCount}</td>
                       <td>
                         <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
@@ -225,7 +255,7 @@ export function Campaigns() {
                     </span>
                   </div>
                   <p className="mt-1.5 text-[12px] text-[#62655c]">
-                    {c.client?.business_name ?? '—'} · {c.channel}
+                    {c.client?.business_name ?? '—'} · {c.channel} · {c.language}
                   </p>
                   <p className="mt-0.5 text-[12px] text-[#9a9d92]">{c.prospectCount} prospects</p>
                   <div className="border-t border-[#f5f2ec] pt-3 mt-2 flex flex-wrap items-center gap-2">
@@ -373,6 +403,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
   const [clientId, setClientId]         = useState('');
   const [name, setName]                 = useState('');
   const [channel, setChannel]           = useState('email');
+  const [language, setLanguage]         = useState('English');
   const [queries, setQueries]           = useState('');
   const [locations, setLocations]       = useState('');
   const [maxResults, setMaxResults]     = useState(1000);
@@ -383,9 +414,10 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
   async function submit() {
     if (!clientId || !name.trim()) { setErr('Pick a client and enter a name.'); return; }
+    if (!language.trim()) { setErr('Outreach language is required.'); return; }
     setBusy(true); setErr(null);
     const { error } = await createCampaign({
-      client_id: clientId, name: name.trim(), channel,
+      client_id: clientId, name: name.trim(), channel, language: language.trim(),
       search_queries: queries.split(',').map((s) => s.trim()).filter(Boolean),
       target_locations: locations.split(';').map((s) => s.trim()).filter(Boolean),
       max_results: maxResults, scrape_enabled: scrapeEnabled,
@@ -440,6 +472,8 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
             <label className={fieldLbl}>Campaign name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Austin gyms — Q3" style={FONT} className={inputCls} />
           </div>
+
+          <LanguageField value={language} onChange={setLanguage} listId="new-campaign-languages" />
 
           <div>
             <label className={fieldLbl}>Channel</label>
@@ -535,6 +569,7 @@ function EditCampaignModal({
   const [name, setName]               = useState(campaign.name);
   const [description, setDescription] = useState(campaign.description ?? '');
   const [channel, setChannel]         = useState(campaign.channel);
+  const [language, setLanguage]       = useState(campaign.language);
   const [queries, setQueries]         = useState(campaign.search_queries.join(', '));
   const [locations, setLocations]     = useState(campaign.target_locations.join('; '));
   const [maxResults, setMaxResults]   = useState(campaign.max_results);
@@ -544,11 +579,13 @@ function EditCampaignModal({
 
   async function submit() {
     if (!name.trim()) { setErr('Campaign name is required.'); return; }
+    if (!language.trim()) { setErr('Outreach language is required.'); return; }
     setBusy(true); setErr(null);
     const { error } = await updateCampaign(campaign.id, {
       name: name.trim(),
       description: description.trim(),
       channel,
+      language: language.trim(),
       search_queries: queries.split(',').map((s) => s.trim()).filter(Boolean),
       target_locations: locations.split(';').map((s) => s.trim()).filter(Boolean),
       max_results: maxResults,
@@ -573,6 +610,9 @@ function EditCampaignModal({
           <label className={campFieldLbl}>Description</label>
           <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" style={FONT} className={campInputCls} />
         </div>
+
+        <LanguageField value={language} onChange={setLanguage} listId="edit-campaign-languages" />
+
         <div>
           <label className={campFieldLbl}>Channel</label>
           <Select value={channel} onValueChange={setChannel}>

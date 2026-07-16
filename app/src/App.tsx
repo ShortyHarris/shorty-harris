@@ -2,9 +2,11 @@ import { useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
 import { useClientHeader, clientHeaderKey } from './hooks/useClientHeader';
-import { dashboardKey } from './hooks/useClientDashboard';
+import { useClientDashboard, dashboardKey } from './hooks/useClientDashboard';
 import { billingKey } from './hooks/useBilling';
 import { useClientApprovals } from './hooks/useClientApprovals';
+import { useGmailConnection } from './hooks/useGmailConnection';
+import { useClientNotifications } from './hooks/useClientNotifications';
 import { useClientRealtimeSync } from './hooks/useClientRealtimeSync';
 import { queryClient } from './lib/queryClient';
 import './styles/theme-admin.css';
@@ -72,6 +74,10 @@ function ClientZone() {
   const clientId = profile!.client_id!;
   const { businessName, credits } = useClientHeader(clientId);
   const { items: pendingApprovals } = useClientApprovals(clientId);
+  const { connection: gmailConnection } = useGmailConnection(clientId);
+  const { leads } = useClientDashboard(clientId);
+  const newHotLeads = leads.filter((l) => l.status === 'new').length;
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useClientNotifications(clientId);
   useClientRealtimeSync(clientId);
 
   // After Stripe checkout redirect, invalidate header + billing + dashboard
@@ -94,6 +100,12 @@ function ClientZone() {
         credits={credits}
         displayName={profile!.full_name ?? 'Account'}
         pendingApprovals={pendingApprovals.length}
+        newHotLeads={newHotLeads}
+        gmailConnected={gmailConnection.connected}
+        notifications={notifications}
+        unreadCount={unreadCount}
+        onMarkAsRead={markAsRead}
+        onMarkAllAsRead={markAllAsRead}
         onSignOut={signOut}
       >
         <Routes>

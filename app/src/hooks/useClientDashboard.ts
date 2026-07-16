@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
@@ -82,22 +82,11 @@ export function useClientDashboard(clientId: string) {
     ...(isPreview ? { initialData: { summary: null as unknown as ClientSummary, leads: mockLeads() } } : {}),
   });
 
-  // Realtime: refresh when a hot lead changes for this client
-  useEffect(() => {
-    if (isPreview) return;
-    const channel = supabase
-      .channel(`client-hot-leads-${clientId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'hot_leads',
-        filter: `client_id=eq.${clientId}`,
-      }, () => {
-        queryClient.invalidateQueries({ queryKey: dashboardKey(clientId) });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [clientId, isPreview]);
+  // Realtime for hot_leads is handled centrally by useClientRealtimeSync() in
+  // ClientZone — not here. This hook is called from multiple places at once
+  // (the Dashboard page itself, plus the nav badge in ClientZone), and a
+  // second per-hook channel subscription with a fixed name crashes the
+  // moment both are mounted concurrently.
 
   const setStatus = useCallback(async (id: string, status: HotLeadStatus) => {
     queryClient.setQueryData<DashboardData>(dashboardKey(clientId), (prev) => {

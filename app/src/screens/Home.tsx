@@ -35,6 +35,7 @@ export function Home() {
         <Features />
         <StatsBar />
         <BigQuote />
+        <DataUse />
         <CtaBand />
       </main>
       <PublicFooter />
@@ -429,6 +430,38 @@ function BigQuote() {
         </motion.div>
       </motion.div>
     </section>
+  );
+}
+
+// ── Data use ──────────────────────────────────────────────────────────────────
+// Explicit, plain-language disclosure of why Shorty Harris requests Gmail
+// access — required to be visible on the public homepage (not just the
+// privacy policy) for Google OAuth verification of the Gmail scope.
+
+function DataUse() {
+  return (
+    <motion.section
+      className="max-w-[720px] mx-auto px-6 lg:px-12 py-16 text-center"
+      initial="hidden" whileInView="show" viewport={VIEW} variants={stagger}
+    >
+      <motion.span variants={fadeUp} className="inline-flex items-center px-3.5 py-[6px] rounded-full bg-[#edf4ef] text-[#3c7a5b] text-[11.5px] font-bold tracking-[0.07em] uppercase mb-4">
+        Your data, protected
+      </motion.span>
+      <motion.h2
+        variants={fadeUp}
+        className="font-extrabold tracking-[-0.03em] text-[#1a1b17] m-0 mb-4"
+        style={{ fontSize: "clamp(24px, 2.6vw, 34px)" }}
+      >
+        How we use your Gmail
+      </motion.h2>
+      <motion.p variants={fadeUp} className="text-[15px] leading-[1.7] text-[#54574e] max-w-[560px] mx-auto m-0 mb-3">
+        Clients can optionally connect their own Gmail account so outreach emails go out from their real business address instead of a shared one. We use that access only to send those emails and detect replies to them — we never read unrelated mail, and we never sell or share this data with anyone.
+      </motion.p>
+      <motion.p variants={fadeUp} className="text-[15px] leading-[1.7] text-[#54574e] max-w-[560px] mx-auto m-0">
+        Gmail access can be disconnected at any time from your dashboard's Settings page. Full details are in our{" "}
+        <Link to="/privacy" className="text-[#3c7a5b] font-semibold underline underline-offset-2">Privacy Policy</Link>.
+      </motion.p>
+    </motion.section>
   );
 }
 

@@ -1,10 +1,15 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useClientApprovals } from '../../hooks/useClientApprovals';
+import { useGmailConnection } from '../../hooks/useGmailConnection';
 import { SkeletonTable } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
+import { RowMenu } from '../../components/RowMenu';
 import type { ClientMessageItem } from '../../types';
 import { Clock, CheckCircle2, Send, Ban } from 'lucide-react';
+
+const GMAIL_REQUIRED_TITLE = "Connect your Gmail in Settings before approving — that's what actually sends this.";
 
 const HELP: HelpContent = {
   title: 'Approvals',
@@ -21,9 +26,9 @@ const HELP: HelpContent = {
 
 const TYPE_LABEL: Record<string, string> = {
   initial: 'First touch',
-  follow_up_d3: 'Follow-up · day 3',
-  follow_up_d7: 'Follow-up · day 7',
-  follow_up_d14: 'Follow-up · day 14',
+  follow_up_d3: 'Follow-up D3',
+  follow_up_d7: 'Follow-up D7',
+  follow_up_d14: 'Follow-up D14',
 };
 
 const PAGE_SIZE = 10;
@@ -39,16 +44,28 @@ const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif
 
 export function Approvals({ clientId }: { clientId: string }) {
   const { items, stats, loading, error, approve, reject, bulkApprove, bulkReject, reload } = useClientApprovals(clientId);
+  const { connection: gmailConnection } = useGmailConnection(clientId);
   const [editItem, setEditItem] = useState<ClientMessageItem | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [bulkBusy, setBulkBusy] = useState(false);
+
+  // Approving an email-channel message only matters if it can actually be
+  // sent — which needs the client's own connected Gmail. Non-email channels
+  // (whatsapp/sms) don't depend on it, so those stay approvable regardless.
+  function needsGmail(item: ClientMessageItem) {
+    return item.channel === 'email' && !gmailConnection.connected;
+  }
 
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
   const paged      = items.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const allSelected = paged.length > 0 && paged.every((i) => selected.has(i.id));
+  const selectedBlockedByGmail = Array.from(selected).some((id) => {
+    const item = items.find((i) => i.id === id);
+    return item ? needsGmail(item) : false;
+  });
 
   function toggleOne(id: string) {
     setSelected((prev) => {
@@ -173,8 +190,9 @@ export function Approvals({ clientId }: { clientId: string }) {
                 <span className="text-[12.5px] text-[#9a9d92]">{selected.size} selected</span>
                 <button
                   onClick={handleBulkApprove}
-                  disabled={bulkBusy}
-                  className="cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50"
+                  disabled={bulkBusy || selectedBlockedByGmail}
+                  title={selectedBlockedByGmail ? GMAIL_REQUIRED_TITLE : undefined}
+                  className="cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Approve selected
                 </button>
@@ -191,7 +209,14 @@ export function Approvals({ clientId }: { clientId: string }) {
 
           {/* Desktop table */}
           <div className="atbl hidden md:block">
-            <table>
+            <table className="table-fixed">
+              <colgroup>
+                <col className="w-9" />
+                <col className="w-[34%]" />
+                <col className="w-[16%]" />
+                <col className="w-[30%]" />
+                <col className="w-[20%]" />
+              </colgroup>
               <thead>
                 <tr>
                   <th className="w-9" />
@@ -206,10 +231,12 @@ export function Approvals({ clientId }: { clientId: string }) {
                     <td className="px-3">
                       <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleOne(item.id)} className="accent-[#3c7a5b]" />
                     </td>
-                    <td>
-                      <div className="font-bold text-[#20211c]">{item.prospect?.business_name ?? 'Unknown'}</div>
+                    <td className="min-w-0">
+                      <div className="truncate font-bold text-[#20211c]" title={item.prospect?.business_name ?? undefined}>
+                        {item.prospect?.business_name ?? 'Unknown'}
+                      </div>
                       {item.prospect?.contact_name && (
-                        <div className="mt-0.5 text-[11px] text-[#9a9d92]">{item.prospect.contact_name}</div>
+                        <div className="mt-0.5 truncate text-[11px] text-[#9a9d92]">{item.prospect.contact_name}</div>
                       )}
                       <ProspectMeta item={item} className="mt-0.5" />
                     </td>
@@ -218,31 +245,25 @@ export function Approvals({ clientId }: { clientId: string }) {
                         {TYPE_LABEL[item.message_type] ?? item.message_type}
                       </span>
                     </td>
-                    <td className="max-w-[240px] text-[#62655c]">
-                      <div className="truncate">
+                    <td className="min-w-0 text-[#62655c]">
+                      <div className="truncate" title={item.subject ?? undefined}>
                         {item.subject ?? <span className="italic text-[#c4bfb5]">No subject</span>}
                       </div>
                     </td>
                     <td className="px-3">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => approve(item.id)}
-                          className="cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46]"
+                          disabled={needsGmail(item)}
+                          title={needsGmail(item) ? GMAIL_REQUIRED_TITLE : undefined}
+                          className="cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3.5 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Approve
                         </button>
-                        <button
-                          onClick={() => setEditItem(item)}
-                          className="cursor-pointer rounded-lg border border-[#ddd8cb] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#20211c] transition-colors hover:bg-[#fbf9f5]"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => reject(item.id)}
-                          className="cursor-pointer rounded-lg border border-[#a8533a] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white"
-                        >
-                          Reject
-                        </button>
+                        <RowMenu items={[
+                          { type: 'action', label: 'Edit', onClick: () => setEditItem(item) },
+                          { type: 'action', label: 'Reject', destructive: true, onClick: () => reject(item.id) },
+                        ]} />
                       </div>
                     </td>
                   </tr>
@@ -266,7 +287,7 @@ export function Approvals({ clientId }: { clientId: string }) {
                     <div className="min-w-0">
                       <div className="font-bold text-[#20211c] truncate">{item.prospect?.business_name ?? 'Unknown'}</div>
                       {item.prospect?.contact_name && (
-                        <div className="mt-0.5 text-[11px] text-[#9a9d92]">{item.prospect.contact_name}</div>
+                        <div className="mt-0.5 truncate text-[11px] text-[#9a9d92]">{item.prospect.contact_name}</div>
                       )}
                       <ProspectMeta item={item} className="mt-0.5" />
                     </div>
@@ -278,25 +299,19 @@ export function Approvals({ clientId }: { clientId: string }) {
                 {item.subject && (
                   <div className="mt-1.5 truncate text-[12px] text-[#9a9d92]">{item.subject}</div>
                 )}
-                <div className="mt-3 border-t border-[#f5f2ec] pt-3 flex gap-2">
+                <div className="mt-3 flex items-center gap-2 border-t border-[#f5f2ec] pt-3">
                   <button
                     onClick={() => approve(item.id)}
-                    className="cursor-pointer flex-1 rounded-lg border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46]"
+                    disabled={needsGmail(item)}
+                    title={needsGmail(item) ? GMAIL_REQUIRED_TITLE : undefined}
+                    className="cursor-pointer flex-1 rounded-lg border-0 bg-[#3c7a5b] px-3 py-2 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Approve
                   </button>
-                  <button
-                    onClick={() => setEditItem(item)}
-                    className="cursor-pointer flex-1 rounded-lg border border-[#ddd8cb] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#20211c] transition-colors hover:bg-[#fbf9f5]"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => reject(item.id)}
-                    className="cursor-pointer flex-1 rounded-lg border border-[#a8533a] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white"
-                  >
-                    Reject
-                  </button>
+                  <RowMenu items={[
+                    { type: 'action', label: 'Edit', onClick: () => setEditItem(item) },
+                    { type: 'action', label: 'Reject', destructive: true, onClick: () => reject(item.id) },
+                  ]} />
                 </div>
               </div>
             ))}
@@ -332,6 +347,7 @@ export function Approvals({ clientId }: { clientId: string }) {
           <EditModal
             key="edit-modal"
             item={editItem}
+            blockedByGmail={needsGmail(editItem)}
             onClose={() => setEditItem(null)}
             onApprove={(id, body, subject) => { approve(id, body, subject); setEditItem(null); }}
           />
@@ -411,10 +427,12 @@ function StatTile({
 
 function EditModal({
   item,
+  blockedByGmail,
   onClose,
   onApprove,
 }: {
   item: ClientMessageItem;
+  blockedByGmail: boolean;
   onClose: () => void;
   onApprove: (id: string, body?: string, subject?: string) => void;
 }) {
@@ -482,6 +500,11 @@ function EditModal({
             {item.prospect?.category && <>{item.prospect.category}</>}
             {item.prospect?.location && <><span className="mx-1.5 text-[#c4bfb5]">·</span>{item.prospect.location}</>}
           </div>
+          {blockedByGmail && (
+            <div className="rounded-xl border border-[#e8d5a8] bg-[#f8efdb] px-3.5 py-2.5 text-[12px] text-[#8a6417]">
+              <Link to="/app/settings" className="font-bold underline">Connect your Gmail</Link> in Settings before approving — that's what actually sends this.
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -491,7 +514,9 @@ function EditModal({
           </button>
           <button
             onClick={() => onApprove(item.id, bodyDirty ? draft : undefined, subjectDirty ? subjectDraft : undefined)}
-            className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46]"
+            disabled={blockedByGmail}
+            title={blockedByGmail ? GMAIL_REQUIRED_TITLE : undefined}
+            className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {dirty ? 'Save & approve' : 'Approve'}
           </button>

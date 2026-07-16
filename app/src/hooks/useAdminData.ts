@@ -123,6 +123,7 @@ export interface CampaignRow {
   description: string | null;
   status: string;
   channel: string;
+  language: string;
   scrape_enabled: boolean;
   last_scraped_at: string | null;
   search_queries: string[];
@@ -136,7 +137,7 @@ export interface CampaignRow {
 async function fetchCampaigns(): Promise<CampaignRow[]> {
   const { data, error } = await supabase
     .from('campaigns')
-    .select(`id, name, description, status, channel, scrape_enabled, last_scraped_at, search_queries, target_locations, max_results, created_at, client:clients ( business_name )`)
+    .select(`id, name, description, status, channel, language, scrape_enabled, last_scraped_at, search_queries, target_locations, max_results, created_at, client:clients ( business_name )`)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -147,6 +148,7 @@ async function fetchCampaigns(): Promise<CampaignRow[]> {
     target_locations: (r.target_locations as string[] | null) ?? [],
     max_results: (r.max_results as number | null) ?? 50,
     description: (r.description as string | null) ?? null,
+    language: (r.language as string | null) ?? 'English',
     prospectCount: 0,
   })) as CampaignRow[];
 
@@ -193,6 +195,7 @@ export interface NewCampaignInput {
   client_id: string;
   name: string;
   channel: string;
+  language: string;
   search_queries: string[];
   target_locations: string[];
   max_results: number;
@@ -217,6 +220,7 @@ export async function createCampaign(input: NewCampaignInput) {
     client_id: input.client_id,
     name: input.name,
     channel: input.channel,
+    language: input.language,
     status: input.status ?? 'active',
     search_queries: input.search_queries,
     target_locations: input.target_locations,
@@ -478,6 +482,7 @@ export interface UpdateCampaignInput {
   name: string;
   description: string;
   channel: string;
+  language: string;
   search_queries: string[];
   target_locations: string[];
   max_results: number;
@@ -489,6 +494,7 @@ export async function updateCampaign(id: string, input: UpdateCampaignInput) {
     name: input.name,
     description: input.description || null,
     channel: input.channel,
+    language: input.language,
     search_queries: input.search_queries,
     target_locations: input.target_locations,
     max_results: input.max_results,

@@ -18,13 +18,13 @@ interface Stats {
 
 async function fetchQueueItems(): Promise<QueueItem[]> {
   const { data, error } = await supabase
-    .from('messages')
+    .from('messages_with_sender')
     .select(
       `
       id, prospect_id, campaign_id, client_id,
       channel, subject, body, message_type,
       approval_status, approved_at, send_status,
-      created_at,
+      created_at, sender_email, sender_status,
       prospect:prospects (
         id, business_name, contact_name, email,
         phone, category, location, pipeline_status

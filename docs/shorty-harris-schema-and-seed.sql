@@ -229,7 +229,10 @@ create table public.notifications (
   status text not null default 'pending' check (status in ('pending','sent','failed','sandbox_logged')),
   twilio_sid text,
   sent_at timestamptz,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Drives the client-side notification bell's unread badge/mark-as-read.
+  -- null = unread.
+  read_at timestamptz
 );
 
 create index idx_messages_prospect on public.messages(prospect_id);

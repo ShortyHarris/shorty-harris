@@ -3,8 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useApprovalQueue } from '../../hooks/useApprovalQueue';
 import { SkeletonTable } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
+import { RowMenu } from '../../components/RowMenu';
 import type { QueueItem } from '../../types';
-import { Clock, CheckCircle2, Send, Ban, Eye } from 'lucide-react';
+import { Clock, CheckCircle2, Send, Ban, Eye, AlertTriangle } from 'lucide-react';
+
+const GMAIL_TOOLTIP = "This client needs to connect their Gmail from Settings before messages can be sent";
+
+function senderBlocked(item: QueueItem): boolean {
+  return !item.sender_email || item.sender_status !== 'active';
+}
 
 const HELP: HelpContent = {
   title: 'Approval Queue',
@@ -21,9 +28,9 @@ const HELP: HelpContent = {
 
 const TYPE_LABEL: Record<string, string> = {
   initial: 'First touch',
-  follow_up_d3: 'Follow-up · day 3',
-  follow_up_d7: 'Follow-up · day 7',
-  follow_up_d14: 'Follow-up · day 14',
+  follow_up_d3: 'Follow-up D3',
+  follow_up_d7: 'Follow-up D7',
+  follow_up_d14: 'Follow-up D14',
 };
 
 const PAGE_SIZE = 10;
@@ -125,7 +132,14 @@ export function ApprovalQueue() {
         <>
           {/* Desktop table */}
           <div className="atbl hidden md:block">
-            <table>
+            <table className="table-fixed">
+              <colgroup>
+                <col className="w-[24%]" />
+                <col className="w-[16%]" />
+                <col className="w-[16%]" />
+                <col className="w-[28%]" />
+                <col className="w-[16%]" />
+              </colgroup>
               <thead>
                 <tr>
                   {(['Prospect', 'Client', 'Type', 'Subject', ''] as const).map((h) => (
@@ -136,45 +150,44 @@ export function ApprovalQueue() {
               <tbody>
                 {paged.map((item) => (
                   <tr key={item.id}>
-                    <td>
-                      <div className="font-bold text-[#20211c]">{item.prospect?.business_name ?? 'Unknown'}</div>
+                    <td className="min-w-0">
+                      <div className="truncate font-bold text-[#20211c]" title={item.prospect?.business_name ?? undefined}>
+                        {item.prospect?.business_name ?? 'Unknown'}
+                      </div>
                       {item.prospect?.contact_name && (
-                        <div className="mt-0.5 text-[11px] text-[#9a9d92]">{item.prospect.contact_name}</div>
+                        <div className="mt-0.5 truncate text-[11px] text-[#9a9d92]">{item.prospect.contact_name}</div>
                       )}
                       <ProspectMeta item={item} className="mt-0.5" />
                     </td>
-                    <td className="text-[#62655c]">{item.client?.business_name ?? '—'}</td>
+                    <td className="min-w-0 text-[#62655c]">
+                      <div className="truncate" title={item.client?.business_name ?? undefined}>{item.client?.business_name ?? '—'}</div>
+                      <SenderLine item={item} className="mt-0.5" />
+                    </td>
                     <td>
                       <span className="atbl-pill" style={{ background: '#edf4ef', color: '#3c7a5b' }}>
                         {TYPE_LABEL[item.message_type] ?? item.message_type}
                       </span>
                     </td>
-                    <td className="max-w-[240px] text-[#62655c]">
-                      <div className="truncate">
+                    <td className="min-w-0 text-[#62655c]">
+                      <div className="truncate" title={item.subject ?? undefined}>
                         {item.subject ?? <span className="italic text-[#c4bfb5]">No subject</span>}
                       </div>
                       <OpenBadge item={item} />
                     </td>
                     <td className="px-3">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => approve(item.id)}
-                          className="cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46]"
+                          disabled={senderBlocked(item)}
+                          title={senderBlocked(item) ? GMAIL_TOOLTIP : undefined}
+                          className="cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3.5 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Approve
                         </button>
-                        <button
-                          onClick={() => setEditItem(item)}
-                          className="cursor-pointer rounded-lg border border-[#ddd8cb] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#20211c] transition-colors hover:bg-[#fbf9f5]"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => reject(item.id)}
-                          className="cursor-pointer rounded-lg border border-[#a8533a] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white"
-                        >
-                          Reject
-                        </button>
+                        <RowMenu items={[
+                          { type: 'action', label: 'Edit', onClick: () => setEditItem(item) },
+                          { type: 'action', label: 'Reject', destructive: true, onClick: () => reject(item.id) },
+                        ]} />
                       </div>
                     </td>
                   </tr>
@@ -200,31 +213,26 @@ export function ApprovalQueue() {
                   </span>
                 </div>
                 {item.client?.business_name && (
-                  <div className="mt-1.5 text-[12px] text-[#62655c]">{item.client.business_name}</div>
+                  <div className="mt-1.5 truncate text-[12px] text-[#62655c]">{item.client.business_name}</div>
                 )}
+                <SenderLine item={item} className="mt-0.5" />
                 {item.subject && (
                   <div className="mt-1 truncate text-[12px] text-[#9a9d92]">{item.subject}</div>
                 )}
                 <OpenBadge item={item} className="mt-1" />
-                <div className="mt-3 border-t border-[#f5f2ec] pt-3 flex gap-2">
+                <div className="mt-3 flex items-center gap-2 border-t border-[#f5f2ec] pt-3">
                   <button
                     onClick={() => approve(item.id)}
-                    className="cursor-pointer flex-1 rounded-lg border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46]"
+                    disabled={senderBlocked(item)}
+                    title={senderBlocked(item) ? GMAIL_TOOLTIP : undefined}
+                    className="cursor-pointer flex-1 rounded-lg border-0 bg-[#3c7a5b] px-3 py-2 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Approve
                   </button>
-                  <button
-                    onClick={() => setEditItem(item)}
-                    className="cursor-pointer flex-1 rounded-lg border border-[#ddd8cb] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#20211c] transition-colors hover:bg-[#fbf9f5]"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => reject(item.id)}
-                    className="cursor-pointer flex-1 rounded-lg border border-[#a8533a] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white"
-                  >
-                    Reject
-                  </button>
+                  <RowMenu items={[
+                    { type: 'action', label: 'Edit', onClick: () => setEditItem(item) },
+                    { type: 'action', label: 'Reject', destructive: true, onClick: () => reject(item.id) },
+                  ]} />
                 </div>
               </div>
             ))}
@@ -278,6 +286,22 @@ function ProspectMeta({ item, className = '' }: { item: QueueItem; className?: s
       {location && <span>{location}</span>}
       {location && phone && <span className="text-[#c4bfb5]">·</span>}
       {phone && <span className="font-mono">{formatPhone(phone)}</span>}
+    </div>
+  );
+}
+
+function SenderLine({ item, className = '' }: { item: QueueItem; className?: string }) {
+  if (senderBlocked(item)) {
+    return (
+      <div title={GMAIL_TOOLTIP} className={`flex min-w-0 items-center gap-1 text-[11px] font-semibold text-[#a8533a] ${className}`}>
+        <AlertTriangle size={11} strokeWidth={2.2} className="shrink-0" />
+        <span className="truncate">Gmail not connected</span>
+      </div>
+    );
+  }
+  return (
+    <div className={`truncate text-[11px] text-[#9a9d92] ${className}`} title={item.sender_email ?? undefined}>
+      Sending from: <span className="font-medium text-[#62655c]">{item.sender_email}</span>
     </div>
   );
 }
@@ -430,6 +454,12 @@ function EditModal({
             {item.prospect?.category && <><span className="mx-1.5 text-[#c4bfb5]">·</span>{item.prospect.category}</>}
             {item.prospect?.location && <><span className="mx-1.5 text-[#c4bfb5]">·</span>{item.prospect.location}</>}
           </div>
+          {senderBlocked(item) && (
+            <div className="flex items-center gap-1.5 rounded-xl border border-[#a8533a]/20 bg-[#fdf0ec] px-3.5 py-2.5 text-[12px] font-semibold text-[#a8533a]">
+              <AlertTriangle size={13} strokeWidth={2.2} className="shrink-0" />
+              {GMAIL_TOOLTIP}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -439,7 +469,9 @@ function EditModal({
           </button>
           <button
             onClick={() => onApprove(item.id, bodyDirty ? draft : undefined, subjectDirty ? subjectDraft : undefined)}
-            className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46]"
+            disabled={senderBlocked(item)}
+            title={senderBlocked(item) ? GMAIL_TOOLTIP : undefined}
+            className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {dirty ? 'Save & approve' : 'Approve'}
           </button>

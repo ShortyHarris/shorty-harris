@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, LogOut,
+  X, LogOut, Bell,
   ClipboardCheck, Flame, Newspaper,
   Building2, Users, Megaphone, BarChart2, Activity,
 } from 'lucide-react';
@@ -23,6 +23,7 @@ import '../../styles/admin-tables.css';
 import './Layout.css';
 
 type NavItem = { to: string; label: string; icon: React.ElementType; badge?: number; badgeColor?: string };
+type NotifItem = { to: string; label: string; icon: React.ElementType; count: number; color: string };
 
 /* ── Root layout ─────────────────────────────────────────────────── */
 export function AdminLayout() {
@@ -54,25 +55,41 @@ export function AdminLayout() {
     { to: '/admin/monitoring', label: 'Monitoring', icon: Activity, badge: unresolvedErrors.length, badgeColor: '#a8533a' },
   ];
 
+  // Notification bell aggregates the same live counts already shown as
+  // sidebar badges above — there's no separate admin notification log in the
+  // schema (the `notifications` table is client-facing hot-lead alerts, not
+  // an admin feed), so this is a live "what needs attention" view rather
+  // than a history of past events. No mark-as-read: counts regenerate from
+  // the underlying data, they aren't a dismissible log.
+  const NOTIF_ITEMS: NotifItem[] = [
+    { to: '/admin/approvals',  label: 'Pending approvals',      icon: ClipboardCheck, count: approvalStats.pending,   color: '#d4870f' },
+    { to: '/admin/hot-leads',  label: 'New hot leads',          icon: Flame,          count: newHotLeadCount,         color: '#d4870f' },
+    { to: '/admin/blog',       label: 'Blog posts to review',   icon: Newspaper,      count: pendingPosts.length,     color: '#d4870f' },
+    { to: '/admin/monitoring', label: 'Unresolved errors',      icon: Activity,       count: unresolvedErrors.length, color: '#a8533a' },
+  ];
+
   return (
     <div className="theme-admin">
       <div className="ashell">
 
         {/* ── DESKTOP SIDEBAR ───────────────────────────────────────── */}
         <aside className="aside">
-          <SidebarInner initial={initial} name={name} signOut={signOut} onNav={() => {}} navDaily={NAV_DAILY} navOps={NAV_OPS} />
+          <SidebarInner initial={initial} name={name} signOut={signOut} onNav={() => {}} navDaily={NAV_DAILY} navOps={NAV_OPS} notifItems={NOTIF_ITEMS} />
         </aside>
 
         {/* ── MAIN ─────────────────────────────────────────────────── */}
         <div className="amain">
           <div className="amobile-bar">
             <Link to="/" className="amobile-brand" style={{ textDecoration: 'none', color: 'inherit' }}>
-              
+
               Shorty Harris
             </Link>
-            <button className="ahamburger" onClick={() => setMobileOpen(true)} aria-label="Open menu">
-              <span /><span /><span />
-            </button>
+            <div className="flex items-center gap-1">
+              <AdminNotificationBell items={NOTIF_ITEMS} />
+              <button className="ahamburger" onClick={() => setMobileOpen(true)} aria-label="Open menu">
+                <span /><span /><span />
+              </button>
+            </div>
           </div>
 
           <main className="apage">
@@ -167,22 +184,24 @@ export function AdminLayout() {
 
 /* ── Desktop sidebar ─────────────────────────────────────────────── */
 function SidebarInner({
-  initial, name, signOut, onNav, navDaily, navOps,
+  initial, name, signOut, onNav, navDaily, navOps, notifItems,
 }: {
   initial: string; name: string;
   signOut: () => void; onNav: () => void;
   navDaily: NavItem[]; navOps: NavItem[];
+  notifItems: NotifItem[];
 }) {
   const navigate = useNavigate();
   return (
     <>
       {/* Brand */}
-      <Link to="/" className="aside-brand" style={{ textDecoration: 'none' }}>
-        <div>
+      <div className="aside-brand">
+        <Link to="/" className="flex-1 min-w-0" style={{ textDecoration: 'none' }}>
           <div className="aside-brand-name">Shorty Harris</div>
           <div className="aside-brand-sub">Admin Dashboard</div>
-        </div>
-      </Link>
+        </Link>
+        <AdminNotificationBell items={notifItems} />
+      </div>
 
       {/* Daily nav */}
       <p className="aside-section-label">Daily</p>
@@ -246,5 +265,84 @@ function NavBadge({ count, color = '#d4870f' }: { count?: number; color?: string
     >
       {count > 99 ? '99+' : count}
     </span>
+  );
+}
+
+/* ── Notification bell — aggregates the same live counts already shown as
+   sidebar badges into one dropdown. No mark-as-read: these are live counts,
+   not a log, so there's nothing to persist as "read". ── */
+function AdminNotificationBell({ items }: { items: NotifItem[] }) {
+  const [open, setOpen] = useState(false);
+  const total = items.reduce((sum, i) => sum + i.count, 0);
+  const active = items.filter((i) => i.count > 0);
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        aria-label="Notifications"
+        className="relative flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-[#62655c] transition-colors hover:bg-[#f5f2ec]"
+      >
+        <Bell size={17} strokeWidth={1.8} />
+        {total > 0 && (
+          <span className="absolute right-0.5 top-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-[#d4870f] px-1 text-[9.5px] font-bold leading-none text-white">
+            {total > 99 ? '99+' : total}
+          </span>
+        )}
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => setOpen(false)}
+          >
+            <motion.div
+              className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[80vh] md:max-w-[420px] md:rounded-2xl md:shadow-2xl"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
+                <span className="text-[15px] font-bold text-[#20211c]">Needs your attention</span>
+                <button onClick={() => setOpen(false)} className="cursor-pointer border-0 bg-transparent text-[22px] leading-none text-[#9a9d92] transition-colors hover:text-[#20211c]">×</button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {active.length === 0 ? (
+                  <div className="px-5 py-14 text-center text-[13px] text-[#9a9d92]">You're all caught up.</div>
+                ) : (
+                  active.map((i) => {
+                    const Icon = i.icon;
+                    return (
+                      <Link
+                        key={i.to}
+                        to={i.to}
+                        onClick={() => setOpen(false)}
+                        className="flex items-center gap-3 border-b border-[#f5f2ec] px-5 py-3.5 no-underline transition-colors last:border-0 hover:bg-[#fbf9f5]"
+                      >
+                        <span
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                          style={{ background: `${i.color}1a`, color: i.color }}
+                        >
+                          <Icon size={15} strokeWidth={2} />
+                        </span>
+                        <span className="flex-1 text-[13px] font-semibold text-[#20211c]">{i.label}</span>
+                        <span className="text-[12.5px] font-bold" style={{ color: i.color }}>{i.count}</span>
+                      </Link>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
