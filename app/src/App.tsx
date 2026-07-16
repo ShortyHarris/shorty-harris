@@ -1,15 +1,6 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
-import { Login } from './screens/Login';
-import { ForgotPassword } from './screens/ForgotPassword';
-import { SetPassword } from './screens/SetPassword';
-import { AdminLayout } from './screens/admin/Layout';
-import { Shell } from './screens/client/Shell';
-import { Dashboard } from './screens/client/Dashboard';
-import { Billing } from './screens/client/Billing';
-import { Approvals } from './screens/client/Approvals';
-import { Settings } from './screens/client/Settings';
 import { useClientHeader, clientHeaderKey } from './hooks/useClientHeader';
 import { dashboardKey } from './hooks/useClientDashboard';
 import { billingKey } from './hooks/useBilling';
@@ -23,6 +14,20 @@ import { Blog } from './screens/Blog';
 import { BlogPost } from './screens/BlogPost';
 import { Privacy } from './screens/Privacy';
 import { Terms } from './screens/Terms';
+
+// Everything below is gated behind auth (or is an auth screen itself) — lazy
+// loading it keeps the public marketing/blog pages from shipping the admin
+// dashboard, client dashboard, and their dependencies (recharts, the
+// markdown editor, …) in the initial bundle.
+const Login          = lazy(() => import('./screens/Login').then((m) => ({ default: m.Login })));
+const ForgotPassword = lazy(() => import('./screens/ForgotPassword').then((m) => ({ default: m.ForgotPassword })));
+const SetPassword    = lazy(() => import('./screens/SetPassword').then((m) => ({ default: m.SetPassword })));
+const AdminLayout    = lazy(() => import('./screens/admin/Layout').then((m) => ({ default: m.AdminLayout })));
+const Shell          = lazy(() => import('./screens/client/Shell').then((m) => ({ default: m.Shell })));
+const Dashboard      = lazy(() => import('./screens/client/Dashboard').then((m) => ({ default: m.Dashboard })));
+const Billing        = lazy(() => import('./screens/client/Billing').then((m) => ({ default: m.Billing })));
+const Approvals      = lazy(() => import('./screens/client/Approvals').then((m) => ({ default: m.Approvals })));
+const Settings       = lazy(() => import('./screens/client/Settings').then((m) => ({ default: m.Settings })));
 
 // ── Guards ──────────────────────────────────────────────────────────────────
 
@@ -236,7 +241,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
-      <AppRoutes />
+      <Suspense fallback={<Spinner />}>
+        <AppRoutes />
+      </Suspense>
     </BrowserRouter>
   );
 }

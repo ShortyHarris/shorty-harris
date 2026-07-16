@@ -29,13 +29,14 @@ export function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-[#f7f4ee] text-[#1a1b17] antialiased" style={FONT}>
       <PublicNav />
-      <Hero />
-      <Logos />
-      <Features />
-   
-      <StatsBar />
-      <BigQuote />
-      <CtaBand />
+      <main>
+        <Hero />
+        <Logos />
+        <Features />
+        <StatsBar />
+        <BigQuote />
+        <CtaBand />
+      </main>
       <PublicFooter />
     </div>
   );

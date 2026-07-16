@@ -10,7 +10,8 @@ import { MarkdownEditor } from '../../components/MarkdownEditor';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
-import { ChevronRight, ExternalLink, Link2, Sparkles } from 'lucide-react';
+import { DateTimePicker } from '../../components/ui/date-time-picker';
+import { ChevronRight, ExternalLink, Link2, Sparkles, Clock } from 'lucide-react';
 
 const HELP: HelpContent = {
   title: 'Blog',
@@ -19,6 +20,7 @@ const HELP: HelpContent = {
     { type: 'p', text: "Click a post to review it in full — you can edit the title, body, excerpt, and SEO fields before approving." },
     { type: 'ul', items: [
       "Approve & publish — goes live on the public site immediately",
+      "Schedule for later — pick a future date/time and it publishes itself automatically, even if no one's looking",
       "Reject — discards the draft with a reason; WF12 won't retry it",
       "Delete — removes the draft so WF12 regenerates it on its next run",
     ]},
@@ -43,13 +45,20 @@ const PAGE_SIZE = 10;
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
+function formatScheduled(iso: string): string {
+  return new Date(iso).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+}
+
 export function Blog() {
   const {
     pending, loading, error,
-    approveAndPublish, reject, deleteForRegeneration, reload,
+    approveAndPublish, scheduleForLater, reject, deleteForRegeneration, reload,
   } = useBlogQueue();
   const {
-    posts: published, loading: publishedLoading, saveEdits, deletePublished, reload: reloadPublished,
+    posts: published, loading: publishedLoading, saveEdits,
+    rescheduleFor, publishNow, cancelSchedule, deletePublished, reload: reloadPublished,
   } = usePublishedBlogPosts();
 
   const [view, setView]           = useState<'pending' | 'published'>('pending');
@@ -82,6 +91,46 @@ export function Blog() {
     }
   }
 
+  async function handleSchedule(post: BlogPost, scheduledFor: string, edits: Partial<Pick<BlogPost, 'title' | 'body_md' | 'excerpt' | 'seo_title' | 'meta_description'>>) {
+    setBusyId(post.id);
+    try {
+      await scheduleForLater(post.id, scheduledFor, edits);
+      setActivePost(null);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleReschedule(post: BlogPost, scheduledFor: string) {
+    setBusyId(post.id);
+    try {
+      await rescheduleFor(post.id, scheduledFor);
+      setActivePost(null);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handlePublishNow(post: BlogPost) {
+    setBusyId(post.id);
+    try {
+      await publishNow(post.id);
+      setActivePost(null);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleCancelSchedule(post: BlogPost) {
+    setBusyId(post.id);
+    try {
+      await cancelSchedule(post.id);
+      setActivePost(null);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function handleReject(reason: string) {
     if (!rejectTarget) return;
     setBusyId(rejectTarget.id);
@@ -97,7 +146,7 @@ export function Blog() {
     if (!deleteTarget) return;
     setBusyId(deleteTarget.id);
     try {
-      if (deleteTarget.status === 'published') {
+      if (deleteTarget.status === 'published' || deleteTarget.status === 'scheduled') {
         await deletePublished(deleteTarget.id);
       } else {
         await deleteForRegeneration(deleteTarget.id);
@@ -213,8 +262,14 @@ export function Blog() {
                     {post.status === 'rejected' && (
                       <span className="shrink-0 text-[11px] font-semibold text-[#a8533a]">Rejected</span>
                     )}
+                    {post.status === 'scheduled' && post.scheduled_for && (
+                      <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-[#b9831f]">
+                        <Clock size={11} strokeWidth={2.2} />
+                        {formatScheduled(post.scheduled_for)}
+                      </span>
+                    )}
                   </button>
-                  {view === 'published' && (
+                  {post.status === 'published' && (
                     <a
                       href={`/blog/${post.slug}`}
                       target="_blank"
@@ -256,7 +311,11 @@ export function Blog() {
             busy={busyId === activePost.id}
             onClose={() => setActivePost(null)}
             onApprove={(edits) => handleApprove(activePost, edits)}
+            onSchedule={(scheduledFor, edits) => handleSchedule(activePost, scheduledFor, edits)}
             onSave={(edits) => handleSave(activePost, edits)}
+            onReschedule={(scheduledFor) => handleReschedule(activePost, scheduledFor)}
+            onPublishNow={() => handlePublishNow(activePost)}
+            onCancelSchedule={() => handleCancelSchedule(activePost)}
             onReject={() => { setActivePost(null); setRejectTarget(activePost); }}
             onDelete={() => { setActivePost(null); setDeleteTarget(activePost); }}
           />
@@ -501,14 +560,18 @@ type EditableFields = Partial<Pick<BlogPost, 'title' | 'body_md' | 'excerpt' | '
 
 /* ── Review modal — full-screen + scrollable on mobile, centered dialog on desktop ── */
 function ReviewModal({
-  post, mode, busy, onClose, onApprove, onSave, onReject, onDelete,
+  post, mode, busy, onClose, onApprove, onSchedule, onSave, onReschedule, onPublishNow, onCancelSchedule, onReject, onDelete,
 }: {
   post: BlogPost;
   mode: 'pending' | 'published';
   busy: boolean;
   onClose: () => void;
   onApprove: (edits: EditableFields) => void;
+  onSchedule: (scheduledFor: string, edits: EditableFields) => void;
   onSave: (edits: EditableFields) => void;
+  onReschedule: (scheduledFor: string) => void;
+  onPublishNow: () => void;
+  onCancelSchedule: () => void;
   onReject: () => void;
   onDelete: () => void;
 }) {
@@ -518,7 +581,10 @@ function ReviewModal({
   const [seoTitle, setSeoTitle]                 = useState(post.seo_title ?? '');
   const [metaDescription, setMetaDescription]   = useState(post.meta_description ?? '');
   const [lightboxOpen, setLightboxOpen]         = useState(false);
+  const [scheduling, setScheduling]             = useState(false);
+  const [scheduledDate, setScheduledDate]       = useState<Date | null>(post.scheduled_for ? new Date(post.scheduled_for) : null);
 
+  const isScheduled = post.status === 'scheduled';
   const pill = CATEGORY_PILL[post.category] ?? CATEGORY_PILL.general;
   const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
   const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
@@ -532,8 +598,17 @@ function ReviewModal({
       meta_description: metaDescription.trim(),
     };
   }
-  function submitApprove() { onApprove(currentEdits()); }
+  function submitApprove() {
+    if (scheduling && scheduledDate) {
+      onSchedule(scheduledDate.toISOString(), currentEdits());
+    } else {
+      onApprove(currentEdits());
+    }
+  }
   function submitSave() { onSave(currentEdits()); }
+  function submitReschedule() {
+    if (scheduledDate) onReschedule(scheduledDate.toISOString());
+  }
 
   return (
     <motion.div
@@ -566,6 +641,39 @@ function ReviewModal({
           {post.status === 'rejected' && post.rejection_reason && (
             <div className="rounded-lg border border-[#a8533a]/20 bg-[#fdf0ec] px-3.5 py-2.5 text-[12.5px] text-[#a8533a]">
               Rejected: {post.rejection_reason}
+            </div>
+          )}
+
+          {isScheduled && (
+            <div className="flex flex-col gap-2.5 rounded-lg border border-[#b9831f]/25 bg-[#fdf6e8] px-3.5 py-3">
+              <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-[#b9831f]">
+                <Clock size={13} strokeWidth={2.2} />
+                Scheduled to publish {post.scheduled_for && formatScheduled(post.scheduled_for)}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <DateTimePicker value={scheduledDate} onChange={setScheduledDate} minDate={new Date()} />
+                <button
+                  onClick={submitReschedule}
+                  disabled={busy || !scheduledDate || scheduledDate.toISOString() === post.scheduled_for}
+                  className="cursor-pointer rounded-lg border-0 bg-[#b9831f] px-3 py-2 text-[12px] font-bold text-white transition-colors hover:bg-[#9c6f1a] disabled:opacity-50"
+                >
+                  Update time
+                </button>
+                <button
+                  onClick={onPublishNow}
+                  disabled={busy}
+                  className="cursor-pointer rounded-lg border border-[#3c7a5b] bg-transparent px-3 py-2 text-[12px] font-bold text-[#3c7a5b] transition-colors hover:bg-[#3c7a5b] hover:text-white disabled:opacity-50"
+                >
+                  Publish now
+                </button>
+                <button
+                  onClick={onCancelSchedule}
+                  disabled={busy}
+                  className="cursor-pointer rounded-lg border border-transparent bg-transparent px-3 py-2 text-[12px] font-semibold text-[#9a9d92] transition-colors hover:text-[#a8533a]"
+                >
+                  Cancel schedule
+                </button>
+              </div>
             </div>
           )}
 
@@ -612,7 +720,24 @@ function ReviewModal({
           </div>
         </div>
 
-        <div className="shrink-0 flex flex-wrap justify-end gap-2.5 border-t border-[#ece8df] px-5 py-4">
+        <div className="shrink-0 flex flex-col gap-3 border-t border-[#ece8df] px-5 py-4">
+          {mode === 'pending' && (
+            <div className="flex flex-wrap items-center gap-2.5 rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5">
+              <label className="flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-[#62655c]">
+                <input
+                  type="checkbox"
+                  checked={scheduling}
+                  onChange={(e) => setScheduling(e.target.checked)}
+                  className="accent-[#3c7a5b]"
+                />
+                Schedule for later instead of publishing immediately
+              </label>
+              {scheduling && (
+                <DateTimePicker value={scheduledDate} onChange={setScheduledDate} minDate={new Date()} />
+              )}
+            </div>
+          )}
+          <div className="flex flex-wrap justify-end gap-2.5">
           {mode === 'pending' ? (
             <>
               <button
@@ -631,10 +756,10 @@ function ReviewModal({
               </button>
               <button
                 onClick={submitApprove}
-                disabled={busy || !title.trim()}
+                disabled={busy || !title.trim() || (scheduling && !scheduledDate)}
                 className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50"
               >
-                {busy ? 'Publishing…' : 'Approve & publish'}
+                {busy ? (scheduling ? 'Scheduling…' : 'Publishing…') : scheduling ? 'Schedule post' : 'Approve & publish'}
               </button>
             </>
           ) : (
@@ -655,6 +780,7 @@ function ReviewModal({
               </button>
             </>
           )}
+          </div>
         </div>
       </motion.div>
 
@@ -739,7 +865,7 @@ function RejectModal({
 function DeleteModal({
   post, busy, onClose, onConfirm,
 }: { post: BlogPost; busy: boolean; onClose: () => void; onConfirm: () => void }) {
-  const isPublished = post.status === 'published';
+  const isPublished = post.status === 'published' || post.status === 'scheduled';
 
   return (
     <motion.div

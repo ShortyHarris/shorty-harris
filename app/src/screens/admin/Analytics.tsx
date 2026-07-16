@@ -5,6 +5,7 @@ import {
   PieChart, Pie, Legend,
 } from 'recharts';
 import { useAnalytics } from '../../hooks/useAnalytics';
+import { useDoNotContact } from '../../hooks/useDoNotContact';
 import { SkeletonTiles, SkeletonChart } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 
@@ -41,6 +42,8 @@ export function Analytics() {
   const { data, loading, error, reload } = useAnalytics();
   const [selectedClientIdx, setSelectedClientIdx] = useState(0);
   const [clientSearch, setClientSearch] = useState('');
+
+  const { stats: dncStats, loading: dncLoading, error: dncError } = useDoNotContact();
 
   const allClients = data?.perClient ?? [];
   const filteredClients = clientSearch
@@ -195,53 +198,93 @@ export function Analytics() {
             </div>
           </ChartCard>
 
-          {/* A/B tests */}
-          <div>
-            <h2 className="m-0 mb-4 text-[18px] font-bold text-[#20211c]">A/B tests</h2>
-            {data.abTests.length === 0 ? (
-              <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-                <span className="text-[13px] text-[#62655c]">No A/B tests running.</span>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {data.abTests.map((t) => {
-                  const best = Math.max(...t.variants.map((v) => v.replyRate));
-                  return (
-                    <div key={t.id} className="overflow-hidden rounded-lg border border-[#ece8df] bg-white p-5">
-                      <div className="mb-4 flex items-center justify-between">
-                        <span className="font-bold text-[#20211c]">{t.name}</span>
-                        <span style={{
-                          background: t.status === 'running' ? '#edf4ef' : '#f5f2ec',
-                          color:      t.status === 'running' ? '#3c7a5b' : '#62655c',
-                        }} className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
-                          {t.status}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        {t.variants.map((v) => {
-                          const winning = v.replyRate === best && best > 0;
-                          return (
-                            <div key={v.key} className={`rounded-lg border p-4 ${winning ? 'border-[#a9d6c1] bg-[#edf4ef]' : 'border-[#ece8df] bg-[#fbf9f5]'}`}>
-                              <div className="flex items-center gap-2 text-[13px] font-semibold text-[#62655c]">
-                                Variant {v.key}
-                                {winning && (
-                                  <span className="rounded-full bg-[#3c7a5b] px-2 py-0.5 text-[10.5px] font-bold text-white">leading</span>
-                                )}
-                              </div>
-                              <div className="mt-1 text-[26px] font-extrabold tabular-nums text-[#20211c]">{v.replyRate}%</div>
-                              <div className="text-[12px] text-[#9a9d92]">{v.replies} replies / {v.sent} sent</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </>
       )}
+
+      {/* A/B tests + Do Not Contact side by side on large screens, stacked below — both
+          boxes stretch to the row's tallest content so they line up evenly. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="flex flex-col">
+          <h2 className="m-0 mb-4 text-[18px] font-bold text-[#20211c]">A/B tests</h2>
+          {loading || !data ? (
+            <SkeletonChart />
+          ) : data.abTests.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
+              <span className="text-[13px] text-[#62655c]">No A/B tests running.</span>
+            </div>
+          ) : (
+            <div className="flex flex-1 flex-col gap-3">
+              {data.abTests.map((t) => {
+                const best = Math.max(...t.variants.map((v) => v.replyRate));
+                return (
+                  <div key={t.id} className="flex flex-1 flex-col overflow-hidden rounded-lg border border-[#ece8df] bg-white p-5">
+                    <div className="mb-4 flex items-center justify-between">
+                      <span className="font-bold text-[#20211c]">{t.name}</span>
+                      <span style={{
+                        background: t.status === 'running' ? '#edf4ef' : '#f5f2ec',
+                        color:      t.status === 'running' ? '#3c7a5b' : '#62655c',
+                      }} className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
+                        {t.status}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <ResponsiveContainer width="100%" height="100%" minHeight={160}>
+                        <BarChart
+                          data={t.variants.map((v) => ({ variant: `Variant ${v.key}`, replyRate: v.replyRate, replies: v.replies, sent: v.sent }))}
+                          margin={{ top: 8, right: 8, bottom: 8, left: -16 }}
+                        >
+                          <XAxis dataKey="variant" tick={{ fontSize: 12, fill: '#62655c', fontFamily: "'Plus Jakarta Sans', sans-serif" }} axisLine={false} tickLine={false} />
+                          <YAxis unit="%" tick={{ fontSize: 12, fill: '#9a9d92', fontFamily: "'Plus Jakarta Sans', sans-serif" }} axisLine={false} tickLine={false} />
+                          <Tooltip
+                            cursor={{ fill: '#f5f2ec' }}
+                            contentStyle={TOOLTIP_STYLE}
+                            formatter={(v, _n, item) => [`${v}% (${item.payload.replies}/${item.payload.sent})`, 'Reply rate']}
+                          />
+                          <Bar dataKey="replyRate" radius={[6, 6, 0, 0]} maxBarSize={96}>
+                            {t.variants.map((v) => (
+                              <Cell key={v.key} fill={v.replyRate === best && best > 0 ? '#3c7a5b' : '#ddd8cb'} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                      {t.variants.map((v) => (
+                        <span key={v.key} className="text-[12px] text-[#9a9d92]">
+                          <strong className="font-semibold text-[#62655c]">Variant {v.key}:</strong> {v.replies} replies / {v.sent} sent
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col">
+          <h2 className="m-0 mb-4 text-[18px] font-bold text-[#20211c]">Do Not Contact</h2>
+          {dncError && (
+            <div className="mb-4 rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{dncError}</div>
+          )}
+          {dncLoading ? (
+            <SkeletonChart />
+          ) : (
+            <div className="flex flex-1 flex-col rounded-lg border border-[#ece8df] bg-white p-5 shadow-[0_1px_2px_rgba(32,33,28,0.04),0_8px_28px_rgba(32,33,28,0.06)]">
+              <div className="flex-1">
+                <ResponsiveContainer width="100%" height="100%" minHeight={240}>
+                  <BarChart data={[{ label: 'Opt-outs', value: dncStats?.total_optouts ?? 0 }]} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
+                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#62655c', fontFamily: "'Plus Jakarta Sans', sans-serif" }} axisLine={false} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#9a9d92', fontFamily: "'Plus Jakarta Sans', sans-serif" }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: '#f5f2ec' }} contentStyle={TOOLTIP_STYLE} />
+                    <Bar dataKey="value" name="Opt-outs" radius={[6, 6, 0, 0]} maxBarSize={96} fill="#a8533a" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

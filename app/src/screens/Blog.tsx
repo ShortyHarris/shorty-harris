@@ -107,6 +107,9 @@ export function Blog() {
                     <img
                       src={post.cover_image_url}
                       alt={post.title}
+                      width={800}
+                      height={400}
+                      loading="lazy"
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
                     />
                   )}

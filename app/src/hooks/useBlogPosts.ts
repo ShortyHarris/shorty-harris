@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
 
 export type BlogCategory = 'family_business' | 'small_business' | 'business_development_rural' | 'general';
-export type BlogStatus = 'draft' | 'pending_approval' | 'approved' | 'published' | 'rejected';
+export type BlogStatus = 'draft' | 'pending_approval' | 'approved' | 'scheduled' | 'published' | 'rejected';
 
 export interface BlogPost {
   id: string;
@@ -23,6 +23,7 @@ export interface BlogPost {
   created_at: string;
   approved_at: string | null;
   published_at: string | null;
+  scheduled_for: string | null;
 }
 
 export interface LinkedPost {
@@ -45,7 +46,7 @@ async function fetchPosts(status: BlogStatus | BlogStatus[]): Promise<BlogPost[]
     .select(
       `id, title, slug, category, body_md, excerpt, cover_image_url,
        seo_title, meta_description, target_keywords, status, author,
-       rejection_reason, created_at, approved_at, published_at`
+       rejection_reason, created_at, approved_at, published_at, scheduled_for`
     );
   q = Array.isArray(status) ? q.in('status', status) : q.eq('status', status);
   const { data, error } = await q.order('created_at', { ascending: false });
@@ -125,6 +126,33 @@ export function useBlogQueue() {
     queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published });
   }, []);
 
+  // Schedules a pending draft to publish itself automatically at a future
+  // time via a Postgres cron job (see project docs) — no one needs to be on
+  // the site when it fires. approved_at is set now because scheduling *is*
+  // the approval; published_at is left for the cron job to set once it
+  // actually goes live.
+  const scheduleForLater = useCallback(async (
+    id: string,
+    scheduledFor: string,
+    edits?: Partial<Pick<BlogPost, 'title' | 'body_md' | 'excerpt' | 'seo_title' | 'meta_description'>>,
+  ) => {
+    queryClient.setQueryData<BlogPost[]>(BLOG_KEYS.pending, (prev = []) =>
+      prev.filter((p) => p.id !== id)
+    );
+
+    const { error } = await supabase
+      .from('blog_posts')
+      .update({ ...edits, status: 'scheduled', scheduled_for: scheduledFor, approved_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) {
+      queryClient.invalidateQueries({ queryKey: BLOG_KEYS.pending });
+      throw new Error(error.message);
+    }
+
+    queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published });
+  }, []);
+
   const reject = useCallback(async (id: string, reason: string) => {
     queryClient.setQueryData<BlogPost[]>(BLOG_KEYS.pending, (prev = []) =>
       prev.filter((p) => p.id !== id)
@@ -160,6 +188,7 @@ export function useBlogQueue() {
     loading,
     error: (error as Error)?.message ?? null,
     approveAndPublish,
+    scheduleForLater,
     reject,
     deleteForRegeneration,
     reload: () => queryClient.invalidateQueries({ queryKey: BLOG_KEYS.pending }),
@@ -167,9 +196,12 @@ export function useBlogQueue() {
 }
 
 export function usePublishedBlogPosts() {
+  // "Published" also shows scheduled-but-not-yet-live posts, badged
+  // separately in the UI, since scheduling a post is the last step before it
+  // goes live — there's nothing left to review once it's queued.
   const { data: posts = [], isLoading: loading, error } = useQuery({
     queryKey: BLOG_KEYS.published,
-    queryFn: () => fetchPosts('published'),
+    queryFn: () => fetchPosts(['published', 'scheduled']),
     staleTime: 60 * 1000,
   });
 
@@ -180,6 +212,45 @@ export function usePublishedBlogPosts() {
     const { error } = await supabase.from('blog_posts').update(edits).eq('id', id);
     if (error) throw new Error(error.message);
     queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published });
+  }, []);
+
+  // Changes the time a scheduled post will go live. Only meaningful while
+  // status is still 'scheduled' — the cron job owns the transition to
+  // 'published' once scheduled_for arrives.
+  const rescheduleFor = useCallback(async (id: string, scheduledFor: string) => {
+    const { error } = await supabase.from('blog_posts').update({ scheduled_for: scheduledFor }).eq('id', id);
+    if (error) throw new Error(error.message);
+    queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published });
+  }, []);
+
+  // Skips the wait and publishes a scheduled post immediately.
+  const publishNow = useCallback(async (id: string) => {
+    const { error } = await supabase
+      .from('blog_posts')
+      .update({ status: 'published', published_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+    queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published });
+  }, []);
+
+  // Pulls a scheduled post back into the pending queue for another look,
+  // rather than deleting it outright.
+  const cancelSchedule = useCallback(async (id: string) => {
+    queryClient.setQueryData<BlogPost[]>(BLOG_KEYS.published, (prev = []) =>
+      prev.filter((p) => p.id !== id)
+    );
+
+    const { error } = await supabase
+      .from('blog_posts')
+      .update({ status: 'pending_approval', scheduled_for: null })
+      .eq('id', id);
+
+    if (error) {
+      queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published });
+      throw new Error(error.message);
+    }
+
+    queryClient.invalidateQueries({ queryKey: BLOG_KEYS.pending });
   }, []);
 
   // Permanently removes a live post from the public site — distinct from
@@ -203,6 +274,9 @@ export function usePublishedBlogPosts() {
     loading,
     error: (error as Error)?.message ?? null,
     saveEdits,
+    rescheduleFor,
+    publishNow,
+    cancelSchedule,
     deletePublished,
     reload: () => queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published }),
   };

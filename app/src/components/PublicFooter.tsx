@@ -34,7 +34,7 @@ export function PublicFooter() {
           ))}
         </div>
       </div>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-t border-[#e5ddd3] pt-6 text-[13px] text-[#9b9e96]">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-t border-[#e5ddd3] pt-6 text-[13px] text-[#6b6e65]">
         <span>© {new Date().getFullYear()} Shorty Harris. All rights reserved.</span>
         <Link to="/login" className="text-[13px] text-[#54574e] no-underline font-semibold hover:text-[#3c7a5b] transition-colors">
           Sign in

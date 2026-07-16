@@ -4,8 +4,9 @@
 
 Every day you don't send, a competitor does. Shorty Harris prospects, writes, and follows up — on autopilot.
 
-## Blog
+## Docs
 
-The Shorty Harris blog covers running and growing a small or family business: outreach strategy, local business development, and practical growth advice.
-
-- Blog index: https://shortyharris.com/blog
+- [Home](https://shortyharris.com/): Product overview, how it works, and results.
+- [Blog](https://shortyharris.com/blog): Articles on outreach strategy, local business development, and practical growth advice for small and family businesses.
+- [Privacy Policy](https://shortyharris.com/privacy)
+- [Terms of Service](https://shortyharris.com/terms)
