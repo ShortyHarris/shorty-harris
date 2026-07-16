@@ -3,11 +3,9 @@
 @layer components {
 
   /* ── Page wrapper ── */
-  .content {
-    max-width: 640px;
-    margin: 0 auto;
-    padding: 24px 20px 64px;
-  }
+  /* .content now lives in styles/theme-client.css, which loads eagerly —
+     see the comment there for why it can't stay in this lazy-loaded
+     screen's own stylesheet. */
 
 
   /* ═══════════════════════════════════════
@@ -344,20 +342,4 @@
   .activity-amt.neg { color: var(--ink-soft); }
 
 
-  /* ═══════════════════════════════════════
-     DESKTOP OVERRIDES  ≥ 768px
-  ═══════════════════════════════════════ */
-
-  @media (min-width: 768px) {
-    .content {
-      max-width: 720px;
-      padding: 32px 32px 80px;
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .content {
-      max-width: 1100px;
-    }
-  }
 }

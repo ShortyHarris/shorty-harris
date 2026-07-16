@@ -31,3 +31,26 @@
 
 /* shared atoms used across client screens */
 .theme-client .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+
+/* Shared page wrapper — lives here (not in a per-screen CSS file) because
+   this stylesheet is imported eagerly in App.tsx, while Billing/Settings/
+   Approvals are each lazy-loaded into their own chunk. A class defined in
+   one screen's own CSS file only ever loads once that screen's chunk has
+   been fetched, so on a hard refresh landing directly on e.g. /app/settings,
+   a `.content` defined in Billing.css would silently not exist yet. */
+.content {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+@media (min-width: 768px) {
+  .content {
+    max-width: 720px;
+    padding: 32px 32px 80px;
+  }
+}
+@media (min-width: 1024px) {
+  .content {
+    max-width: 1100px;
+  }
+}
