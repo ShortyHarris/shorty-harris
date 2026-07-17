@@ -116,12 +116,12 @@ export function Shell({
         {showGmailBanner && (
           <Link
             to="/app/settings"
-            className="flex items-center gap-2.5 no-underline px-4 py-3 md:mx-7 md:mt-6 md:rounded-xl"
-            style={{ background: 'var(--amber-tint)', color: 'var(--ink)' }}
+            className="flex items-center bg-yellow-400 border border-gray-200 shadow-sm gap-2.5 no-underline px-4 py-3 md:mx-7 md:mt-6 md:rounded-md"
+           
           >
-            <Mail size={16} strokeWidth={2} style={{ color: 'var(--amber)', flexShrink: 0 }} />
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gmail_icon_%282020%29.svg/1280px-Gmail_icon_%282020%29.svg.png" alt="Gmail" className="w-5 h-4" /> 
             <span className="flex-1 text-[13px] leading-snug">
-              <strong className="font-bold">Connect your Gmail</strong> to start sending outreach — approvals are disabled until it's set up.
+              <strong className="font-bold">Connect your Gmail</strong> to start sending outreach - approvals are disabled until it's set up.
             </span>
             <ChevronRight size={16} style={{ color: 'var(--amber)', flexShrink: 0 }} />
           </Link>
