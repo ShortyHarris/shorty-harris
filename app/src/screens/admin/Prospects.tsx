@@ -168,7 +168,16 @@ export function Prospects() {
         <>
           {/* Desktop table */}
           <div className="atbl hidden md:block">
-            <table>
+            <table className="table-fixed">
+              <colgroup>
+                <col className="w-[20%]" />
+                <col className="w-[20%]" />
+                <col className="w-[14%]" />
+                <col className="w-[12%]" />
+                <col className="w-[14%]" />
+                <col className="w-[14%]" />
+                <col className="w-[6%]" />
+              </colgroup>
               <thead>
                 <tr>
                   {['Business', 'Contact', 'Client', 'Category', 'Location', 'Status', ''].map((h) => (
@@ -208,21 +217,26 @@ export function Prospects() {
                   ];
                   return (
                     <tr key={r.id}>
-                      <td className="font-bold text-[#20211c]">{r.business_name}</td>
-                      <td>
-                        <div className="text-[#20211c]">{r.contact_name ?? '—'}</div>
-                        {r.email && (
-  <div
-    className="mt-0.5 font-mono text-[11px] text-[#9a9d92] truncate max-w-[220px]"
-    title={r.email}
-  >
-    {r.email}
-  </div>
-)}
+                      <td className="min-w-0">
+                        <div className="truncate font-bold text-[#20211c]" title={r.business_name}>{r.business_name}</div>
                       </td>
-                      <td className="text-[#62655c]">{r.client?.business_name ?? '—'}</td>
-                      <td className="text-[#62655c]">{r.category ?? '—'}</td>
-                      <td className="text-[#62655c]">{r.location ?? '—'}</td>
+                      <td className="min-w-0">
+                        <div className="truncate text-[#20211c]" title={r.contact_name ?? undefined}>{r.contact_name ?? '—'}</div>
+                        {r.email && (
+                          <div className="mt-0.5 truncate font-mono text-[11px] text-[#9a9d92]" title={r.email}>
+                            {r.email}
+                          </div>
+                        )}
+                      </td>
+                      <td className="min-w-0 text-[#62655c]">
+                        <div className="truncate" title={r.client?.business_name ?? undefined}>{r.client?.business_name ?? '—'}</div>
+                      </td>
+                      <td className="min-w-0 text-[#62655c]">
+                        <div className="truncate" title={r.category ?? undefined}>{r.category ?? '—'}</div>
+                      </td>
+                      <td className="min-w-0 text-[#62655c]">
+                        <div className="truncate" title={r.location ?? undefined}>{r.location ?? '—'}</div>
+                      </td>
                       <td>
                         <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
                           {r.pipeline_status.replace(/_/g, ' ')}
@@ -245,7 +259,7 @@ export function Prospects() {
               return (
                 <div key={r.id} className="rounded-xl border border-[#ece8df] bg-white p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="font-bold text-[#20211c]">{r.business_name}</div>
+                    <div className="min-w-0 truncate font-bold text-[#20211c]" title={r.business_name}>{r.business_name}</div>
                     <span
                       style={{
                         background: pill.bg,
@@ -260,16 +274,13 @@ export function Prospects() {
                   {(r.contact_name || r.email) && (
                     <div className="mt-1.5">
                       {r.contact_name && (
-                        <div className="text-[12px] text-[#20211c]">{r.contact_name}</div>
+                        <div className="truncate text-[12px] text-[#20211c]">{r.contact_name}</div>
                       )}
-                     {r.email && (
-  <div
-    className="mt-0.5 font-mono text-[11px] text-[#9a9d92] truncate max-w-[220px]"
-    title={r.email}
-  >
-    {r.email}
-  </div>
-)}
+                      {r.email && (
+                        <div className="mt-0.5 truncate font-mono text-[11px] text-[#9a9d92]" title={r.email}>
+                          {r.email}
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[#62655c]">

@@ -117,7 +117,17 @@ export function Clients() {
         <>
           {/* Desktop table */}
           <div className="atbl hidden md:block">
-            <table>
+            <table className="table-fixed">
+              <colgroup>
+                <col className="w-[24%]" />
+                <col className="w-[12%]" />
+                <col className="w-[14%]" />
+                <col className="w-[11%]" />
+                <col className="w-[9%]" />
+                <col className="w-[9%]" />
+                <col className="w-[15%]" />
+                <col className="w-[6%]" />
+              </colgroup>
               <thead>
                 <tr>
                   {['Business', 'Type', 'Location', 'Added', 'Notify', 'Status', 'Invite', ''].map((h) => (
@@ -133,13 +143,17 @@ export function Clients() {
                   const phase = invitePhase[c.id] ?? 'idle';
                   return (
                     <tr key={c.id}>
-                      <td>
-                        <div className="font-bold text-[#20211c]">{c.business_name}</div>
-                        {c.contact_email && <div className="mt-0.5 font-mono text-[11px] text-[#9a9d92]">{c.contact_email}</div>}
-                        {c.contact_phone && <div className="font-mono text-[11px] text-[#c4bfb5]">{c.contact_phone}</div>}
+                      <td className="min-w-0">
+                        <div className="truncate font-bold text-[#20211c]" title={c.business_name}>{c.business_name}</div>
+                        {c.contact_email && <div className="mt-0.5 truncate font-mono text-[11px] text-[#9a9d92]" title={c.contact_email}>{c.contact_email}</div>}
+                        {c.contact_phone && <div className="truncate font-mono text-[11px] text-[#c4bfb5]" title={c.contact_phone}>{c.contact_phone}</div>}
                       </td>
-                      <td className="text-[#62655c]">{c.business_type ?? '—'}</td>
-                      <td className="text-[#62655c]">{c.location ?? '—'}</td>
+                      <td className="min-w-0 text-[#62655c]">
+                        <div className="truncate" title={c.business_type ?? undefined}>{c.business_type ?? '—'}</div>
+                      </td>
+                      <td className="min-w-0 text-[#62655c]">
+                        <div className="truncate" title={c.location ?? undefined}>{c.location ?? '—'}</div>
+                      </td>
                       <td className="text-[12px] text-[#9a9d92] whitespace-nowrap">
                         {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </td>
@@ -193,7 +207,7 @@ export function Clients() {
               return (
                 <div key={c.id} className="rounded-xl border border-[#ece8df] bg-white p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="font-bold text-[14px] text-[#20211c]">{c.business_name}</span>
+                    <span className="min-w-0 truncate font-bold text-[14px] text-[#20211c]" title={c.business_name}>{c.business_name}</span>
                     <div className="flex shrink-0 items-center gap-1.5">
                       <span style={{ background: spill.bg, color: spill.text }}
                         className="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[.04em]">

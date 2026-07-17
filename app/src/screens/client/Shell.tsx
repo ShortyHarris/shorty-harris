@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, Mail, ChevronRight, Bell } from 'lucide-react';
+import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell } from 'lucide-react';
 import type { ClientNotification } from '../../hooks/useClientNotifications';
 import '../../styles/admin-tables.css';
 import './Shell.css';
@@ -202,7 +202,11 @@ function NotificationBell({
       <AnimatePresence>
         {open && (
           <motion.div
-            className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
+            // z-100 rather than the usual z-50: on the Analytics page, recharts
+            // portals each chart's tooltip into its own chart container (not into
+            // <body>), so it isn't a sibling this overlay can out-rank just by
+            // being later in the DOM — bumping z-index is the reliable fix.
+            className="fixed inset-0 z-100 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

@@ -168,7 +168,17 @@ export function Campaigns() {
         <>
           {/* Desktop table — hidden on mobile */}
           <div className="atbl hidden md:block">
-            <table>
+            <table className="table-fixed">
+              <colgroup>
+                <col className="w-[22%]" />
+                <col className="w-[16%]" />
+                <col className="w-[9%]" />
+                <col className="w-[10%]" />
+                <col className="w-[9%]" />
+                <col className="w-[10%]" />
+                <col className="w-[18%]" />
+                <col className="w-[6%]" />
+              </colgroup>
               <thead>
                 <tr>
                   {['Campaign', 'Client', 'Channel', 'Language', 'Prospects', 'Status', 'Scrape', ''].map((h) => (
@@ -184,17 +194,23 @@ export function Campaigns() {
                   const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
                   return (
                     <tr key={c.id}>
-                      <td>
-                        <div className="font-bold text-[#20211c]">{c.name}</div>
+                      <td className="min-w-0">
+                        <div className="truncate font-bold text-[#20211c]" title={c.name}>{c.name}</div>
                         {needsSetup && (
                           <span className="atbl-pill mt-1" style={{ background: '#f8efdb', color: '#b9831f' }}>
                             ⚠ Needs setup
                           </span>
                         )}
                       </td>
-                      <td className="text-[#62655c]">{c.client?.business_name ?? '—'}</td>
-                      <td className="text-[#62655c] capitalize">{c.channel}</td>
-                      <td className="text-[#62655c]">{c.language}</td>
+                      <td className="min-w-0 text-[#62655c]">
+                        <div className="truncate" title={c.client?.business_name ?? undefined}>{c.client?.business_name ?? '—'}</div>
+                      </td>
+                      <td className="min-w-0 text-[#62655c] capitalize">
+                        <div className="truncate">{c.channel}</div>
+                      </td>
+                      <td className="min-w-0 text-[#62655c]">
+                        <div className="truncate" title={c.language}>{c.language}</div>
+                      </td>
                       <td className="text-[#62655c]">{c.prospectCount}</td>
                       <td>
                         <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
@@ -239,8 +255,8 @@ export function Campaigns() {
               return (
                 <div key={c.id} className="rounded-xl border border-[#ece8df] bg-white p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="font-bold text-[#20211c] text-[14px]">{c.name}</span>
+                    <div className="min-w-0">
+                      <span className="block truncate font-bold text-[#20211c] text-[14px]" title={c.name}>{c.name}</span>
                       {needsSetup && (
                         <div className="mt-1">
                           <span className="inline-flex items-center gap-1 rounded-full bg-[#f8efdb] px-2 py-0.5 text-[10.5px] font-bold text-[#b9831f]">
