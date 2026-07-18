@@ -171,13 +171,13 @@ export function Campaigns() {
             <table className="table-fixed">
               <colgroup>
                 <col className="w-[22%]" />
-                <col className="w-[16%]" />
+                <col className="w-[15%]" />
+                <col className="w-[7%]" />
                 <col className="w-[9%]" />
-                <col className="w-[10%]" />
+                <col className="w-[8%]" />
                 <col className="w-[9%]" />
-                <col className="w-[10%]" />
-                <col className="w-[18%]" />
-                <col className="w-[6%]" />
+                <col className="w-[19%]" />
+                <col className="w-[11%]" />
               </colgroup>
               <thead>
                 <tr>
@@ -196,6 +196,11 @@ export function Campaigns() {
                     <tr key={c.id}>
                       <td className="min-w-0">
                         <div className="truncate font-bold text-[#20211c]" title={c.name}>{c.name}</div>
+                        {c.needsReview && (
+                          <span className="atbl-pill mt-1" style={{ background: '#f0ecf8', color: '#6b4fa0' }}>
+                            🔔 Awaiting approval
+                          </span>
+                        )}
                         {needsSetup && (
                           <span className="atbl-pill mt-1" style={{ background: '#f8efdb', color: '#b9831f' }}>
                             ⚠ Needs setup
@@ -227,16 +232,26 @@ export function Campaigns() {
                         />
                       </td>
                       <td className="px-3 text-right">
-                        <RowMenu items={[
-                          { type: 'action', label: 'Edit campaign',  onClick: () => setEditCampaign(c) },
-                          ...(active || paused ? [{
-                            type: 'action' as const,
-                            label: active ? 'Pause campaign' : 'Activate campaign',
-                            onClick: () => setStatus(c.id, active ? 'paused' : 'active'),
-                          }] : []),
-                          { type: 'separator' },
-                          { type: 'action', label: 'Delete campaign', destructive: true, onClick: () => setDeleteCampaignTarget(c) },
-                        ]} />
+                        <div className="flex items-center justify-end gap-1">
+                          {c.needsReview && (
+                            <button
+                              onClick={() => setStatus(c.id, 'active')}
+                              className="cursor-pointer whitespace-nowrap rounded-lg border-0 bg-[#3c7a5b] px-2 py-1 text-[11px] font-bold text-white transition-colors hover:bg-[#2d5e46]"
+                            >
+                              Approve
+                            </button>
+                          )}
+                          <RowMenu items={[
+                            { type: 'action', label: 'Edit campaign',  onClick: () => setEditCampaign(c) },
+                            ...(active || paused ? [{
+                              type: 'action' as const,
+                              label: active ? 'Pause campaign' : 'Activate campaign',
+                              onClick: () => setStatus(c.id, active ? 'paused' : 'active'),
+                            }] : []),
+                            { type: 'separator' },
+                            { type: 'action', label: 'Delete campaign', destructive: true, onClick: () => setDeleteCampaignTarget(c) },
+                          ]} />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -257,6 +272,13 @@ export function Campaigns() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <span className="block truncate font-bold text-[#20211c] text-[14px]" title={c.name}>{c.name}</span>
+                      {c.needsReview && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#f0ecf8] px-2 py-0.5 text-[10.5px] font-bold text-[#6b4fa0]">
+                            🔔 Awaiting approval
+                          </span>
+                        </div>
+                      )}
                       {needsSetup && (
                         <div className="mt-1">
                           <span className="inline-flex items-center gap-1 rounded-full bg-[#f8efdb] px-2 py-0.5 text-[10.5px] font-bold text-[#b9831f]">
@@ -275,6 +297,14 @@ export function Campaigns() {
                   </p>
                   <p className="mt-0.5 text-[12px] text-[#9a9d92]">{c.prospectCount} prospects</p>
                   <div className="border-t border-[#f5f2ec] pt-3 mt-2 flex flex-wrap items-center gap-2">
+                    {c.needsReview && (
+                      <button
+                        onClick={() => setStatus(c.id, 'active')}
+                        className="cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46]"
+                      >
+                        Approve
+                      </button>
+                    )}
                     {(active || paused) && (
                       <button
                         onClick={() => setStatus(c.id, active ? 'paused' : 'active')}

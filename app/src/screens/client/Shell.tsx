@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell } from 'lucide-react';
+import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone } from 'lucide-react';
 import type { ClientNotification } from '../../hooks/useClientNotifications';
 import '../../styles/admin-tables.css';
 import './Shell.css';
@@ -61,6 +61,10 @@ export function Shell({
             <Inbox size={16} strokeWidth={1.9} className="cside-link-icon" />
             Hot Leads
             {newHotLeads > 0 && <span className="cside-nav-badge">{newHotLeads > 99 ? '99+' : newHotLeads}</span>}
+          </NavLink>
+          <NavLink to="/app/campaigns" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <Megaphone size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Campaigns
           </NavLink>
           <NavLink to="/app/approvals" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
             <ClipboardCheck size={16} strokeWidth={1.9} className="cside-link-icon" />
@@ -137,6 +141,10 @@ export function Shell({
             {newHotLeads > 0 && <span className="cbnav-badge-dot">{newHotLeads > 99 ? '99+' : newHotLeads}</span>}
           </span>
           <span>Leads</span>
+        </NavLink>
+        <NavLink to="/app/campaigns" className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
+          <span className="cbnav-icon"><Megaphone size={20} strokeWidth={1.8} /></span>
+          <span>Campaigns</span>
         </NavLink>
         <NavLink to="/app/approvals" className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
           <span className="cbnav-icon cbnav-icon-badge">

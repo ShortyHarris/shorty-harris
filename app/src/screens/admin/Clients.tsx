@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  useClients, createClient, sendClientInvite,
+  useClients, createClient, sendClientInvite, updateClientLoginEmail,
   updateClient, getClientDeleteCounts, deleteClient,
 } from '../../hooks/useAdminData';
 import type {
@@ -57,6 +57,7 @@ export function Clients() {
   const [showNew, setShowNew]     = useState(false);
   const [editClient, setEditClient]     = useState<ClientListRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClientListRow | null>(null);
+  const [changeEmailTarget, setChangeEmailTarget] = useState<ClientListRow | null>(null);
   const [page, setPage]           = useState(1);
   const [invitePhase, setInvitePhase]   = useState<Record<string, InvitePhase>>({});
   const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
@@ -187,6 +188,13 @@ export function Clients() {
                               ? "This client can already sign in — resending won't do anything. Have them log in directly, or use “Forgot password” on the login screen if they've lost access."
                               : undefined,
                           },
+                          {
+                            type: 'action',
+                            label: 'Change login email',
+                            onClick: () => setChangeEmailTarget(c),
+                            disabled: !c.has_profile,
+                            title: !c.has_profile ? "This client has no login account yet — send an invite first." : undefined,
+                          },
                           { type: 'separator' },
                           { type: 'action', label: 'Delete client', destructive: true, onClick: () => setDeleteTarget(c) },
                         ]} />
@@ -297,6 +305,14 @@ export function Clients() {
             client={deleteTarget}
             onClose={() => setDeleteTarget(null)}
             onDeleted={() => { setDeleteTarget(null); reload(); }}
+          />
+        )}
+        {changeEmailTarget && (
+          <ChangeLoginEmailModal
+            key={`change-email-${changeEmailTarget.id}`}
+            client={changeEmailTarget}
+            onClose={() => setChangeEmailTarget(null)}
+            onChanged={() => setChangeEmailTarget(null)}
           />
         )}
       </AnimatePresence>
@@ -526,7 +542,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
     setBusy(true); setErr(null);
     const { error } = await createClient({
       business_name: businessName.trim(), business_type: businessType.trim(),
-      location: location.trim(), contact_email: contactEmail.trim(),
+      location: location.trim(), website_url: websiteUrl.trim(), contact_email: contactEmail.trim(),
       contact_phone: contactPhone.trim() ? normalizePhone(contactPhone) : '', notification_channel: notifChannel,
       starting_credits: startingCredits,
       status: saveAsDraft ? 'draft' : 'active',
@@ -708,6 +724,7 @@ function EditClientModal({
   const [businessName, setBusinessName] = useState(client.business_name);
   const [businessType, setBusinessType] = useState(client.business_type ?? '');
   const [location, setLocation]         = useState(client.location ?? '');
+  const [websiteUrl, setWebsiteUrl]     = useState(client.website_url ?? '');
   const [contactEmail, setContactEmail] = useState(client.contact_email ?? '');
   const [contactPhone, setContactPhone] = useState(client.contact_phone ?? '');
   const [notifChannel, setNotifChannel] = useState<UpdateClientInput['notification_channel']>(
@@ -729,7 +746,7 @@ function EditClientModal({
     setBusy(true); setErr(null);
     const { error } = await updateClient(client.id, {
       business_name: businessName.trim(), business_type: businessType.trim(),
-      location: location.trim(), contact_email: contactEmail.trim(),
+      location: location.trim(), website_url: websiteUrl.trim(), contact_email: contactEmail.trim(),
       contact_phone: normalizePhone(contactPhone), notification_channel: notifChannel, status,
     });
     setBusy(false);
@@ -756,6 +773,10 @@ function EditClientModal({
             <label className={fieldLbl}>Location</label>
             <input value={location} onChange={(e) => setLocation(e.target.value)} style={FONT} className={inputCls} />
           </div>
+        </div>
+        <div>
+          <label className={fieldLbl}>Website URL</label>
+          <input type="url" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://acmeroofing.com" style={FONT} className={inputCls} />
         </div>
         <div>
           <label className={fieldLbl}>Contact email{reqStar}</label>
@@ -881,6 +902,54 @@ function DeleteClientModal({
         >
           {busy ? 'Deleting…' : `Delete ${client.business_name} and all related data`}
         </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+/* ── Change Login Email Modal ──────────────────────────────────────── */
+function ChangeLoginEmailModal({
+  client, onClose, onChanged,
+}: { client: ClientListRow; onClose: () => void; onChanged: () => void }) {
+  const [newEmail, setNewEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState<string | null>(null);
+
+  async function submit() {
+    if (!newEmail.trim()) { setErr('Enter a new email address.'); return; }
+    if (!isValidEmail(newEmail)) { setErr('Enter a valid email address.'); return; }
+    setBusy(true); setErr(null);
+    const { error } = await updateClientLoginEmail(client.id, newEmail.trim());
+    setBusy(false);
+    if (error) setErr(error); else onChanged();
+  }
+
+  return (
+    <ModalShell onClose={onClose}>
+      <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
+        <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Change login email</h2>
+        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+        <p className="m-0 text-[13px] text-[#62655c]">
+          This changes the email <strong className="font-bold">{client.business_name}</strong> uses to sign in to their dashboard. It's applied immediately — no confirmation email is sent to the new address.
+        </p>
+        <div>
+          <label className={fieldLbl}>New login email</label>
+          <input
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="new-owner@example.com"
+            style={FONT}
+            className={inputCls}
+          />
+        </div>
+        {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
+      </div>
+      <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+        <button onClick={onClose} className={ghostCls}>Cancel</button>
+        <button onClick={submit} disabled={busy} className={primaryCls}>{busy ? 'Saving…' : 'Change email'}</button>
       </div>
     </ModalShell>
   );

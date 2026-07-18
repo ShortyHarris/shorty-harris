@@ -29,6 +29,7 @@ const Shell          = lazy(() => import('./screens/client/Shell').then((m) => (
 const Dashboard      = lazy(() => import('./screens/client/Dashboard').then((m) => ({ default: m.Dashboard })));
 const Billing        = lazy(() => import('./screens/client/Billing').then((m) => ({ default: m.Billing })));
 const Approvals      = lazy(() => import('./screens/client/Approvals').then((m) => ({ default: m.Approvals })));
+const ClientCampaigns = lazy(() => import('./screens/client/Campaigns').then((m) => ({ default: m.Campaigns })));
 const Settings       = lazy(() => import('./screens/client/Settings').then((m) => ({ default: m.Settings })));
 
 // ── Guards ──────────────────────────────────────────────────────────────────
@@ -110,6 +111,7 @@ function ClientZone() {
       >
         <Routes>
           <Route index element={<Dashboard clientId={clientId} />} />
+          <Route path="campaigns" element={<ClientCampaigns clientId={clientId} />} />
           <Route path="approvals" element={<Approvals clientId={clientId} />} />
           <Route path="settings" element={<Settings clientId={clientId} />} />
           <Route path="billing" element={<Billing clientId={clientId} onCreditsChanged={() => {

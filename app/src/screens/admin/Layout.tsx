@@ -10,7 +10,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { useApprovalQueue } from '../../hooks/useApprovalQueue';
 import { useBlogQueue } from '../../hooks/useBlogPosts';
-import { useAdminHotLeads, useErrorLogs } from '../../hooks/useAdminData';
+import { useAdminHotLeads, useErrorLogs, useCampaigns } from '../../hooks/useAdminData';
 import { ApprovalQueue } from './ApprovalQueue';
 import { Blog } from './Blog';
 import { Clients } from './Clients';
@@ -39,8 +39,10 @@ export function AdminLayout() {
   const { pending: pendingPosts } = useBlogQueue();
   const { rows: hotLeads } = useAdminHotLeads();
   const { rows: unresolvedErrors } = useErrorLogs();
+  const { rows: campaigns } = useCampaigns();
 
   const newHotLeadCount = hotLeads.filter((l) => l.status === 'new').length;
+  const campaignsToReview = campaigns.filter((c) => c.needsReview).length;
 
   const NAV_DAILY: NavItem[] = [
     { to: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck, badge: approvalStats.pending, badgeColor: '#d4870f' },
@@ -50,7 +52,7 @@ export function AdminLayout() {
   const NAV_OPS: NavItem[] = [
     { to: '/admin/clients',    label: 'Clients',    icon: Building2  },
     { to: '/admin/prospects',  label: 'Prospects',  icon: Users      },
-    { to: '/admin/campaigns',  label: 'Campaigns',  icon: Megaphone  },
+    { to: '/admin/campaigns',  label: 'Campaigns',  icon: Megaphone, badge: campaignsToReview, badgeColor: '#6b4fa0' },
     { to: '/admin/analytics',  label: 'Analytics',  icon: BarChart2  },
     { to: '/admin/monitoring', label: 'Monitoring', icon: Activity, badge: unresolvedErrors.length, badgeColor: '#a8533a' },
   ];
@@ -65,6 +67,7 @@ export function AdminLayout() {
     { to: '/admin/approvals',  label: 'Pending approvals',      icon: ClipboardCheck, count: approvalStats.pending,   color: '#d4870f' },
     { to: '/admin/hot-leads',  label: 'New hot leads',          icon: Flame,          count: newHotLeadCount,         color: '#d4870f' },
     { to: '/admin/blog',       label: 'Blog posts to review',   icon: Newspaper,      count: pendingPosts.length,     color: '#d4870f' },
+    { to: '/admin/campaigns',  label: 'Campaigns awaiting approval', icon: Megaphone, count: campaignsToReview,       color: '#6b4fa0' },
     { to: '/admin/monitoring', label: 'Unresolved errors',      icon: Activity,       count: unresolvedErrors.length, color: '#a8533a' },
   ];
 

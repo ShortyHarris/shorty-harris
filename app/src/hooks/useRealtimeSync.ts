@@ -33,6 +33,11 @@ export function useRealtimeSync() {
         queryClient.invalidateQueries({ queryKey: QK.prospects });
       })
 
+      // Campaigns — including client-submitted drafts awaiting approval
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'campaigns' }, () => {
+        queryClient.invalidateQueries({ queryKey: QK.campaigns });
+      })
+
       // Error logs written by any workflow
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'error_logs' }, () => {
         queryClient.invalidateQueries({ queryKey: ['error-logs'] });

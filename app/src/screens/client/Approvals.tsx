@@ -5,7 +5,6 @@ import { useClientApprovals } from '../../hooks/useClientApprovals';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
 import { SkeletonTable } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
-import { RowMenu } from '../../components/RowMenu';
 import type { ClientMessageItem } from '../../types';
 import { Clock, CheckCircle2, Send, Ban } from 'lucide-react';
 
@@ -214,8 +213,8 @@ export function Approvals({ clientId }: { clientId: string }) {
                 <col className="w-9" />
                 <col className="w-[34%]" />
                 <col className="w-[16%]" />
-                <col className="w-[30%]" />
-                <col className="w-[20%]" />
+                <col className="w-[22%]" />
+                <col className="w-[28%]" />
               </colgroup>
               <thead>
                 <tr>
@@ -256,14 +255,22 @@ export function Approvals({ clientId }: { clientId: string }) {
                           onClick={() => approve(item.id)}
                           disabled={needsGmail(item)}
                           title={needsGmail(item) ? GMAIL_REQUIRED_TITLE : undefined}
-                          className="cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3.5 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
+                          className="cursor-pointer whitespace-nowrap rounded-lg border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Approve
                         </button>
-                        <RowMenu items={[
-                          { type: 'action', label: 'Edit', onClick: () => setEditItem(item) },
-                          { type: 'action', label: 'Reject', destructive: true, onClick: () => reject(item.id) },
-                        ]} />
+                        <button
+                          onClick={() => setEditItem(item)}
+                          className="cursor-pointer whitespace-nowrap rounded-lg border border-[#ece8df] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => reject(item.id)}
+                          className="cursor-pointer whitespace-nowrap rounded-lg border border-[#a8533a] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white"
+                        >
+                          Reject
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -308,10 +315,18 @@ export function Approvals({ clientId }: { clientId: string }) {
                   >
                     Approve
                   </button>
-                  <RowMenu items={[
-                    { type: 'action', label: 'Edit', onClick: () => setEditItem(item) },
-                    { type: 'action', label: 'Reject', destructive: true, onClick: () => reject(item.id) },
-                  ]} />
+                  <button
+                    onClick={() => setEditItem(item)}
+                    className="cursor-pointer flex-1 rounded-lg border border-[#ece8df] bg-white px-3 py-2 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => reject(item.id)}
+                    className="cursor-pointer flex-1 rounded-lg border border-[#a8533a] bg-transparent px-3 py-2 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white"
+                  >
+                    Reject
+                  </button>
                 </div>
               </div>
             ))}

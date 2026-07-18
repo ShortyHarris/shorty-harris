@@ -132,25 +132,40 @@ export interface CampaignRow {
   created_at: string;
   client: { business_name: string } | null;
   prospectCount: number;
+  // True when a client (not an admin) submitted this campaign and it's still
+  // sitting in draft — i.e. it needs an admin to review and activate it.
+  needsReview: boolean;
 }
 
 async function fetchCampaigns(): Promise<CampaignRow[]> {
   const { data, error } = await supabase
     .from('campaigns')
-    .select(`id, name, description, status, channel, language, scrape_enabled, last_scraped_at, search_queries, target_locations, max_results, created_at, client:clients ( business_name )`)
+    .select(`id, name, description, status, channel, language, scrape_enabled, last_scraped_at, search_queries, target_locations, max_results, created_at, client:clients ( business_name ), creator:profiles ( role )`)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
-  const base = (data ?? []).map((r: Record<string, unknown>) => ({
-    ...r,
-    client: Array.isArray(r.client) ? r.client[0] ?? null : r.client ?? null,
-    search_queries: (r.search_queries as string[] | null) ?? [],
-    target_locations: (r.target_locations as string[] | null) ?? [],
-    max_results: (r.max_results as number | null) ?? 50,
-    description: (r.description as string | null) ?? null,
-    language: (r.language as string | null) ?? 'English',
-    prospectCount: 0,
-  })) as CampaignRow[];
+  const base = (data ?? []).map((r: Record<string, unknown>) => {
+    const client  = Array.isArray(r.client) ? r.client[0] ?? null : r.client ?? null;
+    const creatorRaw = Array.isArray(r.creator) ? r.creator[0] ?? null : r.creator ?? null;
+    const creator = creatorRaw as { role?: string } | null;
+    return {
+      id: r.id,
+      name: r.name,
+      description: (r.description as string | null) ?? null,
+      status: r.status,
+      channel: r.channel,
+      language: (r.language as string | null) ?? 'English',
+      scrape_enabled: r.scrape_enabled,
+      last_scraped_at: r.last_scraped_at,
+      search_queries: (r.search_queries as string[] | null) ?? [],
+      target_locations: (r.target_locations as string[] | null) ?? [],
+      max_results: (r.max_results as number | null) ?? 50,
+      created_at: r.created_at,
+      client,
+      prospectCount: 0,
+      needsReview: r.status === 'draft' && creator?.role === 'client',
+    };
+  }) as CampaignRow[];
 
   await Promise.all(base.map(async (c) => {
     const { count } = await supabase
@@ -171,7 +186,9 @@ export function useCampaigns() {
 
   const setStatus = useCallback(async (id: string, status: string) => {
     queryClient.setQueryData<CampaignRow[]>(QK.campaigns, (prev = []) =>
-      prev.map((c) => (c.id === id ? { ...c, status } : c)),
+      // Leaving draft always clears needsReview — the only path back into
+      // draft is a full refetch, which recomputes it from the creator's role.
+      prev.map((c) => (c.id === id ? { ...c, status, needsReview: status === 'draft' && c.needsReview } : c)),
     );
     const { error } = await supabase
       .from('campaigns')
@@ -287,6 +304,7 @@ export interface ClientListRow {
   business_name: string;
   business_type: string | null;
   location: string | null;
+  website_url: string | null;
   contact_email: string | null;
   contact_phone: string | null;
   notification_channel: string | null;
@@ -299,7 +317,7 @@ export interface ClientListRow {
 async function fetchClients(): Promise<ClientListRow[]> {
   const { data, error } = await supabase
     .from('clients')
-    .select('id, business_name, business_type, location, contact_email, contact_phone, notification_channel, status, created_at')
+    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, notification_channel, status, created_at')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -340,6 +358,7 @@ export interface NewClientInput {
   business_name: string;
   business_type: string;
   location: string;
+  website_url?: string;
   contact_email: string;
   contact_phone: string;
   notification_channel: 'whatsapp' | 'sms';
@@ -359,6 +378,7 @@ export async function createClient(input: NewClientInput) {
       business_name: input.business_name,
       business_type: input.business_type || null,
       location: input.location || null,
+      website_url: input.website_url || null,
       contact_email: input.contact_email || null,
       contact_phone: input.contact_phone || null,
       notification_channel: input.notification_channel,
@@ -411,10 +431,23 @@ export async function sendClientInvite(
   return { error: null };
 }
 
+export async function updateClientLoginEmail(
+  clientId: string,
+  newEmail: string,
+): Promise<{ error: string | null }> {
+  const { data, error } = await supabase.functions.invoke('update-client-email', {
+    body: { client_id: clientId, new_email: newEmail },
+  });
+  if (error) return { error: error.message };
+  if (data?.error) return { error: data.message ?? data.error };
+  return { error: null };
+}
+
 export interface UpdateClientInput {
   business_name: string;
   business_type: string;
   location: string;
+  website_url: string;
   contact_email: string;
   contact_phone: string;
   notification_channel: 'whatsapp' | 'sms';
@@ -426,6 +459,7 @@ export async function updateClient(id: string, input: UpdateClientInput) {
     business_name: input.business_name,
     business_type: input.business_type || null,
     location: input.location || null,
+    website_url: input.website_url || null,
     contact_email: input.contact_email,
     contact_phone: input.contact_phone,
     notification_channel: input.notification_channel,
