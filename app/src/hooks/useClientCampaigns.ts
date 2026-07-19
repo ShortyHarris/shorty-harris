@@ -114,3 +114,32 @@ export function useClientCampaignProspects(campaignId: string | null) {
 
   return { rows, loading };
 }
+
+export interface ClientUsage {
+  monthly_prospect_limit: number;
+  max_campaigns: number;
+  prospects_this_month: number;
+  prospects_remaining: number;
+  campaign_count: number;
+  campaigns_remaining: number;
+  limit_resets_at: string;
+}
+
+export function useClientUsage(clientId: string) {
+  const { data: usage = null } = useQuery({
+    queryKey: ['client-usage', clientId] as const,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('client_usage')
+        .select('monthly_prospect_limit, max_campaigns, prospects_this_month, prospects_remaining, campaign_count, campaigns_remaining, limit_resets_at')
+        .eq('client_id', clientId)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data as ClientUsage | null;
+    },
+    enabled: !!clientId,
+    staleTime: 60 * 1000,
+  });
+
+  return { usage };
+}

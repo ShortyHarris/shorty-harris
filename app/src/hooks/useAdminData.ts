@@ -310,6 +310,8 @@ export interface ClientListRow {
   notification_channel: string | null;
   status: string;
   created_at: string;
+  monthly_prospect_limit: number;
+  max_campaigns: number;
   has_profile: boolean;
   activated_at: string | null;
 }
@@ -317,7 +319,7 @@ export interface ClientListRow {
 async function fetchClients(): Promise<ClientListRow[]> {
   const { data, error } = await supabase
     .from('clients')
-    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, notification_channel, status, created_at')
+    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, notification_channel, status, created_at, monthly_prospect_limit, max_campaigns')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -452,6 +454,8 @@ export interface UpdateClientInput {
   contact_phone: string;
   notification_channel: 'whatsapp' | 'sms';
   status: 'draft' | 'active' | 'paused' | 'churned';
+  monthly_prospect_limit: number;
+  max_campaigns: number;
 }
 
 export async function updateClient(id: string, input: UpdateClientInput) {
@@ -464,8 +468,31 @@ export async function updateClient(id: string, input: UpdateClientInput) {
     contact_phone: input.contact_phone,
     notification_channel: input.notification_channel,
     status: input.status,
+    monthly_prospect_limit: input.monthly_prospect_limit,
+    max_campaigns: input.max_campaigns,
     updated_at: new Date().toISOString(),
   }).eq('id', id);
+}
+
+// ─── Client usage (client_usage view) ─────────────────────────────────────────
+export interface ClientUsage {
+  monthly_prospect_limit: number;
+  max_campaigns: number;
+  prospects_this_month: number;
+  prospects_remaining: number;
+  campaign_count: number;
+  campaigns_remaining: number;
+  limit_resets_at: string;
+}
+
+export async function getClientUsage(clientId: string): Promise<ClientUsage | null> {
+  const { data, error } = await supabase
+    .from('client_usage')
+    .select('monthly_prospect_limit, max_campaigns, prospects_this_month, prospects_remaining, campaign_count, campaigns_remaining, limit_resets_at')
+    .eq('client_id', clientId)
+    .maybeSingle();
+  if (error) return null;
+  return data as ClientUsage | null;
 }
 
 export interface ClientDeleteCounts {

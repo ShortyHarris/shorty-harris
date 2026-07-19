@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   useClients, createClient, sendClientInvite, updateClientLoginEmail,
-  updateClient, getClientDeleteCounts, deleteClient,
+  updateClient, getClientDeleteCounts, deleteClient, getClientUsage,
 } from '../../hooks/useAdminData';
 import type {
-  NewClientInput, UpdateClientInput, ClientListRow, ClientDeleteCounts,
+  NewClientInput, UpdateClientInput, ClientListRow, ClientDeleteCounts, ClientUsage,
 } from '../../hooks/useAdminData';
 import { SkeletonTable } from '../../components/Skeleton';
 import { RowMenu } from '../../components/RowMenu';
@@ -733,9 +733,16 @@ function EditClientModal({
   const [status, setStatus] = useState<UpdateClientInput['status']>(
     (client.status as UpdateClientInput['status']) ?? 'active',
   );
+  const [monthlyProspectLimit, setMonthlyProspectLimit] = useState(client.monthly_prospect_limit);
+  const [maxCampaigns, setMaxCampaigns] = useState(client.max_campaigns);
+  const [usage, setUsage] = useState<ClientUsage | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState<string | null>(null);
   const reqStar = <span className="ml-0.5 text-[#a8533a]">*</span>;
+
+  useEffect(() => {
+    getClientUsage(client.id).then(setUsage);
+  }, [client.id]);
 
   async function submit() {
     if (!businessName.trim()) { setErr('Business name is required.'); return; }
@@ -748,6 +755,7 @@ function EditClientModal({
       business_name: businessName.trim(), business_type: businessType.trim(),
       location: location.trim(), website_url: websiteUrl.trim(), contact_email: contactEmail.trim(),
       contact_phone: normalizePhone(contactPhone), notification_channel: notifChannel, status,
+      monthly_prospect_limit: monthlyProspectLimit, max_campaigns: maxCampaigns,
     });
     setBusy(false);
     if (error) setErr(error.message); else onSaved();
@@ -785,6 +793,38 @@ function EditClientModal({
         <div>
           <label className={fieldLbl}>Contact phone{reqStar}</label>
           <input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} style={FONT} className={inputCls} />
+        </div>
+        <div className="border-t border-[#f0ede6] pt-3 grid grid-cols-2 gap-3">
+          <div>
+            <label className={fieldLbl}>Monthly prospect limit</label>
+            <input
+              type="number"
+              min={0}
+              value={monthlyProspectLimit}
+              onChange={(e) => setMonthlyProspectLimit(Math.max(0, Number(e.target.value)))}
+              style={FONT}
+              className={inputCls}
+            />
+            <p className="mt-1 text-[11px] text-[#9a9d92]">
+              {usage
+                ? `${usage.prospects_this_month} of ${usage.monthly_prospect_limit} prospects this month, resets ${new Date(usage.limit_resets_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                : 'Loading usage…'}
+            </p>
+          </div>
+          <div>
+            <label className={fieldLbl}>Max campaigns</label>
+            <input
+              type="number"
+              min={0}
+              value={maxCampaigns}
+              onChange={(e) => setMaxCampaigns(Math.max(0, Number(e.target.value)))}
+              style={FONT}
+              className={inputCls}
+            />
+            <p className="mt-1 text-[11px] text-[#9a9d92]">
+              {usage ? `${usage.campaign_count} of ${usage.max_campaigns} campaigns` : 'Loading usage…'}
+            </p>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>

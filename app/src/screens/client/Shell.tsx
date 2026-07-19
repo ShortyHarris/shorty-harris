@@ -135,38 +135,47 @@ export function Shell({
 
       {/* ═══ MOBILE BOTTOM NAV ═══ */}
       <nav className="cbnav">
-        <NavLink to="/app" end className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
-          <span className="cbnav-icon cbnav-icon-badge">
-            <Inbox size={20} strokeWidth={1.8} />
-            {newHotLeads > 0 && <span className="cbnav-badge-dot">{newHotLeads > 99 ? '99+' : newHotLeads}</span>}
-          </span>
-          <span>Leads</span>
-        </NavLink>
-        <NavLink to="/app/campaigns" className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
-          <span className="cbnav-icon"><Megaphone size={20} strokeWidth={1.8} /></span>
-          <span>Campaigns</span>
-        </NavLink>
-        <NavLink to="/app/approvals" className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
-          <span className="cbnav-icon cbnav-icon-badge">
-            <ClipboardCheck size={20} strokeWidth={1.8} />
-            {pendingApprovals > 0 && <span className="cbnav-badge-dot">{pendingApprovals > 99 ? '99+' : pendingApprovals}</span>}
-          </span>
-          <span>Approvals</span>
-        </NavLink>
-        <NavLink to="/app/billing" className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
-          <span className="cbnav-icon"><CreditCard size={20} strokeWidth={1.8} /></span>
-          <span>Billing</span>
-        </NavLink>
-        <NavLink to="/app/settings" className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
-          <span className="cbnav-icon"><Settings size={20} strokeWidth={1.8} /></span>
-          <span>Settings</span>
-        </NavLink>
-        <button className="cbnav-item" onClick={onSignOut}>
-          <span className="cbnav-icon"><LogOut size={20} strokeWidth={1.8} /></span>
-          <span>Sign out</span>
-        </button>
+        <MobileNavItem to="/app" end icon={Inbox} label="Leads" badge={newHotLeads} />
+        <MobileNavItem to="/app/campaigns" icon={Megaphone} label="Campaigns" />
+        <MobileNavItem to="/app/approvals" icon={ClipboardCheck} label="Approvals" badge={pendingApprovals} />
+        <MobileNavItem to="/app/billing" icon={CreditCard} label="Billing" />
+        <MobileNavItem to="/app/settings" icon={Settings} label="Settings" />
       </nav>
     </div>
+  );
+}
+
+/* Bottom-nav tab — the active pill is a shared framer-motion layoutId, so it
+   physically slides from one tab to the next instead of instantly swapping,
+   and the icon goes from thin outline to bold duotone when active. */
+function MobileNavItem({
+  to, end, icon: Icon, label, badge,
+}: {
+  to: string; end?: boolean; icon: React.ElementType; label: string; badge?: number;
+}) {
+  return (
+    <NavLink to={to} end={end} className={({ isActive }) => `cbnav-item${isActive ? ' is-active' : ''}`}>
+      {({ isActive }) => (
+        <>
+          <span className="cbnav-icon-wrap">
+            {isActive && (
+              <motion.span
+                layoutId="cbnav-pill"
+                className="cbnav-pill"
+                transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+              />
+            )}
+            <span className="cbnav-icon">
+              <Icon size={20} strokeWidth={isActive ? 2.3 : 1.7} />
+              {!!badge && badge > 0 && (
+                <span className="cbnav-badge-dot">{badge > 99 ? '99+' : badge}</span>
+              )}
+            </span>
+          </span>
+          <span className="cbnav-label">{label}</span>
+        </>
+      )}
+    </NavLink>
   );
 }
 

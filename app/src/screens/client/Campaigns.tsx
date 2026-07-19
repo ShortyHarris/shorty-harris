@@ -1,13 +1,15 @@
 import { useState, type KeyboardEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, TriangleAlert, Plus } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import {
-  useClientCampaignList, createClientCampaign, useClientCampaignProspects,
+  useClientCampaignList, createClientCampaign, useClientCampaignProspects, useClientUsage,
 } from '../../hooks/useClientCampaigns';
 import type { ClientCampaignRow } from '../../hooks/useClientCampaigns';
+import { queryClient } from '../../lib/queryClient';
 import { SkeletonTable } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
+import { useToast, ToastHost } from '../../components/Toast';
 
 const HELP: HelpContent = {
   title: 'Campaigns',
@@ -58,9 +60,15 @@ const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#3c
 
 export function Campaigns({ clientId }: { clientId: string }) {
   const { rows, loading, error, reload } = useClientCampaignList(clientId);
+  const { usage } = useClientUsage(clientId);
+  const { toasts, toast, dismiss } = useToast();
   const [showNew, setShowNew] = useState(false);
   const [openCampaign, setOpenCampaign] = useState<ClientCampaignRow | null>(null);
-  const [banner, setBanner] = useState(false);
+
+  // Existing campaigns over the limit (e.g. the limit was lowered after they
+  // were created) are never touched here — this only gates creating new ones.
+  const atLimit = usage !== null && usage.campaigns_remaining <= 0;
+  const limitTitle = usage ? `You've used ${usage.campaign_count} of ${usage.max_campaigns} campaign slots. Contact us to increase your limit.` : undefined;
 
   return (
     <div style={FONT} className="flex flex-col gap-6 content">
@@ -75,14 +83,25 @@ export function Campaigns({ clientId }: { clientId: string }) {
         <div className="flex items-center gap-2 md:gap-2.5 shrink-0">
           <HelpButton content={HELP} />
           <button onClick={reload} className={ghostCls}>Refresh</button>
-          <button onClick={() => setShowNew(true)} className={`${primaryCls} hidden md:inline-flex`}>+ New campaign</button>
+          <button
+            onClick={() => setShowNew(true)}
+            disabled={atLimit}
+            title={atLimit ? limitTitle : undefined}
+            className={`${primaryCls} hidden md:inline-flex`}
+          >
+            + New campaign
+          </button>
         </div>
       </header>
 
-      {banner && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-[#3c7a5b]/20 bg-[#edf4ef] px-4 py-3 text-[13px] text-[#3c7a5b]">
-          <span>Campaign created. It will be reviewed and activated shortly.</span>
-          <button onClick={() => setBanner(false)} className="cursor-pointer border-0 bg-transparent text-[16px] leading-none text-[#3c7a5b]/60 hover:text-[#3c7a5b]">×</button>
+      {atLimit && (
+        <div className="flex items-start gap-3 rounded-xl border border-[#e8d5a8] bg-[#f8efdb] px-4 py-3.5">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f0dfb8]">
+            <TriangleAlert size={15} strokeWidth={2.2} className="text-[#8a6417]" />
+          </span>
+          <p className="m-0 pt-0.5 text-[13px] leading-snug text-[#8a6417]">
+            <strong className="font-bold">Campaign limit reached</strong> — you've used {usage!.campaign_count} of {usage!.max_campaigns} slots. Contact us to increase it before creating another one.
+          </p>
         </div>
       )}
 
@@ -96,7 +115,14 @@ export function Campaigns({ clientId }: { clientId: string }) {
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
           <strong className="text-[15px] font-bold text-[#20211c]">No campaigns yet.</strong>
           <span className="text-[13px] text-[#62655c]">Create your first campaign to tell us who to target.</span>
-          <button onClick={() => setShowNew(true)} className={`${primaryCls} mt-2`}>+ New campaign</button>
+          <button
+            onClick={() => setShowNew(true)}
+            disabled={atLimit}
+            title={atLimit ? limitTitle : undefined}
+            className={`${primaryCls} mt-2`}
+          >
+            + New campaign
+          </button>
         </div>
       ) : (
         <>
@@ -177,10 +203,12 @@ export function Campaigns({ clientId }: { clientId: string }) {
       {/* Mobile FAB */}
       <button
         onClick={() => setShowNew(true)}
-        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-[#3c7a5b] text-white shadow-[0_6px_24px_rgba(60,122,91,0.4)] text-[28px] leading-none transition-colors hover:bg-[#2d5e46] active:scale-95"
+        disabled={atLimit}
+        title={atLimit ? limitTitle : undefined}
+        className="fixed bottom-24 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-[#3c7a5b] text-white shadow-[0_6px_24px_rgba(60,122,91,0.4)] transition-colors hover:bg-[#2d5e46] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label="New campaign"
       >
-        +
+        <Plus size={24} strokeWidth={2.5} />
       </button>
 
       <AnimatePresence>
@@ -189,7 +217,11 @@ export function Campaigns({ clientId }: { clientId: string }) {
             key="new-campaign-modal"
             clientId={clientId}
             onClose={() => setShowNew(false)}
-            onCreated={() => { setShowNew(false); reload(); setBanner(true); }}
+            onCreated={() => {
+              setShowNew(false); reload();
+              toast('Campaign created. It will be reviewed and activated shortly.');
+              queryClient.invalidateQueries({ queryKey: ['client-usage', clientId] });
+            }}
           />
         )}
         {openCampaign && (
@@ -200,6 +232,8 @@ export function Campaigns({ clientId }: { clientId: string }) {
           />
         )}
       </AnimatePresence>
+
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }

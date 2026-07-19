@@ -113,7 +113,7 @@ function ClientZone() {
           <Route index element={<Dashboard clientId={clientId} />} />
           <Route path="campaigns" element={<ClientCampaigns clientId={clientId} />} />
           <Route path="approvals" element={<Approvals clientId={clientId} />} />
-          <Route path="settings" element={<Settings clientId={clientId} />} />
+          <Route path="settings" element={<Settings clientId={clientId} onSignOut={signOut} />} />
           <Route path="billing" element={<Billing clientId={clientId} onCreditsChanged={() => {
             queryClient.invalidateQueries({ queryKey: clientHeaderKey(clientId) });
             queryClient.invalidateQueries({ queryKey: billingKey(clientId) });

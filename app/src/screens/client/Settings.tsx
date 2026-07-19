@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Mail, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Mail, CheckCircle2, AlertTriangle, LogOut } from 'lucide-react';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 
@@ -18,7 +18,7 @@ function formatLastUsed(iso: string): string {
   });
 }
 
-export function Settings({ clientId }: { clientId: string }) {
+export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut: () => void }) {
   const { connection, loading, error, disconnect, connectUrl, reload } = useGmailConnection(clientId);
   const [searchParams, setSearchParams] = useSearchParams();
   const [banner, setBanner] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
@@ -157,9 +157,22 @@ export function Settings({ clientId }: { clientId: string }) {
             className="inline-flex items-center shadow-sm hover:shadow-md border-gray-500 gap-2 cursor-pointer bg-white rounded-lg border-0 px-4 py-2 text-[13px] font-bold text-white transition-colors"
           >
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gmail_icon_%282020%29.svg/1280px-Gmail_icon_%282020%29.svg.png" alt="Gmail" className="w-5 h-4" /> Connect Gmail
-          </a> 
+          </a>
         </div>
       )}
+
+      <div className="mt-5 rounded-2xl border p-5" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+        <h2 className="text-[15px] font-bold mb-1" style={{ color: 'var(--ink)' }}>Account</h2>
+        <p className="text-[13px] mb-4" style={{ color: 'var(--ink-soft)' }}>You're signed in to this dashboard.</p>
+        <button
+          onClick={onSignOut}
+          className="cursor-pointer inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-[13px] font-bold transition-colors"
+          style={{ borderColor: '#e0b8ae', color: 'var(--clay)', background: 'transparent' }}
+        >
+          <LogOut size={14} />
+          Sign out
+        </button>
+      </div>
     </main>
   );
 }
