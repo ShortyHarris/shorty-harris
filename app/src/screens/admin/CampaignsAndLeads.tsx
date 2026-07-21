@@ -12,6 +12,8 @@ import {
 import { SkeletonTable } from '../../components/Skeleton';
 import { RowMenu } from '../../components/RowMenu';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
+import { TagInput } from '../../components/TagInput';
+import { looksLikeMultipleLocationsJoined } from '../../lib/validation';
 
 const HELP_CAMPAIGNS: HelpContent = {
   title: 'Campaigns',
@@ -451,7 +453,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
   const [channel, setChannel]           = useState('email');
   const [language, setLanguage]         = useState('English');
   const [queries, setQueries]           = useState('');
-  const [locations, setLocations]       = useState('');
+  const [locations, setLocations]       = useState<string[]>([]);
   const [maxResults, setMaxResults]     = useState(1000);
   const [scrapeEnabled, setScrapeEnabled] = useState(true);
   const [saveAsDraft, setSaveAsDraft]   = useState(false);
@@ -461,11 +463,15 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
   async function submit() {
     if (!clientId || !name.trim()) { setErr('Pick a client and enter a name.'); return; }
     if (!language.trim()) { setErr('Outreach language is required.'); return; }
+    if (looksLikeMultipleLocationsJoined(locations)) {
+      setErr(`"${locations[0]}" looks like more than one location joined together — press Enter (or use a semicolon) after each city so they save as separate entries.`);
+      return;
+    }
     setBusy(true); setErr(null);
     const { error } = await createCampaign({
       client_id: clientId, name: name.trim(), channel, language: language.trim(),
       search_queries: queries.split(',').map((s) => s.trim()).filter(Boolean),
-      target_locations: locations.split(';').map((s) => s.trim()).filter(Boolean),
+      target_locations: locations,
       max_results: maxResults, scrape_enabled: scrapeEnabled,
       status: saveAsDraft ? 'draft' : 'active',
     });
@@ -542,10 +548,14 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
                 <label className={fieldLbl}>Search terms <span className="normal-case font-normal">(comma-separated)</span></label>
                 <input value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="hotels, lodges, guesthouses" style={FONT} className={inputCls} />
               </div>
-              <div>
-                <label className={fieldLbl}>Locations <span className="normal-case font-normal">(semicolon-separated; use commas for City, State)</span></label>
-                <input value={locations} onChange={(e) => setLocations(e.target.value)} placeholder="Bloomington, IL; Normal, IL; Springfield, IL" style={FONT} className={inputCls} />
-              </div>
+              <TagInput
+                label="Locations"
+                placeholder="Type a location and press Enter (e.g. Bloomington, IL)"
+                helper="Use City, State format. Separate several with semicolons, or add them one at a time and press Enter."
+                values={locations}
+                onChange={setLocations}
+                splitOn=";"
+              />
               <div className="flex items-end gap-3">
                 <div className="flex-1">
                   <label className={fieldLbl}>Max results per run</label>
@@ -617,7 +627,7 @@ function EditCampaignModal({
   const [channel, setChannel]         = useState(campaign.channel);
   const [language, setLanguage]       = useState(campaign.language);
   const [queries, setQueries]         = useState(campaign.search_queries.join(', '));
-  const [locations, setLocations]     = useState(campaign.target_locations.join('; '));
+  const [locations, setLocations]     = useState<string[]>(campaign.target_locations);
   const [maxResults, setMaxResults]   = useState(campaign.max_results);
   const [scrapeEnabled, setScrapeEnabled] = useState(campaign.scrape_enabled);
   const [busy, setBusy] = useState(false);
@@ -626,6 +636,10 @@ function EditCampaignModal({
   async function submit() {
     if (!name.trim()) { setErr('Campaign name is required.'); return; }
     if (!language.trim()) { setErr('Outreach language is required.'); return; }
+    if (looksLikeMultipleLocationsJoined(locations)) {
+      setErr(`"${locations[0]}" looks like more than one location joined together — press Enter (or use a semicolon) after each city so they save as separate entries.`);
+      return;
+    }
     setBusy(true); setErr(null);
     const { error } = await updateCampaign(campaign.id, {
       name: name.trim(),
@@ -633,7 +647,7 @@ function EditCampaignModal({
       channel,
       language: language.trim(),
       search_queries: queries.split(',').map((s) => s.trim()).filter(Boolean),
-      target_locations: locations.split(';').map((s) => s.trim()).filter(Boolean),
+      target_locations: locations,
       max_results: maxResults,
       scrape_enabled: scrapeEnabled,
     });
@@ -677,10 +691,14 @@ function EditCampaignModal({
               <label className={campFieldLbl}>Search terms <span className="normal-case font-normal">(comma-separated)</span></label>
               <input value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="hotels, lodges, guesthouses" style={FONT} className={campInputCls} />
             </div>
-            <div>
-              <label className={campFieldLbl}>Locations <span className="normal-case font-normal">(semicolon-separated; use commas for City, State)</span></label>
-              <input value={locations} onChange={(e) => setLocations(e.target.value)} placeholder="Bloomington, IL; Normal, IL; Springfield, IL" style={FONT} className={campInputCls} />
-            </div>
+            <TagInput
+              label="Locations"
+              placeholder="Type a location and press Enter (e.g. Bloomington, IL)"
+              helper="Use City, State format. Separate several with semicolons, or add them one at a time and press Enter."
+              values={locations}
+              onChange={setLocations}
+              splitOn=";"
+            />
             <div className="flex items-end gap-3">
               <div className="flex-1">
                 <label className={campFieldLbl}>Max results per run</label>
