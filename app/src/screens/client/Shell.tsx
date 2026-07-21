@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone } from 'lucide-react';
+import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone, BookOpen } from 'lucide-react';
 import type { ClientNotification } from '../../hooks/useClientNotifications';
 import '../../styles/admin-tables.css';
 import './Shell.css';
@@ -79,6 +79,10 @@ export function Shell({
             <Settings size={16} strokeWidth={1.9} className="cside-link-icon" />
             Settings
           </NavLink>
+          <NavLink to="/docs" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <BookOpen size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Help &amp; Docs
+          </NavLink>
         </nav>
 
         <div className="cside-bottom">
@@ -103,6 +107,13 @@ export function Shell({
       {/* ═══ MOBILE TOPBAR ═══ */}
       <header className="ctopbar">
         <span className="ctopbar-biz">{businessName}</span>
+        <Link
+          to="/docs"
+          aria-label="Help & Docs"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#62655c] transition-colors hover:bg-[#f5f2ec]"
+        >
+          <BookOpen size={17} strokeWidth={1.8} />
+        </Link>
         <NotificationBell
           notifications={notifications}
           unreadCount={unreadCount}

@@ -31,6 +31,7 @@ const Billing        = lazy(() => import('./screens/client/Billing').then((m) =>
 const Approvals      = lazy(() => import('./screens/client/Approvals').then((m) => ({ default: m.Approvals })));
 const ClientCampaigns = lazy(() => import('./screens/client/Campaigns').then((m) => ({ default: m.Campaigns })));
 const Settings       = lazy(() => import('./screens/client/Settings').then((m) => ({ default: m.Settings })));
+const Docs           = lazy(() => import('./screens/docs/Docs').then((m) => ({ default: m.Docs })));
 
 // ── Guards ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,16 @@ function RequireClient({ children }: { children: ReactNode }) {
   if (loading) return <Spinner />;
   if (!session || !profile) return <Navigate to="/login" replace />;
   if (!profile.client_id) return <NoClientAccount />;
+  return <>{children}</>;
+}
+
+// Any signed-in user, admin or client — used for screens (like /docs) that
+// both zones link into and that scope their own content via RLS instead of
+// a route-level role check.
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { session, profile, loading } = useAuth();
+  if (loading) return <Spinner />;
+  if (!session || !profile) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
@@ -230,6 +241,23 @@ function AppRoutes() {
           <RequireClient>
             <ClientZone />
           </RequireClient>
+        }
+      />
+
+      <Route
+        path="/docs"
+        element={
+          <RequireAuth>
+            <Docs />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/docs/:slug"
+        element={
+          <RequireAuth>
+            <Docs />
+          </RequireAuth>
         }
       />
 

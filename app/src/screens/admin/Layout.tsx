@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, LogOut, Bell,
   ClipboardCheck, Flame, Newspaper,
-  Building2, Users, Megaphone, BarChart2, Activity,
+  Building2, Users, Megaphone, BarChart2, Activity, BookOpen,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
@@ -18,6 +18,7 @@ import { Prospects } from './Prospects';
 import { Campaigns, HotLeads } from './CampaignsAndLeads';
 import { Analytics } from './Analytics';
 import { Monitoring } from './Monitoring';
+import { DocsAdmin } from './DocsAdmin';
 import '../../styles/theme-admin.css';
 import '../../styles/admin-tables.css';
 import './Layout.css';
@@ -55,6 +56,7 @@ export function AdminLayout() {
     { to: '/admin/campaigns',  label: 'Campaigns',  icon: Megaphone, badge: campaignsToReview, badgeColor: '#6b4fa0' },
     { to: '/admin/analytics',  label: 'Analytics',  icon: BarChart2  },
     { to: '/admin/monitoring', label: 'Monitoring', icon: Activity, badge: unresolvedErrors.length, badgeColor: '#a8533a' },
+    { to: '/admin/docs',       label: 'Docs',       icon: BookOpen   },
   ];
 
   // Notification bell aggregates the same live counts already shown as
@@ -105,6 +107,7 @@ export function AdminLayout() {
               <Route path="hot-leads"  element={<HotLeads />} />
               <Route path="analytics"  element={<Analytics />} />
               <Route path="monitoring" element={<Monitoring />} />
+              <Route path="docs"       element={<DocsAdmin />} />
               <Route path="*" element={<Navigate to="/admin/approvals" replace />} />
             </Routes>
           </main>

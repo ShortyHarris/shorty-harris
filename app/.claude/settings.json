@@ -10,7 +10,11 @@
       "Bash(git fetch *)",
       "Bash(git commit -m ' *)",
       "Bash(node -e ' *)",
-      "Bash(VITE_GA_MEASUREMENT_ID=G-TEST123 npm run build)"
+      "Bash(VITE_GA_MEASUREMENT_ID=G-TEST123 npm run build)",
+      "mcp__claude_ai_Supabase__get_project",
+      "mcp__claude_ai_Supabase__list_extensions",
+      "Bash(curl -s 'https://lxoeotyibsalbxgbjfxo.supabase.co/rest/v1/docs_articles?select=slug,audience,status&limit=5' -H 'apikey: sb_publishable_CdK80AB1j_99hPPZGGS_jA_XYsNzrUs' -H 'Authorization: Bearer sb_publishable_CdK80AB1j_99hPPZGGS_jA_XYsNzrUs')",
+      "mcp__claude_ai_Supabase__get_advisors"
     ],
     "additionalDirectories": [
       "c:\\Users\\user\\Desktop\\shorty-harris-repo\\shorty-harris-repo\\supabase\\functions\\invite-client",
