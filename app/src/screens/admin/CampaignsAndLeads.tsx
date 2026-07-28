@@ -551,7 +551,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
               <TagInput
                 label="Locations"
                 placeholder="Type a location and press Enter (e.g. Bloomington, IL)"
-                helper="Use City, State format. Separate several with semicolons, or add them one at a time and press Enter."
+                helper="One city per entry — press Enter after each one. Use City, State format. To add several at once, separate them with semicolons (not commas); don't put more than one city in a single entry."
                 values={locations}
                 onChange={setLocations}
                 splitOn=";"
@@ -694,7 +694,7 @@ function EditCampaignModal({
             <TagInput
               label="Locations"
               placeholder="Type a location and press Enter (e.g. Bloomington, IL)"
-              helper="Use City, State format. Separate several with semicolons, or add them one at a time and press Enter."
+              helper="One city per entry — press Enter after each one. Use City, State format. To add several at once, separate them with semicolons (not commas); don't put more than one city in a single entry."
               values={locations}
               onChange={setLocations}
               splitOn=";"

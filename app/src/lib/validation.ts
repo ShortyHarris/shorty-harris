@@ -26,13 +26,23 @@ export function isValidPhone(raw: string): boolean {
   return digits.length >= 7 && digits.length <= 15;
 }
 
+const STATE_CODE_RE = /\b[A-Z]{2}\b/g;
+
 // A single legitimate "City, State/Country" entry has exactly one comma (two
-// comma-separated parts). If a target_locations array ends up with only one
-// entry and that entry has more than one comma, it's very likely several
-// locations got typed with the wrong separator and collapsed into one string
-// (e.g. "Bloomington, IL, Normal, IL" typed where semicolons were expected).
+// comma-separated parts) and exactly one state-code-shaped token. If a
+// target_locations array ends up with only one entry, flag it when either:
+//   - it has more than one comma (e.g. "Bloomington, IL, Normal, IL" typed
+//     where semicolons were expected), or
+//   - it contains 2+ state-code-shaped tokens like "Bloomington IL, Normal IL"
+//     — only one comma, so the comma-count check alone misses it, but two
+//     cities were still joined without a separator before each one.
 export function looksLikeMultipleLocationsJoined(locations: string[]): boolean {
   if (locations.length !== 1) return false;
-  const parts = locations[0].split(',').map((s) => s.trim()).filter(Boolean);
-  return parts.length > 2;
+  const entry = locations[0];
+
+  const parts = entry.split(',').map((s) => s.trim()).filter(Boolean);
+  if (parts.length > 2) return true;
+
+  const stateCodeMatches = entry.match(STATE_CODE_RE) ?? [];
+  return stateCodeMatches.length >= 2;
 }

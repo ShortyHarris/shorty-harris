@@ -337,7 +337,7 @@ function NewCampaignModal({
           <TagInput
             label="Target locations"
             placeholder="Type a location and press Enter (e.g. Prague, Czech Republic)"
-            helper="Use City, Country format. Separate several locations with semicolons, or add them one at a time and press Enter."
+            helper="One city per entry — press Enter after each one. Use City, Country format. To add several at once, separate them with semicolons (not commas); don't put more than one city in a single entry."
             values={locations}
             onChange={setLocations}
             splitOn=";"

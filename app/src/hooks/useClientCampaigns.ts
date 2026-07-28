@@ -84,6 +84,7 @@ export async function createClientCampaign(input: NewClientCampaignInput) {
     search_queries: input.search_queries,
     target_locations: input.target_locations,
     max_results: input.max_results,
+    scrape_enabled: true,
   });
 }
 
