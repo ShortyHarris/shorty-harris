@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useClientDashboard } from '../../hooks/useClientDashboard';
 import { useClientApprovals } from '../../hooks/useClientApprovals';
+import { useWarmProspects } from '../../hooks/useWarmProspects';
 import type { HotLead, HotLeadStatus } from '../../types';
-import { RefreshCw, ChevronRight, Zap, MessageSquare, Trophy, XCircle, TrendingUp, Minus, ClipboardCheck } from 'lucide-react';
+import { RefreshCw, ChevronRight, Zap, MessageSquare, Trophy, XCircle, TrendingUp, Minus, ClipboardCheck, Flame, Phone, PhoneCall } from 'lucide-react';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import './Dashboard.css';
 
@@ -61,6 +62,7 @@ function matchesFilter(lead: HotLead, filter: Filter): boolean {
 export function Dashboard({ clientId }: { clientId: string }) {
   const { leads, loading, error, setStatus, reload } = useClientDashboard(clientId);
   const { items: pendingApprovals } = useClientApprovals(clientId);
+  const { prospects: warmProspects, loading: warmLoading, markCalled } = useWarmProspects(clientId);
   const [openId, setOpenId] = useState<string | null>(clientId === '__preview__' ? 'mock-0' : null);
   const [filter, setFilter] = useState<Filter>('new');
   const [page, setPage] = useState(1);
@@ -121,6 +123,11 @@ export function Dashboard({ clientId }: { clientId: string }) {
           </span>
           <ChevronRight size={16} className="appr-nudge-arrow" />
         </Link>
+      )}
+
+      {/* ─── Warm prospects: opened but never replied ─── */}
+      {!warmLoading && warmProspects.length > 0 && (
+        <WarmProspectsPanel prospects={warmProspects} onMarkCalled={markCalled} />
       )}
 
       {/* ─── Stat cards ─── */}
@@ -542,6 +549,79 @@ function LeadsSkeleton() {
         </table>
       </div>
     </>
+  );
+}
+
+/* ───── warm prospects: opened repeatedly, never replied ───── */
+function timeAgo(iso: string | null): string {
+  if (!iso) return '';
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diffMs / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 14) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  return `${weeks}w ago`;
+}
+
+function WarmProspectsPanel({
+  prospects, onMarkCalled,
+}: {
+  prospects: import('../../hooks/useWarmProspects').WarmProspect[];
+  onMarkCalled: (prospectId: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? prospects : prospects.slice(0, 3);
+
+  return (
+    <div className="warm-panel">
+      <div className="warm-panel-head">
+        <span className="warm-panel-icon"><Flame size={16} strokeWidth={2} /></span>
+        <div>
+          <h2 className="warm-panel-title">Worth a call</h2>
+          <p className="warm-panel-sub">
+            {prospects.length} {prospects.length === 1 ? 'business has' : 'businesses have'} opened your emails multiple times without replying
+          </p>
+        </div>
+      </div>
+
+      <div className="warm-list">
+        {visible.map((p) => (
+          <div className="warm-row" key={p.prospect_id}>
+            <div className="warm-row-main">
+              <span className="warm-row-name">{p.business_name}</span>
+              <span className="warm-row-meta">
+                {p.category ? `${p.category} · ` : ''}{p.location ?? ''}
+              </span>
+            </div>
+            <div className="warm-row-side">
+              <span className="warm-opens-badge">{p.total_opens}x opened</span>
+              <span className="warm-row-when">last opened {timeAgo(p.last_opened_at)}</span>
+              <div className="warm-row-actions">
+                {p.phone && (
+                  <a href={`tel:${p.phone}`} className="warm-call-btn" aria-label={`Call ${p.business_name}`}>
+                    <Phone size={14} />
+                  </a>
+                )}
+                <button
+                  className="warm-called-btn"
+                  onClick={() => onMarkCalled(p.prospect_id)}
+                  title="Mark as called - stops further automated follow-ups"
+                >
+                  <PhoneCall size={13} /> Mark called
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {prospects.length > 3 && (
+        <button className="warm-toggle" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? 'Show less' : `Show all ${prospects.length}`}
+        </button>
+      )}
+    </div>
   );
 }
 
