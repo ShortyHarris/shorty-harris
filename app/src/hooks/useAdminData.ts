@@ -521,11 +521,21 @@ export async function getClientDeleteCounts(clientId: string): Promise<ClientDel
 }
 
 export async function deleteClient(clientId: string): Promise<{ error: string | null }> {
+  // Look up linked profiles before deleting the client row — client_id gets
+  // set to null on profiles once the client is gone (cascade rule), so this
+  // has to happen first or userIds would come back empty.
   const { data: profileData } = await supabase
     .from('profiles')
     .select('id')
     .eq('client_id', clientId);
   const userIds = (profileData ?? []).map((p: { id: string }) => p.id);
+
+  // Delete the client row first — this cascades to campaigns, prospects,
+  // messages, etc. via existing FK rules. Deleting the auth user first can
+  // hit FK constraints from tables that still reference profiles.id (e.g.
+  // messages.approved_by) if those rows haven't been cleared yet.
+  const { error } = await supabase.from('clients').delete().eq('id', clientId);
+  if (error) return { error: error.message };
 
   if (userIds.length > 0) {
     const { data, error: fnErr } = await supabase.functions.invoke('delete-client-auth', {
@@ -535,8 +545,7 @@ export async function deleteClient(clientId: string): Promise<{ error: string | 
     if (data?.error) return { error: data.message ?? data.error };
   }
 
-  const { error } = await supabase.from('clients').delete().eq('id', clientId);
-  return { error: error?.message ?? null };
+  return { error: null };
 }
 
 export interface UpdateCampaignInput {
