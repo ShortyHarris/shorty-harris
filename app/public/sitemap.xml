@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Static routes only. Individual /blog/:slug URLs are intentionally not
-  listed here: posts are published live through the admin dashboard, and a
-  static sitemap can't track that without a build-time generation step.
-  Google can still find and index individual posts by following the links
-  from /blog and from each post's own "Keep reading" section.
+  Placeholder only — this file (dist/sitemap.xml) is fully overwritten at
+  build time by scripts/generate-blog-html.ts, which adds every published
+  /blog/:slug URL with its lastmod date. This copy is just what a fresh
+  checkout serves before the first build ever runs; edit the STATIC_ROUTES
+  list in that script if a new top-level page needs to be added, not this file.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://shortyharris.com/</loc></url>
