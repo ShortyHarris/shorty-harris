@@ -31,6 +31,7 @@ const Billing        = lazy(() => import('./screens/client/Billing').then((m) =>
 const Approvals      = lazy(() => import('./screens/client/Approvals').then((m) => ({ default: m.Approvals })));
 const ClientCampaigns = lazy(() => import('./screens/client/Campaigns').then((m) => ({ default: m.Campaigns })));
 const Settings       = lazy(() => import('./screens/client/Settings').then((m) => ({ default: m.Settings })));
+const ClientAnalytics = lazy(() => import('./screens/client/Analytics').then((m) => ({ default: m.Analytics })));
 const Docs           = lazy(() => import('./screens/docs/Docs').then((m) => ({ default: m.Docs })));
 
 // ── Guards ──────────────────────────────────────────────────────────────────
@@ -124,6 +125,7 @@ function ClientZone() {
           <Route index element={<Dashboard clientId={clientId} />} />
           <Route path="campaigns" element={<ClientCampaigns clientId={clientId} />} />
           <Route path="approvals" element={<Approvals clientId={clientId} />} />
+          <Route path="analytics" element={<ClientAnalytics clientId={clientId} />} />
           <Route path="settings" element={<Settings clientId={clientId} onSignOut={signOut} />} />
           <Route path="billing" element={<Billing clientId={clientId} onCreditsChanged={() => {
             queryClient.invalidateQueries({ queryKey: clientHeaderKey(clientId) });

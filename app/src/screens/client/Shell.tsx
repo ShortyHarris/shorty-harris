@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone, BookOpen } from 'lucide-react';
+import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone, BookOpen, BarChart3 } from 'lucide-react';
 import type { ClientNotification } from '../../hooks/useClientNotifications';
 import '../../styles/admin-tables.css';
 import './Shell.css';
@@ -71,6 +71,10 @@ export function Shell({
             Approvals
             {pendingApprovals > 0 && <span className="cside-nav-badge">{pendingApprovals > 99 ? '99+' : pendingApprovals}</span>}
           </NavLink>
+          <NavLink to="/app/analytics" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <BarChart3 size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Analytics
+          </NavLink>
           <NavLink to="/app/billing" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
             <CreditCard size={16} strokeWidth={1.9} className="cside-link-icon" />
             Billing
@@ -107,6 +111,13 @@ export function Shell({
       {/* ═══ MOBILE TOPBAR ═══ */}
       <header className="ctopbar">
         <span className="ctopbar-biz">{businessName}</span>
+        <Link
+          to="/app/analytics"
+          aria-label="Analytics"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#62655c] transition-colors hover:bg-[#f5f2ec]"
+        >
+          <BarChart3 size={17} strokeWidth={1.8} />
+        </Link>
         <Link
           to="/docs"
           aria-label="Help & Docs"

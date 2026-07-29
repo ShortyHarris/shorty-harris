@@ -101,7 +101,7 @@ export function Dashboard({ clientId }: { clientId: string }) {
         <div className="dash-head-row">
           <div>
             <h1 className="dash-title">
-              <Zap size={18} className="dash-title-icon" />
+              
               Hot Leads
             </h1>
             <p className="dash-sub">
@@ -126,9 +126,11 @@ export function Dashboard({ clientId }: { clientId: string }) {
       )}
 
       {/* ─── Warm prospects: opened but never replied ─── */}
-      {!warmLoading && warmProspects.length > 0 && (
-        <WarmProspectsPanel prospects={warmProspects} onMarkCalled={markCalled} />
-      )}
+      <div>
+        {!warmLoading && warmProspects.length > 0 && (
+          <WarmProspectsPanel prospects={warmProspects} onMarkCalled={markCalled} />
+        )}
+      </div>
 
       {/* ─── Stat cards ─── */}
       <StatGrid
@@ -574,7 +576,7 @@ function WarmProspectsPanel({
   const visible = expanded ? prospects : prospects.slice(0, 3);
 
   return (
-    <div className="warm-panel">
+    <div className="dash-leads">
       <div className="warm-panel-head">
         <span className="warm-panel-icon"><Flame size={16} strokeWidth={2} /></span>
         <div>
@@ -680,19 +682,14 @@ function StatGrid({
   return (
     <div className="stat-grid">
       {cards.map((c) => {
-        const Icon = c.icon;
-        const TIcon = c.TrendIcon;
         return (
           <button key={c.label} className="stat-card" onClick={() => onFilter(c.filter)}>
             <div className="stat-card-header">
-              <Icon size={13} style={{ color: c.iconColor, flexShrink: 0 }} />
+             
               <span className="stat-label">{c.label}</span>
             </div>
             <div className="stat-value">{c.value}</div>
-            <div className="stat-trend" style={{ color: c.trendColor }}>
-              <TIcon size={12} strokeWidth={2.5} />
-              <span>{c.trendText}</span>
-            </div>
+            
           </button>
         );
       })}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Mail, CheckCircle2, AlertTriangle, LogOut } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Mail, CheckCircle2, AlertTriangle, LogOut, BarChart3, ChevronRight } from 'lucide-react';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 
@@ -160,6 +160,21 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
           </a>
         </div>
       )}
+
+      <Link
+        to="/app/analytics"
+        className="mt-5 flex items-center gap-3 rounded-2xl border p-5 no-underline transition-colors hover:bg-(--bg)"
+        style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}
+      >
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: 'var(--leaf-tint)' }}>
+          <BarChart3 size={16} style={{ color: 'var(--leaf)' }} />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-[15px] font-bold" style={{ color: 'var(--ink)' }}>Analytics</span>
+          <span className="block text-[13px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>Open rates, reply rates, and per-campaign performance.</span>
+        </span>
+        <ChevronRight size={16} style={{ color: 'var(--ink-faint)' }} />
+      </Link>
 
       <div className="mt-5 rounded-2xl border p-5" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
         <h2 className="text-[15px] font-bold mb-1" style={{ color: 'var(--ink)' }}>Account</h2>
