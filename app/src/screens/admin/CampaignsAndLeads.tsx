@@ -102,6 +102,12 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
   );
 }
 
+function lastScrapedLabel(iso: string | null): string {
+  return iso
+    ? `Last scraped ${new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    : 'Never scraped';
+}
+
 /* ══════════════════════════════════════════════════════════════════ */
 type ScrapeResult = { total_scraped: number; total_with_email: number };
 
@@ -172,14 +178,14 @@ export function Campaigns() {
           <div className="atbl hidden md:block">
             <table className="table-fixed">
               <colgroup>
-                <col className="w-[22%]" />
-                <col className="w-[15%]" />
-                <col className="w-[7%]" />
+                <col className="w-[26%]" />
+                <col className="w-[16%]" />
+                <col className="w-[8%]" />
                 <col className="w-[9%]" />
                 <col className="w-[8%]" />
                 <col className="w-[9%]" />
-                <col className="w-[19%]" />
-                <col className="w-[11%]" />
+                <col className="w-[9%]" />
+                <col className="w-[8%]" />
               </colgroup>
               <thead>
                 <tr>
@@ -208,6 +214,7 @@ export function Campaigns() {
                             ⚠ Needs setup
                           </span>
                         )}
+                        <div className="mt-1 text-[11px] text-[#9a9d92]">{lastScrapedLabel(c.last_scraped_at)}</div>
                       </td>
                       <td className="min-w-0 text-[#62655c]">
                         <div className="truncate" title={c.client?.business_name ?? undefined}>{c.client?.business_name ?? '—'}</div>
@@ -226,10 +233,8 @@ export function Campaigns() {
                       </td>
                       <td>
                         <ScrapeCell
-                          campaignId={c.id}
                           isScraping={scraping.has(c.id)}
                           result={scrapeResults[c.id]}
-                          lastScrapedAt={c.last_scraped_at}
                           onScrape={() => handleScrape(c.id)}
                         />
                       </td>
@@ -288,6 +293,7 @@ export function Campaigns() {
                           </span>
                         </div>
                       )}
+                      <div className="mt-1 text-[11px] text-[#9a9d92]">{lastScrapedLabel(c.last_scraped_at)}</div>
                     </div>
                     <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
                       className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
@@ -322,10 +328,8 @@ export function Campaigns() {
                       </button>
                     )}
                     <ScrapeCell
-                      campaignId={c.id}
                       isScraping={scraping.has(c.id)}
                       result={scrapeResults[c.id]}
-                      lastScrapedAt={c.last_scraped_at}
                       onScrape={() => handleScrape(c.id)}
                     />
                     <button
@@ -391,16 +395,12 @@ export function Campaigns() {
 
 /* ── Scrape cell ───────────────────────────────────────────────────── */
 function ScrapeCell({
-  campaignId: _campaignId,
   isScraping,
   result,
-  lastScrapedAt,
   onScrape,
 }: {
-  campaignId: string;
   isScraping: boolean;
   result: ScrapeResult | 'error' | undefined;
-  lastScrapedAt: string | null;
   onScrape: () => void;
 }) {
   if (isScraping) {
@@ -429,19 +429,12 @@ function ScrapeCell({
     );
   }
   return (
-    <div className="flex flex-col gap-0.5">
-      <button
-        onClick={onScrape}
-        className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-[#ece8df] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b] whitespace-nowrap"
-      >
-        ↻ Run scrape
-      </button>
-      {lastScrapedAt && (
-        <span className="text-[10.5px] text-[#c4bfb5]">
-          Last: {new Date(lastScrapedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-        </span>
-      )}
-    </div>
+    <button
+      onClick={onScrape}
+      className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-[#ece8df] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b] whitespace-nowrap"
+    >
+      ↻ Run scrape
+    </button>
   );
 }
 
