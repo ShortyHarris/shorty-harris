@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useClientDashboard } from '../../hooks/useClientDashboard';
 import { useClientApprovals } from '../../hooks/useClientApprovals';
-import { useWarmProspects } from '../../hooks/useWarmProspects';
+import { useWarmProspects, useProspectMessages, type WarmProspect, type CallOutcome } from '../../hooks/useWarmProspects';
 import type { HotLead, HotLeadStatus } from '../../types';
-import { RefreshCw, ChevronRight, Zap, MessageSquare, Trophy, XCircle, TrendingUp, Minus, ClipboardCheck, Flame, Phone, PhoneCall } from 'lucide-react';
+import { RefreshCw, ChevronRight, Zap, MessageSquare, Trophy, XCircle, TrendingUp, Minus, ClipboardCheck, Flame, Phone, PhoneCall, Mail } from 'lucide-react';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import './Dashboard.css';
 
@@ -62,7 +62,8 @@ function matchesFilter(lead: HotLead, filter: Filter): boolean {
 export function Dashboard({ clientId }: { clientId: string }) {
   const { leads, loading, error, setStatus, reload } = useClientDashboard(clientId);
   const { items: pendingApprovals } = useClientApprovals(clientId);
-  const { prospects: warmProspects, loading: warmLoading, markCalled } = useWarmProspects(clientId);
+  const { prospects: warmProspects, loading: warmLoading, logCallOutcome } = useWarmProspects(clientId);
+  const [historyProspect, setHistoryProspect] = useState<WarmProspect | null>(null);
   const [openId, setOpenId] = useState<string | null>(clientId === '__preview__' ? 'mock-0' : null);
   const [filter, setFilter] = useState<Filter>('new');
   const [page, setPage] = useState(1);
@@ -128,7 +129,7 @@ export function Dashboard({ clientId }: { clientId: string }) {
       {/* ─── Warm prospects: opened but never replied ─── */}
       <div>
         {!warmLoading && warmProspects.length > 0 && (
-          <WarmProspectsPanel prospects={warmProspects} onMarkCalled={markCalled} />
+          <WarmProspectsPanel prospects={warmProspects} onSelect={setHistoryProspect} />
         )}
       </div>
 
@@ -194,6 +195,14 @@ export function Dashboard({ clientId }: { clientId: string }) {
             lead={openLead}
             onClose={() => setOpenId(null)}
             onStatus={setStatus}
+          />
+        )}
+        {historyProspect && (
+          <WarmProspectHistoryModal
+            key={historyProspect.prospect_id}
+            prospect={historyProspect}
+            onClose={() => setHistoryProspect(null)}
+            onLogOutcome={(outcome) => { logCallOutcome(historyProspect.prospect_id, outcome); setHistoryProspect(null); }}
           />
         )}
       </AnimatePresence>
@@ -555,6 +564,13 @@ function LeadsSkeleton() {
 }
 
 /* ───── warm prospects: opened repeatedly, never replied ───── */
+function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  const ten = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  if (ten.length !== 10) return raw;
+  return `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}`;
+}
+
 function timeAgo(iso: string | null): string {
   if (!iso) return '';
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -567,10 +583,10 @@ function timeAgo(iso: string | null): string {
 }
 
 function WarmProspectsPanel({
-  prospects, onMarkCalled,
+  prospects, onSelect,
 }: {
-  prospects: import('../../hooks/useWarmProspects').WarmProspect[];
-  onMarkCalled: (prospectId: string) => void;
+  prospects: WarmProspect[];
+  onSelect: (prospect: WarmProspect) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? prospects : prospects.slice(0, 3);
@@ -589,28 +605,34 @@ function WarmProspectsPanel({
 
       <div className="warm-list">
         {visible.map((p) => (
-          <div className="warm-row" key={p.prospect_id}>
+          <div className="warm-row" key={p.prospect_id} onClick={() => onSelect(p)}>
             <div className="warm-row-main">
               <span className="warm-row-name">{p.business_name}</span>
               <span className="warm-row-meta">
                 {p.category ? `${p.category} · ` : ''}{p.location ?? ''}
               </span>
+              {p.phone && <span className="warm-row-phone">{formatPhone(p.phone)}</span>}
             </div>
             <div className="warm-row-side">
               <span className="warm-opens-badge">{p.total_opens}x opened</span>
               <span className="warm-row-when">last opened {timeAgo(p.last_opened_at)}</span>
               <div className="warm-row-actions">
                 {p.phone && (
-                  <a href={`tel:${p.phone}`} className="warm-call-btn" aria-label={`Call ${p.business_name}`}>
+                  <a
+                    href={`tel:${p.phone}`}
+                    className="warm-call-btn"
+                    aria-label={`Call ${p.business_name}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <Phone size={14} />
                   </a>
                 )}
                 <button
                   className="warm-called-btn"
-                  onClick={() => onMarkCalled(p.prospect_id)}
-                  title="Mark as called - stops further automated follow-ups"
+                  onClick={(e) => { e.stopPropagation(); onSelect(p); }}
+                  title="Log how the call went"
                 >
-                  <PhoneCall size={13} /> Mark called
+                  <PhoneCall size={13} /> Log call
                 </button>
               </div>
             </div>
@@ -624,6 +646,141 @@ function WarmProspectsPanel({
         </button>
       )}
     </div>
+  );
+}
+
+const MSG_TYPE_LABEL: Record<string, string> = {
+  initial: 'First touch',
+  follow_up_d3: 'Follow-up D3',
+  follow_up_d7: 'Follow-up D7',
+  follow_up_d14: 'Follow-up D14',
+};
+
+/* ───── warm prospect detail: contact info + full send/open history ───── */
+function WarmProspectHistoryModal({
+  prospect, onClose, onLogOutcome,
+}: { prospect: WarmProspect; onClose: () => void; onLogOutcome: (outcome: CallOutcome) => void }) {
+  const { messages, loading, error } = useProspectMessages(prospect.prospect_id);
+
+  return (
+    <motion.div
+      className="panel-overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+      onClick={onClose}
+    >
+      <motion.aside
+        className="panel rounded-lg"
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="panel-handle" />
+
+        <div className="panel-scroll">
+          <div className="panel-top">
+            <span className="warm-opens-badge">{prospect.total_opens}x opened</span>
+            <button className="panel-close-btn" onClick={onClose} aria-label="Close">✕</button>
+          </div>
+
+          <h2 className="panel-biz">{prospect.business_name}</h2>
+          {prospect.category && (
+            <p className="panel-category">{prospect.category}{prospect.location ? ` · ${prospect.location}` : ''}</p>
+          )}
+
+          {(prospect.phone || prospect.email) && (
+            <div className="panel-section">
+              <div className="panel-label">Contact info</div>
+              <dl className="contact-dl">
+                {prospect.phone && (<><dt>Phone</dt><dd className="mono">{formatPhone(prospect.phone)}</dd></>)}
+                {prospect.email && (<><dt>Email</dt><dd className="mono">{prospect.email}</dd></>)}
+              </dl>
+            </div>
+          )}
+
+          <div className="panel-section">
+            <div className="panel-label">Email history</div>
+            {loading ? (
+              <p className="text-[13px]" style={{ color: 'var(--ink-faint)' }}>Loading…</p>
+            ) : error ? (
+              <p className="text-[13px]" style={{ color: 'var(--clay)' }}>{error}</p>
+            ) : messages.length === 0 ? (
+              <p className="text-[13px]" style={{ color: 'var(--ink-faint)' }}>No emails sent yet.</p>
+            ) : (
+              <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
+                {messages.map((m) => (
+                  <li
+                    key={m.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border px-3.5 py-2.5"
+                    style={{ borderColor: 'var(--line)' }}
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-[13px] font-semibold" style={{ color: 'var(--ink)' }} title={m.subject ?? undefined}>
+                        {m.subject ?? MSG_TYPE_LABEL[m.message_type] ?? m.message_type}
+                      </div>
+                      <div className="text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
+                        {MSG_TYPE_LABEL[m.message_type] ?? m.message_type}
+                        {m.sent_at ? ` · sent ${timeAgo(m.sent_at)}` : ' · not sent yet'}
+                      </div>
+                    </div>
+                    {m.open_count > 0 ? (
+                      <span className="warm-opens-badge shrink-0">{m.open_count}x opened</span>
+                    ) : (
+                      <span className="shrink-0 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>Not opened</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {(prospect.phone || prospect.email) && (
+            <div className="reach-row mb-2">
+              {prospect.phone && (
+                <a className="reach-btn p-2 rounded-md reach-primary" href={`tel:${prospect.phone}`}>
+                  <span className="reach-icon reach-icon-on-primary"><Phone size={14} /></span>
+                  <span className="text-white">Call</span>
+                </a>
+              )}
+              {prospect.email && (
+                <a className="reach-btn p-2 rounded-md" href={`mailto:${prospect.email}`}>
+                  <span className="reach-icon reach-icon-mail"><Mail size={14} /></span>
+                  <span>Email</span>
+                </a>
+              )}
+            </div>
+          )}
+
+          <div className="panel-section">
+            <div className="panel-label">How did the call go?</div>
+            <div className="panel-outcomes">
+              <button
+                className="outcome-btn p-2 rounded-md outcome-won"
+                onClick={() => onLogOutcome('meeting_agreed')}
+              >
+                🔥 Let&apos;s meet — hot lead
+              </button>
+              <button
+                className="outcome-btn p-2 rounded-md outcome-later"
+                onClick={() => onLogOutcome('call_later')}
+              >
+                Maybe later — call again
+              </button>
+              <button
+                className="outcome-btn p-2 rounded-md outcome-lost"
+                onClick={() => onLogOutcome('rejected')}
+              >
+                Not interested
+              </button>
+            </div>
+          </div>
+        </div>
+      </motion.aside>
+    </motion.div>
   );
 }
 

@@ -60,7 +60,13 @@ export function useClientRealtimeSync(clientId: string) {
           queryClient.invalidateQueries({ queryKey: clientNotificationsKey(clientId) });
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          // Surfaces silent realtime failures (e.g. a table missing from the
+          // supabase_realtime publication) instead of just "reload fixes it".
+          console.error('[client-realtime-sync] subscription failed:', status, err);
+        }
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [clientId]);
