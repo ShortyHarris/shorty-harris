@@ -145,7 +145,7 @@ export function Dashboard({ clientId }: { clientId: string }) {
 
       {/* ─── Leads section ─── */}
       <div className="dash-leads">
-        <div className="filter-bar">
+        <div className="filter-bar" data-tour="lead-filters">
           {FILTER_TABS.map((tab) => {
             const count = leads.filter((l) => matchesFilter(l, tab.key)).length;
             return (
@@ -592,7 +592,7 @@ function WarmProspectsPanel({
   const visible = expanded ? prospects : prospects.slice(0, 3);
 
   return (
-    <div className="dash-leads">
+    <div className="dash-leads" data-tour="warm-prospects">
       <div className="warm-panel-head">
         <span className="warm-panel-icon"><Flame size={16} strokeWidth={2} /></span>
         <div>
@@ -837,7 +837,7 @@ function StatGrid({
   ];
 
   return (
-    <div className="stat-grid">
+    <div className="stat-grid" data-tour="dashboard-stats">
       {cards.map((c) => {
         return (
           <button key={c.label} className="stat-card" onClick={() => onFilter(c.filter)}>

@@ -133,7 +133,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
              <HelpButton content={HELP} />
           </div>
 
-        <div className="credit-hero mb-4 rounded-lg">
+        <div className="credit-hero mb-4 rounded-lg" data-tour="credit-balance">
           <div className="credit-hero-top justify-end">
             
             {!loading && data?.smsCredits != null && (

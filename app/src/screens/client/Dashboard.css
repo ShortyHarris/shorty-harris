@@ -567,12 +567,19 @@
     .stat-grid  { grid-template-columns: repeat(4, 1fr); padding: 0 28px 24px; }
 
     /* Leads card */
+    /* overflow-x: auto so a long business name (auto-layout table, no
+       colgroup) can be reached via horizontal scroll on narrow tablet
+       widths instead of being silently clipped by the rounded corners. */
     .dash-leads {
       margin: 0 28px 32px;
       border-radius: 10px;
       border: 1px solid #e8e3da;
       background: #ffffff;
-      overflow: hidden;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    .dash-leads table {
+      min-width: 560px;
     }
 
     /* Filter bar: revert to underline tabs inside the card */

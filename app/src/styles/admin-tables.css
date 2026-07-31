@@ -3,8 +3,12 @@
 @layer components {
 
   /* ── Table wrapper ────────────────────────────────────────────────── */
+  /* overflow-x: auto so nowrap action buttons/pills in narrow fixed-%
+     columns become reachable via horizontal scroll on tablet widths
+     instead of being silently clipped by the card's rounded corners. */
   .atbl {
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
     border-radius: 10px;
     border: 1px solid #e8e3da;
     background: #ffffff;
@@ -13,6 +17,7 @@
   /* ── table element ───────────────────────────────────────────────── */
   .atbl table {
     width: 100%;
+    min-width: 640px;
     border-collapse: collapse;
     font-size: 13px;
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

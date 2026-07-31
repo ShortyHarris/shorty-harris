@@ -307,11 +307,13 @@ export interface ClientListRow {
   website_url: string | null;
   contact_email: string | null;
   contact_phone: string | null;
+  contact_name: string | null;
   notification_channel: string | null;
   status: string;
   created_at: string;
   monthly_prospect_limit: number;
   max_campaigns: number;
+  auto_approve_campaigns: boolean;
   has_profile: boolean;
   activated_at: string | null;
 }
@@ -319,7 +321,7 @@ export interface ClientListRow {
 async function fetchClients(): Promise<ClientListRow[]> {
   const { data, error } = await supabase
     .from('clients')
-    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, notification_channel, status, created_at, monthly_prospect_limit, max_campaigns')
+    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, notification_channel, status, created_at, monthly_prospect_limit, max_campaigns, auto_approve_campaigns')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -452,10 +454,12 @@ export interface UpdateClientInput {
   website_url: string;
   contact_email: string;
   contact_phone: string;
+  contact_name: string;
   notification_channel: 'whatsapp' | 'sms';
   status: 'draft' | 'active' | 'paused' | 'churned';
   monthly_prospect_limit: number;
   max_campaigns: number;
+  auto_approve_campaigns: boolean;
 }
 
 export async function updateClient(id: string, input: UpdateClientInput) {
@@ -466,10 +470,12 @@ export async function updateClient(id: string, input: UpdateClientInput) {
     website_url: input.website_url || null,
     contact_email: input.contact_email,
     contact_phone: input.contact_phone,
+    contact_name: input.contact_name || null,
     notification_channel: input.notification_channel,
     status: input.status,
     monthly_prospect_limit: input.monthly_prospect_limit,
     max_campaigns: input.max_campaigns,
+    auto_approve_campaigns: input.auto_approve_campaigns,
     updated_at: new Date().toISOString(),
   }).eq('id', id);
 }

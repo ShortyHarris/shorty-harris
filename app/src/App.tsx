@@ -8,6 +8,7 @@ import { useClientApprovals } from './hooks/useClientApprovals';
 import { useGmailConnection } from './hooks/useGmailConnection';
 import { useClientNotifications } from './hooks/useClientNotifications';
 import { useClientRealtimeSync } from './hooks/useClientRealtimeSync';
+import { TourProvider } from './tour/TourProvider';
 import { queryClient } from './lib/queryClient';
 import './styles/theme-admin.css';
 import './styles/theme-client.css';
@@ -108,33 +109,35 @@ function ClientZone() {
 
   return (
     <div className="theme-client">
-      <Shell
-        businessName={businessName}
-        credits={credits}
-        displayName={profile!.full_name ?? 'Account'}
-        pendingApprovals={pendingApprovals.length}
-        newHotLeads={newHotLeads}
-        gmailConnected={gmailConnection.connected}
-        notifications={notifications}
-        unreadCount={unreadCount}
-        onMarkAsRead={markAsRead}
-        onMarkAllAsRead={markAllAsRead}
-        onSignOut={signOut}
-      >
-        <Routes>
-          <Route index element={<Dashboard clientId={clientId} />} />
-          <Route path="campaigns" element={<ClientCampaigns clientId={clientId} />} />
-          <Route path="approvals" element={<Approvals clientId={clientId} />} />
-          <Route path="analytics" element={<ClientAnalytics clientId={clientId} />} />
-          <Route path="settings" element={<Settings clientId={clientId} onSignOut={signOut} />} />
-          <Route path="billing" element={<Billing clientId={clientId} onCreditsChanged={() => {
-            queryClient.invalidateQueries({ queryKey: clientHeaderKey(clientId) });
-            queryClient.invalidateQueries({ queryKey: billingKey(clientId) });
-            queryClient.invalidateQueries({ queryKey: dashboardKey(clientId) });
-          }} />} />
-          <Route path="*" element={<Navigate to="" replace />} />
-        </Routes>
-      </Shell>
+      <TourProvider userId={profile!.id}>
+        <Shell
+          businessName={businessName}
+          credits={credits}
+          displayName={profile!.full_name ?? 'Account'}
+          pendingApprovals={pendingApprovals.length}
+          newHotLeads={newHotLeads}
+          gmailConnected={gmailConnection.connected}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+          onSignOut={signOut}
+        >
+          <Routes>
+            <Route index element={<Dashboard clientId={clientId} />} />
+            <Route path="campaigns" element={<ClientCampaigns clientId={clientId} />} />
+            <Route path="approvals" element={<Approvals clientId={clientId} />} />
+            <Route path="analytics" element={<ClientAnalytics clientId={clientId} />} />
+            <Route path="settings" element={<Settings clientId={clientId} onSignOut={signOut} />} />
+            <Route path="billing" element={<Billing clientId={clientId} onCreditsChanged={() => {
+              queryClient.invalidateQueries({ queryKey: clientHeaderKey(clientId) });
+              queryClient.invalidateQueries({ queryKey: billingKey(clientId) });
+              queryClient.invalidateQueries({ queryKey: dashboardKey(clientId) });
+            }} />} />
+            <Route path="*" element={<Navigate to="" replace />} />
+          </Routes>
+        </Shell>
+      </TourProvider>
     </div>
   );
 }

@@ -727,6 +727,7 @@ function EditClientModal({
   const [websiteUrl, setWebsiteUrl]     = useState(client.website_url ?? '');
   const [contactEmail, setContactEmail] = useState(client.contact_email ?? '');
   const [contactPhone, setContactPhone] = useState(client.contact_phone ?? '');
+  const [contactName, setContactName]   = useState(client.contact_name ?? '');
   const [notifChannel, setNotifChannel] = useState<UpdateClientInput['notification_channel']>(
     (client.notification_channel as UpdateClientInput['notification_channel']) ?? 'whatsapp',
   );
@@ -735,6 +736,7 @@ function EditClientModal({
   );
   const [monthlyProspectLimit, setMonthlyProspectLimit] = useState(client.monthly_prospect_limit);
   const [maxCampaigns, setMaxCampaigns] = useState(client.max_campaigns);
+  const [autoApprove, setAutoApprove] = useState(client.auto_approve_campaigns);
   const [usage, setUsage] = useState<ClientUsage | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState<string | null>(null);
@@ -754,8 +756,10 @@ function EditClientModal({
     const { error } = await updateClient(client.id, {
       business_name: businessName.trim(), business_type: businessType.trim(),
       location: location.trim(), website_url: websiteUrl.trim(), contact_email: contactEmail.trim(),
-      contact_phone: normalizePhone(contactPhone), notification_channel: notifChannel, status,
+      contact_phone: normalizePhone(contactPhone), contact_name: contactName.trim(),
+      notification_channel: notifChannel, status,
       monthly_prospect_limit: monthlyProspectLimit, max_campaigns: maxCampaigns,
+      auto_approve_campaigns: autoApprove,
     });
     setBusy(false);
     if (error) setErr(error.message); else onSaved();
@@ -794,6 +798,11 @@ function EditClientModal({
           <label className={fieldLbl}>Contact phone{reqStar}</label>
           <input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} style={FONT} className={inputCls} />
         </div>
+        <div>
+          <label className={fieldLbl}>Representative name</label>
+          <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="e.g. Yvonne" style={FONT} className={inputCls} />
+          <p className="mt-1 text-[11px] text-[#9a9d92]">Signs outreach emails on this client's behalf (e.g. "Have a wonderful day, Yvonne").</p>
+        </div>
         <div className="border-t border-[#f0ede6] pt-3 grid grid-cols-2 gap-3">
           <div>
             <label className={fieldLbl}>Monthly prospect limit</label>
@@ -826,6 +835,18 @@ function EditClientModal({
             </p>
           </div>
         </div>
+        <label className="flex cursor-pointer items-start gap-2 border-t border-[#f0ede6] pt-3 text-[13px] text-[#62655c]">
+          <input
+            type="checkbox"
+            checked={autoApprove}
+            onChange={(e) => setAutoApprove(e.target.checked)}
+            className="mt-0.5 accent-[#3c7a5b]"
+          />
+          <span>
+            <span className="block font-semibold text-[#20211c]">Auto-approve this client's campaigns</span>
+            <span className="block text-[11px] text-[#9a9d92]">Skips the "Awaiting approval" step — campaigns they create go active immediately, no admin review.</span>
+          </span>
+        </label>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={fieldLbl}>Notification channel</label>

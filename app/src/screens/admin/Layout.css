@@ -383,7 +383,13 @@
 }
 
 /* ── Responsive ──────────────────────────────────────────────────── */
-@media (max-width: 768px) {
+/* 767px, not 768 — Tailwind's `md:` utilities (used throughout the admin
+   screens for the desktop-table/mobile-card split) activate at
+   min-width:768px, so this must end one pixel earlier or the sidebar
+   collapses to the mobile hamburger bar at exactly 768px while the
+   `hidden md:block` desktop tables simultaneously render full-width with
+   no sidebar to make room for them. */
+@media (max-width: 767px) {
   .ashell { grid-template-columns: 1fr; }
   .aside  { display: none; }
   .amobile-bar {

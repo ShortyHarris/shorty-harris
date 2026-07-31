@@ -72,20 +72,87 @@ export interface NewClientCampaignInput {
   max_results: number;
 }
 
-export async function createClientCampaign(input: NewClientCampaignInput) {
-  return supabase.from('campaigns').insert({
-    client_id: input.client_id,
-    created_by: input.created_by,
-    name: input.name,
-    description: input.description || null,
-    language: input.language,
-    channel: 'email',
-    status: 'draft',
-    search_queries: input.search_queries,
-    target_locations: input.target_locations,
-    max_results: input.max_results,
-    scrape_enabled: true,
-  });
+export async function createClientCampaign(
+  input: NewClientCampaignInput,
+): Promise<{ autoApproved: boolean; error: Error | null }> {
+  // Most clients' campaigns land in 'draft' and wait for an admin to review
+  // and activate them (see needsReview in useAdminData.ts). A client flagged
+  // auto_approve_campaigns skips that — but the campaign still has to be
+  // *inserted* as 'draft': the client's own RLS insert policy on campaigns
+  // only allows status='draft' (confirmed by a 403 when this tried to insert
+  // 'active' directly), so a client-authenticated request can never write a
+  // pre-activated row itself. A database trigger elevates it to 'active'
+  // right after, as a separate, privileged update — see
+  // add-client-campaign-auto-approve-trigger.sql.
+  const { data: clientRow } = await supabase
+    .from('clients')
+    .select('auto_approve_campaigns')
+    .eq('id', input.client_id)
+    .single();
+
+  const { error } = await supabase
+    .from('campaigns')
+    .insert({
+      client_id: input.client_id,
+      created_by: input.created_by,
+      name: input.name,
+      description: input.description || null,
+      language: input.language,
+      channel: 'email',
+      status: 'draft',
+      search_queries: input.search_queries,
+      target_locations: input.target_locations,
+      max_results: input.max_results,
+      scrape_enabled: true,
+    });
+
+  return { autoApproved: clientRow?.auto_approve_campaigns ?? false, error };
+}
+
+export interface UpdateClientCampaignInput {
+  name: string;
+  description: string;
+  language: string;
+  search_queries: string[];
+  target_locations: string[];
+  max_results: number;
+}
+
+export async function updateClientCampaign(campaignId: string, input: UpdateClientCampaignInput) {
+  const { error } = await supabase
+    .from('campaigns')
+    .update({
+      name: input.name,
+      description: input.description || null,
+      language: input.language,
+      search_queries: input.search_queries,
+      target_locations: input.target_locations,
+      max_results: input.max_results,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', campaignId);
+  return { error };
+}
+
+export interface ClientCampaignDeleteCounts {
+  prospects: number;
+  messages: number;
+}
+
+export async function getClientCampaignDeleteCounts(campaignId: string): Promise<ClientCampaignDeleteCounts> {
+  const [prosts, msgs] = await Promise.all([
+    supabase.from('prospects').select('id', { count: 'exact', head: true }).eq('campaign_id', campaignId),
+    supabase.from('messages').select('id', { count: 'exact', head: true }).eq('campaign_id', campaignId),
+  ]);
+  return {
+    prospects: prosts.count ?? 0,
+    messages:  msgs.count ?? 0,
+  };
+}
+
+export async function deleteClientCampaign(campaignId: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('campaigns').delete().eq('id', campaignId);
+  return { error: error?.message ?? null };
 }
 
 export interface ClientCampaignProspect {
