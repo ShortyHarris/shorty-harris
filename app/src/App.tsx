@@ -9,6 +9,7 @@ import { useGmailConnection } from './hooks/useGmailConnection';
 import { useClientNotifications } from './hooks/useClientNotifications';
 import { useClientRealtimeSync } from './hooks/useClientRealtimeSync';
 import { TourProvider } from './tour/TourProvider';
+import { initSmartlook, identifySmartlookUser } from './lib/smartlook';
 import { queryClient } from './lib/queryClient';
 import './styles/theme-admin.css';
 import './styles/theme-client.css';
@@ -93,6 +94,17 @@ function ClientZone() {
   const newHotLeads = leads.filter((l) => l.status === 'new').length;
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useClientNotifications(clientId);
   useClientRealtimeSync(clientId);
+
+  // Client dashboard only, per the plan — not admin, not the public site.
+  useEffect(() => {
+    initSmartlook();
+    identifySmartlookUser(profile!.id, {
+      name: profile!.full_name,
+      role: profile!.role,
+      client_id: clientId,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile!.id]);
 
   // After Stripe checkout redirect, invalidate header + billing + dashboard
   useEffect(() => {
