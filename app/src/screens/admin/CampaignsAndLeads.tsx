@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, Plus } from 'lucide-react';
 import {
   useCampaigns, useAdminHotLeads, useClientsList,
   createCampaign, updateCampaign, getCampaignDeleteCounts, deleteCampaign,
+  fetchScrapeSnapshots, fetchProspectCount,
 } from '../../hooks/useAdminData';
 import type { AdminHotLead, CampaignRow, CampaignDeleteCounts } from '../../hooks/useAdminData';
 import {
@@ -102,47 +103,123 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
   );
 }
 
-function lastScrapedLabel(iso: string | null): string {
-  return iso
-    ? `Last scraped ${new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+// A scrape stuck in 'running' this long almost certainly means n8n crashed
+// before it could write 'complete'/'failed' — treat it as failed in the UI
+// (with a Retry) rather than showing "Scraping…" forever.
+const STALE_RUN_MS = 45 * 60 * 1000;
+
+function isStaleRun(scrapeStatus: string, scrapeStartedAt: string | null): boolean {
+  return scrapeStatus === 'running' && !!scrapeStartedAt
+    && Date.now() - new Date(scrapeStartedAt).getTime() > STALE_RUN_MS;
+}
+
+function lastScrapedLabel(c: Pick<CampaignRow, 'last_scraped_at' | 'scrape_status' | 'scrape_started_at'>): string {
+  if (c.scrape_status === 'running' && !isStaleRun(c.scrape_status, c.scrape_started_at)) {
+    return c.scrape_started_at
+      ? `Scraping since ${new Date(c.scrape_started_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+      : 'Scraping…';
+  }
+  return c.last_scraped_at
+    ? `Last scraped ${new Date(c.last_scraped_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
     : 'Never scraped';
 }
 
 /* ══════════════════════════════════════════════════════════════════ */
-type ScrapeResult = { total_scraped: number; total_with_email: number };
-
-async function runWF0(campaignId: string): Promise<ScrapeResult | null> {
+// WF0 now responds immediately once the scrape is accepted (it can run for
+// 15-30 minutes in the background) — this only confirms acceptance, it
+// never waits on the scrape itself. Actual progress/completion is tracked
+// via scrape_status on the campaigns row (see the polling effect below).
+async function startDiscoverScrape(campaignId: string): Promise<{ ok: boolean; message?: string }> {
   try {
     const res = await fetch('https://n8n.shortyharris.com/webhook/wf0-discover', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ campaign_id: campaignId }),
     });
-    const data = await res.json();
-    if (data.total_scraped != null) {
-      return { total_scraped: data.total_scraped, total_with_email: data.total_with_email ?? 0 };
-    }
-    return null;
+    if (!res.ok) return { ok: false, message: `Scrape service returned ${res.status}` };
+    const data = await res.json().catch(() => ({}));
+    if (data.status === 'started' || data.status === 'limit_reached') return { ok: true };
+    return { ok: false, message: data.message ?? 'Unexpected response from the scrape service' };
   } catch {
-    return null;
+    return { ok: false, message: 'Could not reach the scrape service' };
   }
 }
 
+// How often to re-check scrape_status/last_scraped_at while any campaign is
+// actively scraping — stops the moment none are, rather than polling forever.
+const SCRAPE_POLL_MS = 17000;
+
 export function Campaigns() {
-  const { rows, loading, error, reload, setStatus } = useCampaigns();
+  const { rows, loading, error, reload, setStatus, patchCampaign } = useCampaigns();
   const [showNew, setShowNew]         = useState(false);
   const [editCampaign, setEditCampaign]     = useState<CampaignRow | null>(null);
   const [deleteCampaignTarget, setDeleteCampaignTarget] = useState<CampaignRow | null>(null);
   const [page, setPage]               = useState(1);
-  const [scraping, setScraping]       = useState<Set<string>>(new Set());
-  const [scrapeResults, setScrapeResults] = useState<Record<string, ScrapeResult | 'error'>>({});
 
   async function handleScrape(campaignId: string) {
-    setScraping((prev) => new Set(prev).add(campaignId));
-    const result = await runWF0(campaignId);
-    setScraping((prev) => { const s = new Set(prev); s.delete(campaignId); return s; });
-    setScrapeResults((prev) => ({ ...prev, [campaignId]: result ?? 'error' }));
+    // Optimistic: the backend writes scrape_status='running' synchronously
+    // before it even responds, so reflect that immediately instead of
+    // waiting on the (now-fast, but still real) round trip.
+    patchCampaign(campaignId, {
+      scrape_status: 'running',
+      scrape_started_at: new Date().toISOString(),
+      scrape_error: null,
+    });
+    const result = await startDiscoverScrape(campaignId);
+    if (!result.ok) {
+      // The request itself never got accepted — the backend never had a
+      // chance to flip its own status, so this is the one case the frontend
+      // has to report failure on its own rather than waiting for a poll.
+      patchCampaign(campaignId, { scrape_status: 'failed', scrape_error: result.message ?? 'Failed to start scrape' });
+    }
+    // On success, the poll below picks up real progress/completion.
   }
+
+  // Always-current view of rows for the interval callback below, so it never
+  // closes over a stale list of "which campaigns are running".
+  const rowsRef = useRef(rows);
+  useEffect(() => { rowsRef.current = rows; }, [rows]);
+
+  const anyRunning = rows.some((r) => r.scrape_status === 'running' && !isStaleRun(r.scrape_status, r.scrape_started_at));
+
+  useEffect(() => {
+    if (!anyRunning) return;
+
+    async function tick() {
+      const runningIds = rowsRef.current
+        .filter((r) => r.scrape_status === 'running' && !isStaleRun(r.scrape_status, r.scrape_started_at))
+        .map((r) => r.id);
+      if (runningIds.length === 0) return;
+
+      let snapshots;
+      try {
+        snapshots = await fetchScrapeSnapshots(runningIds);
+      } catch {
+        return; // transient fetch error — just try again on the next tick
+      }
+
+      for (const snap of snapshots) {
+        if (snap.scrape_status === rowsRef.current.find((r) => r.id === snap.id)?.scrape_status
+          && snap.last_scraped_at === rowsRef.current.find((r) => r.id === snap.id)?.last_scraped_at) {
+          continue; // nothing changed for this row — skip the render
+        }
+        patchCampaign(snap.id, {
+          scrape_status: snap.scrape_status,
+          scrape_started_at: snap.scrape_started_at,
+          scrape_error: snap.scrape_error,
+          last_scraped_at: snap.last_scraped_at,
+        });
+        if (snap.scrape_status === 'complete') {
+          fetchProspectCount(snap.id).then((prospectCount) => patchCampaign(snap.id, { prospectCount }));
+        }
+      }
+    }
+
+    tick(); // don't wait a full interval for the first check
+    const id = setInterval(tick, SCRAPE_POLL_MS);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anyRunning]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -214,7 +291,7 @@ export function Campaigns() {
                             ⚠ Needs setup
                           </span>
                         )}
-                        <div className="mt-1 text-[11px] text-[#9a9d92]">{lastScrapedLabel(c.last_scraped_at)}</div>
+                        <div className="mt-1 text-[11px] text-[#9a9d92]">{lastScrapedLabel(c)}</div>
                       </td>
                       <td className="min-w-0 text-[#62655c]">
                         <div className="truncate" title={c.client?.business_name ?? undefined}>{c.client?.business_name ?? '—'}</div>
@@ -233,8 +310,9 @@ export function Campaigns() {
                       </td>
                       <td>
                         <ScrapeCell
-                          isScraping={scraping.has(c.id)}
-                          result={scrapeResults[c.id]}
+                          scrapeStatus={c.scrape_status}
+                          scrapeStartedAt={c.scrape_started_at}
+                          scrapeError={c.scrape_error}
                           onScrape={() => handleScrape(c.id)}
                         />
                       </td>
@@ -293,7 +371,7 @@ export function Campaigns() {
                           </span>
                         </div>
                       )}
-                      <div className="mt-1 text-[11px] text-[#9a9d92]">{lastScrapedLabel(c.last_scraped_at)}</div>
+                      <div className="mt-1 text-[11px] text-[#9a9d92]">{lastScrapedLabel(c)}</div>
                     </div>
                     <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
                       className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
@@ -328,8 +406,9 @@ export function Campaigns() {
                       </button>
                     )}
                     <ScrapeCell
-                      isScraping={scraping.has(c.id)}
-                      result={scrapeResults[c.id]}
+                      scrapeStatus={c.scrape_status}
+                      scrapeStartedAt={c.scrape_started_at}
+                      scrapeError={c.scrape_error}
                       onScrape={() => handleScrape(c.id)}
                     />
                     <button
@@ -394,16 +473,26 @@ export function Campaigns() {
 }
 
 /* ── Scrape cell ───────────────────────────────────────────────────── */
+// States map directly to the campaigns.scrape_status column — there's no
+// client-only "just triggered" state anymore beyond the optimistic patch in
+// handleScrape, and no local "just completed" result payload either (WF0
+// no longer returns scrape counts synchronously — see startDiscoverScrape).
+// 'idle' and 'complete' render identically: a plain Run-scrape affordance,
+// since prospect counts already show in their own table column.
 function ScrapeCell({
-  isScraping,
-  result,
+  scrapeStatus,
+  scrapeStartedAt,
+  scrapeError,
   onScrape,
 }: {
-  isScraping: boolean;
-  result: ScrapeResult | 'error' | undefined;
+  scrapeStatus: string;
+  scrapeStartedAt: string | null;
+  scrapeError: string | null;
   onScrape: () => void;
 }) {
-  if (isScraping) {
+  const stale = isStaleRun(scrapeStatus, scrapeStartedAt);
+
+  if (scrapeStatus === 'running' && !stale) {
     return (
       <span className="inline-flex items-center gap-1.5 text-[12px] text-[#9a9d92]">
         <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#ddd8cb] border-t-[#3c7a5b]" />
@@ -411,19 +500,12 @@ function ScrapeCell({
       </span>
     );
   }
-  if (result && result !== 'error') {
+  if (scrapeStatus === 'failed' || stale) {
     return (
       <div className="flex flex-col gap-0.5">
-        <span className="text-[12px] font-semibold text-[#20211c]">{result.total_scraped.toLocaleString()} scraped</span>
-        <span className="text-[11px] text-[#3c7a5b]">{result.total_with_email.toLocaleString()} with email</span>
-        <button onClick={onScrape} className="mt-0.5 cursor-pointer text-left text-[11px] text-[#9a9d92] underline hover:text-[#62655c]">Re-run</button>
-      </div>
-    );
-  }
-  if (result === 'error') {
-    return (
-      <div className="flex flex-col gap-0.5">
-        <span className="text-[11px] text-[#a8533a]">Scrape failed</span>
+        <span className="text-[11px] text-[#a8533a]" title={stale ? undefined : (scrapeError ?? undefined)}>
+          {stale ? 'Scrape timed out' : 'Scrape failed'}
+        </span>
         <button onClick={onScrape} className="cursor-pointer text-left text-[11px] text-[#9a9d92] underline hover:text-[#62655c]">Retry</button>
       </div>
     );

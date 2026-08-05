@@ -126,6 +126,13 @@ export interface CampaignRow {
   language: string;
   scrape_enabled: boolean;
   last_scraped_at: string | null;
+  // Backend-owned scrape lifecycle (n8n WF0 writes these) — the source of
+  // truth for whether a scrape is currently running, not any client-side
+  // in-memory flag, so a page reload mid-scrape reflects reality instead of
+  // guessing "never scraped"/"failed".
+  scrape_status: string;
+  scrape_started_at: string | null;
+  scrape_error: string | null;
   search_queries: string[];
   target_locations: string[];
   max_results: number;
@@ -140,7 +147,7 @@ export interface CampaignRow {
 async function fetchCampaigns(): Promise<CampaignRow[]> {
   const { data, error } = await supabase
     .from('campaigns')
-    .select(`id, name, description, status, channel, language, scrape_enabled, last_scraped_at, search_queries, target_locations, max_results, created_at, client:clients ( business_name ), creator:profiles ( role )`)
+    .select(`id, name, description, status, channel, language, scrape_enabled, last_scraped_at, scrape_status, scrape_started_at, scrape_error, search_queries, target_locations, max_results, created_at, client:clients ( business_name ), creator:profiles ( role )`)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -157,6 +164,9 @@ async function fetchCampaigns(): Promise<CampaignRow[]> {
       language: (r.language as string | null) ?? 'English',
       scrape_enabled: r.scrape_enabled,
       last_scraped_at: r.last_scraped_at,
+      scrape_status: (r.scrape_status as string | null) ?? 'idle',
+      scrape_started_at: (r.scrape_started_at as string | null) ?? null,
+      scrape_error: (r.scrape_error as string | null) ?? null,
       search_queries: (r.search_queries as string[] | null) ?? [],
       target_locations: (r.target_locations as string[] | null) ?? [],
       max_results: (r.max_results as number | null) ?? 50,
@@ -199,13 +209,56 @@ export function useCampaigns() {
     }
   }, []);
 
+  // Cache-only patch, no DB write for the scrape_status/scrape_started_at
+  // fields — that write happens server-side (n8n WF0, synchronously before
+  // it responds). Used both for the initial optimistic update and to apply
+  // results from the targeted scrape-status poll below.
+  const patchCampaign = useCallback((id: string, patch: Partial<CampaignRow>) => {
+    queryClient.setQueryData<CampaignRow[]>(QK.campaigns, (prev = []) =>
+      prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    );
+  }, []);
+
   return {
     rows,
     loading,
     error: (error as Error)?.message ?? null,
     reload: () => queryClient.invalidateQueries({ queryKey: QK.campaigns }),
     setStatus,
+    patchCampaign,
   };
+}
+
+// Direct, targeted read for scrape-status polling — deliberately not routed
+// through invalidateQueries()/the cached useQuery: that depends on "is this
+// query currently active" refetch semantics, and in practice a poll tick
+// wasn't reliably resolving into fresh rows, so this is a plain point-in-time
+// Supabase read for exactly the campaigns being watched, no cache/staleTime
+// ambiguity involved at all.
+export interface ScrapeSnapshot {
+  id: string;
+  scrape_status: string;
+  scrape_started_at: string | null;
+  scrape_error: string | null;
+  last_scraped_at: string | null;
+}
+
+export async function fetchScrapeSnapshots(ids: string[]): Promise<ScrapeSnapshot[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from('campaigns')
+    .select('id, scrape_status, scrape_started_at, scrape_error, last_scraped_at')
+    .in('id', ids);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ScrapeSnapshot[];
+}
+
+export async function fetchProspectCount(campaignId: string): Promise<number> {
+  const { count } = await supabase
+    .from('prospects')
+    .select('id', { count: 'exact', head: true })
+    .eq('campaign_id', campaignId);
+  return count ?? 0;
 }
 
 export interface NewCampaignInput {
