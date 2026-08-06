@@ -49,7 +49,13 @@ export function useRealtimeSync() {
         queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published });
       })
 
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          // Surfaces silent realtime failures (e.g. a table missing from the
+          // supabase_realtime publication) instead of just "reload fixes it".
+          console.error('[admin-realtime-sync] subscription failed:', status, err);
+        }
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, []);

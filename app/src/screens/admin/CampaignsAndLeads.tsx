@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Plus } from 'lucide-react';
+import { ChevronRight, Plus, Info } from 'lucide-react';
 import {
   useCampaigns, useAdminHotLeads, useClientsList,
   createCampaign, updateCampaign, getCampaignDeleteCounts, deleteCampaign,
   fetchScrapeSnapshots, fetchProspectCount,
 } from '../../hooks/useAdminData';
-import type { AdminHotLead, CampaignRow, CampaignDeleteCounts } from '../../hooks/useAdminData';
+import type { AdminHotLead, CampaignRow, CampaignDeleteCounts, ScrapeSummary } from '../../hooks/useAdminData';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
@@ -124,6 +124,113 @@ function lastScrapedLabel(c: Pick<CampaignRow, 'last_scraped_at' | 'scrape_statu
     : 'Never scraped';
 }
 
+// Turns the last scrape's result breakdown into a one-line summary, so
+// "nothing new because it was all duplicates" reads differently from
+// "nothing new because the scrape came up empty" — both are successful
+// outcomes (tone: 'neutral'), distinct from an actual scrape failure, which
+// ScrapeCell already renders separately in red with a retry affordance.
+function scrapeSummaryLabel(
+  c: Pick<CampaignRow, 'scrape_status' | 'last_scrape_summary' | 'prospectCount'>,
+): { text: string; tone: 'positive' | 'neutral' } {
+  const s = c.last_scrape_summary;
+  if (c.scrape_status !== 'complete' || !s) {
+    return { text: `${c.prospectCount} prospect${c.prospectCount === 1 ? '' : 's'}`, tone: 'neutral' };
+  }
+  if (s.new_prospects > 0) {
+    return { text: `${s.new_prospects} new prospect${s.new_prospects === 1 ? '' : 's'} added`, tone: 'positive' };
+  }
+  if (s.total_with_email === 0) {
+    return { text: 'No results found for this search', tone: 'neutral' };
+  }
+  if (s.skipped_duplicate === s.total_with_email) {
+    return { text: `0 new — all ${s.skipped_duplicate} already in your database`, tone: 'neutral' };
+  }
+  if (s.skipped_dnc === s.total_with_email) {
+    return { text: '0 new — all matched your do-not-contact list', tone: 'neutral' };
+  }
+  return { text: `0 new — ${s.skipped_duplicate} already known, ${s.skipped_dnc} on do-not-contact list`, tone: 'neutral' };
+}
+
+// Short version for tight table/card space — the full sentence from
+// scrapeSummaryLabel goes in ScrapeSummaryModal instead of being truncated.
+function scrapeChipLabel(c: Pick<CampaignRow, 'scrape_status' | 'last_scrape_summary' | 'prospectCount'>): string {
+  const s = c.last_scrape_summary;
+  if (c.scrape_status !== 'complete' || !s) {
+    return `${c.prospectCount} prospect${c.prospectCount === 1 ? '' : 's'}`;
+  }
+  if (s.new_prospects > 0) return `+${s.new_prospects} new`;
+  if (s.total_with_email === 0) return 'No results';
+  if (s.skipped_duplicate === s.total_with_email) return '0 new · dupes';
+  if (s.skipped_dnc === s.total_with_email) return '0 new · DNC';
+  return '0 new · skipped';
+}
+
+// Compact chip shown in the table/card — tappable when there's a full
+// breakdown behind it, so the one-line summary never has to be truncated
+// to fit a narrow column; the detail lives in ScrapeSummaryModal instead.
+function ScrapeResultChip({ campaign, onOpenDetail }: { campaign: CampaignRow; onOpenDetail: () => void }) {
+  const sr = scrapeSummaryLabel(campaign);
+  const hasDetail = campaign.scrape_status === 'complete' && !!campaign.last_scrape_summary;
+  const toneCls = sr.tone === 'positive' ? 'bg-[#edf4ef] text-[#3c7a5b]' : 'bg-[#f5f2ec] text-[#62655c]';
+  if (!hasDetail) {
+    return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${toneCls}`}>{scrapeChipLabel(campaign)}</span>;
+  }
+  return (
+    <button
+      onClick={onOpenDetail}
+      title="View full scrape breakdown"
+      className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-semibold transition-opacity hover:opacity-75 ${toneCls}`}
+    >
+      {scrapeChipLabel(campaign)}
+      <Info size={11} strokeWidth={2.5} className="opacity-60" />
+    </button>
+  );
+}
+
+/* ── Scrape result detail modal ───────────────────────────────────── */
+function ScrapeSummaryModal({ campaign, onClose }: { campaign: CampaignRow; onClose: () => void }) {
+  const sr = scrapeSummaryLabel(campaign);
+  const s  = campaign.last_scrape_summary;
+  const rows = s ? [
+    ['Businesses scraped', s.total_scraped],
+    ['With a usable email', s.total_with_email],
+    ['Already in your database', s.skipped_duplicate],
+    ['On do-not-contact list', s.skipped_dnc],
+    ['New prospects added', s.new_prospects],
+  ] as const : [];
+
+  return (
+    <CampModalShell onClose={onClose}>
+      <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
+        <h2 className="m-0 text-[16px] font-bold text-[#20211c]">Scrape results</h2>
+        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+        <div>
+          <p className="m-0 truncate text-[13px] text-[#9a9d92]" title={campaign.name}>{campaign.name}</p>
+          <p className={`m-0 mt-1 text-[15px] font-semibold ${sr.tone === 'positive' ? 'text-[#3c7a5b]' : 'text-[#20211c]'}`}>{sr.text}</p>
+        </div>
+        {rows.length > 0 && (
+          <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-3.5 border-t border-[#f0ede6] pt-4">
+            {rows.map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">{label}</dt>
+                <dd className="m-0 mt-0.5 text-[17px] font-bold text-[#20211c]">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        <p className="m-0 text-[11px] text-[#9a9d92]">{lastScrapedLabel(campaign)}</p>
+      </div>
+      <div className="shrink-0 border-t border-[#ece8df] px-5 py-4">
+        <button onClick={onClose} className="w-full cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#2d5e46]">
+          Close
+        </button>
+      </div>
+    </CampModalShell>
+  );
+}
+
 /* ══════════════════════════════════════════════════════════════════ */
 // WF0 now responds immediately once the scrape is accepted (it can run for
 // 15-30 minutes in the background) — this only confirms acceptance, it
@@ -154,6 +261,7 @@ export function Campaigns() {
   const [showNew, setShowNew]         = useState(false);
   const [editCampaign, setEditCampaign]     = useState<CampaignRow | null>(null);
   const [deleteCampaignTarget, setDeleteCampaignTarget] = useState<CampaignRow | null>(null);
+  const [scrapeDetailCampaign, setScrapeDetailCampaign] = useState<CampaignRow | null>(null);
   const [page, setPage]               = useState(1);
 
   async function handleScrape(campaignId: string) {
@@ -208,6 +316,7 @@ export function Campaigns() {
           scrape_started_at: snap.scrape_started_at,
           scrape_error: snap.scrape_error,
           last_scraped_at: snap.last_scraped_at,
+          last_scrape_summary: snap.last_scrape_summary,
         });
         if (snap.scrape_status === 'complete') {
           fetchProspectCount(snap.id).then((prospectCount) => patchCampaign(snap.id, { prospectCount }));
@@ -255,12 +364,12 @@ export function Campaigns() {
           <div className="atbl hidden md:block">
             <table className="table-fixed">
               <colgroup>
-                <col className="w-[26%]" />
+                <col className="w-[22%]" />
                 <col className="w-[16%]" />
                 <col className="w-[8%]" />
-                <col className="w-[9%]" />
                 <col className="w-[8%]" />
-                <col className="w-[9%]" />
+                <col className="w-[13%]" />
+                <col className="w-[8%]" />
                 <col className="w-[9%]" />
                 <col className="w-[8%]" />
               </colgroup>
@@ -280,7 +389,7 @@ export function Campaigns() {
                   return (
                     <tr key={c.id}>
                       <td className="min-w-0">
-                        <div className="truncate font-bold text-[#20211c]" title={c.name}>{c.name}</div>
+                        <div className="line-clamp-2 font-bold leading-snug text-[#20211c]" title={c.name}>{c.name}</div>
                         {c.needsReview && (
                           <span className="atbl-pill mt-1" style={{ background: '#f0ecf8', color: '#6b4fa0' }}>
                             🔔 Awaiting approval
@@ -302,7 +411,9 @@ export function Campaigns() {
                       <td className="min-w-0 text-[#62655c]">
                         <div className="truncate" title={c.language}>{c.language}</div>
                       </td>
-                      <td className="text-[#62655c]">{c.prospectCount}</td>
+                      <td className="min-w-0">
+                        <ScrapeResultChip campaign={c} onOpenDetail={() => setScrapeDetailCampaign(c)} />
+                      </td>
                       <td>
                         <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
                           {c.status}
@@ -356,7 +467,7 @@ export function Campaigns() {
                 <div key={c.id} className="rounded-xl border border-[#ece8df] bg-white p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <span className="block truncate font-bold text-[#20211c] text-[14px]" title={c.name}>{c.name}</span>
+                      <span className="line-clamp-2 block font-bold leading-snug text-[#20211c] text-[14px]" title={c.name}>{c.name}</span>
                       {c.needsReview && (
                         <div className="mt-1">
                           <span className="inline-flex items-center gap-1 rounded-full bg-[#f0ecf8] px-2 py-0.5 text-[10.5px] font-bold text-[#6b4fa0]">
@@ -381,7 +492,9 @@ export function Campaigns() {
                   <p className="mt-1.5 text-[12px] text-[#62655c]">
                     {c.client?.business_name ?? '—'} · {c.channel} · {c.language}
                   </p>
-                  <p className="mt-0.5 text-[12px] text-[#9a9d92]">{c.prospectCount} prospects</p>
+                  <div className="mt-1.5">
+                    <ScrapeResultChip campaign={c} onOpenDetail={() => setScrapeDetailCampaign(c)} />
+                  </div>
                   <div className="border-t border-[#f5f2ec] pt-3 mt-2 flex flex-wrap items-center gap-2">
                     {c.needsReview && (
                       <button
@@ -465,6 +578,13 @@ export function Campaigns() {
             campaign={deleteCampaignTarget}
             onClose={() => setDeleteCampaignTarget(null)}
             onDeleted={() => { setDeleteCampaignTarget(null); reload(); }}
+          />
+        )}
+        {scrapeDetailCampaign && (
+          <ScrapeSummaryModal
+            key={`scrape-detail-${scrapeDetailCampaign.id}`}
+            campaign={scrapeDetailCampaign}
+            onClose={() => setScrapeDetailCampaign(null)}
           />
         )}
       </AnimatePresence>

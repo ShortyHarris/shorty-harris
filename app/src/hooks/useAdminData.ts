@@ -117,6 +117,19 @@ export async function deleteProspect(prospectId: string): Promise<{ error: strin
 }
 
 // ─── Campaigns ───────────────────────────────────────────────────────────────
+// Written once at the end of every scrape (fresh or resumed) — lets the UI
+// distinguish "found nothing new because everything was a duplicate" from
+// "found nothing new because the search genuinely came up empty" from an
+// actual failure, instead of showing an identical bare prospect count for
+// all three.
+export interface ScrapeSummary {
+  total_scraped: number;
+  total_with_email: number;
+  skipped_dnc: number;
+  skipped_duplicate: number;
+  new_prospects: number;
+}
+
 export interface CampaignRow {
   id: string;
   name: string;
@@ -133,6 +146,7 @@ export interface CampaignRow {
   scrape_status: string;
   scrape_started_at: string | null;
   scrape_error: string | null;
+  last_scrape_summary: ScrapeSummary | null;
   search_queries: string[];
   target_locations: string[];
   max_results: number;
@@ -147,7 +161,7 @@ export interface CampaignRow {
 async function fetchCampaigns(): Promise<CampaignRow[]> {
   const { data, error } = await supabase
     .from('campaigns')
-    .select(`id, name, description, status, channel, language, scrape_enabled, last_scraped_at, scrape_status, scrape_started_at, scrape_error, search_queries, target_locations, max_results, created_at, client:clients ( business_name ), creator:profiles ( role )`)
+    .select(`id, name, description, status, channel, language, scrape_enabled, last_scraped_at, scrape_status, scrape_started_at, scrape_error, last_scrape_summary, search_queries, target_locations, max_results, created_at, client:clients ( business_name ), creator:profiles ( role )`)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -167,6 +181,7 @@ async function fetchCampaigns(): Promise<CampaignRow[]> {
       scrape_status: (r.scrape_status as string | null) ?? 'idle',
       scrape_started_at: (r.scrape_started_at as string | null) ?? null,
       scrape_error: (r.scrape_error as string | null) ?? null,
+      last_scrape_summary: (r.last_scrape_summary as ScrapeSummary | null) ?? null,
       search_queries: (r.search_queries as string[] | null) ?? [],
       target_locations: (r.target_locations as string[] | null) ?? [],
       max_results: (r.max_results as number | null) ?? 50,
@@ -241,13 +256,14 @@ export interface ScrapeSnapshot {
   scrape_started_at: string | null;
   scrape_error: string | null;
   last_scraped_at: string | null;
+  last_scrape_summary: ScrapeSummary | null;
 }
 
 export async function fetchScrapeSnapshots(ids: string[]): Promise<ScrapeSnapshot[]> {
   if (ids.length === 0) return [];
   const { data, error } = await supabase
     .from('campaigns')
-    .select('id, scrape_status, scrape_started_at, scrape_error, last_scraped_at')
+    .select('id, scrape_status, scrape_started_at, scrape_error, last_scraped_at, last_scrape_summary')
     .in('id', ids);
   if (error) throw new Error(error.message);
   return (data ?? []) as ScrapeSnapshot[];
