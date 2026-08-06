@@ -6,7 +6,7 @@ import {
   createCampaign, updateCampaign, getCampaignDeleteCounts, deleteCampaign,
   fetchScrapeSnapshots, fetchProspectCount,
 } from '../../hooks/useAdminData';
-import type { AdminHotLead, CampaignRow, CampaignDeleteCounts, ScrapeSummary } from '../../hooks/useAdminData';
+import type { AdminHotLead, CampaignRow, CampaignDeleteCounts } from '../../hooks/useAdminData';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
@@ -264,7 +264,17 @@ export function Campaigns() {
   const [scrapeDetailCampaign, setScrapeDetailCampaign] = useState<CampaignRow | null>(null);
   const [page, setPage]               = useState(1);
 
+  // Campaign IDs whose start-scrape request is still in flight. The poll
+  // below must not touch these: it reads straight from the DB, and the
+  // backend only writes scrape_status='running' once the request lands —
+  // a poll landing in the gap between the optimistic patch (below) and that
+  // write would read the stale pre-click row and stomp the optimistic
+  // 'running' state right back to idle/complete, flickering the button back
+  // and inviting a second click that fires a duplicate scrape.
+  const pendingStartRef = useRef<Set<string>>(new Set());
+
   async function handleScrape(campaignId: string) {
+    pendingStartRef.current.add(campaignId);
     // Optimistic: the backend writes scrape_status='running' synchronously
     // before it even responds, so reflect that immediately instead of
     // waiting on the (now-fast, but still real) round trip.
@@ -273,14 +283,18 @@ export function Campaigns() {
       scrape_started_at: new Date().toISOString(),
       scrape_error: null,
     });
-    const result = await startDiscoverScrape(campaignId);
-    if (!result.ok) {
-      // The request itself never got accepted — the backend never had a
-      // chance to flip its own status, so this is the one case the frontend
-      // has to report failure on its own rather than waiting for a poll.
-      patchCampaign(campaignId, { scrape_status: 'failed', scrape_error: result.message ?? 'Failed to start scrape' });
+    try {
+      const result = await startDiscoverScrape(campaignId);
+      if (!result.ok) {
+        // The request itself never got accepted — the backend never had a
+        // chance to flip its own status, so this is the one case the frontend
+        // has to report failure on its own rather than waiting for a poll.
+        patchCampaign(campaignId, { scrape_status: 'failed', scrape_error: result.message ?? 'Failed to start scrape' });
+      }
+      // On success, the poll below picks up real progress/completion.
+    } finally {
+      pendingStartRef.current.delete(campaignId);
     }
-    // On success, the poll below picks up real progress/completion.
   }
 
   // Always-current view of rows for the interval callback below, so it never
@@ -295,7 +309,7 @@ export function Campaigns() {
 
     async function tick() {
       const runningIds = rowsRef.current
-        .filter((r) => r.scrape_status === 'running' && !isStaleRun(r.scrape_status, r.scrape_started_at))
+        .filter((r) => r.scrape_status === 'running' && !isStaleRun(r.scrape_status, r.scrape_started_at) && !pendingStartRef.current.has(r.id))
         .map((r) => r.id);
       if (runningIds.length === 0) return;
 
