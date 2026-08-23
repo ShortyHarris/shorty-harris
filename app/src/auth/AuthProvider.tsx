@@ -81,9 +81,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setProfile(null);
-    loadedProfileId.current = null;
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      // Swallow failures (e.g. Navigator LockManager timeouts or a failed
+      // revoke request) — we still want to clear local state below so the
+      // user is signed out on this device even if the server call hung.
+      console.error('Sign out request failed', err);
+    } finally {
+      setSession(null);
+      setProfile(null);
+      loadedProfileId.current = null;
+    }
   };
 
   const resetPassword = async (email: string) => {
