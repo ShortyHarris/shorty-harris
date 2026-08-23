@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import {
   useClientCampaignList, createClientCampaign, updateClientCampaign,
   getClientCampaignDeleteCounts, deleteClientCampaign, useClientCampaignProspects, useClientUsage,
+  useClientLaunchUsage, MONTHLY_LAUNCH_LIMIT,
 } from '../../hooks/useClientCampaigns';
 import type { ClientCampaignRow, ClientCampaignDeleteCounts } from '../../hooks/useClientCampaigns';
 import { queryClient } from '../../lib/queryClient';
@@ -65,6 +66,7 @@ const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#3c
 export function Campaigns({ clientId }: { clientId: string }) {
   const { rows, loading, error, reload } = useClientCampaignList(clientId);
   const { usage } = useClientUsage(clientId);
+  const { usage: launchUsage } = useClientLaunchUsage(clientId);
   const { toasts, toast, dismiss } = useToast();
   const [showNew, setShowNew] = useState(false);
   const [openCampaign, setOpenCampaign] = useState<ClientCampaignRow | null>(null);
@@ -73,6 +75,13 @@ export function Campaigns({ clientId }: { clientId: string }) {
   // were created) are never touched here — this only gates creating new ones.
   const atLimit = usage !== null && usage.campaigns_remaining <= 0;
   const limitTitle = usage ? `You've used ${usage.campaign_count} of ${usage.max_campaigns} campaign slots. Contact us to increase your limit.` : undefined;
+
+  const launchesUsed = launchUsage?.launch_count ?? 0;
+  const atLaunchLimit = launchesUsed >= MONTHLY_LAUNCH_LIMIT;
+  const launchLimitTitle = `You've used ${launchesUsed} of ${MONTHLY_LAUNCH_LIMIT} launches this month. Contact us to increase your limit.`;
+
+  const newCampaignDisabled = atLimit || atLaunchLimit;
+  const newCampaignTitle = atLaunchLimit ? launchLimitTitle : (atLimit ? limitTitle : undefined);
 
   return (
     <div style={FONT} className="flex flex-col gap-6 content">
@@ -85,12 +94,15 @@ export function Campaigns({ clientId }: { clientId: string }) {
           <p className="m-0 mt-1 text-[13px] text-[#62655c]">{rows.length} campaign{rows.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex items-center gap-2 md:gap-2.5 shrink-0">
+          <span className="text-[12px] font-semibold text-[#62655c]" title={launchLimitTitle}>
+            {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used
+          </span>
           <HelpButton content={HELP} />
           <button onClick={reload} className={ghostCls}>Refresh</button>
           <button
             onClick={() => setShowNew(true)}
-            disabled={atLimit}
-            title={atLimit ? limitTitle : undefined}
+            disabled={newCampaignDisabled}
+            title={newCampaignTitle}
             className={`${primaryCls} hidden md:inline-flex`}
             data-tour="new-campaign-btn"
           >
@@ -98,6 +110,17 @@ export function Campaigns({ clientId }: { clientId: string }) {
           </button>
         </div>
       </header>
+
+      {atLaunchLimit && (
+        <div className="flex items-start gap-3 rounded-xl border border-[#e8d5a8] bg-[#f8efdb] px-4 py-3.5">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f0dfb8]">
+            <TriangleAlert size={15} strokeWidth={2.2} className="text-[#8a6417]" />
+          </span>
+          <p className="m-0 pt-0.5 text-[13px] leading-snug text-[#8a6417]">
+            <strong className="font-bold">Launch limit reached</strong> — you've used {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches this month. Contact us to increase it before creating another campaign.
+          </p>
+        </div>
+      )}
 
       {atLimit && (
         <div className="flex items-start gap-3 rounded-xl border border-[#e8d5a8] bg-[#f8efdb] px-4 py-3.5">
@@ -122,8 +145,8 @@ export function Campaigns({ clientId }: { clientId: string }) {
           <span className="text-[13px] text-[#62655c]">Create your first campaign to tell us who to target.</span>
           <button
             onClick={() => setShowNew(true)}
-            disabled={atLimit}
-            title={atLimit ? limitTitle : undefined}
+            disabled={newCampaignDisabled}
+            title={newCampaignTitle}
             className={`${primaryCls} mt-2`}
           >
             + New campaign
@@ -208,8 +231,8 @@ export function Campaigns({ clientId }: { clientId: string }) {
       {/* Mobile FAB */}
       <button
         onClick={() => setShowNew(true)}
-        disabled={atLimit}
-        title={atLimit ? limitTitle : undefined}
+        disabled={newCampaignDisabled}
+        title={newCampaignTitle}
         className="fixed bottom-24 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-[#3c7a5b] text-white shadow-[0_6px_24px_rgba(60,122,91,0.4)] transition-colors hover:bg-[#2d5e46] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label="New campaign"
         data-tour="new-campaign-btn"
@@ -222,6 +245,8 @@ export function Campaigns({ clientId }: { clientId: string }) {
           <NewCampaignModal
             key="new-campaign-modal"
             clientId={clientId}
+            atLaunchLimit={atLaunchLimit}
+            launchLimitTitle={launchLimitTitle}
             onClose={() => setShowNew(false)}
             onCreated={(autoApproved) => {
               setShowNew(false); reload();
@@ -266,8 +291,14 @@ export function Campaigns({ clientId }: { clientId: string }) {
 const STEP_LABELS = ['Basics', 'Who to target', 'Details', 'Review'];
 
 function NewCampaignModal({
-  clientId, onClose, onCreated,
-}: { clientId: string; onClose: () => void; onCreated: (autoApproved: boolean) => void }) {
+  clientId, atLaunchLimit, launchLimitTitle, onClose, onCreated,
+}: {
+  clientId: string;
+  atLaunchLimit: boolean;
+  launchLimitTitle: string;
+  onClose: () => void;
+  onCreated: (autoApproved: boolean) => void;
+}) {
   const { profile } = useAuth();
   const [step, setStep]             = useState(0);
   const [name, setName]             = useState('');
@@ -451,6 +482,9 @@ function NewCampaignModal({
             </div>
           )}
 
+          {atLaunchLimit && step === STEP_LABELS.length - 1 && (
+            <div className="rounded-xl border border-[#e8d5a8] bg-[#f8efdb] px-4 py-3 text-[13px] text-[#8a6417]">{launchLimitTitle}</div>
+          )}
           {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
         </div>
 
@@ -464,7 +498,7 @@ function NewCampaignModal({
           {step < STEP_LABELS.length - 1 ? (
             <button onClick={goNext} className={primaryCls}>Next</button>
           ) : (
-            <button onClick={submit} disabled={busy} className={primaryCls}>
+            <button onClick={submit} disabled={busy || atLaunchLimit} title={atLaunchLimit ? launchLimitTitle : undefined} className={primaryCls}>
               {busy ? 'Creating…' : 'Create Campaign'}
             </button>
           )}

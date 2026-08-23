@@ -211,3 +211,35 @@ export function useClientUsage(clientId: string) {
 
   return { usage };
 }
+
+export const MONTHLY_LAUNCH_LIMIT = 5;
+
+export interface ClientLaunchUsage {
+  month: string;
+  launch_count: number;
+}
+
+function currentMonthKey(): string {
+  return new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+}
+
+export function useClientLaunchUsage(clientId: string) {
+  const month = currentMonthKey();
+  const { data: usage = null } = useQuery({
+    queryKey: ['client-launch-usage', clientId, month] as const,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('monthly_launch_usage')
+        .select('month, launch_count')
+        .eq('client_id', clientId)
+        .eq('month', month)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return (data as ClientLaunchUsage | null) ?? { month, launch_count: 0 };
+    },
+    enabled: !!clientId,
+    staleTime: 60 * 1000,
+  });
+
+  return { usage };
+}
