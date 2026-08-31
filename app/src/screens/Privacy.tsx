@@ -15,7 +15,7 @@ const SECTIONS: LegalSection[] = [
       'Prospect data: publicly available business information (business name, category, location, contact details) that our Service gathers on a Client\'s behalf in order to run outreach campaigns.',
       'Outreach content: the messages our Service drafts and sends, and any replies received, so that Clients can review, approve, and act on them.',
       'Payment information: processed directly by Stripe, our payment processor. We do not store full card numbers on our own servers.',
-      'Usage data: pages visited and general interaction data via Google Analytics, used to understand and improve the Service.',
+      'Usage data: pages visited and general interaction data via Google Analytics (all visitors, with consent) and Smartlook session recording (signed-in Clients only, with consent), used to understand and improve the Service. See our Cookie Policy for details and how to change your choice.',
     ],
   },
   {

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, CheckCircle2, AlertTriangle, LogOut, BarChart3, ChevronRight, Lock, Building2, BookOpen, Compass } from 'lucide-react';
+import { Mail, CheckCircle2, AlertTriangle, LogOut, BarChart3, ChevronRight, Lock, Building2, BookOpen, Compass, ShieldCheck } from 'lucide-react';
+import { openConsentPreferences } from '../../lib/consent';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
 import { useClientProfile, type ClientProfile, type UpdateClientProfileInput } from '../../hooks/useClientProfile';
 import { useAuth } from '../../auth/AuthProvider';
@@ -494,6 +495,22 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
       </div>
       <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
         <PasswordSection />
+
+        <div className="border-t" style={{ borderColor: 'var(--line)' }} />
+
+        <button
+          onClick={openConsentPreferences}
+          className="flex w-full cursor-pointer items-center gap-3 p-5 text-left transition-colors hover:bg-(--bg)"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: 'var(--leaf-tint)' }}>
+            <ShieldCheck size={16} style={{ color: 'var(--leaf)' }} />
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-[15px] font-bold" style={{ color: 'var(--ink)' }}>Privacy &amp; cookie settings</span>
+            <span className="block text-[13px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>Control analytics and session-recording cookies for this dashboard.</span>
+          </span>
+          <ChevronRight size={16} style={{ color: 'var(--ink-faint)' }} />
+        </button>
 
         <div className="border-t" style={{ borderColor: 'var(--line)' }} />
 

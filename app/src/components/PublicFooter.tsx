@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { openConsentPreferences } from '../lib/consent';
 
 // Shared footer for every public-facing page (Home, Blog, BlogPost, …).
 // "How it works" / "Results" link back to the home page's sections (with a
@@ -7,7 +8,7 @@ import { Link } from 'react-router-dom';
 
 const FOOT_LINKS = [
   { title: "Product", links: [["How it works", "/#how"], ["Results", "/#results"]] as const },
-  { title: "Company", links: [["Blog", "/blog"], ["Privacy", "/privacy"], ["Terms", "/terms"]] as const },
+  { title: "Company", links: [["Blog", "/blog"], ["Privacy", "/privacy"], ["Terms", "/terms"], ["Cookies", "/cookies"]] as const },
 ];
 
 export function PublicFooter() {
@@ -36,9 +37,18 @@ export function PublicFooter() {
       </div>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-t border-[#e5ddd3] pt-6 text-[13px] text-[#6b6e65]">
         <span>© {new Date().getFullYear()} Shorty Harris. All rights reserved.</span>
-        <Link to="/login" className="text-[13px] text-[#54574e] no-underline font-semibold hover:text-[#3c7a5b] transition-colors">
-          Sign in
-        </Link>
+        <div className="flex items-center gap-5">
+          <button
+            type="button"
+            onClick={openConsentPreferences}
+            className="text-[13px] text-[#54574e] no-underline font-semibold hover:text-[#3c7a5b] transition-colors bg-transparent border-0 p-0 cursor-pointer"
+          >
+            Cookie settings
+          </button>
+          <Link to="/login" className="text-[13px] text-[#54574e] no-underline font-semibold hover:text-[#3c7a5b] transition-colors">
+            Sign in
+          </Link>
+        </div>
       </div>
     </footer>
   );

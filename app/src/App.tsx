@@ -11,6 +11,8 @@ import { useClientRealtimeSync } from './hooks/useClientRealtimeSync';
 import { TourProvider } from './tour/TourProvider';
 import { initSmartlook, identifySmartlookUser } from './lib/smartlook';
 import { queryClient } from './lib/queryClient';
+import { getConsent, onConsentChange, applyStoredConsent } from './lib/consent';
+import { CookieConsent } from './components/CookieConsent';
 import './styles/theme-admin.css';
 import './styles/theme-client.css';
 import { Home } from './screens/Home';
@@ -18,6 +20,7 @@ import { Blog } from './screens/Blog';
 import { BlogPost } from './screens/BlogPost';
 import { Privacy } from './screens/Privacy';
 import { Terms } from './screens/Terms';
+import { Cookies } from './screens/Cookies';
 
 // Everything below is gated behind auth (or is an auth screen itself) — lazy
 // loading it keeps the public marketing/blog pages from shipping the admin
@@ -96,13 +99,20 @@ function ClientZone() {
   useClientRealtimeSync(clientId);
 
   // Client dashboard only, per the plan — not admin, not the public site.
+  // Gated on analytics consent, same as Google Analytics; also re-checked if
+  // the visitor grants consent later via the cookie preferences banner.
   useEffect(() => {
-    initSmartlook();
-    identifySmartlookUser(profile!.id, {
-      name: profile!.full_name,
-      role: profile!.role,
-      client_id: clientId,
-    });
+    function startIfConsented() {
+      if (!getConsent().analytics) return;
+      initSmartlook();
+      identifySmartlookUser(profile!.id, {
+        name: profile!.full_name,
+        role: profile!.role,
+        client_id: clientId,
+      });
+    }
+    startIfConsented();
+    return onConsentChange(startIfConsented);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile!.id]);
 
@@ -234,6 +244,7 @@ function AppRoutes() {
       <Route path="/blog/:slug" element={<BlogPost />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
+      <Route path="/cookies" element={<Cookies />} />
 
       <Route path="/__preview-dashboard" element={
         <div className="theme-client">
@@ -297,12 +308,17 @@ function ScrollToTop() {
 }
 
 export default function App() {
+  useEffect(() => {
+    applyStoredConsent();
+  }, []);
+
   return (
     <BrowserRouter>
       <ScrollToTop />
       <Suspense fallback={<Spinner />}>
         <AppRoutes />
       </Suspense>
+      <CookieConsent />
     </BrowserRouter>
   );
 }
