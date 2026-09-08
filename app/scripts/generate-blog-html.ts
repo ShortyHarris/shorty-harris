@@ -85,6 +85,21 @@ function initials(name: string): string {
   return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
 }
 
+// Slugs that are still live in `blog_posts` (so /blog/:slug keeps resolving
+// the post rather than 404ing) but that have a redirect pointing away from
+// them (see vercel.json) and must therefore never be re-surfaced by the
+// sitemap or get their own static HTML generated — both would just point
+// crawlers straight back at a URL that immediately redirects.
+//
+// This is a hardcoded exclusion list rather than a new `blog_posts.status`
+// value (e.g. 'redirected') on purpose: the status enum is defined outside
+// this repo (Supabase) and adding a value there is a schema migration that
+// also has to be taught to every other status-aware query in the codebase
+// (useBlogPosts.ts, the admin approval queue, etc). A slug list here is a
+// zero-schema-change fix; revisit as a real status if this list grows past
+// a handful of entries.
+const REDIRECTED_SLUGS = new Set(['simple-weekly-cash-flow-habits-small-business']);
+
 async function fetchPosts(slugFilter?: string): Promise<BlogPostRow[]> {
   let q = supabase
     .from('blog_posts')
@@ -93,7 +108,7 @@ async function fetchPosts(slugFilter?: string): Promise<BlogPostRow[]> {
   if (slugFilter) q = q.eq('slug', slugFilter);
   const { data, error } = await q;
   if (error) throw new Error(`Failed to fetch blog posts: ${error.message}`);
-  return (data ?? []) as BlogPostRow[];
+  return ((data ?? []) as BlogPostRow[]).filter((p) => !REDIRECTED_SLUGS.has(p.slug));
 }
 
 // Matches a <meta ...> tag by one of its attributes regardless of attribute
@@ -207,7 +222,7 @@ function buildHtml(template: string, post: BlogPostRow): string {
   return html;
 }
 
-const STATIC_ROUTES = ['/', '/blog', '/privacy', '/terms'];
+const STATIC_ROUTES = ['/', '/blog', '/privacy', '/terms', '/cookies'];
 
 // The sitemap always reflects every published post, regardless of whether
 // this run was scoped to a single --slug for HTML generation — a partial

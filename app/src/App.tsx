@@ -21,6 +21,7 @@ import { BlogPost } from './screens/BlogPost';
 import { Privacy } from './screens/Privacy';
 import { Terms } from './screens/Terms';
 import { Cookies } from './screens/Cookies';
+import { NotFound } from './screens/NotFound';
 
 // Everything below is gated behind auth (or is an auth screen itself) — lazy
 // loading it keeps the public marketing/blog pages from shipping the admin
@@ -289,7 +290,7 @@ function AppRoutes() {
         }
       />
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
