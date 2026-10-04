@@ -57,8 +57,8 @@ async function fetchPosts(status: BlogStatus | BlogStatus[]): Promise<BlogPost[]
   })) as BlogPost[];
 }
 
-// blog_link_graph rows get written as soon as WF12 plans the interlinks —
-// before the source post is even approved — so this is queried independently
+// blog_link_graph rows get written as soon as WF12 plans the interlinks -
+// before the source post is even approved - so this is queried independently
 // of post status, matching what the dashboard needs to preview at review time.
 export async function fetchLinkedPosts(postId: string): Promise<LinkedPost[]> {
   const { data: links, error } = await supabase
@@ -91,7 +91,10 @@ export function useBlogQueue() {
   const {
     data: pending = [],
     isLoading: loading,
+    isFetching,
+    dataUpdatedAt,
     error,
+    refetch,
   } = useQuery({
     queryKey: BLOG_KEYS.pending,
     queryFn: () => fetchPosts('pending_approval'),
@@ -99,7 +102,7 @@ export function useBlogQueue() {
   });
 
   // Realtime invalidation for the `blog_posts` table is handled once,
-  // centrally, by useRealtimeSync() in AdminLayout — not here. A second
+  // centrally, by useRealtimeSync() in AdminLayout - not here. A second
   // per-hook channel subscription with a fixed name breaks the moment this
   // hook is mounted more than once at a time (e.g. the sidebar badge + the
   // page itself).
@@ -127,7 +130,7 @@ export function useBlogQueue() {
   }, []);
 
   // Schedules a pending draft to publish itself automatically at a future
-  // time via a Postgres cron job (see project docs) — no one needs to be on
+  // time via a Postgres cron job (see project docs) - no one needs to be on
   // the site when it fires. approved_at is set now because scheduling *is*
   // the approval; published_at is left for the cron job to set once it
   // actually goes live.
@@ -169,7 +172,7 @@ export function useBlogQueue() {
     }
   }, []);
 
-  // "Regenerate" is intentionally not an AI call from the frontend — WF12
+  // "Regenerate" is intentionally not an AI call from the frontend - WF12
   // picks up the gap on its next scheduled run once the row is gone.
   const deleteForRegeneration = useCallback(async (id: string) => {
     queryClient.setQueryData<BlogPost[]>(BLOG_KEYS.pending, (prev = []) =>
@@ -186,20 +189,25 @@ export function useBlogQueue() {
   return {
     pending,
     loading,
+    isFetching,
+    dataUpdatedAt,
     error: (error as Error)?.message ?? null,
     approveAndPublish,
     scheduleForLater,
     reject,
     deleteForRegeneration,
-    reload: () => queryClient.invalidateQueries({ queryKey: BLOG_KEYS.pending }),
+    reload: async () => {
+      const res = await refetch();
+      if (res.error) throw res.error;
+    },
   };
 }
 
 export function usePublishedBlogPosts() {
   // "Published" also shows scheduled-but-not-yet-live posts, badged
   // separately in the UI, since scheduling a post is the last step before it
-  // goes live — there's nothing left to review once it's queued.
-  const { data: posts = [], isLoading: loading, error } = useQuery({
+  // goes live - there's nothing left to review once it's queued.
+  const { data: posts = [], isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
     queryKey: BLOG_KEYS.published,
     queryFn: () => fetchPosts(['published', 'scheduled']),
     staleTime: 60 * 1000,
@@ -215,7 +223,7 @@ export function usePublishedBlogPosts() {
   }, []);
 
   // Changes the time a scheduled post will go live. Only meaningful while
-  // status is still 'scheduled' — the cron job owns the transition to
+  // status is still 'scheduled' - the cron job owns the transition to
   // 'published' once scheduled_for arrives.
   const rescheduleFor = useCallback(async (id: string, scheduledFor: string) => {
     const { error } = await supabase.from('blog_posts').update({ scheduled_for: scheduledFor }).eq('id', id);
@@ -253,7 +261,7 @@ export function usePublishedBlogPosts() {
     queryClient.invalidateQueries({ queryKey: BLOG_KEYS.pending });
   }, []);
 
-  // Permanently removes a live post from the public site — distinct from
+  // Permanently removes a live post from the public site - distinct from
   // useBlogQueue's deleteForRegeneration, which is for pending drafts WF12
   // will redraft. There's no "regenerate" implication for something that
   // already went live.
@@ -272,17 +280,22 @@ export function usePublishedBlogPosts() {
   return {
     posts,
     loading,
+    isFetching,
+    dataUpdatedAt,
     error: (error as Error)?.message ?? null,
     saveEdits,
     rescheduleFor,
     publishNow,
     cancelSchedule,
     deletePublished,
-    reload: () => queryClient.invalidateQueries({ queryKey: BLOG_KEYS.published }),
+    reload: async () => {
+      const res = await refetch();
+      if (res.error) throw res.error;
+    },
   };
 }
 
-// Public post detail page — RLS only allows reading status = 'published'
+// Public post detail page - RLS only allows reading status = 'published'
 // rows anyway, so this is safe to call with the anon key straight from the
 // browser like the rest of the public site.
 async function fetchPublishedPostBySlug(slug: string): Promise<BlogPost | null> {

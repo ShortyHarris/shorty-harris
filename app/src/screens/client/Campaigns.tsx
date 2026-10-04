@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { ChevronRight, TriangleAlert, Plus, Pencil, Trash2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import {
   useClientCampaignList, createClientCampaign, updateClientCampaign,
@@ -10,22 +12,33 @@ import {
 } from '../../hooks/useClientCampaigns';
 import type { ClientCampaignRow, ClientCampaignDeleteCounts } from '../../hooks/useClientCampaigns';
 import { queryClient } from '../../lib/queryClient';
+import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { looksLikeMultipleLocationsJoined } from '../../lib/validation';
 import { SkeletonTable } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { TagInput } from '../../components/TagInput';
+import { LocationAreaInput } from '../../components/LocationAreaInput';
+import { areaDisplayLabel, areasToLocationLabels, locationsToAreas, type TargetArea } from '../../lib/targetAreas';
 import { useToast, ToastHost } from '../../components/Toast';
+import { RefreshButton } from '../../components/RefreshButton';
+import { useRefreshHandler } from '../../hooks/useRefreshHandler';
+import {
+  suggestCampaignInputs, useCampaignLimits, validateCampaignInputs, describeViolation,
+  type SuggestCampaignInputsResult,
+} from '../../hooks/useClientIcp';
+import { PIPELINE_STATUS_LABEL, PIPELINE_STATUS_PILL } from '../../lib/pipelineStatus';
+import { Sparkles } from 'lucide-react';
 
 const HELP: HelpContent = {
   title: 'Campaigns',
   body: [
-    { type: 'p', text: "A campaign tells us who to target and how — the search terms and locations we use to find new prospects for you." },
-    { type: 'p', text: "New campaigns start as Draft. Our team reviews the setup and activates it shortly after." },
+    { type: 'p', text: "A campaign tells us who to target and how - the search terms and locations we use to find new prospects for you." },
+    { type: 'p', text: "New campaigns start as In review. Our team reviews the setup and activates it shortly after." },
     { type: 'ul', items: [
-      "Draft — waiting for our team to review and activate",
-      "Active — outreach is running",
-      "Paused — temporarily on hold",
-      "Completed — all prospects processed",
+      "In review - waiting for our team to review and activate",
+      "Active - outreach is running",
+      "Paused - temporarily on hold",
+      "Completed - all prospects processed",
     ]},
   ],
 };
@@ -33,27 +46,25 @@ const HELP: HelpContent = {
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
 const CAMP_PILL: Record<string, { bg: string; text: string; border?: string }> = {
-  draft:     { bg: '#f5f2ec', text: '#62655c', border: '1px solid #ece8df' },
-  active:    { bg: '#edf4ef', text: '#3c7a5b' },
-  paused:    { bg: '#f8efdb', text: '#b9831f' },
-  completed: { bg: '#e7f0f7', text: '#2f6690' },
+  pending_review: { bg: '#f0ecf8', text: '#6b4fa0' },
+  draft:          { bg: '#f5f2ec', text: '#62655c', border: '1px solid #ece8df' },
+  active:         { bg: '#edf4ef', text: '#3c7a5b' },
+  paused:         { bg: '#f8efdb', text: '#b9831f' },
+  completed:      { bg: '#e7f0f7', text: '#2f6690' },
 };
 
-const PROSPECT_STATUS_LABEL: Record<string, string> = {
-  new: 'New', contacted: 'Contacted', replied: 'Replied', hot_lead: 'Hot lead',
-  won: 'Won', lost: 'Lost', generation_failed: 'Gen. failed', message_pending: 'Msg. pending',
+const CAMP_STATUS_LABEL: Record<string, string> = {
+  pending_review: 'In review',
+  draft: 'Draft',
+  active: 'Active',
+  paused: 'Paused',
+  completed: 'Completed',
 };
 
-const PROSPECT_STATUS_PILL: Record<string, { bg: string; text: string; border?: string }> = {
-  new:                { bg: '#edf4ef', text: '#3c7a5b' },
-  contacted:          { bg: '#f8efdb', text: '#b9831f' },
-  replied:            { bg: '#f8efdb', text: '#b9831f' },
-  hot_lead:           { bg: '#3c7a5b', text: '#fff' },
-  won:                { bg: '#3c7a5b', text: '#fff' },
-  lost:               { bg: 'transparent', text: '#9a9d92', border: '1px solid #ddd8cb' },
-  generation_failed:  { bg: '#f6e8e2', text: '#a8533a', border: '1px solid rgba(168,83,58,0.2)' },
-  message_pending:    { bg: '#f0ecf8', text: '#6b4fa0', border: '1px solid rgba(107,79,160,0.2)' },
-};
+// Plain-language status copy lives in ../../lib/pipelineStatus so every
+// screen shows the same wording for the same raw pipeline_status value.
+const PROSPECT_STATUS_LABEL = PIPELINE_STATUS_LABEL;
+const PROSPECT_STATUS_PILL = PIPELINE_STATUS_PILL;
 
 const LANGUAGE_OPTIONS = [
   'English', 'Czech', 'French', 'Spanish', 'Portuguese', 'German', 'Italian',
@@ -63,16 +74,19 @@ const LANGUAGE_OPTIONS = [
 const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]';
 const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50';
 
-export function Campaigns({ clientId }: { clientId: string }) {
-  const { rows, loading, error, reload } = useClientCampaignList(clientId);
-  const { usage } = useClientUsage(clientId);
-  const { usage: launchUsage } = useClientLaunchUsage(clientId);
+export function Campaigns({
+  clientId, client = supabase, readOnly = false, basePath = '/app',
+}: { clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string }) {
+  const { rows, loading, isFetching, dataUpdatedAt, error, reload } = useClientCampaignList(clientId, client);
+  const { usage } = useClientUsage(clientId, client);
+  const { usage: launchUsage } = useClientLaunchUsage(clientId, client);
   const { toasts, toast, dismiss } = useToast();
+  const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh campaigns.');
   const [showNew, setShowNew] = useState(false);
   const [openCampaign, setOpenCampaign] = useState<ClientCampaignRow | null>(null);
 
   // Existing campaigns over the limit (e.g. the limit was lowered after they
-  // were created) are never touched here — this only gates creating new ones.
+  // were created) are never touched here - this only gates creating new ones.
   const atLimit = usage !== null && usage.campaigns_remaining <= 0;
   const limitTitle = usage ? `You've used ${usage.campaign_count} of ${usage.max_campaigns} campaign slots. Contact us to increase your limit.` : undefined;
 
@@ -98,16 +112,18 @@ export function Campaigns({ clientId }: { clientId: string }) {
             {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used
           </span>
           <HelpButton content={HELP} />
-          <button onClick={reload} className={ghostCls}>Refresh</button>
-          <button
-            onClick={() => setShowNew(true)}
-            disabled={newCampaignDisabled}
-            title={newCampaignTitle}
-            className={`${primaryCls} hidden md:inline-flex`}
-            data-tour="new-campaign-btn"
-          >
-            + New campaign
-          </button>
+          <RefreshButton onRefresh={handleRefresh} isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} className={ghostCls} />
+          {!readOnly && (
+            <button
+              onClick={() => setShowNew(true)}
+              disabled={newCampaignDisabled}
+              title={newCampaignTitle}
+              className={`${primaryCls} hidden md:inline-flex`}
+              data-tour="new-campaign-btn"
+            >
+              + New campaign
+            </button>
+          )}
         </div>
       </header>
 
@@ -117,7 +133,7 @@ export function Campaigns({ clientId }: { clientId: string }) {
             <TriangleAlert size={15} strokeWidth={2.2} className="text-[#8a6417]" />
           </span>
           <p className="m-0 pt-0.5 text-[13px] leading-snug text-[#8a6417]">
-            <strong className="font-bold">Launch limit reached</strong> — you've used {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches this month. Contact us to increase it before creating another campaign.
+            <strong className="font-bold">Launch limit reached</strong> - you've used {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches this month. Contact us to increase it before creating another campaign.
           </p>
         </div>
       )}
@@ -128,7 +144,7 @@ export function Campaigns({ clientId }: { clientId: string }) {
             <TriangleAlert size={15} strokeWidth={2.2} className="text-[#8a6417]" />
           </span>
           <p className="m-0 pt-0.5 text-[13px] leading-snug text-[#8a6417]">
-            <strong className="font-bold">Campaign limit reached</strong> — you've used {usage!.campaign_count} of {usage!.max_campaigns} slots. Contact us to increase it before creating another one.
+            <strong className="font-bold">Campaign limit reached</strong> - you've used {usage!.campaign_count} of {usage!.max_campaigns} slots. Contact us to increase it before creating another one.
           </p>
         </div>
       )}
@@ -182,7 +198,7 @@ export function Campaigns({ clientId }: { clientId: string }) {
                       </td>
                       <td>
                         <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
-                          {c.status}
+                          {CAMP_STATUS_LABEL[c.status] ?? c.status}
                         </span>
                       </td>
                       <td className="min-w-0 text-[#62655c]">
@@ -216,7 +232,7 @@ export function Campaigns({ clientId }: { clientId: string }) {
                     <span className="min-w-0 truncate font-bold text-[#20211c] text-[14px]" title={c.name}>{c.name}</span>
                     <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
                       className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
-                      {c.status}
+                      {CAMP_STATUS_LABEL[c.status] ?? c.status}
                     </span>
                   </div>
                   <p className="mt-1.5 text-[12px] text-[#62655c]">{c.language}</p>
@@ -252,8 +268,8 @@ export function Campaigns({ clientId }: { clientId: string }) {
               setShowNew(false); reload();
               toast(
                 autoApproved
-                  ? "Campaign created and running — we're finding businesses now."
-                  : "Campaign created — it'll be reviewed and activated shortly."
+                  ? "Campaign created and running - we're finding businesses now."
+                  : "Campaign created - it'll be reviewed and activated shortly."
               );
               queryClient.invalidateQueries({ queryKey: ['client-usage', clientId] });
             }}
@@ -263,6 +279,10 @@ export function Campaigns({ clientId }: { clientId: string }) {
           <CampaignDetailModal
             key={`detail-${openCampaign.id}`}
             campaign={openCampaign}
+            clientId={clientId}
+            client={client}
+            readOnly={readOnly}
+            basePath={basePath}
             onClose={() => setOpenCampaign(null)}
             onUpdated={() => {
               reload();
@@ -284,10 +304,10 @@ export function Campaigns({ clientId }: { clientId: string }) {
 }
 
 
-/* ── New Campaign Modal — 4-step wizard ──────────────────────────────
+/* ── New Campaign Modal - 4-step wizard ──────────────────────────────
    Splitting one 6-field form into steps so a client isn't hit with
    everything (incl. two TagInputs with different separator rules) at
-   once — each step validates only what's on screen before advancing. */
+   once - each step validates only what's on screen before advancing. */
 const STEP_LABELS = ['Basics', 'Who to target', 'Details', 'Review'];
 
 function NewCampaignModal({
@@ -304,19 +324,31 @@ function NewCampaignModal({
   const [name, setName]             = useState('');
   const [description, setDescription] = useState('');
   const [queries, setQueries]       = useState<string[]>([]);
-  const [locations, setLocations]   = useState<string[]>([]);
+  const [areas, setAreas]           = useState<TargetArea[]>([]);
   const [maxResults, setMaxResults] = useState(50);
   const [language, setLanguage]     = useState('English');
   const [busy, setBusy]             = useState(false);
   const [err, setErr]               = useState<string | null>(null);
+  const limits = useCampaignLimits(clientId);
+  const locationLabels = areasToLocationLabels(areas);
 
   function validateStep(n: number): string | null {
     if (n === 0 && !name.trim()) return 'Campaign name is required.';
     if (n === 1) {
       if (queries.length === 0) return 'Add at least one search term.';
-      if (locations.length === 0) return 'Add at least one target location.';
-      if (looksLikeMultipleLocationsJoined(locations)) {
-        return `"${locations[0]}" looks like more than one location joined together — press Enter (or use a semicolon) after each city so they save as separate entries.`;
+      if (areas.length === 0) return 'Add at least one target location.';
+      if (looksLikeMultipleLocationsJoined(locationLabels)) {
+        return `"${locationLabels[0]}" looks like more than one location joined together - press Enter (or use a semicolon) after each city so they save as separate entries.`;
+      }
+      // Belt-and-suspenders: TagInput/LocationAreaInput already refuse
+      // extra entries once a limit loads, but don't block advancing on a
+      // limit that hasn't loaded yet (limits == null) - the server still
+      // enforces the real cap either way.
+      if (limits && queries.length > limits.max_search_terms) {
+        return `You can use up to ${limits.max_search_terms} search terms.`;
+      }
+      if (limits && areas.length > limits.max_locations) {
+        return `You can use up to ${limits.max_locations} locations.`;
       }
     }
     if (n === 2 && !language.trim()) return 'Outreach language is required.';
@@ -337,6 +369,21 @@ function NewCampaignModal({
 
   async function submit() {
     setBusy(true); setErr(null);
+
+    const { data: validation, error: validationError } = await validateCampaignInputs({
+      searchQueries: queries,
+      targetLocations: locationLabels,
+      maxResults,
+      forLaunch: true,
+      targetAreas: areas,
+    });
+    if (validationError) { setBusy(false); setErr(validationError); return; }
+    if (validation && !validation.valid) {
+      setBusy(false);
+      setErr(validation.violations.map(describeViolation).join(' '));
+      return;
+    }
+
     const { autoApproved, error } = await createClientCampaign({
       client_id: clientId,
       created_by: profile?.id ?? null,
@@ -344,7 +391,7 @@ function NewCampaignModal({
       description: description.trim(),
       language: language.trim(),
       search_queries: queries,
-      target_locations: locations,
+      target_areas: areas,
       max_results: maxResults,
     });
     setBusy(false);
@@ -361,7 +408,7 @@ function NewCampaignModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}
@@ -388,7 +435,7 @@ function NewCampaignModal({
             ))}
           </div>
           <p className="m-0 mt-2 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">
-            Step {step + 1} of {STEP_LABELS.length} — {STEP_LABELS[step]}
+            Step {step + 1} of {STEP_LABELS.length} - {STEP_LABELS[step]}
           </p>
         </div>
 
@@ -410,27 +457,37 @@ function NewCampaignModal({
                   style={FONT}
                   className={`${inputCls} resize-y`}
                 />
+                <p className="mt-1 text-[11px] text-[#9a9d92]">Internal notes for our team - not shown to prospects. Helpful for context, e.g. "Focus on independent clinics, skip chains."</p>
               </div>
             </>
           )}
 
           {step === 1 && (
             <>
+              <SuggestForMe
+                clientId={clientId}
+                queries={queries}
+                locations={locationLabels}
+                onAddQuery={(term) => setQueries((q) => (q.includes(term) ? q : [...q, term]))}
+                onAddLocation={(loc) => setAreas((a) => (a.some((x) => x.label === loc) ? a : [...a, { mode: 'text', label: loc }]))}
+              />
               <TagInput
                 label="Search terms"
                 placeholder="Type a search term and press Enter (e.g. restaurants, cafes, hotels)"
-                helper="Separate several with commas, or add them one at a time and press Enter."
+                helper="Business types, not job titles - e.g. 'dentists' or 'law firms', not 'dentist' or 'lawyer'. 3 to 5 terms works best; separate several with commas, or add them one at a time and press Enter."
                 values={queries}
                 onChange={setQueries}
                 splitOn=","
+                maxItems={limits?.max_search_terms}
+                capLabel="search term"
               />
-              <TagInput
+              <LocationAreaInput
                 label="Target locations"
-                placeholder="Type a location and press Enter (e.g. Prague, Czech Republic)"
-                helper="One city per entry — press Enter after each one. Use City, Country format. To add several at once, separate them with semicolons (not commas); don't put more than one city in a single entry."
-                values={locations}
-                onChange={setLocations}
-                splitOn=";"
+                helper="Add a city or area, or a radius around a point. The 3-location limit counts both kinds together."
+                values={areas}
+                onChange={setAreas}
+                maxItems={limits?.max_locations}
+                capLabel="location"
               />
             </>
           )}
@@ -473,7 +530,7 @@ function NewCampaignModal({
               <ReviewRow label="Campaign name" value={name} />
               {description.trim() && <ReviewRow label="Description" value={description} />}
               <ReviewRow label="Search terms" tags={queries} />
-              <ReviewRow label="Target locations" tags={locations} />
+              <ReviewRow label="Target locations" tags={areas.map(areaDisplayLabel)} />
               <ReviewRow label="Max results" value={String(maxResults)} />
               <ReviewRow label="Outreach language" value={language} />
               <p className="m-0 text-[12px] text-[#9a9d92]">
@@ -508,6 +565,191 @@ function NewCampaignModal({
   );
 }
 
+/* ── "Suggest for me" - pulls ICP-derived search terms / locations ───────
+   Fetches suggest_campaign_inputs on demand (not on mount - most clients
+   won't click it, and it's one more RPC we don't need to fire eagerly) and
+   lets the client tap chips to append to whatever they've already typed.
+   Caps are enforced here too so the client never gets as far as the raw
+   Postgres rejection the database would otherwise throw. */
+export function SuggestForMe({
+  clientId, queries, locations, onAddQuery, onAddLocation,
+}: {
+  clientId: string;
+  queries: string[];
+  locations: string[];
+  onAddQuery: (term: string) => void;
+  onAddLocation: (loc: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [result, setResult] = useState<SuggestCampaignInputsResult | null>(null);
+
+  async function load() {
+    setOpen(true);
+    if (result || loading) return;
+    setLoading(true); setErr(null);
+    const { data, error } = await suggestCampaignInputs(clientId);
+    setLoading(false);
+    if (error) setErr(error); else setResult(data);
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={load}
+        className="inline-flex items-center gap-1.5 cursor-pointer rounded-lg border border-[#ece8df] bg-transparent px-3 py-1.5 text-[12px] font-semibold text-[#3c7a5b] transition-colors hover:border-[#3c7a5b]/40 hover:bg-[#edf4ef]"
+      >
+        <Sparkles size={13} /> Suggest for me
+      </button>
+    );
+  }
+
+  const limits = result?.limits;
+  const atTermCap = !!limits && queries.length >= limits.max_search_terms;
+  const atLocationCap = !!limits && locations.length >= limits.max_locations;
+  const pairsWouldExceed = (addTerms: number, addLocations: number) =>
+    !!limits && (queries.length + addTerms) * (locations.length + addLocations) > limits.max_term_location_pairs;
+
+  const termDisabled = (term: string) => queries.includes(term) || atTermCap || pairsWouldExceed(1, 0);
+  const locationDisabled = (loc: string) => locations.includes(loc) || atLocationCap || pairsWouldExceed(0, 1);
+
+  function confidenceCaption(): string | null {
+    if (!result) return null;
+    if (result.confidence === 'thin') {
+      return `Based on ${result.history.positive} positive repl${result.history.positive === 1 ? 'y' : 'ies'} from ${result.history.emailed} emails so far - early days, so treat these as a hint rather than a rule.`;
+    }
+    if (result.confidence === 'usable') {
+      return `Based on ${result.history.positive} positive repl${result.history.positive === 1 ? 'y' : 'ies'} from ${result.history.emailed} emails.`;
+    }
+    return null;
+  }
+
+  const resultTerms = result?.terms ?? [];
+  const resultLocations = result?.locations ?? [];
+  const workedTerms = resultTerms.filter((t) => t.source === 'results');
+  const websiteTerms = resultTerms.filter((t) => t.source === 'website');
+  const historyLocations = resultLocations.filter((l) => l.source === 'history');
+  const websiteLocations = resultLocations.filter((l) => l.source === 'website');
+
+  return (
+    <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-4 py-3.5 flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#3c7a5b]"><Sparkles size={13} /> Suggestions</span>
+        <button type="button" onClick={() => setOpen(false)} className="cursor-pointer border-0 bg-transparent text-[18px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+      </div>
+
+      {loading && <p className="m-0 text-[12.5px] text-[#9a9d92]">Looking up your targeting profile…</p>}
+      {err && <p className="m-0 text-[12.5px] text-[#a8533a]">Couldn't load suggestions: {err}</p>}
+
+      {result && !result.has_icp && (
+        <p className="m-0 text-[12.5px] text-[#62655c]">
+          We don't have a targeting profile for you yet. Add your website in{' '}
+          <Link to="/app/targeting" className="font-semibold text-[#3c7a5b] underline">your targeting profile</Link> and we'll read it.
+        </p>
+      )}
+
+      {result && result.has_icp && resultTerms.length === 0 && resultLocations.length === 0 && (
+        <p className="m-0 text-[12.5px] text-[#62655c]">
+          We don't have enough to suggest yet. Add your website in{' '}
+          <Link to="/app/targeting" className="font-semibold text-[#3c7a5b] underline">your targeting profile</Link> and we'll read it.
+        </p>
+      )}
+
+      {result && result.has_icp && (resultTerms.length > 0 || resultLocations.length > 0) && (
+        <>
+          {result.confidence === 'none' && (
+            <p className="m-0 text-[11.5px] text-[#9a9d92]">
+              These come from reading your website. Once your campaigns get replies, we'll start suggesting what actually works.
+            </p>
+          )}
+
+          {workedTerms.length > 0 && (
+            <SuggestGroup
+              label="Worked before - search terms"
+              caption={confidenceCaption()}
+              items={workedTerms.map((t) => ({
+                key: t.term,
+                label: t.term,
+                sub: t.evidence ? `${t.evidence.positive ?? 0} repl${(t.evidence.positive ?? 0) === 1 ? 'y' : 'ies'} from ${t.evidence.emailed ?? 0} emails` : undefined,
+                disabled: termDisabled(t.term),
+              }))}
+              onPick={onAddQuery}
+            />
+          )}
+          {websiteTerms.length > 0 && (
+            <SuggestGroup
+              label="From your website - search terms"
+              items={websiteTerms.map((t) => ({ key: t.term, label: t.term, disabled: termDisabled(t.term) }))}
+              onPick={onAddQuery}
+            />
+          )}
+          {historyLocations.length > 0 && (
+            <SuggestGroup
+              label="Worked before - locations"
+              items={historyLocations.map((l) => ({
+                key: l.location,
+                label: l.location,
+                sub: l.evidence?.campaigns ? `used in ${l.evidence.campaigns} campaign${l.evidence.campaigns !== 1 ? 's' : ''}` : undefined,
+                disabled: locationDisabled(l.location),
+              }))}
+              onPick={onAddLocation}
+            />
+          )}
+          {websiteLocations.length > 0 && (
+            <SuggestGroup
+              label="From your website - locations"
+              items={websiteLocations.map((l) => ({ key: l.location, label: l.location, disabled: locationDisabled(l.location) }))}
+              onPick={onAddLocation}
+            />
+          )}
+
+          {(atTermCap || atLocationCap || pairsWouldExceed(0, 0)) && limits && (
+            <p className="m-0 text-[11px] text-[#b9831f]">
+              {atTermCap && `You've reached the ${limits.max_search_terms}-term limit. `}
+              {atLocationCap && `You've reached the ${limits.max_locations}-location limit. `}
+              {!atTermCap && !atLocationCap && pairsWouldExceed(0, 0) && `Adding more would exceed the ${limits.max_term_location_pairs} term×location limit. `}
+              Remove one to add another.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function SuggestGroup({
+  label, caption, items, onPick,
+}: {
+  label: string;
+  caption?: string | null;
+  items: { key: string; label: string; sub?: string; disabled: boolean }[];
+  onPick: (value: string) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">{label}</div>
+      {caption && <p className="m-0 mb-1.5 text-[11.5px] text-[#62655c]">{caption}</p>}
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            disabled={item.disabled}
+            onClick={() => onPick(item.label)}
+            title={item.sub}
+            className="cursor-pointer rounded-full border border-[#3c7a5b]/30 bg-white px-2.5 py-1 text-left text-[12px] font-semibold text-[#3c7a5b] transition-colors hover:bg-[#edf4ef] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {item.label}
+            {item.sub && <span className="ml-1.5 font-normal text-[#62655c]">· {item.sub}</span>}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* Read-only row for the wizard's final review step. */
 function ReviewRow({ label, value, tags }: { label: string; value?: string; tags?: string[] }) {
   return (
@@ -528,20 +770,25 @@ function ReviewRow({ label, value, tags }: { label: string; value?: string; tags
 
 /* ── Campaign Detail Modal ─────────────────────────────────────────── */
 function CampaignDetailModal({
-  campaign, onClose, onUpdated, onDeleted,
-}: { campaign: ClientCampaignRow; onClose: () => void; onUpdated: () => void; onDeleted: () => void }) {
-  const { rows: prospects, loading } = useClientCampaignProspects(campaign.id);
+  campaign, clientId, onClose, onUpdated, onDeleted, client = supabase, readOnly = false, basePath = '/app',
+}: {
+  campaign: ClientCampaignRow; clientId: string; onClose: () => void; onUpdated: () => void; onDeleted: () => void;
+  client?: SupabaseClient; readOnly?: boolean; basePath?: string;
+}) {
+  const { rows: prospects, loading } = useClientCampaignProspects(campaign.id, client);
 
   const [editing, setEditing]       = useState(false);
   const [deleting, setDeleting]     = useState(false);
   const [name, setName]             = useState(campaign.name);
   const [description, setDescription] = useState(campaign.description ?? '');
   const [queries, setQueries]       = useState<string[]>(campaign.search_queries);
-  const [locations, setLocations]   = useState<string[]>(campaign.target_locations);
+  const [areas, setAreas]           = useState<TargetArea[]>(campaign.target_areas ?? locationsToAreas(campaign.target_locations));
   const [maxResults, setMaxResults] = useState(campaign.max_results);
   const [language, setLanguage]     = useState(campaign.language);
   const [busy, setBusy]             = useState(false);
   const [err, setErr]               = useState<string | null>(null);
+  const limits = useCampaignLimits(clientId);
+  const locationLabels = areasToLocationLabels(areas);
 
   const pill = CAMP_PILL[campaign.status] ?? CAMP_PILL.draft;
 
@@ -559,7 +806,7 @@ function CampaignDetailModal({
     setName(campaign.name);
     setDescription(campaign.description ?? '');
     setQueries(campaign.search_queries);
-    setLocations(campaign.target_locations);
+    setAreas(campaign.target_areas ?? locationsToAreas(campaign.target_locations));
     setMaxResults(campaign.max_results);
     setLanguage(campaign.language);
     setErr(null);
@@ -569,20 +816,37 @@ function CampaignDetailModal({
   async function saveEdit() {
     if (!name.trim()) { setErr('Campaign name is required.'); return; }
     if (queries.length === 0) { setErr('Add at least one search term.'); return; }
-    if (locations.length === 0) { setErr('Add at least one target location.'); return; }
-    if (looksLikeMultipleLocationsJoined(locations)) {
-      setErr(`"${locations[0]}" looks like more than one location joined together — press Enter (or use a semicolon) after each city so they save as separate entries.`);
+    if (areas.length === 0) { setErr('Add at least one target location.'); return; }
+    if (looksLikeMultipleLocationsJoined(locationLabels)) {
+      setErr(`"${locationLabels[0]}" looks like more than one location joined together - press Enter (or use a semicolon) after each city so they save as separate entries.`);
       return;
     }
+    if (limits && queries.length > limits.max_search_terms) { setErr(`You can use up to ${limits.max_search_terms} search terms.`); return; }
+    if (limits && areas.length > limits.max_locations) { setErr(`You can use up to ${limits.max_locations} locations.`); return; }
     if (!language.trim()) { setErr('Outreach language is required.'); return; }
 
     setBusy(true); setErr(null);
+
+    const { data: validation, error: validationError } = await validateCampaignInputs({
+      searchQueries: queries,
+      targetLocations: locationLabels,
+      maxResults,
+      forLaunch: campaign.status === 'active',
+      targetAreas: areas,
+    });
+    if (validationError) { setBusy(false); setErr(validationError); return; }
+    if (validation && !validation.valid) {
+      setBusy(false);
+      setErr(validation.violations.map(describeViolation).join(' '));
+      return;
+    }
+
     const { error } = await updateClientCampaign(campaign.id, {
       name: name.trim(),
       description: description.trim(),
       language: language.trim(),
       search_queries: queries,
-      target_locations: locations,
+      target_areas: areas,
       max_results: maxResults,
     });
     setBusy(false);
@@ -602,7 +866,7 @@ function CampaignDetailModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}
@@ -619,11 +883,11 @@ function CampaignDetailModal({
             <h2 className="m-0 truncate text-[18px] font-bold text-[#20211c]">{name}</h2>
             <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
               className="mt-1.5 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
-              {campaign.status}
+              {CAMP_STATUS_LABEL[campaign.status] ?? campaign.status}
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            {!editing && (
+            {!editing && !readOnly && (
               <>
                 <button
                   onClick={startEdit}
@@ -666,6 +930,14 @@ function CampaignDetailModal({
             />
           </div>
 
+          <SuggestForMe
+            clientId={clientId}
+            queries={queries}
+            locations={locationLabels}
+            onAddQuery={(term) => setQueries((q) => (q.includes(term) ? q : [...q, term]))}
+            onAddLocation={(loc) => setAreas((a) => (a.some((x) => x.label === loc) ? a : [...a, { mode: 'text', label: loc }]))}
+          />
+
           <TagInput
             label="Search terms"
             placeholder="Type a search term and press Enter (e.g. restaurants, cafes, hotels)"
@@ -673,15 +945,17 @@ function CampaignDetailModal({
             values={queries}
             onChange={setQueries}
             splitOn=","
+            maxItems={limits?.max_search_terms}
+            capLabel="search term"
           />
 
-          <TagInput
+          <LocationAreaInput
             label="Target locations"
-            placeholder="Type a location and press Enter (e.g. Prague, Czech Republic)"
-            helper="One city per entry — press Enter after each one. Use City, Country format. To add several at once, separate them with semicolons (not commas); don't put more than one city in a single entry."
-            values={locations}
-            onChange={setLocations}
-            splitOn=";"
+            helper="Add a city or area, or a radius around a point. The 3-location limit counts both kinds together."
+            values={areas}
+            onChange={setAreas}
+            maxItems={limits?.max_locations}
+            capLabel="location"
           />
 
           <div>
@@ -725,14 +999,14 @@ function CampaignDetailModal({
               <p className="m-0 mt-1.5 text-[12.5px] leading-relaxed text-[#62655c]">
                 We'll find matching businesses, write personalized outreach for each one, and
                 {' '}{campaign.status === 'active' ? "get them approved and sent" : "have them ready once your campaign is approved"}.
-                This can take a little while — check back here, or we'll flag it once there's something for you to review.
+                This can take a little while - check back here, or we'll flag it once there's something for you to review.
               </p>
             </div>
           )}
 
           {pendingApproval > 0 && (
             <Link
-              to="/app/approvals"
+              to={`${basePath}/approvals`}
               className="flex items-center gap-3 rounded-xl border border-[#d8cdf0] bg-[#f0ecf8] px-4 py-3.5 no-underline transition-colors hover:bg-[#e9e2f5]"
             >
               <span className="flex-1 text-[13px] leading-snug text-[#6b4fa0]">
@@ -754,8 +1028,8 @@ function CampaignDetailModal({
           <div>
             <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Target locations</div>
             <div className="flex flex-wrap gap-1.5">
-              {locations.map((l) => (
-                <span key={l} className="rounded-full bg-[#fbf9f5] border border-[#ece8df] px-2.5 py-1 text-[12px] text-[#62655c]">{l}</span>
+              {areas.map((a, i) => (
+                <span key={`${a.label}-${i}`} className="rounded-full bg-[#fbf9f5] border border-[#ece8df] px-2.5 py-1 text-[12px] text-[#62655c]">{areaDisplayLabel(a)}</span>
               ))}
             </div>
           </div>
@@ -772,7 +1046,7 @@ function CampaignDetailModal({
           </div>
 
           <div>
-            <div className="mb-2 text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Prospects — {campaign.prospectCount} total</div>
+            <div className="mb-2 text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Prospects - {campaign.prospectCount} total</div>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="rounded-xl border border-[#ece8df] bg-white px-2 py-2.5">
                 <div className="text-[18px] font-extrabold text-[#20211c]">{contacted}</div>
@@ -822,7 +1096,7 @@ function CampaignDetailModal({
         </div>
         )}
 
-        {/* Footer — only shown while editing; view mode has no footer actions */}
+        {/* Footer - only shown while editing; view mode has no footer actions */}
         {editing && (
           <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
             <button onClick={cancelEdit} className={ghostCls}>Cancel</button>
@@ -850,7 +1124,7 @@ function CampaignDetailModal({
 
 /* ── Delete Campaign confirmation ─────────────────────────────────────
    Same "show what gets deleted first" pattern as the admin's own delete
-   flow (getCampaignDeleteCounts/deleteCampaign in useAdminData.ts) — a
+   flow (getCampaignDeleteCounts/deleteCampaign in useAdminData.ts) - a
    client can't undo this, so they should see the blast radius up front. */
 function DeleteCampaignModal({
   campaign, onClose, onDeleted,
@@ -884,7 +1158,7 @@ function DeleteCampaignModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}
@@ -916,7 +1190,7 @@ function DeleteCampaignModal({
                 Counting affected records…
               </div>
             ) : blastItems.length === 0 ? (
-              <p className="text-[13px] text-[#62655c]">No associated records — the campaign row only.</p>
+              <p className="text-[13px] text-[#62655c]">No associated records - the campaign row only.</p>
             ) : (
               <ul className="m-0 list-none p-0 flex flex-col gap-1">
                 {blastItems.map((item) => (

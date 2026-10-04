@@ -24,7 +24,7 @@ export interface DocsArticle {
 
 async function fetchDocsArticles(): Promise<DocsArticle[]> {
   // RLS does the real access control here (published + audience-scoped for
-  // clients, everything for admins) — this query has no role/status filter
+  // clients, everything for admins) - this query has no role/status filter
   // of its own, so the sidebar can never show something the API wouldn't
   // actually return.
   const { data, error } = await supabase
@@ -36,13 +36,13 @@ async function fetchDocsArticles(): Promise<DocsArticle[]> {
 }
 
 export function useDocsArticles() {
-  const { data: rows = [], isLoading: loading, error } = useQuery({
+  const { data: rows = [], isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
     queryKey: DOCS_KEY,
     queryFn: fetchDocsArticles,
     staleTime: 2 * 60 * 1000,
   });
 
-  // Categories in first-appearance order — since rows are already sorted by
+  // Categories in first-appearance order - since rows are already sorted by
   // order_index and every seeded category's lowest order_index matches its
   // intended sidebar position, this needs no separate hardcoded ordering.
   const categories = useMemo(() => {
@@ -58,8 +58,13 @@ export function useDocsArticles() {
     rows,
     categories,
     loading,
+    isFetching,
+    dataUpdatedAt,
     error: (error as Error)?.message ?? null,
-    reload: () => queryClient.invalidateQueries({ queryKey: DOCS_KEY }),
+    reload: async () => {
+      const res = await refetch();
+      if (res.error) throw res.error;
+    },
   };
 }
 
@@ -75,7 +80,7 @@ export interface DocsArticleInput {
 }
 
 // Fire-and-forget: re-embedding is a background enhancement for search, not
-// part of the save itself — a failure here (e.g. GEMINI_API_KEY not yet
+// part of the save itself - a failure here (e.g. GEMINI_API_KEY not yet
 // configured) must never make the article save appear to fail. Admins also
 // have the "Re-embed all" bulk action in the Docs admin screen as a backstop.
 function reembedInBackground(articleId: string) {
@@ -96,7 +101,7 @@ export type DocsArticleUpdate = Partial<Omit<DocsArticleInput, 'slug'>>;
 
 export async function updateDocsArticle(id: string, patch: DocsArticleUpdate) {
   // version / updated_at / updated_by are handled by the docs_articles_bump_version
-  // trigger — never set from here, so no write path can skip that bookkeeping.
+  // trigger - never set from here, so no write path can skip that bookkeeping.
   const { error } = await supabase.from('docs_articles').update(patch).eq('id', id);
   if (!error) {
     queryClient.invalidateQueries({ queryKey: DOCS_KEY });

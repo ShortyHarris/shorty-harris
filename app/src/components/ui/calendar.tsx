@@ -8,7 +8,7 @@ export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
 // Colors are hardcoded to this app's palette (leaf/ink/line) rather than the
 // shadcn --primary/--accent/--popover variables, which this project never
-// defines — using them here would silently render with no background at all.
+// defines - using them here would silently render with no background at all.
 function Calendar({
   className,
   classNames,

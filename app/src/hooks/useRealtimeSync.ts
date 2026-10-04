@@ -10,7 +10,7 @@ import { BLOG_KEYS } from './useBlogPosts';
  * external workflows (n8n). Call this once in the admin layout.
  *
  * When a relevant row changes, the corresponding TanStack Query cache entry
- * is invalidated — components refetch automatically with the fresh data.
+ * is invalidated - components refetch automatically with the fresh data.
  */
 export function useRealtimeSync() {
   useEffect(() => {
@@ -33,7 +33,7 @@ export function useRealtimeSync() {
         queryClient.invalidateQueries({ queryKey: QK.prospects });
       })
 
-      // Campaigns — including client-submitted drafts awaiting approval
+      // Campaigns - including client-submitted drafts awaiting approval
       .on('postgres_changes', { event: '*', schema: 'public', table: 'campaigns' }, () => {
         queryClient.invalidateQueries({ queryKey: QK.campaigns });
       })

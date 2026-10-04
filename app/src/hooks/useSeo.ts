@@ -2,14 +2,14 @@ import { useEffect } from 'react';
 
 // Client-side per-page SEO: document.title, meta description, canonical link,
 // and Open Graph / Twitter Card tags. This runs after React renders, so it
-// helps real browsers and JS-executing crawlers (Google) but — same caveat
-// as the rest of this app's public pages — not simple/non-JS crawlers,
+// helps real browsers and JS-executing crawlers (Google) but - same caveat
+// as the rest of this app's public pages - not simple/non-JS crawlers,
 // which only ever see the static baseline tags in index.html.
 
 interface SeoOptions {
   title: string;
   description?: string;
-  /** Path only, e.g. "/blog/my-post" — origin is read from window.location. */
+  /** Path only, e.g. "/blog/my-post" - origin is read from window.location. */
   path?: string;
   image?: string;
   type?: 'website' | 'article';
@@ -37,7 +37,7 @@ function upsertLink(rel: string, href: string) {
 
 export function useSeo({ title, description, path, image, type = 'website' }: SeoOptions) {
   useEffect(() => {
-    const fullTitle = title.endsWith('Shorty Harris') ? title : `${title} — Shorty Harris`;
+    const fullTitle = title.endsWith('Shorty Harris') ? title : `${title} - Shorty Harris`;
     document.title = fullTitle;
 
     upsertMeta('property', 'og:title', fullTitle);

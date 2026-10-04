@@ -1,6 +1,9 @@
-import { useEffect, lazy, Suspense, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState, lazy, Suspense, type ReactNode } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { useAuth } from './auth/AuthProvider';
+import { startImpersonation, endImpersonation } from './lib/impersonation';
+import { ImpersonationBanner } from './components/ImpersonationBanner';
 import { useClientHeader, clientHeaderKey } from './hooks/useClientHeader';
 import { useClientDashboard, dashboardKey } from './hooks/useClientDashboard';
 import { billingKey } from './hooks/useBilling';
@@ -21,13 +24,15 @@ import { BlogPost } from './screens/BlogPost';
 import { Privacy } from './screens/Privacy';
 import { Terms } from './screens/Terms';
 import { Cookies } from './screens/Cookies';
+import { Unsubscribe } from './screens/Unsubscribe';
 import { NotFound } from './screens/NotFound';
 
-// Everything below is gated behind auth (or is an auth screen itself) — lazy
+// Everything below is gated behind auth (or is an auth screen itself) - lazy
 // loading it keeps the public marketing/blog pages from shipping the admin
 // dashboard, client dashboard, and their dependencies (recharts, the
 // markdown editor, …) in the initial bundle.
 const Login          = lazy(() => import('./screens/Login').then((m) => ({ default: m.Login })));
+const Signup         = lazy(() => import('./screens/Signup').then((m) => ({ default: m.Signup })));
 const ForgotPassword = lazy(() => import('./screens/ForgotPassword').then((m) => ({ default: m.ForgotPassword })));
 const SetPassword    = lazy(() => import('./screens/SetPassword').then((m) => ({ default: m.SetPassword })));
 const AdminLayout    = lazy(() => import('./screens/admin/Layout').then((m) => ({ default: m.AdminLayout })));
@@ -38,6 +43,9 @@ const Approvals      = lazy(() => import('./screens/client/Approvals').then((m) 
 const ClientCampaigns = lazy(() => import('./screens/client/Campaigns').then((m) => ({ default: m.Campaigns })));
 const Settings       = lazy(() => import('./screens/client/Settings').then((m) => ({ default: m.Settings })));
 const ClientAnalytics = lazy(() => import('./screens/client/Analytics').then((m) => ({ default: m.Analytics })));
+const TargetingProfile = lazy(() => import('./screens/client/TargetingProfile').then((m) => ({ default: m.TargetingProfile })));
+const Results         = lazy(() => import('./screens/client/Results').then((m) => ({ default: m.Results })));
+const Prospects       = lazy(() => import('./screens/client/Prospects').then((m) => ({ default: m.Prospects })));
 const Docs           = lazy(() => import('./screens/docs/Docs').then((m) => ({ default: m.Docs })));
 
 // ── Guards ──────────────────────────────────────────────────────────────────
@@ -58,7 +66,7 @@ function RequireClient({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-// Any signed-in user, admin or client — used for screens (like /docs) that
+// Any signed-in user, admin or client - used for screens (like /docs) that
 // both zones link into and that scope their own content via RLS instead of
 // a route-level role check.
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -78,7 +86,7 @@ function LoginRoute() {
     if (loading || !session || !profile) return;
     if (profile.role === 'admin') navigate('/admin/approvals', { replace: true });
     else if (profile.client_id) navigate('/app', { replace: true });
-    // profile exists but has neither admin role nor client_id — sign out and show login
+    // profile exists but has neither admin role nor client_id - sign out and show login
     else signOut();
   }, [loading, session, profile, navigate, signOut]);
 
@@ -86,7 +94,24 @@ function LoginRoute() {
   return <Login />;
 }
 
-// ── Client zone — topbar shell + nested routes ───────────────────────────────
+// ── Signup route: same already-signed-in redirect as LoginRoute ──────────────
+
+function SignupRoute() {
+  const { session, profile, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (loading || !session || !profile) return;
+    if (profile.role === 'admin') navigate('/admin/approvals', { replace: true });
+    else if (profile.client_id) navigate('/app', { replace: true });
+    else signOut();
+  }, [loading, session, profile, navigate, signOut]);
+
+  if (loading || (session && profile)) return <Spinner />;
+  return <Signup />;
+}
+
+// ── Client zone - topbar shell + nested routes ───────────────────────────────
 
 function ClientZone() {
   const { profile, signOut } = useAuth();
@@ -99,7 +124,7 @@ function ClientZone() {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useClientNotifications(clientId);
   useClientRealtimeSync(clientId);
 
-  // Client dashboard only, per the plan — not admin, not the public site.
+  // Client dashboard only, per the plan - not admin, not the public site.
   // Gated on analytics consent, same as Google Analytics; also re-checked if
   // the visitor grants consent later via the cookie preferences banner.
   useEffect(() => {
@@ -149,8 +174,11 @@ function ClientZone() {
           <Routes>
             <Route index element={<Dashboard clientId={clientId} />} />
             <Route path="campaigns" element={<ClientCampaigns clientId={clientId} />} />
+            <Route path="prospects" element={<Prospects clientId={clientId} />} />
             <Route path="approvals" element={<Approvals clientId={clientId} />} />
             <Route path="analytics" element={<ClientAnalytics clientId={clientId} />} />
+            <Route path="results" element={<Results clientId={clientId} />} />
+            <Route path="targeting" element={<TargetingProfile clientId={clientId} />} />
             <Route path="settings" element={<Settings clientId={clientId} onSignOut={signOut} />} />
             <Route path="billing" element={<Billing clientId={clientId} onCreditsChanged={() => {
               queryClient.invalidateQueries({ queryKey: clientHeaderKey(clientId) });
@@ -161,6 +189,78 @@ function ClientZone() {
           </Routes>
         </Shell>
       </TourProvider>
+    </div>
+  );
+}
+
+// ── Impersonation zone - admin "View as client", read-only ──────────────────
+// Deliberately NOT a parameterized variant of ClientZone: it skips realtime
+// sync, Smartlook identity, notifications, Gmail status, and Settings
+// entirely (none of those matter for a point-in-time read-only view, and
+// skipping them avoids threading the impersonation client into hooks that
+// don't need it). The actual read-only guarantee is enforced two ways: the
+// injected client throws on any write before hitting the network, and -
+// the one that really matters - the impersonation_read-only RLS policies
+// (see supabase/migrations/20261002090000_impersonation_rls.sql), which
+// block writes at the database level regardless of what the frontend does.
+
+function ImpersonateZone() {
+  const { clientId } = useParams<{ clientId: string }>();
+  const navigate = useNavigate();
+  const [session, setSession] = useState<{ client: SupabaseClient; businessName: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!clientId) return;
+    let cancelled = false;
+    startImpersonation(clientId)
+      .then((s) => { if (!cancelled) setSession({ client: s.client, businessName: s.businessName }); })
+      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to start impersonation.'); });
+    return () => { cancelled = true; };
+  }, [clientId]);
+
+  function exit() {
+    if (clientId) endImpersonation(clientId);
+    navigate('/admin/clients', { replace: true });
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="text-[14px] text-[#a8533a]">{error}</p>
+        <button onClick={exit} className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-semibold text-white">
+          Back to Clients
+        </button>
+      </div>
+    );
+  }
+
+  if (!session || !clientId) return <Spinner />;
+
+  return (
+    <div className="theme-client">
+      <ImpersonationBanner businessName={session.businessName} onExit={exit} />
+      <Shell
+        businessName={session.businessName}
+        credits="-"
+        displayName={session.businessName}
+        hideSettings
+        signOutLabel="Exit impersonation"
+        onSignOut={exit}
+        basePath={`/admin/impersonate/${clientId}`}
+      >
+        <Routes>
+          <Route index element={<Dashboard clientId={clientId} client={session.client} readOnly basePath={`/admin/impersonate/${clientId}`} />} />
+          <Route path="campaigns" element={<ClientCampaigns clientId={clientId} client={session.client} readOnly basePath={`/admin/impersonate/${clientId}`} />} />
+          <Route path="prospects" element={<Prospects clientId={clientId} client={session.client} readOnly basePath={`/admin/impersonate/${clientId}`} />} />
+          <Route path="approvals" element={<Approvals clientId={clientId} client={session.client} readOnly />} />
+          <Route path="analytics" element={<ClientAnalytics clientId={clientId} client={session.client} />} />
+          <Route path="results" element={<Results clientId={clientId} client={session.client} basePath={`/admin/impersonate/${clientId}`} />} />
+          <Route path="targeting" element={<TargetingProfile clientId={clientId} client={session.client} readOnly />} />
+          <Route path="billing" element={<Billing clientId={clientId} client={session.client} readOnly />} />
+          <Route path="*" element={<Navigate to="" replace />} />
+        </Routes>
+      </Shell>
     </div>
   );
 }
@@ -238,6 +338,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<LoginRoute />} />
+      <Route path="/signup" element={<SignupRoute />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/auth/set-password" element={<SetPassword />} />
 
@@ -246,6 +347,7 @@ function AppRoutes() {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/cookies" element={<Cookies />} />
+      <Route path="/unsubscribe" element={<Unsubscribe />} />
 
       <Route path="/__preview-dashboard" element={
         <div className="theme-client">
@@ -260,6 +362,17 @@ function AppRoutes() {
         element={
           <RequireAdmin>
             <AdminLayout />
+          </RequireAdmin>
+        }
+      />
+
+      {/* Deliberately outside AdminLayout - this renders the client's own
+          Shell (read-only), not the admin's sidebar chrome. */}
+      <Route
+        path="/admin/impersonate/:clientId/*"
+        element={
+          <RequireAdmin>
+            <ImpersonateZone />
           </RequireAdmin>
         }
       />

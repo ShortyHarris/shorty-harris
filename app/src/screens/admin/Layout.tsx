@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, LogOut, Bell,
   ClipboardCheck, Flame, Newspaper,
-  Building2, Users, Megaphone, BarChart2, Activity, BookOpen,
+  Building2, Users, Megaphone, BarChart2, Activity, BookOpen, ShieldAlert, Filter,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
+import { BrandLockup } from '../../components/BrandLockup';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { useApprovalQueue } from '../../hooks/useApprovalQueue';
 import { useBlogQueue } from '../../hooks/useBlogPosts';
@@ -18,7 +19,9 @@ import { Prospects } from './Prospects';
 import { Campaigns, HotLeads } from './CampaignsAndLeads';
 import { Analytics } from './Analytics';
 import { Monitoring } from './Monitoring';
+import { AdminResults } from './AdminResults';
 import { DocsAdmin } from './DocsAdmin';
+import { Domains } from './Domains';
 import '../../styles/theme-admin.css';
 import '../../styles/admin-tables.css';
 import './Layout.css';
@@ -34,7 +37,7 @@ export function AdminLayout() {
   const initial = (profile?.full_name ?? 'A')[0].toUpperCase();
   const name    = profile?.full_name ?? 'Administrator';
 
-  // Badge counts — each reuses the exact same hook/query the destination page
+  // Badge counts - each reuses the exact same hook/query the destination page
   // itself uses, so the sidebar number can never drift from what the page shows.
   const { stats: approvalStats } = useApprovalQueue();
   const { pending: pendingPosts } = useBlogQueue();
@@ -54,13 +57,15 @@ export function AdminLayout() {
     { to: '/admin/clients',    label: 'Clients',    icon: Building2  },
     { to: '/admin/prospects',  label: 'Prospects',  icon: Users      },
     { to: '/admin/campaigns',  label: 'Campaigns',  icon: Megaphone, badge: campaignsToReview, badgeColor: '#6b4fa0' },
+    { to: '/admin/results',    label: 'Results',    icon: Filter     },
     { to: '/admin/analytics',  label: 'Analytics',  icon: BarChart2  },
     { to: '/admin/monitoring', label: 'Monitoring', icon: Activity, badge: unresolvedErrors.length, badgeColor: '#a8533a' },
     { to: '/admin/docs',       label: 'Docs',       icon: BookOpen   },
+    { to: '/admin/domains',    label: 'Domains',    icon: ShieldAlert },
   ];
 
   // Notification bell aggregates the same live counts already shown as
-  // sidebar badges above — there's no separate admin notification log in the
+  // sidebar badges above - there's no separate admin notification log in the
   // schema (the `notifications` table is client-facing hot-lead alerts, not
   // an admin feed), so this is a live "what needs attention" view rather
   // than a history of past events. No mark-as-read: counts regenerate from
@@ -75,28 +80,50 @@ export function AdminLayout() {
 
   return (
     <div className="theme-admin">
+      {/* ── Top bar - spans the FULL page width, above both the sidebar and
+           the main column (not just above main) - logo on the left,
+           notifications + the signed-in user on the right. Hidden below
+           768px in favor of .amobile-bar, which plays the same role. ──── */}
+      <header className="atopbar">
+        <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}><BrandLockup iconSize={22} noMargin /></Link>
+        <div className="atopbar-right">
+          <AdminNotificationBell items={NOTIF_ITEMS} />
+          <div className="atopbar-user">
+            <div className="atopbar-user-avatar">{initial}</div>
+            <div className="atopbar-user-info">
+              <div className="atopbar-user-name">{name}</div>
+              <div className="atopbar-user-role">Super Admin</div>
+            </div>
+            <button className="atopbar-signout" onClick={signOut} title="Sign out">
+              <LogOut size={14} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="amobile-bar">
+        <Link to="/" className="amobile-brand" style={{ textDecoration: 'none', color: 'inherit' }}>
+
+          Shorty Harris
+        </Link>
+        <div className="flex items-center gap-1">
+          <AdminNotificationBell items={NOTIF_ITEMS} />
+          <button className="ahamburger" onClick={() => setMobileOpen(true)} aria-label="Open menu">
+            <span /><span /><span />
+          </button>
+        </div>
+      </div>
+
       <div className="ashell">
 
-        {/* ── DESKTOP SIDEBAR ───────────────────────────────────────── */}
+        {/* ── DESKTOP SIDEBAR - navigation only; branding and account info
+             live in the top bar above ──────────────────────────────────── */}
         <aside className="aside">
-          <SidebarInner initial={initial} name={name} signOut={signOut} onNav={() => {}} navDaily={NAV_DAILY} navOps={NAV_OPS} notifItems={NOTIF_ITEMS} />
+          <SidebarInner navDaily={NAV_DAILY} navOps={NAV_OPS} onNav={() => {}} />
         </aside>
 
         {/* ── MAIN ─────────────────────────────────────────────────── */}
         <div className="amain">
-          <div className="amobile-bar">
-            <Link to="/" className="amobile-brand" style={{ textDecoration: 'none', color: 'inherit' }}>
-
-              Shorty Harris
-            </Link>
-            <div className="flex items-center gap-1">
-              <AdminNotificationBell items={NOTIF_ITEMS} />
-              <button className="ahamburger" onClick={() => setMobileOpen(true)} aria-label="Open menu">
-                <span /><span /><span />
-              </button>
-            </div>
-          </div>
-
           <main className="apage">
             <Routes>
               <Route path="approvals"  element={<ApprovalQueue />} />
@@ -105,9 +132,11 @@ export function AdminLayout() {
               <Route path="prospects"  element={<Prospects />} />
               <Route path="campaigns"  element={<Campaigns />} />
               <Route path="hot-leads"  element={<HotLeads />} />
+              <Route path="results"    element={<AdminResults />} />
               <Route path="analytics"  element={<Analytics />} />
               <Route path="monitoring" element={<Monitoring />} />
               <Route path="docs"       element={<DocsAdmin />} />
+              <Route path="domains"    element={<Domains />} />
               <Route path="*" element={<Navigate to="/admin/approvals" replace />} />
             </Routes>
           </main>
@@ -188,40 +217,35 @@ export function AdminLayout() {
   );
 }
 
-/* ── Desktop sidebar ─────────────────────────────────────────────── */
+/* ── Desktop sidebar - navigation only. Branding and the signed-in user
+   live in the top bar (AdminLayout) instead. ────────────────────────── */
 function SidebarInner({
-  initial, name, signOut, onNav, navDaily, navOps, notifItems,
+  onNav, navDaily, navOps,
 }: {
-  initial: string; name: string;
-  signOut: () => void; onNav: () => void;
+  onNav: () => void;
   navDaily: NavItem[]; navOps: NavItem[];
-  notifItems: NotifItem[];
 }) {
   const navigate = useNavigate();
   return (
     <>
-      {/* Brand */}
-      <div className="aside-brand">
-        <Link to="/" className="flex-1 min-w-0" style={{ textDecoration: 'none' }}>
-          <div className="aside-brand-name">Shorty Harris</div>
-          <div className="aside-brand-sub">Admin Dashboard</div>
-        </Link>
-        <AdminNotificationBell items={notifItems} />
+      {/* Scrolls independently of the bottom button below — this grows with
+          the nav list (Operations keeps gaining items) without pushing
+          New Campaign out of view. */}
+      <div className="aside-scroll">
+        {/* Daily nav */}
+        <p className="aside-section-label" style={{ marginTop: 4 }}>Daily</p>
+        <nav className="aside-nav">
+          {navDaily.map((n) => <NavItem key={n.to} item={n} onNav={onNav} />)}
+        </nav>
+
+        {/* Operations nav */}
+        <p className="aside-section-label" style={{ marginTop: 18 }}>Operations</p>
+        <nav className="aside-nav">
+          {navOps.map((n) => <NavItem key={n.to} item={n} onNav={onNav} />)}
+        </nav>
       </div>
 
-      {/* Daily nav */}
-      <p className="aside-section-label">Daily</p>
-      <nav className="aside-nav">
-        {navDaily.map((n) => <NavItem key={n.to} item={n} onNav={onNav} />)}
-      </nav>
-
-      {/* Operations nav */}
-      <p className="aside-section-label" style={{ marginTop: 18 }}>Operations</p>
-      <nav className="aside-nav">
-        {navOps.map((n) => <NavItem key={n.to} item={n} onNav={onNav} />)}
-      </nav>
-
-      {/* Bottom */}
+      {/* Bottom — fixed in place, never scrolls with the nav above */}
       <div className="aside-bottom">
         <button
           className="aside-new"
@@ -230,16 +254,6 @@ function SidebarInner({
           <Megaphone size={14} strokeWidth={2} />
           New Campaign
         </button>
-        <div className="aside-user">
-          <div className="aside-user-avatar">{initial}</div>
-          <div className="aside-user-info">
-            <div className="aside-user-name">{name}</div>
-            <div className="aside-user-role">Super Admin</div>
-          </div>
-          <button className="aside-signout" onClick={signOut} title="Sign out">
-            <LogOut size={14} />
-          </button>
-        </div>
       </div>
     </>
   );
@@ -261,7 +275,7 @@ function NavItem({ item, onNav }: { item: NavItem; onNav: () => void }) {
   );
 }
 
-/* ── Small count bubble — shown next to a nav label when count > 0 ── */
+/* ── Small count bubble - shown next to a nav label when count > 0 ── */
 function NavBadge({ count, color = '#d4870f' }: { count?: number; color?: string }) {
   if (!count) return null;
   return (
@@ -274,7 +288,7 @@ function NavBadge({ count, color = '#d4870f' }: { count?: number; color?: string
   );
 }
 
-/* ── Notification bell — aggregates the same live counts already shown as
+/* ── Notification bell - aggregates the same live counts already shown as
    sidebar badges into one dropdown. No mark-as-read: these are live counts,
    not a log, so there's nothing to persist as "read". ── */
 function AdminNotificationBell({ items }: { items: NotifItem[] }) {
@@ -303,7 +317,7 @@ function AdminNotificationBell({ items }: { items: NotifItem[] }) {
             // z-[100] rather than the usual z-50: on the Analytics page, recharts
             // portals each chart's tooltip into its own chart container (not into
             // <body>), so it isn't a sibling this overlay can out-rank just by
-            // being later in the DOM — bumping z-index is the reliable fix.
+            // being later in the DOM - bumping z-index is the reliable fix.
             className="fixed inset-0 z-100 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

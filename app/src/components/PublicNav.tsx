@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 
 // Shared header for every public-facing page (Home, Blog, BlogPost, …).
 // The "How it works" / "Results" links only make sense on the home page
-// (they scroll to sections that only exist there) — everything else
+// (they scroll to sections that only exist there) - everything else
 // (logo, Blog, Log in, Get started) is identical everywhere.
 
 const SCROLL_LINKS = [
@@ -91,7 +91,7 @@ export function PublicNav() {
                 Log in
               </Link>
               <Link
-                to="/login"
+                to="/signup"
                 className="hidden md:inline-flex items-center bg-[#1a1b17] text-white px-5 py-2.5 rounded-[10px] text-[14px] font-semibold no-underline hover:bg-[#3c7a5b] transition-colors whitespace-nowrap"
               >
                 Get started
@@ -152,7 +152,7 @@ export function PublicNav() {
                   Log in
                 </Link>
                 <Link
-                  to="/login"
+                  to="/signup"
                   onClick={() => setMenuOpen(false)}
                   className="flex items-center justify-center rounded-[10px] bg-[#1a1b17] px-4 py-3 text-[15px] font-semibold text-white no-underline hover:bg-[#3c7a5b] transition-colors"
                 >

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
 export interface CampaignAnalytics {
@@ -75,19 +76,19 @@ function weekLabel(weekStartIsoDate: string): string {
 
 const WEEKS_OF_TREND = 8;
 
-async function fetchClientAnalytics(clientId: string): Promise<ClientAnalytics> {
+async function fetchClientAnalytics(clientId: string, client: SupabaseClient): Promise<ClientAnalytics> {
   const [campaignsRes, messagesRes, repliesRes, dncRes] = await Promise.all([
-    supabase.from('campaigns').select('id, name').eq('client_id', clientId),
-    supabase
+    client.from('campaigns').select('id, name').eq('client_id', clientId),
+    client
       .from('messages')
       .select('id, campaign_id, sent_at, opened_at, open_count')
       .eq('client_id', clientId)
       .eq('send_status', 'sent'),
-    supabase
+    client
       .from('replies')
       .select('prospect_id, intent, classified_at, prospect:prospects ( campaign_id )')
       .eq('client_id', clientId),
-    supabase
+    client
       .from('do_not_contact')
       .select('id, created_at, prospect:prospects!source_prospect_id ( campaign_id )'),
   ]);
@@ -243,12 +244,12 @@ function mockAnalytics(): ClientAnalytics {
   };
 }
 
-export function useClientAnalytics(clientId: string) {
+export function useClientAnalytics(clientId: string, client: SupabaseClient = supabase) {
   const isPreview = clientId === '__preview__';
 
   const { data, isLoading: loading, error } = useQuery({
     queryKey: clientAnalyticsKey(clientId),
-    queryFn: () => fetchClientAnalytics(clientId),
+    queryFn: () => fetchClientAnalytics(clientId, client),
     enabled: !isPreview,
     staleTime: 5 * 60 * 1000,
     ...(isPreview ? { initialData: mockAnalytics() } : {}),

@@ -17,7 +17,7 @@ function slugifyHeading(text: string): string {
 
 interface TocEntry { id: string; text: string; level: 2 | 3; }
 
-// marked's default renderer emits plain <h2>/<h3> with no id — inject one
+// marked's default renderer emits plain <h2>/<h3> with no id - inject one
 // derived from the heading text, and collect the same ids for the mini-TOC,
 // so the two can never drift out of sync with each other.
 function renderBody(md: string): { html: string; toc: TocEntry[] } {
@@ -75,7 +75,7 @@ export function Docs() {
       <nav className="docs-sidebar-nav">
         {categories.map(({ category, articles }) => {
           // Whichever category holds the active article is always shown
-          // expanded — derived at render time so there's no effect/setState
+          // expanded - derived at render time so there's no effect/setState
           // needed just to seed the "default open" behavior.
           const isOpen = expanded.has(category) || category === active?.category;
           return (

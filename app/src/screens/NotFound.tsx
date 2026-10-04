@@ -5,7 +5,7 @@ import { PublicFooter } from '../components/PublicFooter';
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif" };
 
-// Catch-all for any URL that doesn't match a real route — renders
+// Catch-all for any URL that doesn't match a real route - renders
 // synchronously (no data fetching) so crawlers get real "not found" content
 // immediately, and marks itself noindex so it never competes with real pages
 // in search results. Deliberately does NOT redirect anywhere: routing an
@@ -13,7 +13,7 @@ const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', -apple-sys
 // "page with redirect" that also happens to be blocked by robots.txt.
 export function NotFound() {
   useEffect(() => {
-    document.title = 'Page not found — Shorty Harris';
+    document.title = 'Page not found - Shorty Harris';
 
     let el = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
     if (!el) {

@@ -21,8 +21,8 @@ const VIEW = { once: true, margin: "-60px" } as const;
 
 export function Home() {
   useSeo({
-    title: 'Shorty Harris — AI-Powered Outbound for Small & Family Businesses',
-    description: "Shorty Harris finds ideal customers, writes outreach, follows up, and routes hot leads to your team — outbound prospecting on autopilot for small and family businesses.",
+    title: 'Shorty Harris - AI-Powered Outbound for Small & Family Businesses',
+    description: "Shorty Harris finds ideal customers, writes outreach, follows up, and routes hot leads to your team - outbound prospecting on autopilot for small and family businesses.",
     path: '/',
   });
 
@@ -49,15 +49,15 @@ export function Home() {
 const INDUSTRIES = ["Cleaning", "Gyms", "Hotels", "Clinics", "Retail", "Logistics"];
 
 const HERO_BG = [
-  /* green glow — top center */
+  /* green glow - top center */
   "radial-gradient(72% 55% at 50% -8%,  rgba(60,122,91,0.28)  0%, transparent 100%)",
-  /* amber glow — upper right */
+  /* amber glow - upper right */
   "radial-gradient(55% 65% at 95% 22%,  rgba(212,135,15,0.24) 0%, transparent 100%)",
-  /* teal-blue glow — left */
+  /* teal-blue glow - left */
   "radial-gradient(48% 55% at 2%  65%,  rgba(42,122,158,0.20) 0%, transparent 100%)",
-  /* coral glow — lower right */
+  /* coral glow - lower right */
   "radial-gradient(40% 48% at 90% 90%,  rgba(196,82,58,0.18)  0%, transparent 100%)",
-  /* lime accent — lower left */
+  /* lime accent - lower left */
   "radial-gradient(38% 40% at 12% 92%,  rgba(106,178,60,0.14) 0%, transparent 100%)",
   /* base */
   "#faf9f7",
@@ -67,7 +67,7 @@ function Hero() {
   return (
     <section className="relative overflow-hidden pt-16 pb-0 lg:pt-28" style={{ background: HERO_BG }}>
 
-      {/* Decorative vertical border lines — desktop only */}
+      {/* Decorative vertical border lines - desktop only */}
       <div aria-hidden className="pointer-events-none absolute inset-0 hidden lg:block">
         <div
           className="absolute left-[calc(50%-580px)] inset-y-0 w-px"
@@ -112,7 +112,7 @@ function Hero() {
         {/* CTAs */}
         <div className="flex items-center gap-3 flex-wrap justify-center mb-5">
           <Link
-            to="/login"
+            to="/signup"
             className="inline-flex items-center bg-[#1a1b17] text-white px-7 py-[15px] rounded-[14px] text-[15px] font-bold no-underline hover:bg-[#3c7a5b] transition-all hover:-translate-y-0.5 whitespace-nowrap shadow-[0_2px_0_rgba(0,0,0,0.3),0_8px_24px_rgba(26,27,23,0.22)]"
           >
             Get started free
@@ -195,7 +195,7 @@ function Features() {
           Everything handled for you
         </motion.h2>
         <motion.p variants={fadeUp} className="text-[16px] text-[#54574e] max-w-[480px] leading-[1.55] m-0">
-          From finding the right targets to warming them up — we run the full outbound loop.
+          From finding the right targets to warming them up - we run the full outbound loop.
         </motion.p>
       </motion.div>
 
@@ -203,7 +203,7 @@ function Features() {
         className="grid grid-cols-1 md:grid-cols-2 gap-4"
         initial="hidden" whileInView="show" viewport={VIEW} variants={stagger}
       >
-        {/* Card 1 — Find businesses */}
+        {/* Card 1 - Find businesses */}
         <motion.div variants={fadeUp} className="bg-white border border-[#e5ddd3] rounded-[20px] overflow-hidden flex flex-col hover:border-[#b4d5c0] hover:shadow-[0_12px_32px_-12px_rgba(60,122,91,0.15)] transition-all">
           <div className="flex items-end justify-center px-8 py-10 pb-0 bg-[#f7f4ee] min-h-[190px]">
             <ProspectVisual />
@@ -214,18 +214,18 @@ function Features() {
           </div>
         </motion.div>
 
-        {/* Card 2 — AI writes */}
+        {/* Card 2 - AI writes */}
         <motion.div variants={fadeUp} className="bg-white border border-[#e5ddd3] rounded-[20px] overflow-hidden flex flex-col hover:border-[#b4d5c0] hover:shadow-[0_12px_32px_-12px_rgba(60,122,91,0.15)] transition-all">
           <div className="flex items-end justify-center px-8 pt-8 pb-0 bg-[#f7f4ee] min-h-[190px]">
             <MessageVisual />
           </div>
           <div className="p-7 pt-6">
             <h3 className="text-[18px] font-bold tracking-[-0.02em] text-[#1a1b17] m-0 mb-2">AI writes every message</h3>
-            <p className="text-[14.5px] leading-[1.6] text-[#54574e] m-0">Each outreach is drafted personally for that business — not a template. Your team reviews before anything goes out.</p>
+            <p className="text-[14.5px] leading-[1.6] text-[#54574e] m-0">Each outreach is drafted personally for that business - not a template. Your team reviews before anything goes out.</p>
           </div>
         </motion.div>
 
-        {/* Card 3 — Filter */}
+        {/* Card 3 - Filter */}
         <motion.div variants={fadeUp} className="bg-white border border-[#e5ddd3] rounded-[20px] overflow-hidden flex flex-col hover:border-[#b4d5c0] hover:shadow-[0_12px_32px_-12px_rgba(60,122,91,0.15)] transition-all">
           <div className="flex items-center justify-center px-8 pt-8 pb-0 bg-[#f7f4ee] min-h-[190px]">
             <FilterVisual />
@@ -236,7 +236,7 @@ function Features() {
           </div>
         </motion.div>
 
-        {/* Card 4 — Close */}
+        {/* Card 4 - Close */}
         <motion.div variants={fadeUp} className="bg-white border border-[#e5ddd3] rounded-[20px] overflow-hidden flex flex-col hover:border-[#b4d5c0] hover:shadow-[0_12px_32px_-12px_rgba(60,122,91,0.15)] transition-all">
           <div className="flex items-end justify-center px-8 pt-8 pb-0 bg-[#f7f4ee] min-h-[190px]">
             <LeadCardVisual />
@@ -368,7 +368,7 @@ function LeadCardVisual() {
           <div className="text-[9px] text-[#9b9e96] font-bold uppercase tracking-wider mb-1">What they said</div>
           <p className="text-[10.5px] text-[#54574e] italic leading-relaxed m-0">"Please send over your pricing. We've been looking for a partner like this."</p>
         </div>
-        <div className="text-[10px] text-[#3c7a5b] font-semibold">→ Call them today — they're ready to talk</div>
+        <div className="text-[10px] text-[#3c7a5b] font-semibold">→ Call them today - they're ready to talk</div>
         <div className="flex gap-1.5">
           <div className="flex-1 rounded-[7px] bg-[#3c7a5b] text-white text-[10px] font-bold text-center py-1.5">Call</div>
           <div className="flex-1 rounded-[7px] border border-[#e8e3da] text-[#54574e] text-[10px] font-semibold text-center py-1.5">Email</div>
@@ -435,7 +435,7 @@ function BigQuote() {
 
 // ── Data use ──────────────────────────────────────────────────────────────────
 // Explicit, plain-language disclosure of why Shorty Harris requests Gmail
-// access — required to be visible on the public homepage (not just the
+// access - required to be visible on the public homepage (not just the
 // privacy policy) for Google OAuth verification of the Gmail scope.
 
 function DataUse() {
@@ -455,7 +455,7 @@ function DataUse() {
         How we use your Gmail
       </motion.h2>
       <motion.p variants={fadeUp} className="text-[15px] leading-[1.7] text-[#54574e] max-w-[560px] mx-auto m-0 mb-3">
-        Clients can optionally connect their own Gmail account so outreach emails go out from their real business address instead of a shared one. We use that access only to send those emails and detect replies to them — we never read unrelated mail, and we never sell or share this data with anyone.
+        Clients can optionally connect their own Gmail account so outreach emails go out from their real business address instead of a shared one. We use that access only to send those emails and detect replies to them - we never read unrelated mail, and we never sell or share this data with anyone.
       </motion.p>
       <motion.p variants={fadeUp} className="text-[15px] leading-[1.7] text-[#54574e] max-w-[560px] mx-auto m-0">
         Gmail access can be disconnected at any time from your dashboard's Settings page. Full details are in our{" "}
@@ -478,7 +478,7 @@ function CtaBand() {
         {/* ── Left botanical ─────────────────────────────────────────── */}
         <div className="absolute inset-y-0 left-0 w-2/5 md:w-[38%] pointer-events-none select-none" aria-hidden>
           <svg viewBox="0 0 300 340" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full" preserveAspectRatio="xMinYMax meet">
-            {/* Deepest background — palest, widest sweep */}
+            {/* Deepest background - palest, widest sweep */}
             <path d="M-70 360 C-20 262 65 172 158 115 C172 146 154 234 94 302 C54 346 -4 372 -70 360Z" fill="#d8f0c4" opacity="0.42"/>
             {/* Background leaf 2 */}
             <path d="M-40 360 C-10 280 50 200 130 150 C145 185 130 260 75 320 C40 360 0 368 -40 360Z" fill="#c4e6b4" opacity="0.60"/>
@@ -585,7 +585,7 @@ function CtaBand() {
           </motion.p>
           <motion.div variants={fadeUp}>
             <Link
-              to="/login"
+              to="/signup"
               className="inline-flex items-center gap-2 bg-[#1a3527] text-white px-8 py-[14px] rounded-full text-[15px] font-bold no-underline hover:bg-[#2d5e46] hover:-translate-y-0.5 transition-all"
               style={{ boxShadow: "0 4px 18px rgba(26,53,39,0.28)" }}
             >

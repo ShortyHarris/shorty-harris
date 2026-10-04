@@ -7,8 +7,12 @@ import {
 } from '../../hooks/useAdminData';
 import type { ProspectListRow, UpdateProspectInput, ProspectDeleteCounts } from '../../hooks/useAdminData';
 import { SkeletonTable } from '../../components/Skeleton';
+import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { RowMenu } from '../../components/RowMenu';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
+import { useToast, ToastHost } from '../../components/Toast';
+import { RefreshButton } from '../../components/RefreshButton';
+import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import { isValidEmail, isValidPhone, normalizePhone } from '../../lib/validation';
 
 const HELP: HelpContent = {
@@ -17,11 +21,11 @@ const HELP: HelpContent = {
     { type: 'p', text: "Every contact added to the outreach pipeline, across all clients and campaigns. The scraper finds and adds them automatically." },
     { type: 'p', text: "Use the ⋮ menu on each row to update their pipeline status or copy their email. Use the filters at the top to narrow by client, status, or category." },
     { type: 'ul', items: [
-      "New — just added, no contact yet",
-      "Contacted — email sent",
-      "Replied — they responded",
-      "Hot Lead — showed buying interest",
-      "Won / Lost — deal resolved",
+      "New - just added, no contact yet",
+      "Contacted - email sent",
+      "Replied - they responded",
+      "Hot Lead - showed buying interest",
+      "Won / Lost - deal resolved",
     ]},
   ],
 };
@@ -57,7 +61,9 @@ const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#3c
 const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#a8533a] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#8a3f2b] disabled:opacity-50';
 
 export function Prospects() {
-  const { rows, loading, error, reload, updateStatus } = useProspects();
+  const { rows, loading, isFetching, dataUpdatedAt, error, reload, updateStatus } = useProspects();
+  const { toasts, toast, dismiss } = useToast();
+  const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh prospects.');
   const [q, setQ]           = useState('');
   const [status, setStatus] = useState('all');
   const [cat, setCat]       = useState('all');
@@ -102,13 +108,13 @@ export function Prospects() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton content={HELP} />
-          <button onClick={reload} className={ghostCls}>Refresh</button>
+          <RefreshButton onRefresh={handleRefresh} isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} className={ghostCls} />
           <button onClick={() => setShowAdd(true)} className={`${primaryCls} hidden md:inline-flex`}>+ Add prospect</button>
         </div>
       </header>
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[#ece8df] bg-white p-3">
+      <div className="flex flex-wrap items-center gap-3  bg-white ">
         <div className="relative flex min-w-[220px] flex-1 items-center">
           <Search className="absolute left-3 h-4 w-4 text-[#9a9d92] pointer-events-none" />
           <input
@@ -158,7 +164,7 @@ export function Prospects() {
 
       {/* Table / Cards */}
       {loading ? (
-        <SkeletonTable rows={PAGE_SIZE} cols={6} />
+        <SkeletonTable rows={PAGE_SIZE} cols={5} />
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
           <strong className="text-[15px] font-bold text-[#20211c]">No matches.</strong>
@@ -170,17 +176,16 @@ export function Prospects() {
           <div className="atbl hidden md:block">
             <table className="table-fixed">
               <colgroup>
-                <col className="w-[20%]" />
-                <col className="w-[20%]" />
-                <col className="w-[14%]" />
-                <col className="w-[12%]" />
-                <col className="w-[14%]" />
+                <col className="w-[24%]" />
+                <col className="w-[24%]" />
+                <col className="w-[16%]" />
+                <col className="w-[16%]" />
                 <col className="w-[14%]" />
                 <col className="w-[6%]" />
               </colgroup>
               <thead>
                 <tr>
-                  {['Business', 'Contact', 'Client', 'Category', 'Location', 'Status', ''].map((h) => (
+                  {['Business', 'Contact', 'Category', 'Location', 'Status', ''].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -221,7 +226,7 @@ export function Prospects() {
                         <div className="truncate font-bold text-[#20211c]" title={r.business_name}>{r.business_name}</div>
                       </td>
                       <td className="min-w-0">
-                        <div className="truncate text-[#20211c]" title={r.contact_name ?? undefined}>{r.contact_name ?? '—'}</div>
+                        <div className="truncate text-[#20211c]" title={r.contact_name ?? undefined}>{r.contact_name ?? '-'}</div>
                         {r.email && (
                           <div className="mt-0.5 truncate font-mono text-[11px] text-[#9a9d92]" title={r.email}>
                             {r.email}
@@ -229,15 +234,12 @@ export function Prospects() {
                         )}
                       </td>
                       <td className="min-w-0 text-[#62655c]">
-                        <div className="truncate" title={r.client?.business_name ?? undefined}>{r.client?.business_name ?? '—'}</div>
+                        <div className="truncate" title={r.category ?? undefined}>{r.category ?? '-'}</div>
                       </td>
                       <td className="min-w-0 text-[#62655c]">
-                        <div className="truncate" title={r.category ?? undefined}>{r.category ?? '—'}</div>
+                        <div className="truncate" title={r.location ?? undefined}>{r.location ?? '-'}</div>
                       </td>
-                      <td className="min-w-0 text-[#62655c]">
-                        <div className="truncate" title={r.location ?? undefined}>{r.location ?? '—'}</div>
-                      </td>
-                      <td>
+                      <td className="pr-3">
                         <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
                           {r.pipeline_status.replace(/_/g, ' ')}
                         </span>
@@ -378,6 +380,8 @@ export function Prospects() {
           />
         )}
       </AnimatePresence>
+
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }
@@ -428,10 +432,10 @@ function NewProspectModal({ onClose, onCreated }: { onClose: () => void; onCreat
       });
       const json = await res.json();
       if (json.prospect_id || json.status === 'imported') {
-        setSuccessId(json.prospect_id ?? '—');
+        setSuccessId(json.prospect_id ?? '-');
         onCreated();
       } else {
-        setErr(json.message ?? 'Import failed — check the response from WF1.');
+        setErr(json.message ?? 'Import failed - check the response from WF1.');
       }
     } catch {
       setErr('Could not reach the import endpoint. Check your connection.');
@@ -450,7 +454,7 @@ function NewProspectModal({ onClose, onCreated }: { onClose: () => void; onCreat
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}
@@ -595,7 +599,7 @@ function EditProspectModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}
@@ -697,7 +701,7 @@ function DeleteProspectModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}
@@ -732,7 +736,7 @@ function DeleteProspectModal({
                 Counting affected records…
               </div>
             ) : blastItems.length === 0 ? (
-              <p className="text-[13px] text-[#62655c]">No associated records — the prospect row only.</p>
+              <p className="text-[13px] text-[#62655c]">No associated records - the prospect row only.</p>
             ) : (
               <ul className="m-0 list-none p-0 flex flex-col gap-1">
                 {blastItems.map((item) => (

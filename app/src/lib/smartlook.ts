@@ -1,6 +1,6 @@
 import smartlookClient from 'smartlook-client';
 
-// Client-dashboard only (see ClientZone in App.tsx) — not the admin side or
+// Client-dashboard only (see ClientZone in App.tsx) - not the admin side or
 // the public marketing site. Project keys like this are meant to sit in
 // front-end code (same threat model as the GA tracking id or Supabase anon
 // key already hardcoded elsewhere in this app); this doesn't grant access to

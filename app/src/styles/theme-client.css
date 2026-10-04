@@ -1,4 +1,4 @@
-/* Client "good news feed" palette — warm, calm, rewarding */
+/* Client "good news feed" palette - warm, calm, rewarding */
 .theme-client {
   --bg: #fbf9f5;
   --surface: #ffffff;
@@ -32,7 +32,29 @@
 /* shared atoms used across client screens */
 .theme-client .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
 
-/* Shared page wrapper — lives here (not in a per-screen CSS file) because
+/* Two-font system matching the admin theme: Plus Jakarta Sans (display
+   weight) for headings and labels, Inter for body copy, table data, and
+   form inputs read at length. */
+.theme-client p,
+.theme-client td,
+.theme-client input,
+.theme-client textarea,
+.theme-client select,
+.theme-client li {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.theme-client h1,
+.theme-client h2,
+.theme-client h3,
+.theme-client h4,
+.theme-client th,
+.theme-client button,
+.theme-client label {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Shared page wrapper - lives here (not in a per-screen CSS file) because
    this stylesheet is imported eagerly in App.tsx, while Billing/Settings/
    Approvals are each lazy-loaded into their own chunk. A class defined in
    one screen's own CSS file only ever loads once that screen's chunk has

@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Supabase fires TOKEN_REFRESHED whenever the tab regains focus/visibility
       // and the session gets silently revalidated. This is NOT a real sign-in
       // event, so we must not re-trigger loading state or refetch the profile
-      // here — doing so causes `loading` to flip back to true every time the
+      // here - doing so causes `loading` to flip back to true every time the
       // user switches tabs, which unmounts anything gated on it (e.g. modals).
       if (event === 'TOKEN_REFRESHED') {
         return;
@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function loadProfile(userId: string) {
-    // Already have this exact user's profile loaded — skip the redundant
+    // Already have this exact user's profile loaded - skip the redundant
     // setLoading(true)/refetch cycle entirely.
     if (loadedProfileId.current === userId) return;
 
@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut();
     } catch (err) {
       // Swallow failures (e.g. Navigator LockManager timeouts or a failed
-      // revoke request) — we still want to clear local state below so the
+      // revoke request) - we still want to clear local state below so the
       // user is signed out on this device even if the server call hung.
       console.error('Sign out request failed', err);
     } finally {

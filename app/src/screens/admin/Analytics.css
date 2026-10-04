@@ -71,7 +71,7 @@
   }
 
   /* The admin sidebar is a fixed 252px, so tablet-width viewports (768-1023px)
-     leave much less room for this content than the raw viewport suggests —
+     leave much less room for this content than the raw viewport suggests -
      a 4-column grid there is cramped well before a "phone" breakpoint. */
   @media (max-width: 1023px) {
     .metric-row  { @apply grid-cols-2; }

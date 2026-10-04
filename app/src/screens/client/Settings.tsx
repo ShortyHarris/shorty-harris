@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, CheckCircle2, AlertTriangle, LogOut, BarChart3, ChevronRight, Lock, Building2, BookOpen, Compass, ShieldCheck } from 'lucide-react';
+import { Mail, CheckCircle2, AlertTriangle, LogOut, BarChart3, ChevronRight, Lock, Building2, BookOpen, Compass, ShieldCheck, ShieldOff, Target } from 'lucide-react';
+import { BlockedDomainsModal } from './BlockedDomains';
 import { openConsentPreferences } from '../../lib/consent';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
 import { useClientProfile, type ClientProfile, type UpdateClientProfileInput } from '../../hooks/useClientProfile';
+import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { useAuth } from '../../auth/AuthProvider';
 import { useTour } from '../../tour/TourProvider';
 import { isValidEmail, isValidPhone, normalizePhone } from '../../lib/validation';
@@ -20,7 +22,7 @@ const inputStyle = { borderColor: 'var(--line)', background: 'var(--bg)', color:
 const HELP: HelpContent = {
   title: 'Email Connection',
   body: [
-    { type: 'p', text: "Connect your own Gmail so outreach emails go out from your business's real address instead of a shared one — replies land straight in your inbox." },
+    { type: 'p', text: "Connect your own Gmail so outreach emails go out from your business's real address instead of a shared one - replies land straight in your inbox." },
     { type: 'p', text: "You can disconnect at any time. If Gmail ever revokes access, reconnect here to pick back up." },
   ],
 };
@@ -33,7 +35,7 @@ function formatLastUsed(iso: string): string {
 
 /* ─── Business profile: name, type, address, contact info, signature name ───
    Shown as a tappable summary row (like the Analytics link below it) rather
-   than an always-open form — tapping it opens an edit modal. */
+   than an always-open form - tapping it opens an edit modal. */
 function ProfileSection({ clientId }: { clientId: string }) {
   const { profile, loading, updateProfile } = useClientProfile(clientId);
   const [editing, setEditing] = useState(false);
@@ -83,7 +85,7 @@ function ProfileEditModal({
   updateProfile: (input: UpdateClientProfileInput) => Promise<{ error: string | null }>;
   onClose: () => void;
 }) {
-  // Lazy initializer, not an effect — `profile` is already loaded by the time
+  // Lazy initializer, not an effect - `profile` is already loaded by the time
   // this component mounts (ProfileSection gates on it), so the form's local
   // editable copy only ever needs to be seeded once, at mount.
   const [form, setForm] = useState<UpdateClientProfileInput>(() => ({
@@ -127,7 +129,7 @@ function ProfileEditModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         className="flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[560px] md:rounded-2xl md:shadow-2xl"
@@ -148,7 +150,7 @@ function ProfileEditModal({
             <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Representative name</label>
             <input value={form.contact_name} onChange={(e) => set('contact_name', e.target.value)} placeholder="e.g. Yvonne" style={inputStyle} className={inputCls} />
             <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>
-              Used to sign outreach emails — e.g. "Have a wonderful day, {form.contact_name || '…'}"
+              Used to sign outreach emails - e.g. "Have a wonderful day, {form.contact_name || '…'}"
             </p>
           </div>
 
@@ -224,7 +226,7 @@ function ProfileEditModal({
   );
 }
 
-/* ─── Take a tour — replays the guided walkthrough on demand ─── */
+/* ─── Take a tour - replays the guided walkthrough on demand ─── */
 function TourReplayRow() {
   const { start } = useTour();
   return (
@@ -247,7 +249,7 @@ function TourReplayRow() {
 /* ─── Password change ───
    Reuses the existing forgot-password flow (AuthProvider.resetPassword →
    emails a reset link → /auth/set-password) instead of a raw new/confirm
-   password form here — one less place for password-change logic to live,
+   password form here - one less place for password-change logic to live,
    and it's already the tested, working path. */
 function PasswordSection() {
   const { session, resetPassword } = useAuth();
@@ -301,6 +303,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
   const [searchParams, setSearchParams] = useSearchParams();
   const [banner, setBanner] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [showBlockedDomains, setShowBlockedDomains] = useState(false);
 
   useEffect(() => {
     const connected = searchParams.get('gmail_connected');
@@ -311,6 +314,11 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
       reload();
     } else if (gmailError) {
       setBanner({ kind: 'error', text: `Failed to connect Gmail: ${gmailError}` });
+      setSearchParams({}, { replace: true });
+    }
+    // Deep link from the Results page's "Manage exclusions" insight action.
+    if (searchParams.get('open') === 'blacklist') {
+      setShowBlockedDomains(true);
       setSearchParams({}, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -355,6 +363,22 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
       </div>
       <div className="mb-6 overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
         <ProfileSection clientId={clientId} />
+
+        <div className="border-t" style={{ borderColor: 'var(--line)' }} />
+
+        <Link
+          to="/app/targeting"
+          className="flex items-center gap-3 p-5 no-underline transition-colors hover:bg-(--bg)"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: 'var(--leaf-tint)' }}>
+            <Target size={16} style={{ color: 'var(--leaf)' }} />
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-[15px] font-bold" style={{ color: 'var(--ink)' }}>Targeting profile</span>
+            <span className="block text-[13px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>Who we target on your behalf, and what's working.</span>
+          </span>
+          <ChevronRight size={16} style={{ color: 'var(--ink-faint)' }} />
+        </Link>
       </div>
 
       {/* ─── Outreach ─── */}
@@ -470,6 +494,22 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
 
         <div className="border-t" style={{ borderColor: 'var(--line)' }} />
 
+        <button
+          onClick={() => setShowBlockedDomains(true)}
+          className="flex w-full cursor-pointer items-center gap-3 p-5 text-left transition-colors hover:bg-(--bg)"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: 'var(--leaf-tint)' }}>
+            <ShieldOff size={16} style={{ color: 'var(--leaf)' }} />
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-[15px] font-bold" style={{ color: 'var(--ink)' }}>Blocked domains</span>
+            <span className="block text-[13px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>Domains we'll never send outreach to.</span>
+          </span>
+          <ChevronRight size={16} style={{ color: 'var(--ink-faint)' }} />
+        </button>
+
+        <div className="border-t" style={{ borderColor: 'var(--line)' }} />
+
         <Link
           to="/docs"
           className="flex items-center gap-3 p-5 no-underline transition-colors hover:bg-(--bg)"
@@ -488,6 +528,10 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
 
         <TourReplayRow />
       </div>
+
+      {showBlockedDomains && (
+        <BlockedDomainsModal clientId={clientId} onClose={() => setShowBlockedDomains(false)} />
+      )}
 
       {/* ─── Account ─── */}
       <div className="mb-2 px-0.5 text-[10.5px] font-bold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>

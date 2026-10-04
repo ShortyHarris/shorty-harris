@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
 
@@ -34,8 +35,8 @@ function mockWarmProspects(): WarmProspect[] {
   ];
 }
 
-async function fetchWarmProspects(clientId: string): Promise<WarmProspect[]> {
-  const { data, error } = await supabase
+async function fetchWarmProspects(clientId: string, client: SupabaseClient): Promise<WarmProspect[]> {
+  const { data, error } = await client
     .from('warm_prospects')
     .select('*')
     .eq('client_id', clientId)
@@ -47,12 +48,12 @@ async function fetchWarmProspects(clientId: string): Promise<WarmProspect[]> {
 
 export const warmProspectsKey = (clientId: string) => ['warm-prospects', clientId] as const;
 
-export function useWarmProspects(clientId: string) {
+export function useWarmProspects(clientId: string, client: SupabaseClient = supabase) {
   const isPreview = clientId === '__preview__';
 
   const { data, isLoading: loading, error } = useQuery({
     queryKey: warmProspectsKey(clientId),
-    queryFn: () => fetchWarmProspects(clientId),
+    queryFn: () => fetchWarmProspects(clientId, client),
     enabled: !isPreview,
     staleTime: 2 * 60 * 1000,
     ...(isPreview ? { initialData: mockWarmProspects() } : {}),
@@ -60,7 +61,7 @@ export function useWarmProspects(clientId: string) {
 
   // Logs how a manual call ended. Every outcome flips pipeline_status to
   // 'called', which a DB trigger (cancel_follow_ups_on_stop) picks up to
-  // cancel any pending automated follow-up for them — so the bot doesn't
+  // cancel any pending automated follow-up for them - so the bot doesn't
   // email someone the client just spoke to on the phone, regardless of how
   // the call went.
   const logCallOutcome = useCallback(async (prospectId: string, outcome: CallOutcome) => {
@@ -113,16 +114,16 @@ function mockProspectMessages(): ProspectMessage[] {
   ];
 }
 
-// Per-prospect send/open history — "what did they open, and how many times"
+// Per-prospect send/open history - "what did they open, and how many times"
 // for whoever's about to follow up with a call, so they know what's already
 // landed instead of guessing.
-export function useProspectMessages(prospectId: string | null) {
+export function useProspectMessages(prospectId: string | null, client: SupabaseClient = supabase) {
   const isPreview = prospectId?.startsWith('mock-') ?? false;
 
   const { data, isLoading: loading, error } = useQuery({
     queryKey: prospectMessagesKey(prospectId ?? ''),
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('messages')
         .select('id, message_type, subject, send_status, sent_at, opened_at, open_count')
         .eq('prospect_id', prospectId as string)

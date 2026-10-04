@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone, BookOpen, BarChart3 } from 'lucide-react';
+import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone, BookOpen, BarChart3, Target, Filter, Users } from 'lucide-react';
 import type { ClientNotification } from '../../hooks/useClientNotifications';
 import '../../styles/admin-tables.css';
 import './Shell.css';
@@ -18,6 +18,9 @@ export function Shell({
   onMarkAsRead,
   onMarkAllAsRead,
   onSignOut,
+  hideSettings = false,
+  signOutLabel = 'Sign out',
+  basePath = '/app',
   children,
 }: {
   businessName: string;
@@ -31,80 +34,105 @@ export function Shell({
   onMarkAsRead?: (id: string) => void;
   onMarkAllAsRead?: () => void;
   onSignOut: () => void;
+  hideSettings?: boolean;
+  signOutLabel?: string;
+  basePath?: string;
   children: ReactNode;
 }) {
   const nameInitial = (displayName  || 'U')[0].toUpperCase();
   const location = useLocation();
-  const showGmailBanner = !gmailConnected && location.pathname !== '/app/settings';
+  const showGmailBanner = !gmailConnected && location.pathname !== `${basePath}/settings`;
 
   return (
     <div className="cpage">
 
-      {/* ═══ DESKTOP SIDEBAR ═══ */}
-      <aside className="cside">
-        <div className="cside-brand">
-          <div className="flex-1 min-w-0">
-            <div className="cside-biz-name">{businessName}</div>
-            <div className="cside-biz-sub">Dashboard</div>
-          </div>
+      {/* ═══ DESKTOP TOP BAR - spans the full width above the sidebar and
+           content, business name left, notifications + signed-in user
+           right. Mirrors the admin top bar. Hidden on mobile in favor of
+           .ctopbar below. ═══ */}
+      <header className="ctopbar-desktop">
+        <span className="ctopbar-desktop-biz">{businessName}</span>
+        <div className="ctopbar-desktop-right">
           <NotificationBell
             notifications={notifications}
             unreadCount={unreadCount}
             onMarkAsRead={onMarkAsRead}
             onMarkAllAsRead={onMarkAllAsRead}
           />
-        </div>
-
-        <p className="cside-section-label">Menu</p>
-        <nav className="cside-nav">
-          <NavLink to="/app" end className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <Inbox size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Hot Leads
-            {newHotLeads > 0 && <span className="cside-nav-badge">{newHotLeads > 99 ? '99+' : newHotLeads}</span>}
-          </NavLink>
-          <NavLink to="/app/campaigns" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <Megaphone size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Campaigns
-          </NavLink>
-          <NavLink to="/app/approvals" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <ClipboardCheck size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Approvals
-            {pendingApprovals > 0 && <span className="cside-nav-badge">{pendingApprovals > 99 ? '99+' : pendingApprovals}</span>}
-          </NavLink>
-          <NavLink to="/app/analytics" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <BarChart3 size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Analytics
-          </NavLink>
-          <NavLink to="/app/billing" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <CreditCard size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Billing
-          </NavLink>
-          <NavLink to="/app/settings" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <Settings size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Settings
-          </NavLink>
-          <NavLink to="/docs" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <BookOpen size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Help &amp; Docs
-          </NavLink>
-        </nav>
-
-        <div className="cside-bottom">
-          <Link to="/app/billing" className="cside-credits">
-            <span className="cside-credits-num">{credits}</span>
-            <span className="cside-credits-label">credits remaining</span>
-            <span className="cside-credits-cta">Add credits </span>
-          </Link>
-          <div className="cside-user">
+          <div className="ctopbar-desktop-user">
             <div className="cside-user-avatar">{nameInitial}</div>
             <div className="cside-user-info">
               <div className="cside-user-name">{displayName}</div>
               <div className="cside-user-role">Account</div>
             </div>
-            <button className="cside-signout" onClick={onSignOut} title="Sign out">
+            <button className="cside-signout" onClick={onSignOut} title={signOutLabel}>
               <LogOut size={14} />
             </button>
           </div>
+        </div>
+      </header>
+
+      <div className="cshell-row">
+
+      {/* ═══ DESKTOP SIDEBAR - navigation only; branding and account info
+           live in the top bar above ═══ */}
+      <aside className="cside">
+        <div className="cside-scroll">
+        <p className="cside-section-label" style={{ marginTop: 4 }}>Menu</p>
+        <nav className="cside-nav">
+          <NavLink to={basePath} end className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <Inbox size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Hot Leads
+            {newHotLeads > 0 && <span className="cside-nav-badge">{newHotLeads > 99 ? '99+' : newHotLeads}</span>}
+          </NavLink>
+          <NavLink to={`${basePath}/results`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <Filter size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Results
+          </NavLink>
+          <NavLink to={`${basePath}/campaigns`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <Megaphone size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Campaigns
+          </NavLink>
+          <NavLink to={`${basePath}/prospects`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <Users size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Prospects
+          </NavLink>
+          <NavLink to={`${basePath}/approvals`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <ClipboardCheck size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Approvals
+            {pendingApprovals > 0 && <span className="cside-nav-badge">{pendingApprovals > 99 ? '99+' : pendingApprovals}</span>}
+          </NavLink>
+          <NavLink to={`${basePath}/analytics`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <BarChart3 size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Analytics
+          </NavLink>
+          <NavLink to={`${basePath}/targeting`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <Target size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Targeting
+          </NavLink>
+          <NavLink to={`${basePath}/billing`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <CreditCard size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Billing
+          </NavLink>
+          {!hideSettings && (
+            <NavLink to={`${basePath}/settings`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+              <Settings size={16} strokeWidth={1.9} className="cside-link-icon" />
+              Settings
+            </NavLink>
+          )}
+          <NavLink to="/docs" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+            <BookOpen size={16} strokeWidth={1.9} className="cside-link-icon" />
+            Help &amp; Docs
+          </NavLink>
+        </nav>
+        </div>
+
+        <div className="cside-bottom">
+          <Link to={`${basePath}/billing`} className="cside-credits">
+            <span className="cside-credits-num">{credits}</span>
+            <span className="cside-credits-label">credits remaining</span>
+            <span className="cside-credits-cta">Add credits </span>
+          </Link>
         </div>
       </aside>
 
@@ -112,7 +140,7 @@ export function Shell({
       <header className="ctopbar">
         <span className="ctopbar-biz">{businessName}</span>
         <Link
-          to="/app/analytics"
+          to={`${basePath}/analytics`}
           aria-label="Analytics"
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#62655c] transition-colors hover:bg-[#f5f2ec]"
         >
@@ -131,7 +159,7 @@ export function Shell({
           onMarkAsRead={onMarkAsRead}
           onMarkAllAsRead={onMarkAllAsRead}
         />
-        <Link to="/app/billing" className="ctopbar-credits">
+        <Link to={`${basePath}/billing`} className="ctopbar-credits">
           <span className="ctopbar-credits-num">{credits}</span>
           <span className="ctopbar-credits-label"> cr</span>
         </Link>
@@ -141,7 +169,7 @@ export function Shell({
       <div className="cpage-body">
         {showGmailBanner && (
           <Link
-            to="/app/settings"
+            to={`${basePath}/settings`}
             className="flex items-center bg-yellow-400 border border-gray-200 shadow-sm gap-2.5 no-underline px-4 py-3 md:mx-7 md:mt-6 md:rounded-md"
            
           >
@@ -155,19 +183,22 @@ export function Shell({
         {children}
       </div>
 
+      </div>
+
       {/* ═══ MOBILE BOTTOM NAV ═══ */}
       <nav className="cbnav">
-        <MobileNavItem to="/app" end icon={Inbox} label="Leads" badge={newHotLeads} />
-        <MobileNavItem to="/app/campaigns" icon={Megaphone} label="Campaigns" />
-        <MobileNavItem to="/app/approvals" icon={ClipboardCheck} label="Approvals" badge={pendingApprovals} />
-        <MobileNavItem to="/app/billing" icon={CreditCard} label="Billing" />
-        <MobileNavItem to="/app/settings" icon={Settings} label="Settings" />
+        <MobileNavItem to={basePath} end icon={Inbox} label="Leads" badge={newHotLeads} />
+        <MobileNavItem to={`${basePath}/campaigns`} icon={Megaphone} label="Campaigns" />
+        <MobileNavItem to={`${basePath}/approvals`} icon={ClipboardCheck} label="Approvals" badge={pendingApprovals} />
+        <MobileNavItem to={`${basePath}/targeting`} icon={Target} label="Targeting" />
+        <MobileNavItem to={`${basePath}/billing`} icon={CreditCard} label="Billing" />
+        {!hideSettings && <MobileNavItem to={`${basePath}/settings`} icon={Settings} label="Settings" />}
       </nav>
     </div>
   );
 }
 
-/* Bottom-nav tab — the active pill is a shared framer-motion layoutId, so it
+/* Bottom-nav tab - the active pill is a shared framer-motion layoutId, so it
    physically slides from one tab to the next instead of instantly swapping,
    and the icon goes from thin outline to bold duotone when active. */
 function MobileNavItem({
@@ -244,7 +275,7 @@ function NotificationBell({
             // z-100 rather than the usual z-50: on the Analytics page, recharts
             // portals each chart's tooltip into its own chart container (not into
             // <body>), so it isn't a sibling this overlay can out-rank just by
-            // being later in the DOM — bumping z-index is the reliable fix.
+            // being later in the DOM - bumping z-index is the reliable fix.
             className="fixed inset-0 z-100 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

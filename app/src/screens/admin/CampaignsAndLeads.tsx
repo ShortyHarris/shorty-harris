@@ -7,6 +7,10 @@ import {
   fetchScrapeSnapshots, fetchProspectCount,
 } from '../../hooks/useAdminData';
 import type { AdminHotLead, CampaignRow, CampaignDeleteCounts } from '../../hooks/useAdminData';
+import { useOverlayClose } from '../../hooks/useOverlayClose';
+import { useToast, ToastHost } from '../../components/Toast';
+import { RefreshButton } from '../../components/RefreshButton';
+import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
@@ -14,17 +18,19 @@ import { SkeletonTable } from '../../components/Skeleton';
 import { RowMenu } from '../../components/RowMenu';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { TagInput } from '../../components/TagInput';
+import { SuggestForMe } from '../client/Campaigns';
 import { looksLikeMultipleLocationsJoined } from '../../lib/validation';
+import { getScrapeStatusDisplay } from '../../lib/scrapeFailures';
 
 const HELP_CAMPAIGNS: HelpContent = {
   title: 'Campaigns',
   body: [
     { type: 'p', text: "Each campaign belongs to a client and controls who gets targeted and how. The search terms and target locations tell the scraper where to find new prospects." },
-    { type: 'p', text: "A ⚠ Needs setup badge means the campaign is missing search terms or locations — it won't find new prospects until those are filled in." },
+    { type: 'p', text: "A ⚠ Needs setup badge means the campaign is missing search terms or locations - it won't find new prospects until those are filled in." },
     { type: 'ul', items: [
-      "Edit — update campaign settings, search terms, or locations",
-      "Pause / Activate — stop or resume outreach for this campaign",
-      "Scrape — trigger a fresh prospect search right now",
+      "Edit - update campaign settings, search terms, or locations",
+      "Pause / Activate - stop or resume outreach for this campaign",
+      "Scrape - trigger a fresh prospect search right now",
     ]},
   ],
 };
@@ -40,10 +46,19 @@ const HELP_HOT_LEADS: HelpContent = {
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
 const CAMP_PILL: Record<string, { bg: string; text: string; border?: string }> = {
-  draft:     { bg: '#f5f2ec', text: '#62655c', border: '1px solid #ece8df' },
-  active:    { bg: '#edf4ef', text: '#3c7a5b' },
-  paused:    { bg: '#f8efdb', text: '#b9831f' },
-  completed: { bg: '#f0f0f0', text: '#9a9d92' },
+  pending_review: { bg: '#f0ecf8', text: '#6b4fa0' },
+  draft:          { bg: '#f5f2ec', text: '#62655c', border: '1px solid #ece8df' },
+  active:         { bg: '#edf4ef', text: '#3c7a5b' },
+  paused:         { bg: '#f8efdb', text: '#b9831f' },
+  completed:      { bg: '#f0f0f0', text: '#9a9d92' },
+};
+
+const CAMP_STATUS_LABEL: Record<string, string> = {
+  pending_review: 'In review',
+  draft: 'Draft',
+  active: 'Active',
+  paused: 'Paused',
+  completed: 'Completed',
 };
 
 const LEAD_PILL: Record<string, { bg: string; text: string; border?: string }> = {
@@ -61,7 +76,7 @@ const LANGUAGE_OPTIONS = [
   'Dutch', 'Polish', 'Slovak', 'Arabic', 'Chinese', 'Swahili', 'Bemba', 'Nyanja',
 ];
 
-/* Text input + datalist (combobox) — not a Select, since the admin should be
+/* Text input + datalist (combobox) - not a Select, since the admin should be
    able to type any language, not just pick from the suggestion list. */
 function LanguageField({ value, onChange, listId }: { value: string; onChange: (v: string) => void; listId: string }) {
   const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
@@ -104,7 +119,7 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
 }
 
 // A scrape stuck in 'running' this long almost certainly means n8n crashed
-// before it could write 'complete'/'failed' — treat it as failed in the UI
+// before it could write 'complete'/'failed' - treat it as failed in the UI
 // (with a Retry) rather than showing "Scraping…" forever.
 const STALE_RUN_MS = 45 * 60 * 1000;
 
@@ -126,7 +141,7 @@ function lastScrapedLabel(c: Pick<CampaignRow, 'last_scraped_at' | 'scrape_statu
 
 // Turns the last scrape's result breakdown into a one-line summary, so
 // "nothing new because it was all duplicates" reads differently from
-// "nothing new because the scrape came up empty" — both are successful
+// "nothing new because the scrape came up empty" - both are successful
 // outcomes (tone: 'neutral'), distinct from an actual scrape failure, which
 // ScrapeCell already renders separately in red with a retry affordance.
 function scrapeSummaryLabel(
@@ -143,15 +158,15 @@ function scrapeSummaryLabel(
     return { text: 'No results found for this search', tone: 'neutral' };
   }
   if (s.skipped_duplicate === s.total_with_email) {
-    return { text: `0 new — all ${s.skipped_duplicate} already in your database`, tone: 'neutral' };
+    return { text: `0 new - all ${s.skipped_duplicate} already in your database`, tone: 'neutral' };
   }
   if (s.skipped_dnc === s.total_with_email) {
-    return { text: '0 new — all matched your do-not-contact list', tone: 'neutral' };
+    return { text: '0 new - all matched your do-not-contact list', tone: 'neutral' };
   }
-  return { text: `0 new — ${s.skipped_duplicate} already known, ${s.skipped_dnc} on do-not-contact list`, tone: 'neutral' };
+  return { text: `0 new - ${s.skipped_duplicate} already known, ${s.skipped_dnc} on do-not-contact list`, tone: 'neutral' };
 }
 
-// Short version for tight table/card space — the full sentence from
+// Short version for tight table/card space - the full sentence from
 // scrapeSummaryLabel goes in ScrapeSummaryModal instead of being truncated.
 function scrapeChipLabel(c: Pick<CampaignRow, 'scrape_status' | 'last_scrape_summary' | 'prospectCount'>): string {
   const s = c.last_scrape_summary;
@@ -165,7 +180,7 @@ function scrapeChipLabel(c: Pick<CampaignRow, 'scrape_status' | 'last_scrape_sum
   return '0 new · skipped';
 }
 
-// Compact chip shown in the table/card — tappable when there's a full
+// Compact chip shown in the table/card - tappable when there's a full
 // breakdown behind it, so the one-line summary never has to be truncated
 // to fit a narrow column; the detail lives in ScrapeSummaryModal instead.
 function ScrapeResultChip({ campaign, onOpenDetail }: { campaign: CampaignRow; onOpenDetail: () => void }) {
@@ -187,8 +202,76 @@ function ScrapeResultChip({ campaign, onOpenDetail }: { campaign: CampaignRow; o
   );
 }
 
-/* ── Scrape result detail modal ───────────────────────────────────── */
-function ScrapeSummaryModal({ campaign, onClose }: { campaign: CampaignRow; onClose: () => void }) {
+/* ── Scrape result detail modal ───────────────────────────────────────
+   Handles both outcomes behind one click target: a completed scrape's
+   result breakdown, and a failed/stalled scrape's full failure detail
+   (message, suggested fix, raw technical error) plus its action -
+   everything the table-row cells only hint at via a compact badge. */
+function ScrapeSummaryModal({
+  campaign, onClose, onScrape, onEditCampaign,
+}: {
+  campaign: CampaignRow; onClose: () => void; onScrape: () => void; onEditCampaign: () => void;
+}) {
+  const stale = isStaleRun(campaign.scrape_status, campaign.scrape_started_at);
+  const failed = campaign.scrape_status === 'failed' || stale;
+
+  if (failed) {
+    const display = getScrapeStatusDisplay({
+      scrape_status: 'failed',
+      scrape_failure_reason: stale ? 'stalled' : campaign.scrape_failure_reason,
+      scrape_error: stale ? null : campaign.scrape_error,
+      scrape_attempt_count: campaign.scrape_attempt_count,
+    });
+    const d = display as Extract<ReturnType<typeof getScrapeStatusDisplay>, { technical?: unknown }>;
+
+    return (
+      <CampModalShell onClose={onClose}>
+        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
+          <h2 className="m-0 text-[16px] font-bold text-[#20211c]">Scrape failed</h2>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+          <div>
+            <p className="m-0 truncate text-[13px] text-[#9a9d92]" title={campaign.name}>{campaign.name}</p>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="m-0 text-[15px] font-semibold text-[#a8533a]">{d.label}</p>
+              {d.repeatedlyFailing && (
+                <span
+                  title={`Failed ${campaign.scrape_attempt_count} times in a row`}
+                  className="inline-flex items-center rounded-full bg-[#a8533a] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[.04em] text-white"
+                >
+                  Repeated
+                </span>
+              )}
+            </div>
+          </div>
+          <p className="m-0 text-[13px] leading-relaxed text-[#62655c]">{d.detail}</p>
+          {d.fix && (
+            <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-4 py-3.5">
+              <p className="m-0 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">Suggested fix</p>
+              <p className="m-0 mt-1 text-[13px] leading-relaxed text-[#20211c]">{d.fix}</p>
+            </div>
+          )}
+          {d.technical && (
+            <div>
+              <p className="m-0 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">Technical detail</p>
+              <p className="m-0 mt-1 break-words text-[12px] leading-relaxed text-[#9a9d92]">{d.technical}</p>
+            </div>
+          )}
+          <p className="m-0 text-[11px] text-[#9a9d92]">{lastScrapedLabel(campaign)}</p>
+        </div>
+        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex gap-2.5">
+          <button onClick={onClose} className={`${ghostCls} flex-1`}>Close</button>
+          {d.retryable ? (
+            <button onClick={() => { onScrape(); onClose(); }} className={`${primaryCls} flex-1`}>Retry scrape</button>
+          ) : (
+            <button onClick={() => { onEditCampaign(); onClose(); }} className={`${primaryCls} flex-1`}>Edit campaign</button>
+          )}
+        </div>
+      </CampModalShell>
+    );
+  }
+
   const sr = scrapeSummaryLabel(campaign);
   const s  = campaign.last_scrape_summary;
   const rows = s ? [
@@ -233,7 +316,7 @@ function ScrapeSummaryModal({ campaign, onClose }: { campaign: CampaignRow; onCl
 
 /* ══════════════════════════════════════════════════════════════════ */
 // WF0 now responds immediately once the scrape is accepted (it can run for
-// 15-30 minutes in the background) — this only confirms acceptance, it
+// 15-30 minutes in the background) - this only confirms acceptance, it
 // never waits on the scrape itself. Actual progress/completion is tracked
 // via scrape_status on the campaigns row (see the polling effect below).
 async function startDiscoverScrape(campaignId: string): Promise<{ ok: boolean; message?: string }> {
@@ -253,11 +336,13 @@ async function startDiscoverScrape(campaignId: string): Promise<{ ok: boolean; m
 }
 
 // How often to re-check scrape_status/last_scraped_at while any campaign is
-// actively scraping — stops the moment none are, rather than polling forever.
+// actively scraping - stops the moment none are, rather than polling forever.
 const SCRAPE_POLL_MS = 17000;
 
 export function Campaigns() {
-  const { rows, loading, error, reload, setStatus, patchCampaign } = useCampaigns();
+  const { rows, loading, isFetching, dataUpdatedAt, error, reload, setStatus, patchCampaign } = useCampaigns();
+  const { toasts, toast, dismiss } = useToast();
+  const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh campaigns.');
   const [showNew, setShowNew]         = useState(false);
   const [editCampaign, setEditCampaign]     = useState<CampaignRow | null>(null);
   const [deleteCampaignTarget, setDeleteCampaignTarget] = useState<CampaignRow | null>(null);
@@ -266,7 +351,7 @@ export function Campaigns() {
 
   // Campaign IDs whose start-scrape request is still in flight. The poll
   // below must not touch these: it reads straight from the DB, and the
-  // backend only writes scrape_status='running' once the request lands —
+  // backend only writes scrape_status='running' once the request lands -
   // a poll landing in the gap between the optimistic patch (below) and that
   // write would read the stale pre-click row and stomp the optimistic
   // 'running' state right back to idle/complete, flickering the button back
@@ -282,14 +367,17 @@ export function Campaigns() {
       scrape_status: 'running',
       scrape_started_at: new Date().toISOString(),
       scrape_error: null,
+      scrape_failure_reason: null,
     });
     try {
       const result = await startDiscoverScrape(campaignId);
       if (!result.ok) {
-        // The request itself never got accepted — the backend never had a
+        // The request itself never got accepted - the backend never had a
         // chance to flip its own status, so this is the one case the frontend
         // has to report failure on its own rather than waiting for a poll.
-        patchCampaign(campaignId, { scrape_status: 'failed', scrape_error: result.message ?? 'Failed to start scrape' });
+        // No scrape_failure_reason code applies here (WF0 never ran), so
+        // getScrapeStatusDisplay falls back to its generic 'unknown' copy.
+        patchCampaign(campaignId, { scrape_status: 'failed', scrape_error: result.message ?? 'Failed to start scrape', scrape_failure_reason: null });
       }
       // On success, the poll below picks up real progress/completion.
     } finally {
@@ -317,18 +405,21 @@ export function Campaigns() {
       try {
         snapshots = await fetchScrapeSnapshots(runningIds);
       } catch {
-        return; // transient fetch error — just try again on the next tick
+        return; // transient fetch error - just try again on the next tick
       }
 
       for (const snap of snapshots) {
         if (snap.scrape_status === rowsRef.current.find((r) => r.id === snap.id)?.scrape_status
           && snap.last_scraped_at === rowsRef.current.find((r) => r.id === snap.id)?.last_scraped_at) {
-          continue; // nothing changed for this row — skip the render
+          continue; // nothing changed for this row - skip the render
         }
         patchCampaign(snap.id, {
           scrape_status: snap.scrape_status,
           scrape_started_at: snap.scrape_started_at,
           scrape_error: snap.scrape_error,
+          scrape_failure_reason: snap.scrape_failure_reason,
+          scrape_attempt_count: snap.scrape_attempt_count,
+          scrape_finished_at: snap.scrape_finished_at,
           last_scraped_at: snap.last_scraped_at,
           last_scrape_summary: snap.last_scrape_summary,
         });
@@ -357,7 +448,7 @@ export function Campaigns() {
         </div>
         <div className="flex items-center gap-2 md:gap-2.5 shrink-0">
           <HelpButton content={HELP_CAMPAIGNS} />
-          <button onClick={reload} className={ghostCls}>Refresh</button>
+          <RefreshButton onRefresh={handleRefresh} isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} className={ghostCls} />
           <button onClick={() => setShowNew(true)} className={`${primaryCls} hidden md:inline-flex`}>+ New campaign</button>
         </div>
       </header>
@@ -367,29 +458,27 @@ export function Campaigns() {
       )}
 
       {loading ? (
-        <SkeletonTable rows={PAGE_SIZE} cols={8} />
+        <SkeletonTable rows={PAGE_SIZE} cols={6} />
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
           <strong className="text-[15px] font-bold text-[#20211c]">No campaigns yet.</strong>
         </div>
       ) : (
         <>
-          {/* Desktop table — hidden on mobile */}
+          {/* Desktop table - hidden on mobile */}
           <div className="atbl hidden md:block">
             <table className="table-fixed">
               <colgroup>
-                <col className="w-[22%]" />
+                <col className="w-[30%]" />
+                <col className="w-[20%]" />
                 <col className="w-[16%]" />
-                <col className="w-[8%]" />
-                <col className="w-[8%]" />
+                <col className="w-[11%]" />
                 <col className="w-[13%]" />
-                <col className="w-[8%]" />
-                <col className="w-[9%]" />
-                <col className="w-[8%]" />
+                <col className="w-[10%]" />
               </colgroup>
               <thead>
                 <tr>
-                  {['Campaign', 'Client', 'Channel', 'Language', 'Prospects', 'Status', 'Scrape', ''].map((h) => (
+                  {['Campaign', 'Client', 'Prospects', 'Status', 'Scrape', ''].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -400,10 +489,11 @@ export function Campaigns() {
                   const active     = c.status === 'active';
                   const paused     = c.status === 'paused';
                   const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
+                  const draft      = c.status === 'draft' || c.status === 'pending_review';
                   return (
-                    <tr key={c.id}>
+                    <tr key={c.id} onClick={() => setEditCampaign(c)} className="group cursor-pointer">
                       <td className="min-w-0">
-                        <div className="line-clamp-2 font-bold leading-snug text-[#20211c]" title={c.name}>{c.name}</div>
+                        <div className="line-clamp-2 font-bold leading-snug text-[#20211c] group-hover:underline" title={c.name}>{c.name}</div>
                         {c.needsReview && (
                           <span className="atbl-pill mt-1" style={{ background: '#f0ecf8', color: '#6b4fa0' }}>
                             🔔 Awaiting approval
@@ -417,32 +507,33 @@ export function Campaigns() {
                         <div className="mt-1 text-[11px] text-[#9a9d92]">{lastScrapedLabel(c)}</div>
                       </td>
                       <td className="min-w-0 text-[#62655c]">
-                        <div className="truncate" title={c.client?.business_name ?? undefined}>{c.client?.business_name ?? '—'}</div>
-                      </td>
-                      <td className="min-w-0 text-[#62655c] capitalize">
-                        <div className="truncate">{c.channel}</div>
-                      </td>
-                      <td className="min-w-0 text-[#62655c]">
-                        <div className="truncate" title={c.language}>{c.language}</div>
+                        <div className="truncate" title={c.client?.business_name ?? undefined}>{c.client?.business_name ?? '-'}</div>
                       </td>
                       <td className="min-w-0">
                         <ScrapeResultChip campaign={c} onOpenDetail={() => setScrapeDetailCampaign(c)} />
                       </td>
                       <td>
                         <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
-                          {c.status}
+                          {CAMP_STATUS_LABEL[c.status] ?? c.status}
                         </span>
                       </td>
-                      <td>
+                      <td onClick={(e) => e.stopPropagation()}>
                         <ScrapeCell
-                          scrapeStatus={c.scrape_status}
-                          scrapeStartedAt={c.scrape_started_at}
-                          scrapeError={c.scrape_error}
+                          campaign={c}
                           onScrape={() => handleScrape(c.id)}
+                          onOpenDetail={() => setScrapeDetailCampaign(c)}
                         />
                       </td>
-                      <td className="px-3 text-right">
+                      <td className="px-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex flex-wrap items-center justify-end gap-1">
+                          {draft && (
+                            <button
+                              onClick={() => setEditCampaign(c)}
+                              className="cursor-pointer whitespace-nowrap rounded-lg border border-[#ece8df] bg-white px-2 py-1 text-[11px] font-bold text-[#20211c] transition-colors hover:bg-[#f5f2ec]"
+                            >
+                              Edit
+                            </button>
+                          )}
                           {c.needsReview && (
                             <button
                               onClick={() => setStatus(c.id, 'active')}
@@ -470,7 +561,7 @@ export function Campaigns() {
             </table>
           </div>
 
-          {/* Mobile cards — shown below md */}
+          {/* Mobile cards - shown below md */}
           <div className="md:hidden flex flex-col gap-3">
             {paged.map((c) => {
               const pill       = CAMP_PILL[c.status] ?? CAMP_PILL.draft;
@@ -478,7 +569,11 @@ export function Campaigns() {
               const paused     = c.status === 'paused';
               const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
               return (
-                <div key={c.id} className="rounded-xl border border-[#ece8df] bg-white p-4">
+                <div
+                  key={c.id}
+                  onClick={() => setEditCampaign(c)}
+                  className="cursor-pointer rounded-xl border border-[#ece8df] bg-white p-4"
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <span className="line-clamp-2 block font-bold leading-snug text-[#20211c] text-[14px]" title={c.name}>{c.name}</span>
@@ -500,16 +595,16 @@ export function Campaigns() {
                     </div>
                     <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
                       className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
-                      {c.status}
+                      {CAMP_STATUS_LABEL[c.status] ?? c.status}
                     </span>
                   </div>
                   <p className="mt-1.5 text-[12px] text-[#62655c]">
-                    {c.client?.business_name ?? '—'} · {c.channel} · {c.language}
+                    {c.client?.business_name ?? '-'} · {c.channel} · {c.language}
                   </p>
                   <div className="mt-1.5">
                     <ScrapeResultChip campaign={c} onOpenDetail={() => setScrapeDetailCampaign(c)} />
                   </div>
-                  <div className="border-t border-[#f5f2ec] pt-3 mt-2 flex flex-wrap items-center gap-2">
+                  <div className="border-t border-[#f5f2ec] pt-3 mt-2 flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     {c.needsReview && (
                       <button
                         onClick={() => setStatus(c.id, 'active')}
@@ -533,10 +628,9 @@ export function Campaigns() {
                       </button>
                     )}
                     <ScrapeCell
-                      scrapeStatus={c.scrape_status}
-                      scrapeStartedAt={c.scrape_started_at}
-                      scrapeError={c.scrape_error}
+                      campaign={c}
                       onScrape={() => handleScrape(c.id)}
+                      onOpenDetail={() => setScrapeDetailCampaign(c)}
                     />
                     <button
                       onClick={() => setEditCampaign(c)}
@@ -556,12 +650,12 @@ export function Campaigns() {
             })}
           </div>
 
-          {/* Pagination — below both desktop table and mobile cards */}
+          {/* Pagination - below both desktop table and mobile cards */}
           <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
         </>
       )}
 
-      {/* Mobile FAB — replaces the header button on small screens */}
+      {/* Mobile FAB - replaces the header button on small screens */}
       <button
         onClick={() => setShowNew(true)}
         className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-[#3c7a5b] text-white shadow-[0_6px_24px_rgba(60,122,91,0.4)] transition-all hover:bg-[#2d5e46] active:scale-95"
@@ -599,51 +693,76 @@ export function Campaigns() {
             key={`scrape-detail-${scrapeDetailCampaign.id}`}
             campaign={scrapeDetailCampaign}
             onClose={() => setScrapeDetailCampaign(null)}
+            onScrape={() => handleScrape(scrapeDetailCampaign.id)}
+            onEditCampaign={() => setEditCampaign(scrapeDetailCampaign)}
           />
         )}
       </AnimatePresence>
+
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }
 
 /* ── Scrape cell ───────────────────────────────────────────────────── */
-// States map directly to the campaigns.scrape_status column — there's no
+// States map directly to the campaigns.scrape_status column - there's no
 // client-only "just triggered" state anymore beyond the optimistic patch in
 // handleScrape, and no local "just completed" result payload either (WF0
-// no longer returns scrape counts synchronously — see startDiscoverScrape).
+// no longer returns scrape counts synchronously - see startDiscoverScrape).
 // 'idle' and 'complete' render identically: a plain Run-scrape affordance,
 // since prospect counts already show in their own table column.
+//
+// A stale 'running' row (isStaleRun) is folded into the 'stalled' failure
+// reason here rather than invented as a new local string, so
+// getScrapeStatusDisplay stays the single source of truth for scrape-status
+// copy - see scrapeFailures.ts.
+//
+// Failure detail (message, fix, raw technical error, repeated-failure flag)
+// lives behind a click into ScrapeSummaryModal, not inline - this cell is
+// just a compact badge so the row stays scannable; Retry/Edit campaign are
+// the modal's actions, not duplicated here.
 function ScrapeCell({
-  scrapeStatus,
-  scrapeStartedAt,
-  scrapeError,
+  campaign,
   onScrape,
+  onOpenDetail,
 }: {
-  scrapeStatus: string;
-  scrapeStartedAt: string | null;
-  scrapeError: string | null;
+  campaign: Pick<CampaignRow, 'scrape_status' | 'scrape_started_at' | 'scrape_error' | 'scrape_failure_reason' | 'scrape_attempt_count'>;
   onScrape: () => void;
+  onOpenDetail: () => void;
 }) {
-  const stale = isStaleRun(scrapeStatus, scrapeStartedAt);
+  const stale = isStaleRun(campaign.scrape_status, campaign.scrape_started_at);
 
-  if (scrapeStatus === 'running' && !stale) {
+  if (campaign.scrape_status === 'running' && !stale) {
     return (
       <span className="inline-flex items-center gap-1.5 text-[12px] text-[#9a9d92]">
         <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#ddd8cb] border-t-[#3c7a5b]" />
-        Scraping…
+        Searching
       </span>
     );
   }
-  if (scrapeStatus === 'failed' || stale) {
+
+  if (campaign.scrape_status === 'failed' || stale) {
+    const display = getScrapeStatusDisplay({
+      scrape_status: 'failed',
+      scrape_failure_reason: stale ? 'stalled' : campaign.scrape_failure_reason,
+      scrape_error: stale ? null : campaign.scrape_error,
+      scrape_attempt_count: campaign.scrape_attempt_count,
+    });
+    const d = display as Extract<ReturnType<typeof getScrapeStatusDisplay>, { technical?: unknown }>;
+
     return (
-      <div className="flex flex-col gap-0.5">
-        <span className="text-[11px] text-[#a8533a]" title={stale ? undefined : (scrapeError ?? undefined)}>
-          {stale ? 'Scrape timed out' : 'Scrape failed'}
-        </span>
-        <button onClick={onScrape} className="cursor-pointer text-left text-[11px] text-[#9a9d92] underline hover:text-[#62655c]">Retry</button>
-      </div>
+      <button
+        onClick={onOpenDetail}
+        title="View failure details"
+        className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full bg-[#fdf0ec] px-2 py-0.5 text-[11.5px] font-semibold text-[#a8533a] transition-opacity hover:opacity-75"
+      >
+        {d.label}
+        {d.repeatedlyFailing && <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#a8533a]" title={`Failed ${campaign.scrape_attempt_count} times in a row`} />}
+        <Info size={11} strokeWidth={2.5} className="opacity-60" />
+      </button>
     );
   }
+
   return (
     <button
       onClick={onScrape}
@@ -673,7 +792,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
     if (!clientId || !name.trim()) { setErr('Pick a client and enter a name.'); return; }
     if (!language.trim()) { setErr('Outreach language is required.'); return; }
     if (looksLikeMultipleLocationsJoined(locations)) {
-      setErr(`"${locations[0]}" looks like more than one location joined together — press Enter (or use a semicolon) after each city so they save as separate entries.`);
+      setErr(`"${locations[0]}" looks like more than one location joined together - press Enter (or use a semicolon) after each city so they save as separate entries.`);
       return;
     }
     setBusy(true); setErr(null);
@@ -698,7 +817,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}
@@ -731,7 +850,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
           <div>
             <label className={fieldLbl}>Campaign name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Austin gyms — Q3" style={FONT} className={inputCls} />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Austin gyms - Q3" style={FONT} className={inputCls} />
           </div>
 
           <LanguageField value={language} onChange={setLanguage} listId="new-campaign-languages" />
@@ -753,14 +872,30 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
           <div className="border-t border-[#f0ede6] pt-3">
             <p className="mb-3 text-[11px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Prospect discovery (Apify)</p>
             <div className="flex flex-col gap-3">
+              {clientId ? (
+                <SuggestForMe
+                  key={clientId}
+                  clientId={clientId}
+                  queries={queries.split(',').map((s) => s.trim()).filter(Boolean)}
+                  locations={locations}
+                  onAddQuery={(term) => setQueries((q) => {
+                    const parts = q.split(',').map((s) => s.trim()).filter(Boolean);
+                    return parts.includes(term) ? q : [...parts, term].join(', ');
+                  })}
+                  onAddLocation={(loc) => setLocations((l) => (l.includes(loc) ? l : [...l, loc]))}
+                />
+              ) : (
+                <p className="m-0 text-[11px] text-[#9a9d92]">Pick a client above to see targeting suggestions from their profile.</p>
+              )}
               <div>
                 <label className={fieldLbl}>Search terms <span className="normal-case font-normal">(comma-separated)</span></label>
                 <input value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="hotels, lodges, guesthouses" style={FONT} className={inputCls} />
+                <p className="mt-1 text-[11px] text-[#9a9d92]">Business types, not job titles - 3 to 5 terms works best.</p>
               </div>
               <TagInput
                 label="Locations"
                 placeholder="Type a location and press Enter (e.g. Bloomington, IL)"
-                helper="One city per entry — press Enter after each one. Use City, State format. To add several at once, separate them with semicolons (not commas); don't put more than one city in a single entry."
+                helper="One city per entry - press Enter after each one. Use City, State format. To add several at once, separate them with semicolons (not commas); don't put more than one city in a single entry."
                 values={locations}
                 onChange={setLocations}
                 splitOn=";"
@@ -784,7 +919,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
               <input type="checkbox" checked={saveAsDraft} onChange={(e) => setSaveAsDraft(e.target.checked)} className="accent-[#3c7a5b]" />
               Save as draft
             </label>
-            <p className="mt-1 text-[11px] text-[#9a9d92]">Saved with status "Draft" instead of "Active" — switch its status here later when it's ready.</p>
+            <p className="mt-1 text-[11px] text-[#9a9d92]">Saved with status "Draft" instead of "Active" - switch its status here later when it's ready.</p>
           </div>
 
           {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
@@ -809,7 +944,7 @@ function CampModalShell({ onClose, children }: { onClose: () => void; children: 
       className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}
@@ -846,7 +981,7 @@ function EditCampaignModal({
     if (!name.trim()) { setErr('Campaign name is required.'); return; }
     if (!language.trim()) { setErr('Outreach language is required.'); return; }
     if (looksLikeMultipleLocationsJoined(locations)) {
-      setErr(`"${locations[0]}" looks like more than one location joined together — press Enter (or use a semicolon) after each city so they save as separate entries.`);
+      setErr(`"${locations[0]}" looks like more than one location joined together - press Enter (or use a semicolon) after each city so they save as separate entries.`);
       return;
     }
     setBusy(true); setErr(null);
@@ -896,14 +1031,25 @@ function EditCampaignModal({
         <div className="border-t border-[#f0ede6] pt-3">
           <p className="mb-3 text-[11px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Prospect discovery (Apify)</p>
           <div className="flex flex-col gap-3">
+            <SuggestForMe
+              clientId={campaign.client_id}
+              queries={queries.split(',').map((s) => s.trim()).filter(Boolean)}
+              locations={locations}
+              onAddQuery={(term) => setQueries((q) => {
+                const parts = q.split(',').map((s) => s.trim()).filter(Boolean);
+                return parts.includes(term) ? q : [...parts, term].join(', ');
+              })}
+              onAddLocation={(loc) => setLocations((l) => (l.includes(loc) ? l : [...l, loc]))}
+            />
             <div>
               <label className={campFieldLbl}>Search terms <span className="normal-case font-normal">(comma-separated)</span></label>
               <input value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="hotels, lodges, guesthouses" style={FONT} className={campInputCls} />
+              <p className="mt-1 text-[11px] text-[#9a9d92]">Business types, not job titles - 3 to 5 terms works best.</p>
             </div>
             <TagInput
               label="Locations"
               placeholder="Type a location and press Enter (e.g. Bloomington, IL)"
-              helper="One city per entry — press Enter after each one. Use City, State format. To add several at once, separate them with semicolons (not commas); don't put more than one city in a single entry."
+              helper="One city per entry - press Enter after each one. Use City, State format. To add several at once, separate them with semicolons (not commas); don't put more than one city in a single entry."
               values={locations}
               onChange={setLocations}
               splitOn=";"
@@ -980,7 +1126,7 @@ function DeleteCampaignModal({
               Counting affected records…
             </div>
           ) : blastItems.length === 0 ? (
-            <p className="text-[13px] text-[#62655c]">No associated records — the campaign row only.</p>
+            <p className="text-[13px] text-[#62655c]">No associated records - the campaign row only.</p>
           ) : (
             <ul className="m-0 list-none p-0 flex flex-col gap-1">
               {blastItems.map((item) => (
@@ -1031,7 +1177,9 @@ function matchesHL(lead: AdminHotLead, f: LeadFilter) {
 
 /* ══════════════════════════════════════════════════════════════════ */
 export function HotLeads() {
-  const { rows, loading, error, reload, setStatus } = useAdminHotLeads();
+  const { rows, loading, isFetching, dataUpdatedAt, error, reload, setStatus } = useAdminHotLeads();
+  const { toasts, toast, dismiss } = useToast();
+  const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh hot leads.');
   const [filter, setFilter] = useState<LeadFilter>('new');
   const [openId, setOpenId] = useState<string | null>(null);
   const [page, setPage]     = useState(1);
@@ -1056,7 +1204,7 @@ export function HotLeads() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton content={HELP_HOT_LEADS} />
-          <button onClick={reload} className={ghostCls}>Refresh</button>
+          <RefreshButton onRefresh={handleRefresh} isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} className={ghostCls} />
         </div>
       </header>
 
@@ -1075,7 +1223,7 @@ export function HotLeads() {
         <>
           {/* ── MOBILE ─────────────────────────────────────────────── */}
           <div className="md:hidden flex flex-col gap-3">
-            {/* Pill filter tabs — horizontally scrollable */}
+            {/* Pill filter tabs - horizontally scrollable */}
             <div className="flex items-center gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
               {HL_TABS.map((tab) => {
                 const cnt    = rows.filter((r) => matchesHL(r, tab.key)).length;
@@ -1206,9 +1354,9 @@ export function HotLeads() {
                               </div>
                             )}
                           </td>
-                          <td className="align-top text-[#62655c]">{lead.client?.business_name ?? '—'}</td>
+                          <td className="align-top text-[#62655c]">{lead.client?.business_name ?? '-'}</td>
                           <td className="max-w-[340px] align-top">
-                            <p className="m-0 line-clamp-1 text-[#62655c]">{lead.ai_summary ?? '—'}</p>
+                            <p className="m-0 line-clamp-1 text-[#62655c]">{lead.ai_summary ?? '-'}</p>
                           </td>
                           <td className="align-top">
                             <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
@@ -1240,6 +1388,8 @@ export function HotLeads() {
           />
         )}
       </AnimatePresence>
+
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }
@@ -1264,7 +1414,7 @@ function LeadDetailModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}

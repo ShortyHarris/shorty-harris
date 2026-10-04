@@ -24,7 +24,7 @@ function formatDate(iso: string | null): string {
 export function Blog() {
   useSeo({
     title: 'Blog',
-    description: 'Practical advice for growing your small or family business — outreach strategy, local business development, and growth tips.',
+    description: 'Practical advice for growing your small or family business - outreach strategy, local business development, and growth tips.',
     path: '/blog',
   });
 
@@ -92,7 +92,7 @@ export function Blog() {
           </div>
         ) : filteredPosts.length === 0 ? (
           <div className="mt-14 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center text-[13px] text-[#62655c]">
-            {posts.length === 0 ? 'Nothing published yet — check back soon.' : 'No posts in this category yet.'}
+            {posts.length === 0 ? 'Nothing published yet - check back soon.' : 'No posts in this category yet.'}
           </div>
         ) : (
           <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">

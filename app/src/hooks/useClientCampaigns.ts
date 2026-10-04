@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { queryClient } from '../lib/queryClient';
+import { buildAreaColumns, type TargetArea } from '../lib/targetAreas';
 
 export const myCampaignsKey = (clientId: string) => ['my-campaigns', clientId] as const;
 const myCampaignProspectsKey = (campaignId: string) => ['my-campaign-prospects', campaignId] as const;
@@ -13,42 +14,40 @@ export interface ClientCampaignRow {
   language: string;
   search_queries: string[];
   target_locations: string[];
+  target_areas: TargetArea[] | null;
   max_results: number;
   created_at: string;
   prospectCount: number;
 }
 
-async function fetchClientCampaigns(clientId: string): Promise<ClientCampaignRow[]> {
-  const { data, error } = await supabase
+async function fetchClientCampaigns(clientId: string, client: SupabaseClient): Promise<ClientCampaignRow[]> {
+  const { data, error } = await client
     .from('campaigns')
-    .select('id, name, description, status, language, search_queries, target_locations, max_results, created_at')
+    // prospect_count is the same trigger-maintained counter the admin
+    // campaign list reads (see migration add_campaigns_prospect_count) - a
+    // single shared definition instead of each side running its own
+    // `prospects` count query, which is what let the two numbers drift
+    // apart after a scrape.
+    .select('id, name, description, status, language, search_queries, target_locations, target_areas, max_results, created_at, prospect_count')
     .eq('client_id', clientId)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
-  const base = (data ?? []).map((r: Record<string, unknown>) => ({
+  return (data ?? []).map((r: Record<string, unknown>) => ({
     ...r,
     search_queries: (r.search_queries as string[] | null) ?? [],
     target_locations: (r.target_locations as string[] | null) ?? [],
+    target_areas: (r.target_areas as TargetArea[] | null) ?? null,
     description: (r.description as string | null) ?? null,
     language: (r.language as string | null) ?? 'English',
-    prospectCount: 0,
+    prospectCount: (r.prospect_count as number | null) ?? 0,
   })) as ClientCampaignRow[];
-
-  await Promise.all(base.map(async (c) => {
-    const { count } = await supabase
-      .from('prospects').select('id', { count: 'exact', head: true })
-      .eq('campaign_id', c.id);
-    c.prospectCount = count ?? 0;
-  }));
-
-  return base;
 }
 
-export function useClientCampaignList(clientId: string) {
-  const { data: rows = [], isLoading: loading, error } = useQuery({
+export function useClientCampaignList(clientId: string, client: SupabaseClient = supabase) {
+  const { data: rows = [], isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
     queryKey: myCampaignsKey(clientId),
-    queryFn: () => fetchClientCampaigns(clientId),
+    queryFn: () => fetchClientCampaigns(clientId, client),
     enabled: !!clientId,
     staleTime: 60 * 1000,
   });
@@ -56,8 +55,13 @@ export function useClientCampaignList(clientId: string) {
   return {
     rows,
     loading,
+    isFetching,
+    dataUpdatedAt,
     error: (error as Error)?.message ?? null,
-    reload: () => queryClient.invalidateQueries({ queryKey: myCampaignsKey(clientId) }),
+    reload: async () => {
+      const res = await refetch();
+      if (res.error) throw res.error;
+    },
   };
 }
 
@@ -68,22 +72,22 @@ export interface NewClientCampaignInput {
   description: string;
   language: string;
   search_queries: string[];
-  target_locations: string[];
+  target_areas: TargetArea[];
   max_results: number;
 }
 
 export async function createClientCampaign(
   input: NewClientCampaignInput,
 ): Promise<{ autoApproved: boolean; error: Error | null }> {
-  // Most clients' campaigns land in 'draft' and wait for an admin to review
-  // and activate them (see needsReview in useAdminData.ts). A client flagged
-  // auto_approve_campaigns skips that — but the campaign still has to be
-  // *inserted* as 'draft': the client's own RLS insert policy on campaigns
-  // only allows status='draft' (confirmed by a 403 when this tried to insert
-  // 'active' directly), so a client-authenticated request can never write a
-  // pre-activated row itself. A database trigger elevates it to 'active'
-  // right after, as a separate, privileged update — see
-  // add-client-campaign-auto-approve-trigger.sql.
+  // Most clients' campaigns land in 'pending_review' and wait for an admin to
+  // review and activate them (see needsReview in useAdminData.ts). A client
+  // flagged auto_approve_campaigns skips that - but the campaign still has to
+  // be *inserted* as 'pending_review': the client's own RLS insert policy on
+  // campaigns only allows status='pending_review' (confirmed by a 403 when
+  // this tried to insert 'active' directly), so a client-authenticated
+  // request can never write a pre-activated row itself. A database trigger
+  // (auto_approve_client_campaign) elevates it to 'active' right after, as a
+  // separate, privileged update.
   const { data: clientRow } = await supabase
     .from('clients')
     .select('auto_approve_campaigns')
@@ -99,9 +103,9 @@ export async function createClientCampaign(
       description: input.description || null,
       language: input.language,
       channel: 'email',
-      status: 'draft',
+      status: 'pending_review',
       search_queries: input.search_queries,
-      target_locations: input.target_locations,
+      ...buildAreaColumns(input.target_areas),
       max_results: input.max_results,
       scrape_enabled: true,
     });
@@ -114,7 +118,7 @@ export interface UpdateClientCampaignInput {
   description: string;
   language: string;
   search_queries: string[];
-  target_locations: string[];
+  target_areas: TargetArea[];
   max_results: number;
 }
 
@@ -126,7 +130,7 @@ export async function updateClientCampaign(campaignId: string, input: UpdateClie
       description: input.description || null,
       language: input.language,
       search_queries: input.search_queries,
-      target_locations: input.target_locations,
+      ...buildAreaColumns(input.target_areas),
       max_results: input.max_results,
       updated_at: new Date().toISOString(),
     })
@@ -164,11 +168,11 @@ export interface ClientCampaignProspect {
   pipeline_status: string;
 }
 
-export function useClientCampaignProspects(campaignId: string | null) {
+export function useClientCampaignProspects(campaignId: string | null, client: SupabaseClient = supabase) {
   const { data: rows = [], isLoading: loading } = useQuery({
     queryKey: myCampaignProspectsKey(campaignId ?? ''),
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('prospects')
         .select('id, business_name, contact_name, category, location, pipeline_status')
         .eq('campaign_id', campaignId as string)
@@ -193,11 +197,11 @@ export interface ClientUsage {
   limit_resets_at: string;
 }
 
-export function useClientUsage(clientId: string) {
+export function useClientUsage(clientId: string, client: SupabaseClient = supabase) {
   const { data: usage = null } = useQuery({
     queryKey: ['client-usage', clientId] as const,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('client_usage')
         .select('monthly_prospect_limit, max_campaigns, prospects_this_month, prospects_remaining, campaign_count, campaigns_remaining, limit_resets_at')
         .eq('client_id', clientId)
@@ -223,12 +227,12 @@ function currentMonthKey(): string {
   return new Date().toISOString().slice(0, 7); // 'YYYY-MM'
 }
 
-export function useClientLaunchUsage(clientId: string) {
+export function useClientLaunchUsage(clientId: string, client: SupabaseClient = supabase) {
   const month = currentMonthKey();
   const { data: usage = null } = useQuery({
     queryKey: ['client-launch-usage', clientId, month] as const,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('monthly_launch_usage')
         .select('month, launch_count')
         .eq('client_id', clientId)

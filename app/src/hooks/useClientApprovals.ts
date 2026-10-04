@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
 import { useAuth } from '../auth/AuthProvider';
@@ -15,8 +16,8 @@ interface ClientApprovalStats {
   rejected: number;
 }
 
-async function fetchPendingMessages(clientId: string): Promise<ClientMessageItem[]> {
-  const { data, error } = await supabase
+async function fetchPendingMessages(clientId: string, client: SupabaseClient): Promise<ClientMessageItem[]> {
+  const { data, error } = await client
     .from('messages')
     .select(
       `
@@ -37,19 +38,19 @@ async function fetchPendingMessages(clientId: string): Promise<ClientMessageItem
   })) as ClientMessageItem[];
 }
 
-async function fetchClientStats(clientId: string): Promise<ClientApprovalStats> {
+async function fetchClientStats(clientId: string, client: SupabaseClient): Promise<ClientApprovalStats> {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
   const iso = startOfDay.toISOString();
 
   const [pending, approvedToday, sentToday, rejected] = await Promise.all([
-    supabase.from('messages').select('id', { count: 'exact', head: true })
+    client.from('messages').select('id', { count: 'exact', head: true })
       .eq('client_id', clientId).eq('approval_status', 'pending'),
-    supabase.from('messages').select('id', { count: 'exact', head: true })
+    client.from('messages').select('id', { count: 'exact', head: true })
       .eq('client_id', clientId).eq('approval_status', 'approved').gte('approved_at', iso),
-    supabase.from('messages').select('id', { count: 'exact', head: true })
+    client.from('messages').select('id', { count: 'exact', head: true })
       .eq('client_id', clientId).eq('send_status', 'sent').gte('sent_at', iso),
-    supabase.from('messages').select('id', { count: 'exact', head: true })
+    client.from('messages').select('id', { count: 'exact', head: true })
       .eq('client_id', clientId).eq('approval_status', 'rejected'),
   ]);
 
@@ -61,7 +62,7 @@ async function fetchClientStats(clientId: string): Promise<ClientApprovalStats> 
   };
 }
 
-export function useClientApprovals(clientId: string) {
+export function useClientApprovals(clientId: string, client: SupabaseClient = supabase) {
   const { profile } = useAuth();
 
   const isPreview = clientId === '__preview__';
@@ -69,17 +70,24 @@ export function useClientApprovals(clientId: string) {
   const {
     data: items = [],
     isLoading: loading,
+    isFetching: itemsFetching,
+    dataUpdatedAt,
     error,
+    refetch: refetchItems,
   } = useQuery({
     queryKey: clientApprovalsKey(clientId),
-    queryFn: () => fetchPendingMessages(clientId),
+    queryFn: () => fetchPendingMessages(clientId, client),
     enabled: !!clientId && !isPreview,
     staleTime: 30 * 1000,
   });
 
-  const { data: stats = { pending: 0, approvedToday: 0, sentToday: 0, rejected: 0 } } = useQuery({
+  const {
+    data: stats = { pending: 0, approvedToday: 0, sentToday: 0, rejected: 0 },
+    isFetching: statsFetching,
+    refetch: refetchStats,
+  } = useQuery({
     queryKey: clientApprovalsStatsKey(clientId),
-    queryFn: () => fetchClientStats(clientId),
+    queryFn: () => fetchClientStats(clientId, client),
     enabled: !!clientId && !isPreview,
     staleTime: 60 * 1000,
   });
@@ -148,6 +156,8 @@ export function useClientApprovals(clientId: string) {
     items,
     stats,
     loading,
+    isFetching: itemsFetching || statsFetching,
+    dataUpdatedAt,
     error: (error as Error)?.message ?? null,
 
     approve,
@@ -155,9 +165,10 @@ export function useClientApprovals(clientId: string) {
     bulkApprove,
     bulkReject,
 
-    reload: () => {
-      queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
-      queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
+    reload: async () => {
+      const [itemsRes, statsRes] = await Promise.all([refetchItems(), refetchStats()]);
+      if (itemsRes.error) throw itemsRes.error;
+      if (statsRes.error) throw statsRes.error;
     },
   };
 }

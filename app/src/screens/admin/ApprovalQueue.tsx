@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApprovalQueue } from '../../hooks/useApprovalQueue';
+import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { SkeletonTable } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { RowMenu } from '../../components/RowMenu';
+import { useToast, ToastHost } from '../../components/Toast';
+import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import type { QueueItem } from '../../types';
-import { Clock, CheckCircle2, Send, Ban, Eye, AlertTriangle } from 'lucide-react';
+import { Clock, CheckCircle2, Send, Ban, Eye, AlertTriangle, RefreshCw } from 'lucide-react';
 
 const GMAIL_TOOLTIP = "This client needs to connect their Gmail from Settings before messages can be sent";
 
@@ -19,9 +22,9 @@ const HELP: HelpContent = {
     { type: 'p', text: "Every email the AI drafts lands here before it goes anywhere. Nothing sends until you approve it." },
     { type: 'p', text: "Read the draft, edit the copy if you want to tweak it, then Approve or Reject." },
     { type: 'ul', items: [
-      "Approve — sends the message exactly as written",
-      "Edit then approve — change the copy first, then send",
-      "Reject — discards the draft; the prospect receives nothing",
+      "Approve - sends the message exactly as written",
+      "Edit then approve - change the copy first, then send",
+      "Reject - discards the draft; the prospect receives nothing",
     ]},
   ],
 };
@@ -45,15 +48,27 @@ function formatPhone(raw: string): string {
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
 export function ApprovalQueue() {
-  const { items, stats, loading, error, approve, reject, reload } = useApprovalQueue();
+  const { items, stats, loading, isFetching, dataUpdatedAt, error, approve, reject, reload } = useApprovalQueue();
+  const { toasts, toast, dismiss } = useToast();
   const [editItem, setEditItem] = useState<QueueItem | null>(null);
   const [page, setPage] = useState(1);
+  const queueRef = useRef<HTMLDivElement | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
   const paged      = items.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const pagBtnCls = 'cursor-pointer rounded-lg border border-[#ddd8cb] bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-[#20211c] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-40';
+  const scrollToQueue = () => queueRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  async function handleRefresh() {
+    try {
+      await reload();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to refresh approvals.', 'error');
+    }
+  }
+
+  const pagBtnCls = 'cursor-pointer rounded-md border border-[#ddd8cb] bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-[#20211c] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <div style={FONT} className="flex flex-col gap-6">
@@ -67,11 +82,18 @@ export function ApprovalQueue() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {dataUpdatedAt > 0 && (
+            <span className="whitespace-nowrap text-[11px] text-[#9a9d92]">
+              {isFetching ? 'Updating…' : `Updated ${formatRelativeTime(dataUpdatedAt)}`}
+            </span>
+          )}
           <HelpButton content={HELP} />
           <button
-            onClick={reload}
-            className="cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]"
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-60"
           >
+            <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
             Refresh
           </button>
         </div>
@@ -86,6 +108,7 @@ export function ApprovalQueue() {
           value={stats.pending}
           sub={stats.pending > 0 ? 'needs your decision' : 'queue is clear'}
           subColor={stats.pending > 0 ? '#d4870f' : '#9a9d92'}
+          onClick={stats.pending > 0 ? scrollToQueue : undefined}
         />
         <StatTile
           icon={CheckCircle2}
@@ -124,12 +147,12 @@ export function ApprovalQueue() {
       {loading ? (
         <SkeletonTable rows={PAGE_SIZE} cols={5} />
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
+        <div ref={queueRef} className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
           <strong className="text-[15px] font-bold text-[#20211c]">Queue's clear.</strong>
           <span className="text-[13px] text-[#62655c]">No drafts waiting for review. New ones appear here as the AI writes them.</span>
         </div>
       ) : (
-        <>
+        <div ref={queueRef} className="flex flex-col gap-6">
           {/* Desktop table */}
           <div className="atbl hidden md:block">
             <table className="table-fixed">
@@ -160,7 +183,7 @@ export function ApprovalQueue() {
                       <ProspectMeta item={item} className="mt-0.5" />
                     </td>
                     <td className="min-w-0 text-[#62655c]">
-                      <div className="truncate" title={item.client?.business_name ?? undefined}>{item.client?.business_name ?? '—'}</div>
+                      <div className="truncate" title={item.client?.business_name ?? undefined}>{item.client?.business_name ?? '-'}</div>
                       <SenderLine item={item} className="mt-0.5" />
                     </td>
                     <td>
@@ -180,7 +203,7 @@ export function ApprovalQueue() {
                           onClick={() => approve(item.id)}
                           disabled={senderBlocked(item)}
                           title={senderBlocked(item) ? GMAIL_TOOLTIP : undefined}
-                          className="cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3.5 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
+                          className="cursor-pointer rounded-md border-0 bg-[#3c7a5b] px-3.5 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Approve
                         </button>
@@ -225,7 +248,7 @@ export function ApprovalQueue() {
                     onClick={() => approve(item.id)}
                     disabled={senderBlocked(item)}
                     title={senderBlocked(item) ? GMAIL_TOOLTIP : undefined}
-                    className="cursor-pointer flex-1 rounded-lg border-0 bg-[#3c7a5b] px-3 py-2 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="cursor-pointer flex-1 rounded-md border-0 bg-[#3c7a5b] px-3 py-2 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Approve
                   </button>
@@ -260,7 +283,7 @@ export function ApprovalQueue() {
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       <AnimatePresence>
@@ -273,6 +296,8 @@ export function ApprovalQueue() {
           />
         )}
       </AnimatePresence>
+
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }
@@ -330,6 +355,7 @@ function StatTile({
   sub,
   subColor,
   accent,
+  onClick,
 }: {
   icon: React.ElementType;
   iconColor: string;
@@ -338,6 +364,7 @@ function StatTile({
   sub: string;
   subColor: string;
   accent?: boolean;
+  onClick?: () => void;
 }) {
   const bg   = accent ? '#3c7a5b' : '#ffffff';
   const bdr  = accent ? '#3c7a5b' : '#ece8df';
@@ -347,8 +374,9 @@ function StatTile({
 
   return (
     <div
-      style={{ background: bg, borderColor: bdr }}
-      className="flex flex-col rounded-lg border px-5 py-[18px] gap-0 transition-shadow hover:shadow-sm"
+      onClick={onClick}
+      style={{ background: bg, borderColor: bdr, boxShadow: '0 1px 2px rgba(32,33,28,.04)' }}
+      className={`flex flex-col rounded-lg border px-5 py-[18px] gap-0 transition-shadow hover:shadow-md ${onClick ? 'cursor-pointer' : ''}`}
     >
       {/* Icon + label row */}
       <div className="flex items-center gap-[5px] mb-[10px]">
@@ -402,7 +430,7 @@ function EditModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}
@@ -464,14 +492,14 @@ function EditModal({
 
         {/* Footer */}
         <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
-          <button onClick={onClose} className="cursor-pointer rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:bg-[#fbf9f5]">
+          <button onClick={onClose} className="cursor-pointer rounded-md border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:bg-[#fbf9f5]">
             Cancel
           </button>
           <button
             onClick={() => onApprove(item.id, bodyDirty ? draft : undefined, subjectDirty ? subjectDraft : undefined)}
             disabled={senderBlocked(item)}
             title={senderBlocked(item) ? GMAIL_TOOLTIP : undefined}
-            className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
+            className="cursor-pointer rounded-md border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {dirty ? 'Save & approve' : 'Approve'}
           </button>

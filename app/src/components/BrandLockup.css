@@ -1,0 +1,17 @@
+@reference "tailwindcss";
+
+@layer components {
+  /* Icon + wordmark, sized as a quiet brand tag rather than a heading of
+     its own. Used above the heading on auth screens, and inline in the
+     admin top bar (which passes noMargin + a larger iconSize). */
+  .brand-lockup {
+    @apply inline-flex items-center gap-1.5;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    color: #1a1c17;
+    margin-bottom: 24px;
+    line-height: 1;
+  }
+}

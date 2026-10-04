@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
+import { BrandLockup } from '../components/BrandLockup';
+import { authRedirectError } from '../lib/authRedirectError';
 import './Login.css';
 
 const MIN_PW = 8;
@@ -17,8 +19,13 @@ export function SetPassword() {
   const [busy, setBusy]           = useState(false);
   const [done, setDone]           = useState(false);
 
-  // Redirect to login if the invite link is expired or already used
+  // Only fall back to a silent redirect when there's genuinely no session
+  // and no explanation for it (e.g. someone just typed this URL directly).
+  // An expired/used invite or reset link carries its own error in the URL
+  // (captured by authRedirectError before Supabase strips it): that case
+  // shows a real message below instead of bouncing to /login unexplained.
   useEffect(() => {
+    if (authRedirectError) return;
     if (!loading && !session) navigate('/login', { replace: true });
   }, [loading, session, navigate]);
 
@@ -41,6 +48,54 @@ export function SetPassword() {
     setTimeout(() => navigate('/app', { replace: true }), 1400);
   }
 
+  if (authRedirectError) {
+    return (
+      <div className="login-shell">
+        <div className="login-left">
+          <div className="login-form-wrap">
+            <BrandLockup />
+            <h1 className="login-title">This link has expired</h1>
+            <p className="login-sub">
+              {authRedirectError.code === 'otp_expired'
+                ? "This invite or password reset link is no longer valid, links like this expire after a while or after they've already been used once."
+                : (authRedirectError.description ?? 'This link is no longer valid.')}
+            </p>
+            <div style={{
+              background: '#edf4ef',
+              borderRadius: 10,
+              padding: '14px 16px',
+              color: '#2d5e46',
+              fontSize: 13,
+              fontWeight: 600,
+              lineHeight: 1.5,
+            }}>
+              If this was an invite, ask your admin to resend it. If you were resetting your password, request a new link below.
+            </div>
+            <p className="login-switch" style={{ marginTop: 20 }}>
+              <Link to="/forgot-password">Request a new reset link</Link>
+            </p>
+            <p className="login-copy">
+              <Link to="/login" className="login-forgot-link">Back to sign in</Link>
+            </p>
+          </div>
+        </div>
+        <div className="login-right">
+          <div className="login-right-inner">
+            <img
+              src="/outbound-illustration.png"
+              alt="Welcome to Shorty Harris"
+              className="login-illustration"
+            />
+            <p className="login-tagline">Welcome to Shorty Harris</p>
+            <p className="login-tagline-sub">
+              Your leads, messages, and results,<br />all in one place.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Show nothing while auth is resolving or while redirecting
   if (loading || !session) return null;
 
@@ -53,7 +108,7 @@ export function SetPassword() {
       <div className="login-left">
         <div className="login-form-wrap">
 
-          <div className="login-wordmark">Shorty Harris</div>
+          <BrandLockup />
 
           <h1 className="login-title">Set your password</h1>
           <p className="login-sub">
@@ -141,7 +196,7 @@ export function SetPassword() {
       <div className="login-right">
         <div className="login-right-inner">
           <img
-            src="https://illustrations.popsy.co/amber/paper-plane.svg"
+            src="/outbound-illustration.png"
             alt="Welcome to Shorty Harris"
             className="login-illustration"
           />
@@ -149,7 +204,7 @@ export function SetPassword() {
             Welcome to Shorty Harris
           </p>
           <p className="login-tagline-sub">
-            Your leads, messages, and results —<br />all in one place.
+            Your leads, messages, and results,<br />all in one place.
           </p>
         </div>
       </div>

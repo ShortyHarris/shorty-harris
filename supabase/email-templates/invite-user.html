@@ -1,0 +1,104 @@
+<!--
+  Supabase Auth email template: Authentication → Email Templates → "Invite user"
+  Paste this whole file into the template body field in the dashboard.
+  Suggested subject line: You're invited to Shorty Harris
+
+  Uses Supabase's template variables:
+    {{ .ConfirmationURL }} — the invite accept link (goes to /auth/set-password
+                              per redirectTo, handled by invite-client edge fn)
+    {{ .Email }}           — the invited address
+
+  Table-based layout + inline styles only, no external CSS/flexbox/grid —
+  required for this to render correctly across real email clients (Gmail,
+  Outlook, Apple Mail), not just a browser preview.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>You're invited to Shorty Harris</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f5f2ec; font-family:'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f2ec; padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; background-color:#ffffff; border-radius:12px; border:1px solid #ece8df; overflow:hidden;">
+
+          <!-- Logo -->
+          <tr>
+            <td style="padding:32px 40px 0;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="vertical-align:middle; padding-right:8px;">
+                    <img src="https://shortyharris.com/apple-touch-icon.png" width="22" height="22" alt="" style="display:block; border:0;" />
+                  </td>
+                  <td style="vertical-align:middle; font-size:15px; font-weight:700; color:#1a1c17; letter-spacing:-0.01em;">
+                    Shorty Harris
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Heading -->
+          <tr>
+            <td style="padding:28px 40px 0;">
+              <h1 style="margin:0; font-size:21px; font-weight:800; letter-spacing:-0.025em; color:#1a1c17;">
+                You've been invited
+              </h1>
+              <p style="margin:10px 0 0; font-size:14px; line-height:1.6; color:#62655c;">
+                An admin has set up your Shorty Harris account for <strong style="color:#1a1c17;">{{ .Email }}</strong>. Set a password to get in and see your leads, messages, and results in one place.
+              </p>
+            </td>
+          </tr>
+
+          <!-- CTA button -->
+          <tr>
+            <td style="padding:28px 40px 0;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center" style="border-radius:8px; background-color:#3c7a5b;">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:block; padding:13px 0; font-size:14.5px; font-weight:700; color:#ffffff; text-decoration:none; letter-spacing:-0.01em;">
+                      Set your password
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Fallback link -->
+          <tr>
+            <td style="padding:20px 40px 0;">
+              <p style="margin:0; font-size:12px; line-height:1.6; color:#9a9d92;">
+                Button not working? Paste this link into your browser:<br />
+                <a href="{{ .ConfirmationURL }}" style="color:#3c7a5b; word-break:break-all;">{{ .ConfirmationURL }}</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Expiry note -->
+          <tr>
+            <td style="padding:20px 40px 0;">
+              <p style="margin:0; font-size:12px; line-height:1.6; color:#9a9d92;">
+                This link expires after a while and can only be used once. If it's stopped working, ask the admin who invited you to resend it.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:32px 40px 32px;">
+              <p style="margin:0; font-size:11px; color:#c4c0b7;">
+                © 2026 Shorty Harris. If you weren't expecting this, you can ignore this email.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

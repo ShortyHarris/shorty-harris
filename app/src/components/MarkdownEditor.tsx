@@ -3,7 +3,7 @@ import { Bold, Italic, Underline, Heading2, List } from 'lucide-react';
 
 // A plain markdown textarea with a small formatting toolbar. Buttons wrap the
 // current selection (or insert placeholder text) with the matching markdown
-// syntax, so the stored value stays real markdown — the public post page
+// syntax, so the stored value stays real markdown - the public post page
 // already renders body_md with `marked`, and this keeps that pipeline
 // completely unchanged instead of switching to a contentEditable/HTML value.
 

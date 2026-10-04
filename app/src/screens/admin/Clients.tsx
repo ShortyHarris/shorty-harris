@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   useClients, createClient, sendClientInvite, updateClientLoginEmail,
@@ -10,6 +11,9 @@ import type {
 import { SkeletonTable } from '../../components/Skeleton';
 import { RowMenu } from '../../components/RowMenu';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
+import { useToast, ToastHost } from '../../components/Toast';
+import { RefreshButton } from '../../components/RefreshButton';
+import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import { isValidEmail, isValidPhone, normalizePhone } from '../../lib/validation';
 
 const HELP: HelpContent = {
@@ -18,9 +22,9 @@ const HELP: HelpContent = {
     { type: 'p', text: "Every business you run outreach for. Add new clients here, update their details, and send them a login invite so they can view their own Hot Leads." },
     { type: 'p', text: "Clicking Invite emails the client a secure link. Once they click it and set a password, they can log in to their dashboard." },
     { type: 'ul', items: [
-      "Active — outreach is running",
-      "Paused — campaigns on hold",
-      "Churned — no longer active",
+      "Active - outreach is running",
+      "Paused - campaigns on hold",
+      "Churned - no longer active",
     ]},
   ],
 };
@@ -53,7 +57,10 @@ const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 
 type InvitePhase = 'idle' | 'sending' | 'sent' | 'active' | 'error';
 
 export function Clients() {
-  const { rows, loading, error, reload } = useClients();
+  const navigate = useNavigate();
+  const { rows, loading, isFetching, dataUpdatedAt, error, reload } = useClients();
+  const { toasts, toast, dismiss } = useToast();
+  const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh clients.');
   const [showNew, setShowNew]     = useState(false);
   const [editClient, setEditClient]     = useState<ClientListRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClientListRow | null>(null);
@@ -75,7 +82,7 @@ export function Clients() {
       setInvitePhase((p) => ({ ...p, [c.id]: alreadyActive ? 'active' : 'error' }));
       if (!alreadyActive) setInviteErrors((e) => ({ ...e, [c.id]: err }));
       // The edge function persists activated_at once it discovers a genuinely
-      // active account — reload so future page loads skip the round trip and
+      // active account - reload so future page loads skip the round trip and
       // show the disabled state up front instead of only finding out on click.
       if (alreadyActive) reload();
     } else {
@@ -97,7 +104,7 @@ export function Clients() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton content={HELP} />
-          <button onClick={reload} className={ghostCls}>Refresh</button>
+          <RefreshButton onRefresh={handleRefresh} isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} className={ghostCls} />
           <button onClick={() => setShowNew(true)} className={`${primaryCls} hidden md:inline-flex`}>+ New client</button>
         </div>
       </header>
@@ -120,55 +127,41 @@ export function Clients() {
           <div className="atbl hidden md:block">
             <table className="table-fixed">
               <colgroup>
-                <col className="w-[24%]" />
+                <col className="w-[26%]" />
+                <col className="w-[18%]" />
+                <col className="w-[13%]" />
+                <col className="w-[13%]" />
+                <col className="w-[18%]" />
                 <col className="w-[12%]" />
-                <col className="w-[14%]" />
-                <col className="w-[11%]" />
-                <col className="w-[9%]" />
-                <col className="w-[9%]" />
-                <col className="w-[15%]" />
-                <col className="w-[6%]" />
               </colgroup>
               <thead>
                 <tr>
-                  {['Business', 'Type', 'Location', 'Added', 'Notify', 'Status', 'Invite', ''].map((h) => (
+                  {['Business', 'Representative', 'Added', 'Status', 'Invite', ''].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {paged.map((c) => {
-                  const ch    = c.notification_channel ?? 'whatsapp';
-                  const cpill = CHANNEL_PILL[ch] ?? CHANNEL_PILL.whatsapp;
                   const spill = STATUS_PILL[c.status] ?? STATUS_PILL.active;
                   const phase = invitePhase[c.id] ?? 'idle';
                   return (
-                    <tr key={c.id}>
+                    <tr key={c.id} onClick={() => setEditClient(c)} className="group cursor-pointer">
                       <td className="min-w-0">
-                        <div className="truncate font-bold text-[#20211c]" title={c.business_name}>{c.business_name}</div>
-                        {c.contact_email && <div className="mt-0.5 truncate font-mono text-[11px] text-[#9a9d92]" title={c.contact_email}>{c.contact_email}</div>}
-                        {c.contact_phone && <div className="truncate font-mono text-[11px] text-[#c4bfb5]" title={c.contact_phone}>{c.contact_phone}</div>}
+                        <div className="truncate font-bold text-[#20211c] group-hover:underline" title={c.business_name}>{c.business_name}</div>
                       </td>
                       <td className="min-w-0 text-[#62655c]">
-                        <div className="truncate" title={c.business_type ?? undefined}>{c.business_type ?? '—'}</div>
-                      </td>
-                      <td className="min-w-0 text-[#62655c]">
-                        <div className="truncate" title={c.location ?? undefined}>{c.location ?? '—'}</div>
+                        <div className="truncate" title={c.contact_name ?? undefined}>{c.contact_name ?? '-'}</div>
                       </td>
                       <td className="text-[12px] text-[#9a9d92] whitespace-nowrap">
                         {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </td>
-                      <td>
-                        <span className="atbl-pill" style={{ background: cpill.bg, color: cpill.text }}>
-                          {ch}
-                        </span>
                       </td>
                       <td>
                         <span className="atbl-pill" style={{ background: spill.bg, color: spill.text }}>
                           {c.status}
                         </span>
                       </td>
-                      <td>
+                      <td onClick={(e) => e.stopPropagation()}>
                         <InviteCell
                           client={c}
                           phase={phase}
@@ -176,8 +169,9 @@ export function Clients() {
                           onInvite={() => handleInvite(c)}
                         />
                       </td>
-                      <td className="px-3 text-right">
+                      <td className="px-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <RowMenu items={[
+                          { type: 'action', label: 'View as client', onClick: () => navigate(`/admin/impersonate/${c.id}`) },
                           { type: 'action', label: 'Edit client', onClick: () => setEditClient(c) },
                           {
                             type: 'action',
@@ -185,7 +179,7 @@ export function Clients() {
                             onClick: () => handleInvite(c),
                             disabled: !c.contact_email || phase === 'sending' || phase === 'active' || !!c.activated_at,
                             title: (phase === 'active' || c.activated_at)
-                              ? "This client can already sign in — resending won't do anything. Have them log in directly, or use “Forgot password” on the login screen if they've lost access."
+                              ? "This client can already sign in - resending won't do anything. Have them log in directly, or use “Forgot password” on the login screen if they've lost access."
                               : undefined,
                           },
                           {
@@ -193,7 +187,7 @@ export function Clients() {
                             label: 'Change login email',
                             onClick: () => setChangeEmailTarget(c),
                             disabled: !c.has_profile,
-                            title: !c.has_profile ? "This client has no login account yet — send an invite first." : undefined,
+                            title: !c.has_profile ? "This client has no login account yet - send an invite first." : undefined,
                           },
                           { type: 'separator' },
                           { type: 'action', label: 'Delete client', destructive: true, onClick: () => setDeleteTarget(c) },
@@ -243,6 +237,12 @@ export function Clients() {
                       errMsg={inviteErrors[c.id]}
                       onInvite={() => handleInvite(c)}
                     />
+                    <button
+                      onClick={() => navigate(`/admin/impersonate/${c.id}`)}
+                      className="cursor-pointer rounded-lg border border-[#ece8df] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                    >
+                      View as client
+                    </button>
                     <button
                       onClick={() => setEditClient(c)}
                       className="cursor-pointer rounded-lg border border-[#ece8df] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
@@ -316,11 +316,17 @@ export function Clients() {
           />
         )}
       </AnimatePresence>
+
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }
 
 /* ── Invite cell ───────────────────────────────────────────────────── */
+// All states render as the same pill shape/size (atbl-pill) as the Status
+// column next to it - only the actionable "send/resend" state is a real
+// <button>, so the column reads as one consistent badge instead of mixing
+// a wide bordered box with a tiny muted chip.
 function InviteCell({
   client, phase, errMsg, onInvite,
 }: {
@@ -329,40 +335,41 @@ function InviteCell({
   errMsg: string | undefined;
   onInvite: () => void;
 }) {
+  const pillCls = 'atbl-pill w-[120px] justify-center';
+
   if (!client.contact_email) {
-    return <span className="text-[11px] text-[#c4bfb5]">No email</span>;
+    return <span className={pillCls} style={{ background: '#f5f2ec', color: '#c4bfb5' }}>No email</span>;
   }
   if (phase === 'sending') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[12px] text-[#9a9d92]">
-        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#ddd8cb] border-t-[#3c7a5b]" />
-        Sending…
+      <span className={`${pillCls} inline-flex items-center gap-1.5`} style={{ background: '#f5f2ec', color: '#9a9d92' }}>
+        <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border-2 border-[#ddd8cb] border-t-[#3c7a5b]" />
+        Sending
       </span>
     );
   }
   if (phase === 'sent') {
-    return <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#3c7a5b]">✓ Invite sent</span>;
+    return <span className={pillCls} style={{ background: '#edf4ef', color: '#3c7a5b' }}>✓ Invite sent</span>;
   }
   if (phase === 'active' || client.activated_at) {
     return (
-      <button
-        disabled
-        title="This client can already sign in — resending an invite won't do anything. Have them log in directly, or use “Forgot password” on the login screen if they've lost access."
-        className="cursor-not-allowed inline-flex items-center whitespace-nowrap rounded-full border border-[#ece8df] bg-[#f5f2ec] px-2 py-1 text-[8px] font-bold uppercase tracking-[.04em] text-[#9a9d92]"
+      <span
+        title="This client can already sign in - resending an invite won't do anything. Have them log in directly, or use “Forgot password” on the login screen if they've lost access."
+        className={pillCls}
+        style={{ background: '#f0f0f0', color: '#9a9d92' }}
       >
         Account active
-      </button>
+      </span>
     );
   }
   return (
     <div className="flex flex-col gap-1">
       <button
         onClick={onInvite}
-        className={`cursor-pointer inline-flex items-center whitespace-nowrap rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-          client.has_profile
-            ? 'border-[#ece8df] bg-white text-[#62655c] hover:border-[#ddd8cb] hover:bg-[#fbf9f5]'
-            : 'border-[#3c7a5b] bg-[#edf4ef] text-[#3c7a5b] hover:bg-[#d9ede3]'
-        }`}
+        className={`${pillCls} cursor-pointer border-0 font-bold transition-opacity hover:opacity-75`}
+        style={client.has_profile
+          ? { background: '#f8efdb', color: '#b9831f' }
+          : { background: '#edf4ef', color: '#3c7a5b' }}
       >
         {client.has_profile ? 'Resend invite' : 'Send invite'}
       </button>
@@ -418,12 +425,18 @@ interface EnrichResult {
 }
 
 const ENRICH_ERROR_MESSAGES: Record<string, string> = {
-  could_not_fetch_website: "Couldn't reach that website — check the URL.",
+  invalid_url: "That doesn't look like a valid URL - check for typos.",
+  could_not_resolve: "Couldn't resolve that URL - check the address and try again.",
+  could_not_fetch_website: "Couldn't reach that website - check the URL.",
   'website_url is required': 'Website URL is required.',
-  enrichment_generation_failed: 'Enrichment temporarily unavailable — try again.',
+  // Distinct from a generic/transient AI failure: this one won't fix itself
+  // on retry, so it gets its own reason + message rather than falling under
+  // enrichment_generation_failed's "try again" wording.
+  ai_service_billing_issue: "The lookup service needs attention (billing/quota issue on our end) - this won't fix itself by retrying. Let an admin know.",
+  enrichment_generation_failed: 'Enrichment temporarily unavailable - try again.',
 };
 
-// Fields the enrichment call can fill — used to fill gaps only (never
+// Fields the enrichment call can fill - used to fill gaps only (never
 // overwrite what the admin already typed) and to track which of them came
 // back genuinely empty (AI searched but found nothing) vs never asked about.
 type EnrichableField = 'businessName' | 'businessType' | 'location' | 'contactEmail' | 'contactPhone';
@@ -469,10 +482,10 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
         body: JSON.stringify({ website_url: url, business_name: businessName.trim() }),
       });
     } catch (e) {
-      // fetch() only throws for network-level failures — most commonly the n8n
+      // fetch() only throws for network-level failures - most commonly the n8n
       // webhook not sending CORS headers back to this origin, or DNS/offline.
       console.error('Enrich webhook unreachable:', e);
-      setEnrichErr("Couldn't reach the enrichment service — check your connection, or the n8n workflow may not be active.");
+      setEnrichErr("Couldn't reach the enrichment service - check your connection, or the n8n workflow may not be active.");
       setEnriching(false);
       return;
     }
@@ -496,18 +509,24 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
     }
 
     if (json.status === 'error') {
-      setEnrichErr(
-        ENRICH_ERROR_MESSAGES[json.reason ?? ''] ??
-        json.detail ??
-        'Could not enrich from that website — fill in the details manually.'
-      );
+      // For most reasons the mapped message is already the clearest wording
+      // we have. The exception is enrichment_generation_failed: n8n now
+      // passes through the real upstream error as `detail` (and reclassifies
+      // anything billing/quota-shaped into ai_service_billing_issue before
+      // it even gets here) - so for whatever's left over, show that real
+      // detail instead of a generic "try again" that would hide it.
+      const reason = json.reason ?? '';
+      const message = reason === 'enrichment_generation_failed'
+        ? (json.detail || ENRICH_ERROR_MESSAGES[reason])
+        : (ENRICH_ERROR_MESSAGES[reason] ?? json.detail ?? 'Could not enrich from that website - fill in the details manually.');
+      setEnrichErr(message);
       setEnriching(false);
       return;
     }
 
     setEnrichResult(json);
 
-    // Fill gaps only — a field the admin already typed into is left alone,
+    // Fill gaps only - a field the admin already typed into is left alone,
     // and an empty string from the API means "searched, genuinely not found"
     // rather than an error, so it's tracked (not written) for the inline hint.
     const notFound = new Set<EnrichableField>();
@@ -549,7 +568,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
       // Pre-fill the auto-created default campaign from whatever we know:
       // the enrichment's services become search terms (no editable field of
       // their own to fall back on), and the location uses whatever ended up
-      // in the Location field — enriched or hand-typed/corrected, either way.
+      // in the Location field - enriched or hand-typed/corrected, either way.
       search_queries: enrichResult?.services ?? [],
       target_locations: location.trim() ? [location.trim()] : [],
     });
@@ -574,7 +593,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
             className={inputCls}
           />
           {notFoundFields.has('businessName') && (
-            <p className="mt-1 text-[11px] text-[#b9831f]">Not found on the site — please fill in.</p>
+            <p className="mt-1 text-[11px] text-[#b9831f]">Not found on the site - please fill in.</p>
           )}
         </div>
         <div>
@@ -595,13 +614,21 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
               disabled={!websiteUrl.trim() || enriching}
               className={`${ghostCls} shrink-0`}
             >
-              {enriching ? 'Looking up…' : 'Enrich'}
+              {enriching ? 'Looking up…' : 'Look up business info'}
             </button>
           </div>
+          {/* Confirmed URL n8n actually fetched after following redirects -
+              lets the admin catch a typo'd/parked domain that still "succeeds"
+              against the wrong final destination. */}
+          {enrichResult?.website_url && !enrichErr && (
+            <p className="mt-1 text-[11px] text-[#3c7a5b]">
+              Confirmed: <span className="font-semibold">{enrichResult.website_url}</span>
+            </p>
+          )}
           <p className="mt-1 text-[11px] text-[#9a9d92]">
             {enriching
-              ? 'Fetching the site and running AI extraction — this can take up to 15 seconds…'
-              : 'Optional — auto-fills business name, type, location, and contact details from the site (won\'t overwrite anything you\'ve already typed).'}
+              ? 'Fetching the site and running AI extraction - this can take up to 15 seconds…'
+              : 'Optional - auto-fills business name, type, location, and contact details from the site (won\'t overwrite anything you\'ve already typed).'}
           </p>
           {enrichErr && <p className="mt-1 text-[11px] text-[#a8533a]">{enrichErr}</p>}
           {enrichResult && (enrichResult.services?.length || enrichResult.target_customer_profiles?.length || enrichResult.summary) && (
@@ -634,7 +661,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
               className={inputCls}
             />
             {notFoundFields.has('businessType') && (
-              <p className="mt-1 text-[11px] text-[#b9831f]">Not found — please fill in.</p>
+              <p className="mt-1 text-[11px] text-[#b9831f]">Not found - please fill in.</p>
             )}
           </div>
           <div>
@@ -647,7 +674,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
               className={inputCls}
             />
             {notFoundFields.has('location') && (
-              <p className="mt-1 text-[11px] text-[#b9831f]">Not found — please fill in.</p>
+              <p className="mt-1 text-[11px] text-[#b9831f]">Not found - please fill in.</p>
             )}
           </div>
         </div>
@@ -662,7 +689,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
             className={inputCls}
           />
           {notFoundFields.has('contactEmail') && (
-            <p className="mt-1 text-[11px] text-[#b9831f]">Not found — please fill in.</p>
+            <p className="mt-1 text-[11px] text-[#b9831f]">Not found - please fill in.</p>
           )}
         </div>
         <div>
@@ -676,7 +703,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
             className={inputCls}
           />
           {notFoundFields.has('contactPhone') && (
-            <p className="mt-1 text-[11px] text-[#b9831f]">Not found — please fill in.</p>
+            <p className="mt-1 text-[11px] text-[#b9831f]">Not found - please fill in.</p>
           )}
           <p className="mt-1 text-[11px] text-[#9a9d92]">Required for hot-lead WhatsApp / SMS notifications.</p>
         </div>
@@ -702,7 +729,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
             <input type="checkbox" checked={saveAsDraft} onChange={(e) => setSaveAsDraft(e.target.checked)} className="accent-[#3c7a5b]" />
             Save as draft
           </label>
-          <p className="mt-1 text-[11px] text-[#9a9d92]">Contact email and phone become optional — finish the profile later.</p>
+          <p className="mt-1 text-[11px] text-[#9a9d92]">Contact email and phone become optional - finish the profile later.</p>
         </div>
 
         {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
@@ -844,7 +871,7 @@ function EditClientModal({
           />
           <span>
             <span className="block font-semibold text-[#20211c]">Auto-approve this client's campaigns</span>
-            <span className="block text-[11px] text-[#9a9d92]">Skips the "Awaiting approval" step — campaigns they create go active immediately, no admin review.</span>
+            <span className="block text-[11px] text-[#9a9d92]">Skips the "Awaiting approval" step - campaigns they create go active immediately, no admin review.</span>
           </span>
         </label>
         <div className="grid grid-cols-2 gap-3">
@@ -934,7 +961,7 @@ function DeleteClientModal({
               Counting affected records…
             </div>
           ) : blastItems.length === 0 ? (
-            <p className="text-[13px] text-[#62655c]">No associated records — the client row only.</p>
+            <p className="text-[13px] text-[#62655c]">No associated records - the client row only.</p>
           ) : (
             <ul className="m-0 list-none p-0 flex flex-col gap-1">
               {blastItems.map((item) => (
@@ -947,7 +974,7 @@ function DeleteClientModal({
           )}
           {client.has_profile && (
             <p className="mt-3 text-[12px] text-[#62655c]">
-              This client has a login account — it will also be deleted.
+              This client has a login account - it will also be deleted.
             </p>
           )}
         </div>
@@ -993,7 +1020,7 @@ function ChangeLoginEmailModal({
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
         <p className="m-0 text-[13px] text-[#62655c]">
-          This changes the email <strong className="font-bold">{client.business_name}</strong> uses to sign in to their dashboard. It's applied immediately — no confirmation email is sent to the new address.
+          This changes the email <strong className="font-bold">{client.business_name}</strong> uses to sign in to their dashboard. It's applied immediately - no confirmation email is sent to the new address.
         </p>
         <div>
           <label className={fieldLbl}>New login email</label>

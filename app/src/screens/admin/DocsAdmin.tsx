@@ -3,10 +3,14 @@ import { AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Search, ExternalLink, Plus, Sparkles } from 'lucide-react';
 import { useDocsArticles, createDocsArticle, reembedAllArticles, type DocsArticle } from '../../hooks/useDocs';
+import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { SkeletonTable } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { DocsEditorModal } from '../docs/DocsEditorModal';
 import { DocsSearchPanel } from '../docs/DocsSearchPanel';
+import { useToast, ToastHost } from '../../components/Toast';
+import { RefreshButton } from '../../components/RefreshButton';
+import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
@@ -16,7 +20,7 @@ const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif
 const HELP: HelpContent = {
   title: 'Docs',
   body: [
-    { type: 'p', text: "Every article behind the /docs help center. Search or filter to find one quickly, then edit it in place — changes are live immediately and re-embedded for search automatically." },
+    { type: 'p', text: "Every article behind the /docs help center. Search or filter to find one quickly, then edit it in place - changes are live immediately and re-embedded for search automatically." },
     { type: 'p', text: "Audience controls who can see it: client-only, admin-only, both, or internal (admin-only, hidden from the sidebar entirely for non-admins)." },
   ],
 };
@@ -36,7 +40,9 @@ function slugify(text: string): string {
 }
 
 export function DocsAdmin() {
-  const { rows, categories, loading, error, reload } = useDocsArticles();
+  const { rows, categories, loading, isFetching, dataUpdatedAt, error, reload } = useDocsArticles();
+  const { toasts, toast, dismiss } = useToast();
+  const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh docs.');
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [audienceFilter, setAudienceFilter] = useState('all');
@@ -53,7 +59,7 @@ export function DocsAdmin() {
     const { succeeded, failed } = await reembedAllArticles(rows.map((r) => r.id));
     setReembedding(false);
     setReembedMsg(failed > 0
-      ? `Re-embedded ${succeeded} of ${rows.length} (${failed} failed — check that GEMINI_API_KEY is configured).`
+      ? `Re-embedded ${succeeded} of ${rows.length} (${failed} failed - check that GEMINI_API_KEY is configured).`
       : `Re-embedded all ${succeeded} articles for search.`);
   }
 
@@ -83,7 +89,7 @@ export function DocsAdmin() {
             <ExternalLink size={13} />
             View docs site
           </Link>
-          <button onClick={reload} className={ghostCls}>Refresh</button>
+          <RefreshButton onRefresh={handleRefresh} isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} className={ghostCls} />
           <button onClick={handleReembedAll} disabled={reembedding} className={`${ghostCls} hidden md:inline-flex items-center gap-1.5`}>
             <Sparkles size={13} />
             {reembedding ? 'Re-embedding…' : 'Re-embed all'}
@@ -246,6 +252,8 @@ export function DocsAdmin() {
           />
         )}
       </AnimatePresence>
+
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }
@@ -281,7 +289,7 @@ function NewArticleModal({ onClose, onCreated }: { onClose: () => void; onCreate
   return (
     <div
       className="fixed inset-0 z-100 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <div
         style={FONT}
@@ -319,7 +327,7 @@ function NewArticleModal({ onClose, onCreated }: { onClose: () => void; onCreate
               </SelectContent>
             </Select>
           </div>
-          <p className="m-0 text-[11px] text-[#9a9d92]">Created as a draft — open it after creating to write the body and publish.</p>
+          <p className="m-0 text-[11px] text-[#9a9d92]">Created as a draft - open it after creating to write the body and publish.</p>
           {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
         </div>
         <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">

@@ -3,7 +3,7 @@ const GA_ID = 'G-YEDGN8S0ED';
 let loaded = false;
 
 // Only ever called after the visitor has opted into analytics cookies
-// (see consent.ts) — previously this loaded unconditionally from index.html.
+// (see consent.ts) - previously this loaded unconditionally from index.html.
 export function loadGoogleAnalytics() {
   if (loaded) return;
   loaded = true;

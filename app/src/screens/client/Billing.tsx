@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { supabase } from '../../lib/supabase';
 import { useBilling, type PaymentRow, type LedgerRow } from '../../hooks/useBilling';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
+import { useToast, ToastHost } from '../../components/Toast';
+import { RefreshButton } from '../../components/RefreshButton';
+import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import './Billing.css';
 
 const HELP: HelpContent = {
@@ -51,8 +56,12 @@ function date(iso: string) {
   });
 }
 
-export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCreditsChanged?: () => void }) {
-  const { data, loading, error, reload } = useBilling(clientId);
+export function Billing({
+  clientId, onCreditsChanged, client = supabase, readOnly = false,
+}: { clientId: string; onCreditsChanged?: () => void; client?: SupabaseClient; readOnly?: boolean }) {
+  const { data, loading, isFetching, dataUpdatedAt, error, reload } = useBilling(clientId, client);
+  const { toasts, toast, dismiss } = useToast();
+  const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh billing.');
   const [selected, setSelected]           = useState<number>(5);
   const [checkoutBusy, setCheckoutBusy]   = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
@@ -79,18 +88,19 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
   useEffect(() => {
     const status = searchParams.get('status');
     if (status === 'success') {
-      setBanner({ kind: 'success', text: 'Payment received — your credits have been added.' });
+      setBanner({ kind: 'success', text: 'Payment received - your credits have been added.' });
       const t = setTimeout(() => { reload(); onCreditsChanged?.(); }, 2500);
       setSearchParams({}, { replace: true });
       return () => clearTimeout(t);
     } else if (status === 'cancel') {
-      setBanner({ kind: 'cancel', text: 'Checkout cancelled — no charge was made.' });
+      setBanner({ kind: 'cancel', text: 'Checkout cancelled - no charge was made.' });
       setSearchParams({}, { replace: true });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function startCheckout() {
+    if (readOnly) return;
     setCheckoutBusy(true);
     setCheckoutError(null);
     try {
@@ -140,7 +150,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
               <span className="credit-hero-sms-chip">+{data.smsCredits} SMS credits</span>
             )}
           </div>
-          <div className="credit-hero-num">{loading ? '—' : data?.credits}</div>
+          <div className="credit-hero-num">{loading ? '-' : data?.credits}</div>
           <div className="credit-hero-label">credits remaining</div>
           <div className="credit-hero-note">
             Each hot lead routed to you costs 1 credit
@@ -174,7 +184,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
             ))}
           </div>
 
-          <button className="checkout-btn rounded-lg" onClick={startCheckout} disabled={checkoutBusy}>
+          <button className="checkout-btn rounded-lg" onClick={startCheckout} disabled={checkoutBusy || readOnly}>
             {!checkoutBusy && <LockIcon />}
             {checkoutBusy
               ? 'Starting secure checkout…'
@@ -192,7 +202,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
       {/* Bottom: both tables, full width, stacked */}
       <div className="bill-section-head bill-section-head-spaced">
         <h2>Payment history</h2>
-        <button className="bill-refresh" onClick={reload}>Refresh</button>
+        <RefreshButton onRefresh={handleRefresh} isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} className="bill-refresh" />
       </div>
 
       {error && <div className="bill-error">{error}</div>}
@@ -215,7 +225,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
             ))}
           </div>
           {/* Desktop: skeleton table */}
-          <div className="hidden lg:block lg:bg-white lg:border lg:border-[var(--line)] lg:rounded-lg lg:p-4" aria-hidden>
+          <div className="hidden lg:block lg:bg-white lg:border lg:border-[#e8e3da] lg:rounded-[10px] lg:p-4 lg:shadow-[0_1px_2px_rgba(32,33,28,0.04)]" aria-hidden>
             <table className="w-full">
               <tbody>
                 {[...Array(4)].map((_, i) => (
@@ -243,7 +253,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
               <div className="payment-item rounded-lg" key={p.id}>
                 <div className="payment-item-left">
                   <span className="payment-item-credits">
-                    {p.credits_purchased > 0 ? `+${p.credits_purchased} credits` : '—'}
+                    {p.credits_purchased > 0 ? `+${p.credits_purchased} credits` : '-'}
                   </span>
                   <span className="payment-item-date">{date(p.created_at)}</span>
                 </div>
@@ -258,7 +268,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
           </div>
 
           {/* Desktop: real table, full width, contained in one bordered card */}
-          <div className="hidden lg:block lg:bg-white lg:border lg:border-[var(--line)] lg:rounded-lg lg:p-4">
+          <div className="hidden lg:block lg:bg-white lg:border lg:border-[#e8e3da] lg:rounded-[10px] lg:p-4 lg:shadow-[0_1px_2px_rgba(32,33,28,0.04)]">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[13px] text-[var(--ink-faint)]">
                 {filteredPayments.length} payment{filteredPayments.length !== 1 ? 's' : ''}
@@ -312,7 +322,7 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
           </div>
 
           {/* Desktop: real table, full width, contained in one bordered card */}
-          <div className="hidden lg:block lg:bg-white lg:border lg:border-[var(--line)] lg:rounded-lg lg:p-4">
+          <div className="hidden lg:block lg:bg-white lg:border lg:border-[#e8e3da] lg:rounded-[10px] lg:p-4 lg:shadow-[0_1px_2px_rgba(32,33,28,0.04)]">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[13px] text-[var(--ink-faint)]">
                 {filteredLedger.length} entr{filteredLedger.length !== 1 ? 'ies' : 'y'}
@@ -341,6 +351,8 @@ export function Billing({ clientId, onCreditsChanged }: { clientId: string; onCr
           </div>
         </>
       )}
+
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
     </main>
   );
 }
@@ -351,17 +363,17 @@ function PaymentsTable({ payments }: { payments: PaymentRow[] }) {
     <table className="w-full text-left">
       <thead>
         <tr className="border-b border-[var(--line)]">
-          <th className="py-2.5 px-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-faint)]">Credits</th>
-          <th className="py-2.5 px-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-faint)]">Date</th>
-          <th className="py-2.5 px-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-faint)]">Amount</th>
-          <th className="py-2.5 px-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-faint)]">Status</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0]">Credits</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0]">Date</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0]">Amount</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0]">Status</th>
         </tr>
       </thead>
       <tbody>
         {payments.map((p) => (
-          <tr key={p.id} className="border-b border-[var(--line)] last:border-0">
+          <tr key={p.id} className="border-b border-[var(--line)] last:border-0 transition-colors hover:bg-[#faf9f7]">
             <td className="py-3 px-2 font-semibold text-[14px] text-[var(--ink)]">
-              {p.credits_purchased > 0 ? `+${p.credits_purchased}` : '—'}
+              {p.credits_purchased > 0 ? `+${p.credits_purchased}` : '-'}
             </td>
             <td className="py-3 px-2 text-[13.5px] text-[var(--ink-faint)]">{date(p.created_at)}</td>
             <td className="py-3 px-2 text-[14px] text-[var(--ink)] font-medium">{money(p.amount_cents, p.currency)}</td>
@@ -379,14 +391,14 @@ function ActivityTable({ ledger }: { ledger: LedgerRow[] }) {
     <table className="w-full text-left">
       <thead>
         <tr className="border-b border-[var(--line)]">
-          <th className="py-2.5 px-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-faint)]">Description</th>
-          <th className="py-2.5 px-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-faint)]">Date</th>
-          <th className="py-2.5 px-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-faint)] text-right">Amount</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0]">Description</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0]">Date</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0] text-right">Amount</th>
         </tr>
       </thead>
       <tbody>
         {ledger.map((l) => (
-          <tr key={l.id} className="border-b border-[var(--line)] last:border-0">
+          <tr key={l.id} className="border-b border-[var(--line)] last:border-0 transition-colors hover:bg-[#faf9f7]">
             <td className="py-3 px-2 text-[14px] text-[var(--ink)] capitalize">
               {l.description ?? l.type.replace(/_/g, ' ')}
             </td>

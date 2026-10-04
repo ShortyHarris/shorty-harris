@@ -5,7 +5,7 @@ export interface TourStep {
   title: string;
   body: string;
   // Shown instead of `body` when the target element never appears (e.g. a
-  // brand-new account with no warm prospects yet) — without this, a new
+  // brand-new account with no warm prospects yet) - without this, a new
   // user just sees a dark screen with a description of something invisible
   // and no explanation why.
   fallbackBody?: string;
@@ -13,7 +13,7 @@ export interface TourStep {
 
 // Each step's `selector` matches a `data-tour="..."` attribute placed on the
 // real element it should highlight (see Dashboard.tsx, Campaigns.tsx,
-// Billing.tsx, Settings.tsx). `path` is the route the step lives on — the
+// Billing.tsx, Settings.tsx). `path` is the route the step lives on - the
 // tour navigates there automatically when advancing to a step on a
 // different page.
 export const TOUR_STEPS: TourStep[] = [
@@ -29,8 +29,8 @@ export const TOUR_STEPS: TourStep[] = [
     path: '/app',
     selector: 'warm-prospects',
     title: 'Worth a call',
-    body: "Prospects who've opened your emails multiple times without replying — a phone call here often closes the deal.",
-    fallbackBody: "You don't have any of these yet — this section fills up once some of your emails get opened more than once without a reply. Nothing to see here for now, moving on.",
+    body: "Prospects who've opened your emails multiple times without replying - a phone call here often closes the deal.",
+    fallbackBody: "You don't have any of these yet - this section fills up once some of your emails get opened more than once without a reply. Nothing to see here for now, moving on.",
   },
   {
     id: 'lead-filters',
@@ -44,7 +44,7 @@ export const TOUR_STEPS: TourStep[] = [
     path: '/app/campaigns',
     selector: 'new-campaign-btn',
     title: 'Start a campaign',
-    body: 'Create your own outreach campaign — pick a location, search terms, and language, and we take it from there.',
+    body: 'Create your own outreach campaign - pick a location, search terms, and language, and we take it from there.',
   },
   {
     id: 'credits',

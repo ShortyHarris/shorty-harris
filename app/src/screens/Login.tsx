@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
+import { BrandLockup } from '../components/BrandLockup';
 import './Login.css';
 
 export function Login() {
@@ -27,7 +28,7 @@ export function Login() {
       <div className="login-left">
         <div className="login-form-wrap">
 
-          <Link to="/" className="login-wordmark" style={{ textDecoration: 'none', color: 'inherit' }}>Shorty Harris</Link>
+          <Link to="/" style={{ textDecoration: 'none' }}><BrandLockup /></Link>
 
           <h1 className="login-title">Welcome back</h1>
           <p className="login-sub">Sign in to your account to continue</p>
@@ -88,6 +89,10 @@ export function Login() {
             </button>
           </form>
 
+          <p className="login-switch">
+            New here? <Link to="/signup">Create an account</Link>
+          </p>
+
           <p className="login-copy">© {new Date().getFullYear()} Shorty Harris</p>
         </div>
       </div>
@@ -96,7 +101,7 @@ export function Login() {
       <div className="login-right">
         <div className="login-right-inner">
           <img
-            src="https://illustrations.popsy.co/amber/paper-plane.svg"
+            src="/outbound-illustration.png"
             alt="Outbound illustration"
             className="login-illustration"
           />
@@ -104,7 +109,7 @@ export function Login() {
             Every day you don't send,<br />a competitor does.
           </p>
           <p className="login-tagline-sub">
-            Shorty Harris prospects, writes, and follows up — on autopilot.
+            Shorty Harris prospects, writes, and follows up, on autopilot.
           </p>
         </div>
       </div>

@@ -330,7 +330,7 @@
 @media (max-width: 899px) {
   .docs-hamburger { display: inline-flex; }
   .docs-sidebar { display: none; }
-  /* grid-template-columns is structural — hiding the sidebar element doesn't
+  /* grid-template-columns is structural - hiding the sidebar element doesn't
      un-reserve its 260px track, so without this the main column was only
      ever getting the leftover space after a phantom sidebar-width gap. */
   .docs-body { grid-template-columns: minmax(0, 1fr); }
@@ -341,7 +341,7 @@
   .docs-search-trigger kbd { display: none; }
 
   /* Title was fighting the Edit button for width, wrapping to 5+ lines on
-     narrow screens — stack them instead so the title gets the full row. */
+     narrow screens - stack them instead so the title gets the full row. */
   .docs-article-head { flex-direction: column; align-items: stretch; gap: 10px; max-width: none; }
   .docs-edit-btn { align-self: flex-end; }
   .docs-article-title { font-size: 21px; }

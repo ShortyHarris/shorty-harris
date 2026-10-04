@@ -3,7 +3,7 @@
 @layer components {
 
   /* ── Page wrapper ── */
-  /* .content now lives in styles/theme-client.css, which loads eagerly —
+  /* .content now lives in styles/theme-client.css, which loads eagerly -
      see the comment there for why it can't stay in this lazy-loaded
      screen's own stylesheet. */
 
@@ -139,7 +139,7 @@
 
 
   /* ═══════════════════════════════════════
-     PACK SELECTION — vertical radio rows
+     PACK SELECTION - vertical radio rows
   ═══════════════════════════════════════ */
 
   .pack-list {
@@ -251,7 +251,7 @@
 
 
   /* ═══════════════════════════════════════
-     PAYMENT HISTORY — card list
+     PAYMENT HISTORY - card list
   ═══════════════════════════════════════ */
 
   .payment-list {
@@ -304,7 +304,7 @@
 
 
   /* ═══════════════════════════════════════
-     CREDIT ACTIVITY — card list
+     CREDIT ACTIVITY - card list
   ═══════════════════════════════════════ */
 
   .activity-list {

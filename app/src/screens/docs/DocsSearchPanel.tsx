@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Sparkles, X, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useOverlayClose } from '../../hooks/useOverlayClose';
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 const FUNCTIONS_URL = 'https://lxoeotyibsalbxgbjfxo.supabase.co/functions/v1';
@@ -72,7 +73,7 @@ export function DocsSearchPanel({
             const parsed = JSON.parse(jsonPart);
             if (Array.isArray(parsed)) setSources(parsed);
           } catch {
-            // sources JSON not fully arrived yet — will parse on a later chunk
+            // sources JSON not fully arrived yet - will parse on a later chunk
           }
         }
       }
@@ -98,7 +99,7 @@ export function DocsSearchPanel({
       className="fixed inset-0 z-110 flex flex-col items-center bg-black/40 px-4 pt-[10vh]"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}

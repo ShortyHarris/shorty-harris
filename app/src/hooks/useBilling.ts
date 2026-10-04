@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { queryClient } from '../lib/queryClient';
 
 export interface PaymentRow {
   id: string;
@@ -28,11 +28,11 @@ export interface BillingData {
 
 export const billingKey = (clientId: string) => ['billing', clientId] as const;
 
-async function fetchBilling(clientId: string): Promise<BillingData> {
+async function fetchBilling(clientId: string, client: SupabaseClient): Promise<BillingData> {
   const [billingRes, paymentsRes, ledgerRes] = await Promise.all([
-    supabase.from('billing_profiles').select('credits_remaining, sms_credits_remaining').eq('client_id', clientId).single(),
-    supabase.from('payments').select('id, amount_cents, currency, credits_purchased, status, created_at').eq('client_id', clientId).order('created_at', { ascending: false }),
-    supabase.from('credit_transactions').select('id, amount, type, description, created_at').eq('client_id', clientId).order('created_at', { ascending: false }).limit(50),
+    client.from('billing_profiles').select('credits_remaining, sms_credits_remaining').eq('client_id', clientId).single(),
+    client.from('payments').select('id, amount_cents, currency, credits_purchased, status, created_at').eq('client_id', clientId).order('created_at', { ascending: false }),
+    client.from('credit_transactions').select('id, amount, type, description, created_at').eq('client_id', clientId).order('created_at', { ascending: false }).limit(50),
   ]);
   if (paymentsRes.error) throw new Error(paymentsRes.error.message);
   return {
@@ -43,10 +43,10 @@ async function fetchBilling(clientId: string): Promise<BillingData> {
   };
 }
 
-export function useBilling(clientId: string) {
-  const { data, isLoading: loading, error } = useQuery({
+export function useBilling(clientId: string, client: SupabaseClient = supabase) {
+  const { data, isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
     queryKey: billingKey(clientId),
-    queryFn: () => fetchBilling(clientId),
+    queryFn: () => fetchBilling(clientId, client),
     enabled: !!clientId,
     staleTime: 3 * 60 * 1000,
   });
@@ -54,7 +54,12 @@ export function useBilling(clientId: string) {
   return {
     data:   data ?? null,
     loading,
+    isFetching,
+    dataUpdatedAt,
     error:  (error as Error)?.message ?? null,
-    reload: () => queryClient.invalidateQueries({ queryKey: billingKey(clientId) }),
+    reload: async () => {
+      const res = await refetch();
+      if (res.error) throw res.error;
+    },
   };
 }

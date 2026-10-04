@@ -5,7 +5,7 @@
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, 'Cascadia Code', monospace;
 
-  /* shadcn/ui tokens — bridged to the existing client/admin theme variables
+  /* shadcn/ui tokens - bridged to the existing client/admin theme variables
      so shadcn components pick up brand colors automatically. Falls back to
      the client theme's defaults outside a themed scope. */
   --color-background: var(--bg, #fbf9f5);
@@ -30,7 +30,7 @@
   --radius: var(--radius-sm, 10px);
 }
 
-/* Global base — unlayered so these win over Preflight */
+/* Global base - unlayered so these win over Preflight */
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 body {

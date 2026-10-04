@@ -4,13 +4,13 @@ const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif
 const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
 const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
 
-/* Tag input — type + Enter (or the separator key, or clicking away) adds
+/* Tag input - type + Enter (or the separator key, or clicking away) adds
    removable chips. `splitOn` also lets a single paste/typed string like
    "restaurants, cafes, hotels" become three chips at once. Each chip is
-   its own array entry — this is what keeps a multi-value field (locations,
+   its own array entry - this is what keeps a multi-value field (locations,
    search terms) from ever collapsing into one joined string on save. */
 export function TagInput({
-  label, placeholder, helper, values, onChange, splitOn = ',',
+  label, placeholder, helper, values, onChange, splitOn = ',', maxItems, capLabel,
 }: {
   label: string;
   placeholder: string;
@@ -18,14 +18,23 @@ export function TagInput({
   values: string[];
   onChange: (v: string[]) => void;
   splitOn?: string;
+  /** When set, values beyond this count are refused rather than added — read
+   *  from the server's validate_campaign_inputs limits, never hardcoded. */
+  maxItems?: number;
+  /** Noun shown in the cap message, e.g. "search terms" or "locations". */
+  capLabel?: string;
 }) {
   const [draft, setDraft] = useState('');
+  const atCap = maxItems != null && values.length >= maxItems;
 
   function commitDraft(raw: string) {
     const parts = raw.split(splitOn).map((s) => s.trim()).filter(Boolean);
     if (parts.length === 0) { setDraft(''); return; }
     const next = [...values];
-    for (const p of parts) if (!next.includes(p)) next.push(p);
+    for (const p of parts) {
+      if (maxItems != null && next.length >= maxItems) break;
+      if (!next.includes(p)) next.push(p);
+    }
     onChange(next);
     setDraft('');
   }
@@ -44,7 +53,8 @@ export function TagInput({
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={() => commitDraft(draft)}
-        placeholder={placeholder}
+        placeholder={atCap ? `Limit reached — remove one to add another` : placeholder}
+        disabled={atCap}
         style={FONT}
         className={inputCls}
       />
@@ -65,7 +75,13 @@ export function TagInput({
           ))}
         </div>
       )}
-      {helper && <p className="mt-1 text-[11px] text-[#9a9d92]">{helper}</p>}
+      {atCap ? (
+        <p className="mt-1 text-[11px] text-[#b9831f]">
+          You've reached the {maxItems}{capLabel ? ` ${capLabel}` : ''} limit. Remove one to add another.
+        </p>
+      ) : (
+        helper && <p className="mt-1 text-[11px] text-[#9a9d92]">{helper}</p>
+      )}
     </div>
   );
 }

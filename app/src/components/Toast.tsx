@@ -11,7 +11,7 @@ const KIND_STYLE: Record<ToastKind, { icon: React.ElementType; iconColor: string
   error:   { icon: TriangleAlert, iconColor: '#a8533a', iconBg: '#f6e8e2' },
 };
 
-/* Self-contained toast state — no provider needed. A screen calls useToast(),
+/* Self-contained toast state - no provider needed. A screen calls useToast(),
    renders <ToastHost toasts={toasts} onDismiss={dismiss} /> once, then fires
    toast('message') wherever it previously showed a one-off success banner. */
 // eslint-disable-next-line react-refresh/only-export-components

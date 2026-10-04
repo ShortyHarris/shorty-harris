@@ -33,7 +33,7 @@ const SECTIONS: LegalSection[] = [
       {
         type: 'ul',
         items: [
-          'To operate the Service — finding prospects, drafting outreach, and routing replies for review.',
+          'To operate the Service - finding prospects, drafting outreach, and routing replies for review.',
           'To send emails or messages on a Client\'s behalf, using the Client\'s own connected Gmail account where applicable.',
           'To process payments and manage billing.',
           'To provide customer support and respond to inquiries.',
@@ -49,11 +49,11 @@ const SECTIONS: LegalSection[] = [
       {
         type: 'ul',
         items: [
-          'Supabase — database hosting and authentication.',
-          'Google — Gmail API, for Clients who choose to connect Gmail.',
-          'Stripe — payment processing.',
-          'Our workflow automation infrastructure — for scheduling and sending outreach.',
-          'Google Analytics — anonymized usage analytics.',
+          'Supabase - database hosting and authentication.',
+          'Google - Gmail API, for Clients who choose to connect Gmail.',
+          'Stripe - payment processing.',
+          'Our workflow automation infrastructure - for scheduling and sending outreach.',
+          'Google Analytics - anonymized usage analytics.',
         ],
       },
       'We may also disclose information if required by law, or to protect the rights, property, or safety of Shorty Harris, our Clients, or others.',
@@ -82,7 +82,7 @@ const SECTIONS: LegalSection[] = [
   {
     heading: '8. Security',
     body: [
-      'We use reasonable technical and organizational measures — including encryption in transit, access controls, and row-level data isolation between Clients — to protect information against unauthorized access, alteration, or loss. No method of transmission or storage is completely secure, and we cannot guarantee absolute security.',
+      'We use reasonable technical and organizational measures - including encryption in transit, access controls, and row-level data isolation between Clients - to protect information against unauthorized access, alteration, or loss. No method of transmission or storage is completely secure, and we cannot guarantee absolute security.',
     ],
   },
   {

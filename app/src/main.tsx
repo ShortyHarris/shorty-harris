@@ -1,3 +1,5 @@
+// Must stay the first import - see the file for why.
+import './lib/authRedirectError';
 import { StrictMode, Component, type ReactNode, type ErrorInfo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -14,7 +16,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
     if (this.state.error) {
       return (
         <div style={{ padding: 32, fontFamily: 'monospace', color: '#9d3b3b', background: '#fff' }}>
-          <strong>Something went wrong — check the browser console.</strong>
+          <strong>Something went wrong, check the browser console.</strong>
           <pre style={{ marginTop: 12, fontSize: 13, whiteSpace: 'pre-wrap' }}>
             {(this.state.error as Error).message}
           </pre>

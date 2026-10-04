@@ -8,11 +8,14 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import { useDoNotContact } from '../../hooks/useDoNotContact';
 import { SkeletonTiles, SkeletonChart } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
+import { useToast, ToastHost } from '../../components/Toast';
+import { RefreshButton } from '../../components/RefreshButton';
+import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 
 const HELP: HelpContent = {
   title: 'Analytics',
   body: [
-    { type: 'p', text: "Top-level performance across every client and campaign — how many emails went out, how many got a reply, how many became Hot Leads, and how many closed as Won." },
+    { type: 'p', text: "Top-level performance across every client and campaign - how many emails went out, how many got a reply, how many became Hot Leads, and how many closed as Won." },
     { type: 'p', text: "Use the per-client breakdown on the right to compare results across accounts. Click a client name to see their individual numbers." },
   ],
 };
@@ -39,7 +42,9 @@ const TOOLTIP_STYLE = {
 };
 
 export function Analytics() {
-  const { data, loading, error, reload } = useAnalytics();
+  const { data, loading, isFetching, dataUpdatedAt, error, reload } = useAnalytics();
+  const { toasts, toast, dismiss } = useToast();
+  const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh analytics.');
   const [selectedClientIdx, setSelectedClientIdx] = useState(0);
   const [clientSearch, setClientSearch] = useState('');
 
@@ -68,12 +73,12 @@ export function Analytics() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton content={HELP} />
-          <button
-            onClick={reload}
+          <RefreshButton
+            onRefresh={handleRefresh}
+            isFetching={isFetching}
+            dataUpdatedAt={dataUpdatedAt}
             className="cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]"
-          >
-            Refresh
-          </button>
+          />
         </div>
       </header>
 
@@ -146,7 +151,7 @@ export function Analytics() {
 
             {/* ── Mobile: pill selector + single-client chart ── */}
             <div className="md:hidden">
-              {/* Search — shown when 6+ clients */}
+              {/* Search - shown when 6+ clients */}
               {allClients.length >= 6 && (
                 <div className="mb-3 relative">
                   <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9a9d92]" />
@@ -160,7 +165,7 @@ export function Analytics() {
                 </div>
               )}
 
-              {/* Client pills — horizontally scrollable */}
+              {/* Client pills - horizontally scrollable */}
               <div className="-mx-5 mb-4 flex gap-2 overflow-x-auto px-5 pb-1">
                 {filteredClients.map((c, i) => (
                   <button
@@ -180,7 +185,7 @@ export function Analytics() {
                 )}
               </div>
 
-              {/* Chart for selected client — maxBarSize keeps bars proportional */}
+              {/* Chart for selected client - maxBarSize keeps bars proportional */}
               {selectedClient && (
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={clientChartData} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
@@ -201,7 +206,7 @@ export function Analytics() {
         </>
       )}
 
-      {/* A/B tests + Do Not Contact side by side on large screens, stacked below — both
+      {/* A/B tests + Do Not Contact side by side on large screens, stacked below - both
           boxes stretch to the row's tallest content so they line up evenly. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="flex flex-col">
@@ -285,6 +290,8 @@ export function Analytics() {
           )}
         </div>
       </div>
+
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }

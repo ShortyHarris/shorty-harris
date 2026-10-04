@@ -35,7 +35,7 @@ export function TourProvider({ userId, children }: { userId: string; children: R
   const location = useLocation();
 
   // Auto-start once, shortly after first mount, for an account that's never
-  // seen it — wrapped in setTimeout (not a bare setState-in-effect) so it
+  // seen it - wrapped in setTimeout (not a bare setState-in-effect) so it
   // doesn't fire before the dashboard has settled in.
   useEffect(() => {
     if (!userId || hasTourSeen(userId)) return;

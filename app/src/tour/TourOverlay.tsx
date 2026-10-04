@@ -13,7 +13,7 @@ const POLL_TIMEOUT_MS = 3000;
 const DIM = 'rgba(20, 20, 18, 0.65)';
 
 // Multiple elements can share the same data-tour value across breakpoints
-// (e.g. a desktop button and a mobile FAB that does the same thing) — only
+// (e.g. a desktop button and a mobile FAB that does the same thing) - only
 // one is ever actually on screen, so pick the first with a real size rather
 // than always grabbing whichever comes first in the DOM.
 function findVisibleTourElement(selector: string): HTMLElement | null {
@@ -33,7 +33,7 @@ interface Highlight {
 export function TourOverlay() {
   const { active, currentStep, stepIndex, totalSteps, next, prev, skip } = useTour();
   const location = useLocation();
-  // Tagged with the step it was found for, rather than cleared-then-refilled —
+  // Tagged with the step it was found for, rather than cleared-then-refilled -
   // that way a stale rect from the previous step is simply ignored at render
   // time instead of needing a synchronous setState(null) at the top of the
   // effect below (which the exact-same-purpose Billing.tsx/Settings.tsx
@@ -41,7 +41,7 @@ export function TourOverlay() {
   // here: react-hooks/set-state-in-effect flags it).
   const [highlight, setHighlight] = useState<Highlight | null>(null);
   // Which step's poll has genuinely given up (as opposed to just still
-  // searching) — tagged by step id for the same reason `highlight` is: no
+  // searching) - tagged by step id for the same reason `highlight` is: no
   // synchronous setState-in-effect needed to "clear" it between steps.
   const [notFoundFor, setNotFoundFor] = useState<string | null>(null);
 
@@ -63,7 +63,7 @@ export function TourOverlay() {
       attempts += 1;
       if (attempts * POLL_INTERVAL_MS >= POLL_TIMEOUT_MS) {
         // Element never showed up (e.g. an empty warm-prospects panel on a
-        // brand-new account) — stop looking, leave the dim backdrop + card
+        // brand-new account) - stop looking, leave the dim backdrop + card
         // up, and switch to the step's fallbackBody so it's clear why
         // nothing's highlighted instead of describing something invisible.
         // Advancing on its own here would read as the tour moving by itself
@@ -99,7 +99,7 @@ export function TourOverlay() {
 
   // Block every click outside the highlighted element and the card itself.
   // Checked via DOM ancestry (closest()) rather than comparing click
-  // coordinates against a measured/estimated rect — coordinate math has to
+  // coordinates against a measured/estimated rect - coordinate math has to
   // stay in sync with the card's real (variable-height, text-dependent) size
   // and position, and any drift there silently blocks clicks on the card's
   // own buttons. Asking "is this click inside the card/target element" is
@@ -120,7 +120,7 @@ export function TourOverlay() {
   }, [active, currentStep]);
 
   // active+currentStep but no rect yet (mid-navigation, or still polling for
-  // the target on the same page) — keep the dim backdrop and card up rather
+  // the target on the same page) - keep the dim backdrop and card up rather
   // than rendering nothing, so a same-page step change never reads as "the
   // tour just vanished" while its element is still being found.
   if (!active || !currentStep) return null;
@@ -148,7 +148,7 @@ export function TourOverlay() {
             border: '2px solid var(--leaf)',
             // The 9999px spread is the standard spotlight trick: it fills the
             // rest of the viewport with the dim color, leaving only this
-            // box's own (rounded) area see-through — correctly rounded by
+            // box's own (rounded) area see-through - correctly rounded by
             // construction, since it's this element's own border-radius.
             boxShadow: `0 0 0 4px rgba(60, 122, 91, 0.18), 0 0 0 9999px ${DIM}`,
           }}

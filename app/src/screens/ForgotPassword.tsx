@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
+import { BrandLockup } from '../components/BrandLockup';
 import './Login.css';
 
 export function ForgotPassword() {
@@ -16,7 +17,7 @@ export function ForgotPassword() {
     setBusy(true);
     const { error } = await resetPassword(email.trim());
     setBusy(false);
-    // Show the same confirmation whether or not the email exists — don't
+    // Show the same confirmation whether or not the email exists - don't
     // leak account existence through the response.
     if (error) setErr(error);
     else setSent(true);
@@ -29,7 +30,7 @@ export function ForgotPassword() {
       <div className="login-left">
         <div className="login-form-wrap">
 
-          <Link to="/" className="login-wordmark" style={{ textDecoration: 'none', color: 'inherit' }}>Shorty Harris</Link>
+          <Link to="/" style={{ textDecoration: 'none' }}><BrandLockup /></Link>
 
           <h1 className="login-title">Reset your password</h1>
           <p className="login-sub">
@@ -82,7 +83,7 @@ export function ForgotPassword() {
       <div className="login-right">
         <div className="login-right-inner">
           <img
-            src="https://illustrations.popsy.co/amber/paper-plane.svg"
+            src="/outbound-illustration.png"
             alt="Outbound illustration"
             className="login-illustration"
           />
@@ -90,7 +91,7 @@ export function ForgotPassword() {
             Every day you don't send,<br />a competitor does.
           </p>
           <p className="login-tagline-sub">
-            Shorty Harris prospects, writes, and follows up — on autopilot.
+            Shorty Harris prospects, writes, and follows up, on autopilot.
           </p>
         </div>
       </div>

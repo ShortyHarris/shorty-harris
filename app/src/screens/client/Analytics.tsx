@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { supabase } from '../../lib/supabase';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts';
@@ -22,8 +24,8 @@ const TOOLTIP_STYLE = {
   fontFamily: "'Plus Jakarta Sans', sans-serif",
 };
 
-export function Analytics({ clientId }: { clientId: string }) {
-  const { overall, byCampaign, trend, loading, error } = useClientAnalytics(clientId);
+export function Analytics({ clientId, client = supabase }: { clientId: string; client?: SupabaseClient }) {
+  const { overall, byCampaign, trend, loading, error } = useClientAnalytics(clientId, client);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
 
   const selected: CampaignAnalytics | null =

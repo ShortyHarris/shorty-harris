@@ -42,7 +42,7 @@ export function Header() {
             <Link to="/login">Sign in</Link>
           </Button>
           <Button asChild>
-            <Link to="/login">Get started</Link>
+            <Link to="/signup">Get started</Link>
           </Button>
         </div>
 
@@ -77,7 +77,7 @@ export function Header() {
             <Link to="/login" onClick={() => setOpen(false)}>Sign in</Link>
           </Button>
           <Button className="w-full" asChild>
-            <Link to="/login" onClick={() => setOpen(false)}>Get started</Link>
+            <Link to="/signup" onClick={() => setOpen(false)}>Get started</Link>
           </Button>
         </div>
       </MobileMenu>

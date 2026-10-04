@@ -9,7 +9,7 @@ export function isValidEmail(raw: string): boolean {
   return EMAIL_RE.test(raw.trim());
 }
 
-// Strips everything except digits (and a leading +) — "+260 970 001 0001",
+// Strips everything except digits (and a leading +) - "+260 970 001 0001",
 // "(260) 970-001-0001", and "260 970 001 0001" all normalize to the same
 // stored value.
 export function normalizePhone(raw: string): string {
@@ -34,7 +34,7 @@ const STATE_CODE_RE = /\b[A-Z]{2}\b/g;
 //   - it has more than one comma (e.g. "Bloomington, IL, Normal, IL" typed
 //     where semicolons were expected), or
 //   - it contains 2+ state-code-shaped tokens like "Bloomington IL, Normal IL"
-//     — only one comma, so the comma-count check alone misses it, but two
+//     - only one comma, so the comma-count check alone misses it, but two
 //     cities were still joined without a separator before each one.
 export function looksLikeMultipleLocationsJoined(locations: string[]): boolean {
   if (locations.length !== 1) return false;

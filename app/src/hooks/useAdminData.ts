@@ -41,7 +41,7 @@ async function fetchProspects(): Promise<ProspectListRow[]> {
 }
 
 export function useProspects() {
-  const { data: rows = [], isLoading: loading, error } = useQuery({
+  const { data: rows = [], isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
     queryKey: QK.prospects,
     queryFn: fetchProspects,
     staleTime: Infinity, // realtime drives updates
@@ -65,8 +65,13 @@ export function useProspects() {
   return {
     rows,
     loading,
+    isFetching,
+    dataUpdatedAt,
     error: (error as Error)?.message ?? null,
-    reload: () => queryClient.invalidateQueries({ queryKey: QK.prospects }),
+    reload: async () => {
+      const res = await refetch();
+      if (res.error) throw res.error;
+    },
     updateStatus,
   };
 }
@@ -117,7 +122,7 @@ export async function deleteProspect(prospectId: string): Promise<{ error: strin
 }
 
 // ─── Campaigns ───────────────────────────────────────────────────────────────
-// Written once at the end of every scrape (fresh or resumed) — lets the UI
+// Written once at the end of every scrape (fresh or resumed) - lets the UI
 // distinguish "found nothing new because everything was a duplicate" from
 // "found nothing new because the search genuinely came up empty" from an
 // actual failure, instead of showing an identical bare prospect count for
@@ -139,36 +144,44 @@ export interface CampaignRow {
   language: string;
   scrape_enabled: boolean;
   last_scraped_at: string | null;
-  // Backend-owned scrape lifecycle (n8n WF0 writes these) — the source of
+  // Backend-owned scrape lifecycle (n8n WF0 writes these) - the source of
   // truth for whether a scrape is currently running, not any client-side
   // in-memory flag, so a page reload mid-scrape reflects reality instead of
   // guessing "never scraped"/"failed".
   scrape_status: string;
   scrape_started_at: string | null;
   scrape_error: string | null;
+  scrape_failure_reason: string | null;
+  scrape_attempt_count: number;
+  scrape_finished_at: string | null;
   last_scrape_summary: ScrapeSummary | null;
   search_queries: string[];
   target_locations: string[];
   max_results: number;
   created_at: string;
+  client_id: string;
   client: { business_name: string } | null;
   prospectCount: number;
   // True when a client (not an admin) submitted this campaign and it's still
-  // sitting in draft — i.e. it needs an admin to review and activate it.
+  // sitting in draft - i.e. it needs an admin to review and activate it.
   needsReview: boolean;
 }
 
 async function fetchCampaigns(): Promise<CampaignRow[]> {
   const { data, error } = await supabase
     .from('campaigns')
-    .select(`id, name, description, status, channel, language, scrape_enabled, last_scraped_at, scrape_status, scrape_started_at, scrape_error, last_scrape_summary, search_queries, target_locations, max_results, created_at, client:clients ( business_name ), creator:profiles ( role )`)
+    // prospect_count is a denormalised counter maintained by a DB trigger on
+    // `prospects` (see migration add_campaigns_prospect_count) - the single
+    // shared definition of "how many prospects does this campaign have",
+    // also used by the client-side campaign list. Reading it straight off
+    // the campaigns row (instead of a separate per-campaign count query)
+    // means this number can never drift from what the client UI shows.
+    .select(`id, name, description, status, channel, language, scrape_enabled, last_scraped_at, scrape_status, scrape_started_at, scrape_error, scrape_failure_reason, scrape_attempt_count, scrape_finished_at, last_scrape_summary, search_queries, target_locations, max_results, created_at, client_id, prospect_count, client:clients ( business_name )`)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
-  const base = (data ?? []).map((r: Record<string, unknown>) => {
+  return (data ?? []).map((r: Record<string, unknown>) => {
     const client  = Array.isArray(r.client) ? r.client[0] ?? null : r.client ?? null;
-    const creatorRaw = Array.isArray(r.creator) ? r.creator[0] ?? null : r.creator ?? null;
-    const creator = creatorRaw as { role?: string } | null;
     return {
       id: r.id,
       name: r.name,
@@ -181,29 +194,24 @@ async function fetchCampaigns(): Promise<CampaignRow[]> {
       scrape_status: (r.scrape_status as string | null) ?? 'idle',
       scrape_started_at: (r.scrape_started_at as string | null) ?? null,
       scrape_error: (r.scrape_error as string | null) ?? null,
+      scrape_failure_reason: (r.scrape_failure_reason as string | null) ?? null,
+      scrape_attempt_count: (r.scrape_attempt_count as number | null) ?? 0,
+      scrape_finished_at: (r.scrape_finished_at as string | null) ?? null,
       last_scrape_summary: (r.last_scrape_summary as ScrapeSummary | null) ?? null,
       search_queries: (r.search_queries as string[] | null) ?? [],
       target_locations: (r.target_locations as string[] | null) ?? [],
       max_results: (r.max_results as number | null) ?? 50,
       created_at: r.created_at,
+      client_id: r.client_id,
       client,
-      prospectCount: 0,
-      needsReview: r.status === 'draft' && creator?.role === 'client',
+      prospectCount: (r.prospect_count as number | null) ?? 0,
+      needsReview: r.status === 'pending_review',
     };
   }) as CampaignRow[];
-
-  await Promise.all(base.map(async (c) => {
-    const { count } = await supabase
-      .from('prospects').select('id', { count: 'exact', head: true })
-      .eq('campaign_id', c.id);
-    c.prospectCount = count ?? 0;
-  }));
-
-  return base;
 }
 
 export function useCampaigns() {
-  const { data: rows = [], isLoading: loading, error } = useQuery({
+  const { data: rows = [], isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
     queryKey: QK.campaigns,
     queryFn: fetchCampaigns,
     staleTime: 3 * 60 * 1000,
@@ -211,9 +219,7 @@ export function useCampaigns() {
 
   const setStatus = useCallback(async (id: string, status: string) => {
     queryClient.setQueryData<CampaignRow[]>(QK.campaigns, (prev = []) =>
-      // Leaving draft always clears needsReview — the only path back into
-      // draft is a full refetch, which recomputes it from the creator's role.
-      prev.map((c) => (c.id === id ? { ...c, status, needsReview: status === 'draft' && c.needsReview } : c)),
+      prev.map((c) => (c.id === id ? { ...c, status, needsReview: status === 'pending_review' } : c)),
     );
     const { error } = await supabase
       .from('campaigns')
@@ -225,7 +231,7 @@ export function useCampaigns() {
   }, []);
 
   // Cache-only patch, no DB write for the scrape_status/scrape_started_at
-  // fields — that write happens server-side (n8n WF0, synchronously before
+  // fields - that write happens server-side (n8n WF0, synchronously before
   // it responds). Used both for the initial optimistic update and to apply
   // results from the targeted scrape-status poll below.
   const patchCampaign = useCallback((id: string, patch: Partial<CampaignRow>) => {
@@ -237,14 +243,19 @@ export function useCampaigns() {
   return {
     rows,
     loading,
+    isFetching,
+    dataUpdatedAt,
     error: (error as Error)?.message ?? null,
-    reload: () => queryClient.invalidateQueries({ queryKey: QK.campaigns }),
+    reload: async () => {
+      const res = await refetch();
+      if (res.error) throw res.error;
+    },
     setStatus,
     patchCampaign,
   };
 }
 
-// Direct, targeted read for scrape-status polling — deliberately not routed
+// Direct, targeted read for scrape-status polling - deliberately not routed
 // through invalidateQueries()/the cached useQuery: that depends on "is this
 // query currently active" refetch semantics, and in practice a poll tick
 // wasn't reliably resolving into fresh rows, so this is a plain point-in-time
@@ -255,6 +266,9 @@ export interface ScrapeSnapshot {
   scrape_status: string;
   scrape_started_at: string | null;
   scrape_error: string | null;
+  scrape_failure_reason: string | null;
+  scrape_attempt_count: number;
+  scrape_finished_at: string | null;
   last_scraped_at: string | null;
   last_scrape_summary: ScrapeSummary | null;
 }
@@ -263,18 +277,23 @@ export async function fetchScrapeSnapshots(ids: string[]): Promise<ScrapeSnapsho
   if (ids.length === 0) return [];
   const { data, error } = await supabase
     .from('campaigns')
-    .select('id, scrape_status, scrape_started_at, scrape_error, last_scraped_at, last_scrape_summary')
+    .select('id, scrape_status, scrape_started_at, scrape_error, scrape_failure_reason, scrape_attempt_count, scrape_finished_at, last_scraped_at, last_scrape_summary')
     .in('id', ids);
   if (error) throw new Error(error.message);
   return (data ?? []) as ScrapeSnapshot[];
 }
 
 export async function fetchProspectCount(campaignId: string): Promise<number> {
-  const { count } = await supabase
-    .from('prospects')
-    .select('id', { count: 'exact', head: true })
-    .eq('campaign_id', campaignId);
-  return count ?? 0;
+  // Reads the same trigger-maintained prospect_count column fetchCampaigns
+  // does, rather than re-counting `prospects` independently - one shared
+  // count definition, not two queries that can disagree.
+  const { data, error } = await supabase
+    .from('campaigns')
+    .select('prospect_count')
+    .eq('id', campaignId)
+    .single();
+  if (error) throw new Error(error.message);
+  return (data?.prospect_count as number | null) ?? 0;
 }
 
 export interface NewCampaignInput {
@@ -345,24 +364,36 @@ async function fetchAdminHotLeads(): Promise<AdminHotLead[]> {
 }
 
 export function useAdminHotLeads() {
-  const { data: rows = [], isLoading: loading, error } = useQuery({
+  const { data: rows = [], isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
     queryKey: QK.adminHotLeads,
     queryFn: fetchAdminHotLeads,
     staleTime: Infinity, // realtime drives updates
   });
 
+  // The only sanctioned way to change a hot lead's status - set_hot_lead_outcome
+  // keeps hot_leads.status and prospects.pipeline_status in step server-side
+  // (a raw .update() here is exactly how leads ended up with mismatched
+  // pipeline_status in the first place).
   const setStatus = useCallback(async (id: string, status: string) => {
     queryClient.setQueryData<AdminHotLead[]>(QK.adminHotLeads, (prev = []) =>
       prev.map((r) => (r.id === id ? { ...r, status } : r)),
     );
-    await supabase.from('hot_leads').update({ status }).eq('id', id);
+    const { error } = await supabase.rpc('set_hot_lead_outcome', {
+      p_hot_lead_id: id, p_status: status, p_note: null, p_call_outcome: null,
+    });
+    if (error) queryClient.invalidateQueries({ queryKey: QK.adminHotLeads });
   }, []);
 
   return {
     rows,
     loading,
+    isFetching,
+    dataUpdatedAt,
     error: (error as Error)?.message ?? null,
-    reload: () => queryClient.invalidateQueries({ queryKey: QK.adminHotLeads }),
+    reload: async () => {
+      const res = await refetch();
+      if (res.error) throw res.error;
+    },
     setStatus,
   };
 }
@@ -413,7 +444,7 @@ async function fetchClients(): Promise<ClientListRow[]> {
 }
 
 export function useClients() {
-  const { data: rows = [], isLoading: loading, error } = useQuery({
+  const { data: rows = [], isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
     queryKey: QK.clients,
     queryFn: fetchClients,
     staleTime: 3 * 60 * 1000,
@@ -422,8 +453,13 @@ export function useClients() {
   return {
     rows,
     loading,
+    isFetching,
+    dataUpdatedAt,
     error: (error as Error)?.message ?? null,
-    reload: () => queryClient.invalidateQueries({ queryKey: QK.clients }),
+    reload: async () => {
+      const res = await refetch();
+      if (res.error) throw res.error;
+    },
   };
 }
 
@@ -437,7 +473,7 @@ export interface NewClientInput {
   notification_channel: 'whatsapp' | 'sms';
   starting_credits: number;
   status?: 'draft' | 'active';
-  // Pre-fills the auto-created default campaign's prospect-discovery fields —
+  // Pre-fills the auto-created default campaign's prospect-discovery fields -
   // typically sourced from the website-enrichment result (services -> search
   // terms, location -> target location) so the campaign isn't created blank.
   search_queries?: string[];
@@ -472,7 +508,7 @@ export async function createClient(input: NewClientInput) {
     .from('campaigns')
     .insert({
       client_id: clientId,
-      name: `${input.business_name} — Campaign 1`,
+      name: `${input.business_name} - Campaign 1`,
       channel: 'email',
       status: 'active',
       search_queries: input.search_queries ?? [],
@@ -596,7 +632,7 @@ export async function getClientDeleteCounts(clientId: string): Promise<ClientDel
 }
 
 export async function deleteClient(clientId: string): Promise<{ error: string | null }> {
-  // Look up linked profiles before deleting the client row — client_id gets
+  // Look up linked profiles before deleting the client row - client_id gets
   // set to null on profiles once the client is gone (cascade rule), so this
   // has to happen first or userIds would come back empty.
   const { data: profileData } = await supabase
@@ -605,7 +641,7 @@ export async function deleteClient(clientId: string): Promise<{ error: string | 
     .eq('client_id', clientId);
   const userIds = (profileData ?? []).map((p: { id: string }) => p.id);
 
-  // Delete the client row first — this cascades to campaigns, prospects,
+  // Delete the client row first - this cascades to campaigns, prospects,
   // messages, etc. via existing FK rules. Deleting the auth user first can
   // hit FK constraints from tables that still reference profiles.id (e.g.
   // messages.approved_by) if those rows haven't been cleared yet.
@@ -703,7 +739,7 @@ export function useErrorLogs() {
   // showResolved is tracked in the query key so a change forces a new fetch
   const [showResolved, setShowResolved] = useErrorLogsFilter();
 
-  const { data: rows = [], isLoading: loading, error } = useQuery({
+  const { data: rows = [], isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
     queryKey: QK.errorLogs(showResolved),
     queryFn: async () => {
       let q = supabase
@@ -737,11 +773,16 @@ export function useErrorLogs() {
   return {
     rows,
     loading,
+    isFetching,
+    dataUpdatedAt,
     error: (error as Error)?.message ?? null,
     resolve,
     showResolved,
     setShowResolved,
-    reload: () => queryClient.invalidateQueries({ queryKey: QK.errorLogs(showResolved) }),
+    reload: async () => {
+      const res = await refetch();
+      if (res.error) throw res.error;
+    },
   };
 }
 
@@ -749,4 +790,168 @@ export function useErrorLogs() {
 import { useState } from 'react';
 function useErrorLogsFilter() {
   return useState(false);
+}
+
+// ─── Escalated hot leads (admin) ──────────────────────────────────────────
+// A client sitting on a paid-for hot lead past escalate_after_hours is a
+// churn risk and a refund conversation waiting to happen - Martin's queue.
+export interface EscalatedHotLead {
+  id: string;
+  business_name: string;
+  status: string;
+  routed_at: string;
+  nudge_count: number;
+  escalated_at: string;
+  client: { business_name: string } | null;
+}
+
+async function fetchEscalatedHotLeads(): Promise<EscalatedHotLead[]> {
+  const { data, error } = await supabase
+    .from('hot_leads')
+    .select(`id, status, routed_at, nudge_count, escalated_at,
+             prospect:prospects ( business_name ),
+             client:clients ( business_name )`)
+    .not('escalated_at', 'is', null)
+    .in('status', ['new', 'viewed', 'contacted'])
+    .order('escalated_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r: Record<string, unknown>) => {
+    const prospect = Array.isArray(r.prospect) ? r.prospect[0] ?? null : r.prospect ?? null;
+    const client   = Array.isArray(r.client)   ? r.client[0]   ?? null : r.client   ?? null;
+    return {
+      id: r.id,
+      business_name: (prospect as { business_name: string } | null)?.business_name ?? 'Unknown business',
+      status: r.status,
+      routed_at: r.routed_at,
+      nudge_count: (r.nudge_count as number | null) ?? 0,
+      escalated_at: r.escalated_at,
+      client,
+    };
+  }) as EscalatedHotLead[];
+}
+
+export function useEscalatedHotLeads() {
+  const { data: rows = [], isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
+    queryKey: ['escalated-hot-leads'] as const,
+    queryFn: fetchEscalatedHotLeads,
+    staleTime: 60 * 1000,
+  });
+  return {
+    rows,
+    loading,
+    isFetching,
+    dataUpdatedAt,
+    error: (error as Error)?.message ?? null,
+    reload: async () => { await refetch(); },
+  };
+}
+
+// ─── Failed / cancelled notifications (admin) ─────────────────────────────
+export interface FailedNotificationRow {
+  id: string;
+  channel: string;
+  purpose: string | null;
+  status: string;
+  recipient: string | null;
+  created_at: string;
+  sent_at: string | null;
+  client: { business_name: string } | null;
+}
+
+async function fetchFailedNotifications(): Promise<FailedNotificationRow[]> {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select(`id, channel, purpose, status, recipient, created_at, sent_at,
+             client:clients ( business_name )`)
+    .in('status', ['failed', 'cancelled'])
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    ...r,
+    client: Array.isArray(r.client) ? r.client[0] ?? null : r.client ?? null,
+  })) as FailedNotificationRow[];
+}
+
+export function useFailedNotifications() {
+  const { data: rows = [], isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
+    queryKey: ['failed-notifications'] as const,
+    queryFn: fetchFailedNotifications,
+    staleTime: 60 * 1000,
+  });
+  return {
+    rows,
+    loading,
+    isFetching,
+    dataUpdatedAt,
+    error: (error as Error)?.message ?? null,
+    reload: async () => { await refetch(); },
+  };
+}
+
+// ─── Per-client result insights, across every client (admin) ─────────────
+// Reuses client_result_insights per client rather than a second aggregate
+// RPC - same severity logic as the client-facing page, so a client never
+// sees something different from what this table says about them. Fine at
+// this client count; would need a dedicated aggregate RPC if that changes.
+export type InsightSeverityRank = 'critical' | 'warning' | 'info' | 'none';
+
+export interface AdminClientInsightRow {
+  client_id: string;
+  business_name: string;
+  sent: number;
+  awaiting_approval: number;
+  hot_leads_open: number;
+  bounce_rate: number;
+  top_severity: InsightSeverityRank;
+  top_headline: string | null;
+}
+
+const SEVERITY_RANK: Record<InsightSeverityRank, number> = { critical: 0, warning: 1, info: 2, none: 3 };
+
+async function fetchAdminClientInsights(): Promise<AdminClientInsightRow[]> {
+  const { data: clients, error } = await supabase.from('clients').select('id, business_name').order('business_name');
+  if (error) throw new Error(error.message);
+
+  const rows = await Promise.all((clients ?? []).map(async (c: { id: string; business_name: string }) => {
+    const { data } = await supabase.rpc('client_result_insights', { p_client_id: c.id });
+    const result = data as {
+      ok: boolean;
+      funnel?: { sent: number; awaiting_approval: number; hot_leads_open: number; bounced: number };
+      insights?: { severity: InsightSeverityRank; headline: string }[];
+    } | null;
+    const funnel = result?.funnel;
+    const top = result?.insights?.[0];
+    return {
+      client_id: c.id,
+      business_name: c.business_name,
+      sent: funnel?.sent ?? 0,
+      awaiting_approval: funnel?.awaiting_approval ?? 0,
+      hot_leads_open: funnel?.hot_leads_open ?? 0,
+      bounce_rate: funnel && funnel.sent > 0 ? Math.round((funnel.bounced / funnel.sent) * 1000) / 10 : 0,
+      top_severity: top?.severity ?? 'none',
+      top_headline: top?.headline ?? null,
+    } as AdminClientInsightRow;
+  }));
+
+  // Worst first: severity, then whatever's piling up most.
+  return rows.sort((a, b) =>
+    SEVERITY_RANK[a.top_severity] - SEVERITY_RANK[b.top_severity]
+    || (b.awaiting_approval - a.awaiting_approval)
+    || (b.hot_leads_open - a.hot_leads_open));
+}
+
+export function useAdminClientInsights() {
+  const { data: rows = [], isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
+    queryKey: ['admin-client-insights'] as const,
+    queryFn: fetchAdminClientInsights,
+    staleTime: 2 * 60 * 1000,
+  });
+  return {
+    rows,
+    loading,
+    isFetching,
+    dataUpdatedAt,
+    error: (error as Error)?.message ?? null,
+    reload: async () => { await refetch(); },
+  };
 }

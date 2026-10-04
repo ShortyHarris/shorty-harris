@@ -1,15 +1,17 @@
 /* Admin layout */
 
+:root { --atopbar-h: 52px; }
+
 /* ── Shell ─────────────────────────────────────────────────────────── */
 .ashell {
   display: grid;
   grid-template-columns: 252px 1fr;
-  min-height: 100vh;
-  background: #f5f2ec;
+  min-height: calc(100vh - var(--atopbar-h));
+  background: #ffffff;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* ── Sidebar ─────────────────────────────────────────────────────── */
+/* ── Sidebar - sits below the full-width top bar, not beside it ────── */
 .aside {
   background: #ffffff;
   border-right: 1px solid #ece8df;
@@ -17,49 +19,18 @@
   flex-direction: column;
   padding: 18px 12px 16px;
   position: sticky;
-  top: 0;
-  height: 100vh;
+  top: var(--atopbar-h);
+  height: calc(100vh - var(--atopbar-h));
+  overflow: hidden;
+}
+
+/* Only this scrolls — New Campaign below stays put regardless of how long
+   the nav list gets. min-height: 0 is what lets a flex child actually
+   shrink and scroll instead of forcing the whole sidebar to grow. */
+.aside-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-}
-
-/* ── Logo mark ─────────────────────────────────────────────────────── */
-.aside-logomark {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: #3c7a5b;
-  color: #fff;
-  font-size: 11.5px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-
-/* ── Brand ─────────────────────────────────────────────────────────── */
-.aside-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 8px 18px;
-  margin-bottom: 14px;
-  border-bottom: 1px solid #f2ede7;
-}
-.aside-brand-name {
-  font-size: 14.5px;
-  font-weight: 800;
-  letter-spacing: -0.025em;
-  color: #20211c;
-  line-height: 1;
-}
-.aside-brand-sub {
-  font-size: 9.5px;
-  color: #9a9d92;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-  text-transform: uppercase;
-  margin-top: 3px;
 }
 
 /* ── Section labels ───────────────────────────────────────────────── */
@@ -119,10 +90,13 @@
 
 /* ── Bottom ──────────────────────────────────────────────────────── */
 .aside-bottom {
-  margin-top: auto;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding-top: 12px;
+  margin-top: 8px;
+  border-top: 1px solid #ece8df;
 }
 
 .aside-new {
@@ -133,8 +107,8 @@
   color: #3c7a5b;
   border: 1px solid #ddd8cb;
   cursor: pointer;
-  padding: 10px 14px;
-  border-radius: 10px;
+  padding: 14px 14px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 700;
   font-family: inherit;
@@ -148,13 +122,8 @@
   border-color: #b4d5c0;
 }
 
-.aside-user {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 8px;
-  border-top: 1px solid #f2ede7;
-}
+/* .aside-user-avatar/-info/-name/-role are still used by the mobile
+   fullscreen nav's bottom user block (amobile-nav-bottom). */
 .aside-user-avatar {
   width: 30px;
   height: 30px;
@@ -183,7 +152,63 @@
   font-weight: 600;
   text-transform: uppercase;
 }
-.aside-signout {
+/* ── Main column ────────────────────────────────────────────────── */
+.amain { display: flex; flex-direction: column; min-width: 0; }
+.apage { padding: 28px 32px 40px; flex: 1; }
+
+/* ── Desktop top bar - logo left, notifications + signed-in user right.
+   Hidden on mobile in favor of .amobile-bar underneath it. ──────────── */
+.atopbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--atopbar-h);
+  padding: 0 32px;
+  background: #ffffff;
+  border-bottom: 1px solid #ece8df;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+.atopbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.atopbar-user {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-left: 14px;
+  border-left: 1px solid #ece8df;
+}
+.atopbar-user-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #edf4ef;
+  color: #3c7a5b;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 11.5px;
+  flex-shrink: 0;
+}
+.atopbar-user-info { line-height: 1.3; }
+.atopbar-user-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #20211c;
+  white-space: nowrap;
+}
+.atopbar-user-role {
+  font-size: 9.5px;
+  color: #9a9d92;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.atopbar-signout {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -192,19 +217,18 @@
   cursor: pointer;
   color: #9a9d92;
   padding: 6px 7px;
-  border-radius: 7px;
+  border-radius: 6px;
   flex-shrink: 0;
   transition: background 0.1s, color 0.1s, border-color 0.1s;
 }
-.aside-signout:hover {
+.atopbar-signout:hover {
   background: #f6e8e2;
   color: #a8533a;
   border-color: #e0b8ae;
 }
-
-/* ── Main column ────────────────────────────────────────────────── */
-.amain { display: flex; flex-direction: column; min-width: 0; }
-.apage { padding: 28px 32px 40px; flex: 1; }
+@media (max-width: 767px) {
+  .atopbar { display: none; }
+}
 
 /* ── Mobile top bar ───────────────────────────────────────────── */
 .amobile-bar { display: none; }
@@ -241,7 +265,7 @@
   border: 0;
   cursor: pointer;
   padding: 8px;
-  border-radius: 8px;
+  border-radius: 6px;
   transition: background 0.1s;
 }
 .ahamburger:hover { background: #fbf9f5; }
@@ -372,7 +396,7 @@
   font-weight: 600;
   font-family: inherit;
   padding: 8px 12px;
-  border-radius: 10px;
+  border-radius: 6px;
   flex-shrink: 0;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
@@ -383,14 +407,14 @@
 }
 
 /* ── Responsive ──────────────────────────────────────────────────── */
-/* 767px, not 768 — Tailwind's `md:` utilities (used throughout the admin
+/* 767px, not 768 - Tailwind's `md:` utilities (used throughout the admin
    screens for the desktop-table/mobile-card split) activate at
    min-width:768px, so this must end one pixel earlier or the sidebar
    collapses to the mobile hamburger bar at exactly 768px while the
    `hidden md:block` desktop tables simultaneously render full-width with
    no sidebar to make room for them. */
 @media (max-width: 767px) {
-  .ashell { grid-template-columns: 1fr; }
+  .ashell { grid-template-columns: 1fr; min-height: 100vh; }
   .aside  { display: none; }
   .amobile-bar {
     display: flex;

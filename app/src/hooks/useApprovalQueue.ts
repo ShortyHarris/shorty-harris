@@ -10,7 +10,6 @@ export const AQ_KEYS = {
 };
 
 interface Stats {
-  pending: number;
   approvedToday: number;
   sentToday: number;
   rejected: number;
@@ -78,12 +77,7 @@ async function fetchQueueStats(): Promise<Stats> {
   startOfDay.setHours(0, 0, 0, 0);
   const iso = startOfDay.toISOString();
 
-  const [pending, approvedToday, sentToday, rejected] = await Promise.all([
-    supabase
-      .from('messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('approval_status', 'pending'),
-
+  const [approvedToday, sentToday, rejected] = await Promise.all([
     supabase
       .from('messages')
       .select('id', { count: 'exact', head: true })
@@ -103,7 +97,6 @@ async function fetchQueueStats(): Promise<Stats> {
   ]);
 
   return {
-    pending: pending.count ?? 0,
     approvedToday: approvedToday.count ?? 0,
     sentToday: sentToday.count ?? 0,
     rejected: rejected.count ?? 0,
@@ -114,22 +107,33 @@ export function useApprovalQueue() {
   const {
     data: items = [],
     isLoading: loading,
+    isFetching: itemsFetching,
+    dataUpdatedAt,
     error,
+    refetch: refetchItems,
   } = useQuery({
     queryKey: AQ_KEYS.items,
     queryFn: fetchQueueItems,
     staleTime: Infinity,
   });
 
-  const { data: stats = { pending: 0, approvedToday: 0, sentToday: 0, rejected: 0 } } =
-    useQuery({
-      queryKey: AQ_KEYS.stats,
-      queryFn: fetchQueueStats,
-      staleTime: 60 * 1000,
-    });
+  const {
+    data: otherStats = { approvedToday: 0, sentToday: 0, rejected: 0 },
+    isFetching: statsFetching,
+    refetch: refetchStats,
+  } = useQuery({
+    queryKey: AQ_KEYS.stats,
+    queryFn: fetchQueueStats,
+    staleTime: 60 * 1000,
+  });
+
+  // `pending` is derived from `items` (not a separate count query) so the
+  // number shown on the stat tile and the list rendered below it can never
+  // drift apart - they're reading the exact same cached data.
+  const stats = { pending: items.length, ...otherStats };
 
   // Realtime invalidation for the `messages` table is handled once, centrally,
-  // by useRealtimeSync() in AdminLayout — not here. A second per-hook channel
+  // by useRealtimeSync() in AdminLayout - not here. A second per-hook channel
   // subscription with a fixed name breaks the moment this hook is mounted
   // more than once at a time (e.g. the sidebar badge + the page itself).
 
@@ -188,14 +192,17 @@ export function useApprovalQueue() {
     items,
     stats,
     loading,
+    isFetching: itemsFetching || statsFetching,
+    dataUpdatedAt,
     error: (error as Error)?.message ?? null,
 
     approve,
     reject,
 
-    reload: () => {
-      queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
-      queryClient.invalidateQueries({ queryKey: AQ_KEYS.stats });
+    reload: async () => {
+      const [itemsRes, statsRes] = await Promise.all([refetchItems(), refetchStats()]);
+      if (itemsRes.error) throw itemsRes.error;
+      if (statsRes.error) throw statsRes.error;
     },
   };
 }

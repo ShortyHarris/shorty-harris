@@ -7,6 +7,10 @@ import {
 import type { BlogPost, BlogCategory } from '../../hooks/useBlogPosts';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { MarkdownEditor } from '../../components/MarkdownEditor';
+import { useOverlayClose } from '../../hooks/useOverlayClose';
+import { useToast, ToastHost } from '../../components/Toast';
+import { RefreshButton } from '../../components/RefreshButton';
+import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
@@ -16,13 +20,13 @@ import { ChevronRight, ExternalLink, Link2, Sparkles, Clock } from 'lucide-react
 const HELP: HelpContent = {
   title: 'Blog',
   body: [
-    { type: 'p', text: "WF12 drafts blog posts automatically and they land here pending approval. Nothing appears on the public site until you approve it — approving publishes it immediately." },
-    { type: 'p', text: "Click a post to review it in full — you can edit the title, body, excerpt, and SEO fields before approving." },
+    { type: 'p', text: "WF12 drafts blog posts automatically and they land here pending approval. Nothing appears on the public site until you approve it - approving publishes it immediately." },
+    { type: 'p', text: "Click a post to review it in full - you can edit the title, body, excerpt, and SEO fields before approving." },
     { type: 'ul', items: [
-      "Approve & publish — goes live on the public site immediately",
-      "Schedule for later — pick a future date/time and it publishes itself automatically, even if no one's looking",
-      "Reject — discards the draft with a reason; WF12 won't retry it",
-      "Delete — removes the draft so WF12 regenerates it on its next run",
+      "Approve & publish - goes live on the public site immediately",
+      "Schedule for later - pick a future date/time and it publishes itself automatically, even if no one's looking",
+      "Reject - discards the draft with a reason; WF12 won't retry it",
+      "Delete - removes the draft so WF12 regenerates it on its next run",
     ]},
   ],
 };
@@ -53,13 +57,19 @@ function formatScheduled(iso: string): string {
 
 export function Blog() {
   const {
-    pending, loading, error,
+    pending, loading, isFetching, dataUpdatedAt, error,
     approveAndPublish, scheduleForLater, reject, deleteForRegeneration, reload,
   } = useBlogQueue();
   const {
-    posts: published, loading: publishedLoading, saveEdits,
+    posts: published, loading: publishedLoading, isFetching: publishedFetching, dataUpdatedAt: publishedUpdatedAt, saveEdits,
     rescheduleFor, publishNow, cancelSchedule, deletePublished, reload: reloadPublished,
   } = usePublishedBlogPosts();
+  const { toasts, toast, dismiss } = useToast();
+  const handleRefresh = useRefreshHandler(
+    () => Promise.all([reload(), reloadPublished()]).then(() => {}),
+    toast,
+    'Failed to refresh the blog queue.',
+  );
 
   const [view, setView]           = useState<'pending' | 'published'>('pending');
   const [activePost, setActivePost] = useState<BlogPost | null>(null);
@@ -70,6 +80,8 @@ export function Blog() {
 
   const list = view === 'pending' ? pending : published;
   const isLoading = view === 'pending' ? loading : publishedLoading;
+  const viewFetching = view === 'pending' ? isFetching : publishedFetching;
+  const viewUpdatedAt = view === 'pending' ? dataUpdatedAt : publishedUpdatedAt;
 
   const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -182,12 +194,12 @@ export function Blog() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton content={HELP} />
-          <button
-            onClick={() => { reload(); reloadPublished(); }}
+          <RefreshButton
+            onRefresh={handleRefresh}
+            isFetching={viewFetching}
+            dataUpdatedAt={viewUpdatedAt}
             className="cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]"
-          >
-            Refresh
-          </button>
+          />
         </div>
       </header>
 
@@ -339,6 +351,8 @@ export function Blog() {
           />
         )}
       </AnimatePresence>
+
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }
@@ -370,9 +384,9 @@ function GeneratePostPanel() {
       setNotice({ type: 'success', message: "Generating… this post will appear below in about a minute." });
       setShowModal(false);
     } catch {
-      // A failed fetch means generation never started at all — nothing to
+      // A failed fetch means generation never started at all - nothing to
       // wait for, the webhook simply wasn't reached.
-      setNotice({ type: 'error', message: "Couldn't reach the generation webhook — nothing was started." });
+      setNotice({ type: 'error', message: "Couldn't reach the generation webhook - nothing was started." });
     } finally {
       setGenerating(false);
     }
@@ -454,7 +468,7 @@ function TopicModal({
       className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}
@@ -558,7 +572,7 @@ function LinkedPostsPreview({ postId }: { postId: string }) {
 
 type EditableFields = Partial<Pick<BlogPost, 'title' | 'body_md' | 'excerpt' | 'seo_title' | 'meta_description'>>;
 
-/* ── Review modal — full-screen + scrollable on mobile, centered dialog on desktop ── */
+/* ── Review modal - full-screen + scrollable on mobile, centered dialog on desktop ── */
 function ReviewModal({
   post, mode, busy, onClose, onApprove, onSchedule, onSave, onReschedule, onPublishNow, onCancelSchedule, onReject, onDelete,
 }: {
@@ -615,7 +629,7 @@ function ReviewModal({
       className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}
@@ -818,7 +832,7 @@ function RejectModal({
       className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}
@@ -872,7 +886,7 @@ function DeleteModal({
       className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={onClose}
+      {...useOverlayClose(onClose)}
     >
       <motion.div
         style={FONT}
@@ -891,7 +905,7 @@ function DeleteModal({
             <p className="m-0 mt-1.5 text-[13px] text-[#a8533a]/80">
               {isPublished
                 ? 'This permanently removes it from the public site. This cannot be undone.'
-                : "This isn't a rejection — WF12 will treat the topic as still needing a post and draft a fresh one on its next scheduled run."}
+                : "This isn't a rejection - WF12 will treat the topic as still needing a post and draft a fresh one on its next scheduled run."}
             </p>
           </div>
         </div>

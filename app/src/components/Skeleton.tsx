@@ -1,4 +1,4 @@
-/* Skeleton loading primitives — shared across admin pages */
+/* Skeleton loading primitives - shared across admin pages */
 
 function Sk({ className = '' }: { className?: string }) {
   return <div className={`animate-pulse rounded-md bg-[#ece8df] ${className}`} />;

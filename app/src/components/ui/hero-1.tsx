@@ -36,7 +36,7 @@ export function HeroSection() {
           href="#how"
         >
           <RocketIcon className="size-3 text-muted-foreground" />
-          <span className="text-xs">AI-powered outreach — just launched</span>
+          <span className="text-xs">AI-powered outreach - just launched</span>
           <span className="block h-5 border-l" />
           <ArrowRightIcon className="size-3 duration-150 ease-out group-hover:translate-x-1" />
         </a>
@@ -66,7 +66,7 @@ export function HeroSection() {
             </Link>
           </Button>
           <Button className="rounded-full" size="lg" asChild>
-            <Link to="/login">
+            <Link to="/signup">
               Get started <ArrowRightIcon className="size-4 ml-2" />
             </Link>
           </Button>

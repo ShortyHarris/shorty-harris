@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import { queryClient } from '../lib/queryClient';
 
 export interface Analytics {
   funnel: { stage: string; value: number }[];
@@ -89,7 +88,7 @@ async function fetchAnalytics(): Promise<Analytics> {
 }
 
 export function useAnalytics() {
-  const { data, isLoading: loading, error } = useQuery({
+  const { data, isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
     queryKey: ['analytics'],
     queryFn: fetchAnalytics,
     staleTime: 5 * 60 * 1000,
@@ -98,7 +97,12 @@ export function useAnalytics() {
   return {
     data:   data ?? null,
     loading,
+    isFetching,
+    dataUpdatedAt,
     error:  (error as Error)?.message ?? null,
-    reload: () => queryClient.invalidateQueries({ queryKey: ['analytics'] }),
+    reload: async () => {
+      const res = await refetch();
+      if (res.error) throw res.error;
+    },
   };
 }

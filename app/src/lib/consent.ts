@@ -1,6 +1,6 @@
 // Cookie/tracking consent store. GDPR (EU) and Zambia's Data Protection Act
 // both require opt-in consent before non-essential cookies are set, which is
-// the strictest of the jurisdictions we operate in — so we apply that
+// the strictest of the jurisdictions we operate in - so we apply that
 // opt-in-by-default standard globally rather than trying to geo-detect the
 // visitor (it also satisfies the US/CCPA "opt-out" bar for free, since
 // nothing non-essential runs until the visitor has actively agreed).
@@ -44,7 +44,7 @@ export function setConsent(state: ConsentState) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(record));
   } catch {
-    // Storage unavailable (private mode, quota) — consent still applies for this page load
+    // Storage unavailable (private mode, quota) - consent still applies for this page load
     // via the in-memory event below, it just won't be remembered on the next visit.
   }
   window.dispatchEvent(new CustomEvent(CONSENT_EVENT, { detail: state }));
@@ -75,7 +75,7 @@ export function onOpenConsentPreferences(handler: () => void) {
   return () => window.removeEventListener(OPEN_PREFERENCES_EVENT, handler);
 }
 
-// Applies whatever the visitor has (or hasn't) consented to, on every load —
+// Applies whatever the visitor has (or hasn't) consented to, on every load -
 // so a returning visitor who already opted in gets analytics without seeing
 // the banner again, and one who opted out (or hasn't answered) doesn't.
 export function applyStoredConsent() {
