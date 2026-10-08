@@ -29,3 +29,20 @@ export async function geocodePlace(query: string): Promise<{ data: GeocodeResult
     return { data: [], error: 'Could not reach place search right now.' };
   }
 }
+
+// Used after the map pin is dragged, so the saved label describes where the
+// pin actually ended up instead of the place that was first searched for.
+// Returns null on any failure - the caller keeps the existing label.
+export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  const token = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
+  if (!token) return null;
+  try {
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&types=place,locality,region,country&limit=1`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const json = await res.json() as { features?: { place_name: string }[] };
+    return json.features?.[0]?.place_name ?? null;
+  } catch {
+    return null;
+  }
+}
