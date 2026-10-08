@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Search } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
-  PieChart, Pie, Legend,
+  Legend,
 } from 'recharts';
+import { ReplyBreakdown } from './ReplyBreakdown';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useDoNotContact } from '../../hooks/useDoNotContact';
 import { SkeletonTiles, SkeletonChart } from '../../components/Skeleton';
@@ -25,14 +26,6 @@ const CLIENT_COLORS = ['#ddd8cb', '#b9831f', '#3c7a5b'];
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
 const FUNNEL_COLORS = ['#3c7a5b', '#5a9a78', '#85bfa0', '#b0d5c3'];
-const INTENT_COLORS: Record<string, string> = {
-  interested:    '#3c7a5b',
-  maybe:         '#b9831f',
-  not_interested:'#9a9d92',
-  stop:          '#a8533a',
-  wrong_person:  '#c4bfb5',
-  out_of_office: '#ddd8cb',
-};
 
 const TOOLTIP_STYLE = {
   borderRadius: 10,
@@ -106,6 +99,7 @@ export function Analytics() {
 
           {/* Charts row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
             <ChartCard title="Conversion funnel">
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={data.funnel} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
@@ -118,18 +112,9 @@ export function Analytics() {
                 </BarChart>
               </ResponsiveContainer>
             </ChartCard>
+            </div>
 
-            <ChartCard title="Reply intent">
-              <ResponsiveContainer width="100%" height={240}>
-                <PieChart>
-                  <Pie data={data.intents} dataKey="value" nameKey="intent" cx="50%" cy="50%" innerRadius={48} outerRadius={84} paddingAngle={2}>
-                    {data.intents.map((d, i) => <Cell key={i} fill={INTENT_COLORS[d.intent] ?? '#c4bfb5'} />)}
-                  </Pie>
-                  <Legend formatter={(v: string) => v.replace(/_/g, ' ')} wrapperStyle={{ fontSize: 12, fontFamily: "'Plus Jakarta Sans', sans-serif" }} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v, n) => [v as number, String(n).replace(/_/g, ' ')]} />
-                </PieChart>
-              </ResponsiveContainer>
-            </ChartCard>
+            <ReplyBreakdown replies={data.replyRecords} />
           </div>
 
           {/* Per-client chart */}

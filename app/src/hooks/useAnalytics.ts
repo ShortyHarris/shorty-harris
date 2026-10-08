@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import type { ReplyRecord } from '../lib/replyIntents';
 
 export interface Analytics {
   funnel: { stage: string; value: number }[];
-  intents: { intent: string; value: number }[];
+  replyRecords: ReplyRecord[];
   perClient: { name: string; sent: number; hotLeads: number; won: number }[];
   abTests: ABTestView[];
   totals: { sent: number; replies: number; hotLeads: number; won: number; replyRate: number; conversionRate: number };
@@ -23,7 +24,9 @@ async function fetchAnalytics(): Promise<Analytics> {
     supabase.from('hot_leads').select('id', { count: 'exact', head: true }),
     supabase.from('hot_leads').select('id', { count: 'exact', head: true }).eq('status', 'won'),
     supabase.from('clients').select('id, business_name'),
-    supabase.from('replies').select('intent'),
+    supabase.from('replies')
+      .select('id, intent, body, received_at, created_at, prospect:prospects ( business_name, contact_name )')
+      .order('received_at', { ascending: false }),
     supabase.from('ab_tests').select('id, name, status'),
     supabase.from('ab_variants').select('id, test_id, variant_key'),
     supabase.from('ab_metrics').select('test_id, variant_id, metric, value'),
@@ -34,9 +37,21 @@ async function fetchAnalytics(): Promise<Analytics> {
   const hotLeads = hotR.count     ?? 0;
   const won      = wonR.count     ?? 0;
 
-  const intentMap: Record<string, number> = {};
-  (intentsR.data ?? []).forEach((r: { intent: string | null }) => {
-    if (r.intent) intentMap[r.intent] = (intentMap[r.intent] ?? 0) + 1;
+  type ReplyQueryRow = {
+    id: string; intent: string | null; body: string | null;
+    received_at: string | null; created_at: string | null;
+    prospect: { business_name: string | null; contact_name: string | null }
+      | { business_name: string | null; contact_name: string | null }[] | null;
+  };
+  const replyRecords: ReplyRecord[] = ((intentsR.data ?? []) as unknown as ReplyQueryRow[]).map((r) => {
+    const p = Array.isArray(r.prospect) ? r.prospect[0] : r.prospect;
+    return {
+      id: r.id,
+      intent: r.intent,
+      body: r.body,
+      at: r.received_at ?? r.created_at,
+      prospectName: p?.business_name || p?.contact_name || 'Unknown prospect',
+    };
   });
 
   const clients = clientsR.data ?? [];
@@ -76,7 +91,7 @@ async function fetchAnalytics(): Promise<Analytics> {
       { stage: 'Hot leads', value: hotLeads },
       { stage: 'Won',       value: won },
     ],
-    intents:    Object.entries(intentMap).map(([intent, value]) => ({ intent, value })),
+    replyRecords,
     perClient,
     abTests,
     totals: {
