@@ -11,7 +11,10 @@ import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { SkeletonTable } from '../../components/Skeleton';
 import { Search, StickyNote, ClipboardCheck, Flame, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
-import { PIPELINE_STATUS_LABEL, PIPELINE_STATUS_PILL } from '../../lib/pipelineStatus';
+import {
+  PIPELINE_STATUS_LABEL, PIPELINE_STATUS_PILL, SEQUENCE_STATUS_LABEL, SEQUENCE_STATUS_PILL,
+  SEQUENCE_STATUS_ORDER, SEQUENCE_FILTER_PREFIX, isSequenceStatus,
+} from '../../lib/pipelineStatus';
 import './Dashboard.css';
 
 const HELP: HelpContent = {
@@ -76,6 +79,13 @@ export function Prospects({
     ...STATUS_TAB_ORDER
       .filter((k) => result.counts_by_status[k] > 0)
       .map((k) => ({ key: k as string | null, label: STATUS_LABEL[k] ?? k, count: result.counts_by_status[k] })),
+    ...SEQUENCE_STATUS_ORDER
+      .filter((k) => (result.counts_by_sequence_status[k] ?? 0) > 0)
+      .map((k) => ({
+        key: `${SEQUENCE_FILTER_PREFIX}${k}` as string | null,
+        label: SEQUENCE_STATUS_LABEL[k],
+        count: result.counts_by_sequence_status[k] ?? 0,
+      })),
   ];
 
   const page = Math.floor(offset / PIPELINE_PAGE_SIZE) + 1;
@@ -142,8 +152,8 @@ export function Prospects({
           <div className="atbl" style={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity 0.15s' }}>
             <table className="table-fixed">
               <colgroup>
-                <col className="w-[38%]" />
-                <col className="w-[13%]" />
+                <col className="w-[32%]" />
+                <col className="w-[19%]" />
                 <col className="w-[7%]" />
                 <col className="w-[7%]" />
                 <col className="w-[7%]" />
@@ -216,7 +226,11 @@ function ProspectRow({
 }: {
   row: PipelineRow; readOnly: boolean; basePath: string; onOpen: () => void; onNoteSaved: () => void;
 }) {
-  const pill = STATUS_PILL[row.pipeline_status] ?? { bg: '#f5f2ec', text: '#62655c' };
+  const seq = isSequenceStatus(row.sequence_status) ? row.sequence_status : null;
+  const pill = seq
+    ? SEQUENCE_STATUS_PILL[seq]
+    : STATUS_PILL[row.pipeline_status] ?? { bg: '#f5f2ec', text: '#62655c' };
+  const statusLabel = seq ? SEQUENCE_STATUS_LABEL[seq] : STATUS_LABEL[row.pipeline_status] ?? row.pipeline_status;
   const lastActivity = row.last_reply_at && (!row.last_sent_at || row.last_reply_at > row.last_sent_at)
     ? { label: 'Replied', date: row.last_reply_at }
     : row.last_sent_at
@@ -233,7 +247,7 @@ function ProspectRow({
           </div>
         )}
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          {row.suppressed && (
+          {row.suppressed && !seq && (
             <span className="inline-flex items-center rounded-full border border-[#ddd8cb] px-2 py-0.5 text-[10.5px] font-semibold text-[#9a9d92]">
               Unsubscribed
             </span>
@@ -259,8 +273,11 @@ function ProspectRow({
         </div>
       </td>
       <td onClick={onOpen} className="cursor-pointer">
-        <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
-          {STATUS_LABEL[row.pipeline_status] ?? row.pipeline_status}
+        <span
+          className="atbl-pill"
+          style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none', whiteSpace: 'normal', textAlign: 'left' }}
+        >
+          {statusLabel}
         </span>
       </td>
       <td onClick={onOpen} className="cursor-pointer text-[#62655c]">{row.emails_sent}</td>
@@ -362,6 +379,21 @@ const STEP_STATE_PILL: Record<SequenceStepState, { bg: string; text: string }> =
   failed:               { bg: '#f6e8e2', text: '#a8533a' },
 };
 
+function PanelStatusBadge({
+  sequenceStatus, pipelineStatus,
+}: { sequenceStatus: string | null | undefined; pipelineStatus: string }) {
+  const seq = isSequenceStatus(sequenceStatus) ? sequenceStatus : null;
+  const pill = seq ? SEQUENCE_STATUS_PILL[seq] : STATUS_PILL[pipelineStatus] ?? { bg: '#f5f2ec', text: '#62655c' };
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-2.5 py-1 text-[11.5px] font-bold"
+      style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
+    >
+      {seq ? SEQUENCE_STATUS_LABEL[seq] : STATUS_LABEL[pipelineStatus] ?? pipelineStatus}
+    </span>
+  );
+}
+
 const STOPPED_BECAUSE_LABEL: Record<NonNullable<StoppedBecause>, string> = {
   they_replied_with_interest: 'Follow-ups stopped — they replied with interest',
   unsubscribed_or_bounced: 'Follow-ups stopped — unsubscribed or bounced',
@@ -414,6 +446,13 @@ function SequencePanel({
             <>
               <h2 className="panel-biz">{sequence.prospect.business_name}</h2>
               {sequence.prospect.email && <p className="panel-category mono">{sequence.prospect.email}</p>}
+
+              <div className="mb-4">
+                <PanelStatusBadge
+                  sequenceStatus={sequence.sequence_status}
+                  pipelineStatus={sequence.prospect.pipeline_status}
+                />
+              </div>
 
               {sequence.stopped_because && (
                 <div className="mb-4 rounded-xl px-4 py-3 text-[13px] font-semibold" style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)' }}>

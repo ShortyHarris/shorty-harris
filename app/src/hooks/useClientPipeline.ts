@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
+import type { SequenceStatus } from '../lib/pipelineStatus';
 
 export interface PipelineRow {
   prospect_id: string;
@@ -14,6 +15,8 @@ export interface PipelineRow {
   location: string | null;
   campaign: string | null;
   pipeline_status: string;
+  // Absent until the sequence-status migration is applied; null = show pipeline_status.
+  sequence_status?: SequenceStatus | null;
   call_outcome: string | null;
   call_outcome_at: string | null;
   client_note: string | null;
@@ -33,10 +36,13 @@ export interface ClientPipelineResult {
   limit: number;
   offset: number;
   counts_by_status: Record<string, number>;
+  counts_by_sequence_status: Partial<Record<SequenceStatus, number>>;
   rows: PipelineRow[];
 }
 
-const EMPTY_RESULT: ClientPipelineResult = { total: 0, limit: 50, offset: 0, counts_by_status: {}, rows: [] };
+const EMPTY_RESULT: ClientPipelineResult = {
+  total: 0, limit: 50, offset: 0, counts_by_status: {}, counts_by_sequence_status: {}, rows: [],
+};
 
 export const PIPELINE_PAGE_SIZE = 50;
 
@@ -64,6 +70,7 @@ export function useClientPipeline(
         limit: result.limit ?? PIPELINE_PAGE_SIZE,
         offset: result.offset ?? 0,
         counts_by_status: result.counts_by_status ?? {},
+        counts_by_sequence_status: result.counts_by_sequence_status ?? {},
         rows: result.rows ?? [],
       } as ClientPipelineResult;
     },
@@ -120,6 +127,7 @@ export type StoppedBecause = 'they_replied_with_interest' | 'unsubscribed_or_bou
 
 export interface ProspectSequence {
   prospect: { prospect_id: string; business_name: string; email: string | null; pipeline_status: string };
+  sequence_status?: SequenceStatus | null;
   stopped_because: StoppedBecause;
   replies: SequenceReply[];
   steps: SequenceStep[];
