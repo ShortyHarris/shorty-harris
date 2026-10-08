@@ -1,3 +1,5 @@
+import { looksLikeMultipleLocationsJoined } from './validation';
+
 // campaigns.target_areas: a jsonb array (max 25) enforced by a CHECK
 // constraint on the DB. Each entry is either a plain place name, or a radius
 // around a geocoded point. lat/lng/radius_km are stored as STRINGS in the
@@ -48,6 +50,22 @@ export function buildAreaColumns(areas: TargetArea[]): { target_locations: strin
   };
 }
 
+// What a campaign's areas are when loaded for display or editing: the
+// structured list if it was saved with one, else its plain-text locations.
+export function campaignAreas(campaign: { target_areas: TargetArea[] | null; target_locations: string[] }): TargetArea[] {
+  return campaign.target_areas ?? locationsToAreas(campaign.target_locations);
+}
+
 export function locationsToAreas(locations: string[]): TargetArea[] {
   return locations.map((label) => ({ mode: 'text', label }));
+}
+
+// Only typed text entries can be "several cities joined together" (e.g.
+// "Normal, Bloomington, Peoria" with no semicolons). A radius area's label
+// comes from Mapbox ("Normal, Illinois, United States") and legitimately has
+// several commas, so it is never checked. Returns the message to show, or null.
+export function joinedLocationsError(areas: TargetArea[]): string | null {
+  const typed = areas.filter((a) => a.mode === 'text').map((a) => a.label);
+  if (!looksLikeMultipleLocationsJoined(typed)) return null;
+  return `"${typed[0]}" looks like more than one location joined together - press Enter (or use a semicolon) after each city so they save as separate entries.`;
 }

@@ -17,9 +17,10 @@ import {
 import { SkeletonTable } from '../../components/Skeleton';
 import { RowMenu } from '../../components/RowMenu';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
-import { TagInput } from '../../components/TagInput';
+import { LocationAreaInput } from '../../components/LocationAreaInput';
+import { TargetAreaChips } from '../../components/TargetAreaChips';
 import { SuggestForMe } from '../client/Campaigns';
-import { looksLikeMultipleLocationsJoined } from '../../lib/validation';
+import { areasToLocationLabels, campaignAreas, joinedLocationsError, type TargetArea } from '../../lib/targetAreas';
 import { getScrapeStatusDisplay } from '../../lib/scrapeFailures';
 
 const HELP_CAMPAIGNS: HelpContent = {
@@ -505,6 +506,9 @@ export function Campaigns() {
                           </span>
                         )}
                         <div className="mt-1 text-[11px] text-[#9a9d92]">{lastScrapedLabel(c)}</div>
+                        {c.target_areas && (
+                          <TargetAreaChips areas={c.target_areas} radiusOnly className="mt-1.5 flex flex-wrap gap-1" chipClassName="px-2 py-0.5 text-[11px]" />
+                        )}
                       </td>
                       <td className="min-w-0 text-[#62655c]">
                         <div className="truncate" title={c.client?.business_name ?? undefined}>{c.client?.business_name ?? '-'}</div>
@@ -592,6 +596,9 @@ export function Campaigns() {
                         </div>
                       )}
                       <div className="mt-1 text-[11px] text-[#9a9d92]">{lastScrapedLabel(c)}</div>
+                      {c.target_areas && (
+                        <TargetAreaChips areas={c.target_areas} radiusOnly className="mt-1.5 flex flex-wrap gap-1" chipClassName="px-2 py-0.5 text-[11px]" />
+                      )}
                     </div>
                     <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
                       className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
@@ -781,7 +788,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
   const [channel, setChannel]           = useState('email');
   const [language, setLanguage]         = useState('English');
   const [queries, setQueries]           = useState('');
-  const [locations, setLocations]       = useState<string[]>([]);
+  const [areas, setAreas]                 = useState<TargetArea[]>([]);
   const [maxResults, setMaxResults]     = useState(1000);
   const [scrapeEnabled, setScrapeEnabled] = useState(true);
   const [saveAsDraft, setSaveAsDraft]   = useState(false);
@@ -791,15 +798,13 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
   async function submit() {
     if (!clientId || !name.trim()) { setErr('Pick a client and enter a name.'); return; }
     if (!language.trim()) { setErr('Outreach language is required.'); return; }
-    if (looksLikeMultipleLocationsJoined(locations)) {
-      setErr(`"${locations[0]}" looks like more than one location joined together - press Enter (or use a semicolon) after each city so they save as separate entries.`);
-      return;
-    }
+    const joinedError = joinedLocationsError(areas);
+    if (joinedError) { setErr(joinedError); return; }
     setBusy(true); setErr(null);
     const { error } = await createCampaign({
       client_id: clientId, name: name.trim(), channel, language: language.trim(),
       search_queries: queries.split(',').map((s) => s.trim()).filter(Boolean),
-      target_locations: locations,
+      target_areas: areas,
       max_results: maxResults, scrape_enabled: scrapeEnabled,
       status: saveAsDraft ? 'draft' : 'active',
     });
@@ -877,12 +882,12 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
                   key={clientId}
                   clientId={clientId}
                   queries={queries.split(',').map((s) => s.trim()).filter(Boolean)}
-                  locations={locations}
+                  locations={areasToLocationLabels(areas)}
                   onAddQuery={(term) => setQueries((q) => {
                     const parts = q.split(',').map((s) => s.trim()).filter(Boolean);
                     return parts.includes(term) ? q : [...parts, term].join(', ');
                   })}
-                  onAddLocation={(loc) => setLocations((l) => (l.includes(loc) ? l : [...l, loc]))}
+                  onAddLocation={(loc) => setAreas((a) => (a.some((x) => x.label === loc) ? a : [...a, { mode: 'text', label: loc }]))}
                 />
               ) : (
                 <p className="m-0 text-[11px] text-[#9a9d92]">Pick a client above to see targeting suggestions from their profile.</p>
@@ -892,13 +897,13 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
                 <input value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="hotels, lodges, guesthouses" style={FONT} className={inputCls} />
                 <p className="mt-1 text-[11px] text-[#9a9d92]">Business types, not job titles - 3 to 5 terms works best.</p>
               </div>
-              <TagInput
+              <LocationAreaInput
                 label="Locations"
-                placeholder="Type a location and press Enter (e.g. Bloomington, IL)"
-                helper="One city per entry - press Enter after each one. Use City, State format. To add several at once, separate them with semicolons (not commas); don't put more than one city in a single entry."
-                values={locations}
-                onChange={setLocations}
-                splitOn=";"
+                helper="Add a city or area, or a radius around a point. Plain places and radius areas share one list (max 25)."
+                values={areas}
+                onChange={setAreas}
+                maxItems={25}
+                capLabel="location"
               />
               <div className="flex items-end gap-3">
                 <div className="flex-1">
@@ -971,7 +976,7 @@ function EditCampaignModal({
   const [channel, setChannel]         = useState(campaign.channel);
   const [language, setLanguage]       = useState(campaign.language);
   const [queries, setQueries]         = useState(campaign.search_queries.join(', '));
-  const [locations, setLocations]     = useState<string[]>(campaign.target_locations);
+  const [areas, setAreas]         = useState<TargetArea[]>(campaignAreas(campaign));
   const [maxResults, setMaxResults]   = useState(campaign.max_results);
   const [scrapeEnabled, setScrapeEnabled] = useState(campaign.scrape_enabled);
   const [busy, setBusy] = useState(false);
@@ -980,10 +985,8 @@ function EditCampaignModal({
   async function submit() {
     if (!name.trim()) { setErr('Campaign name is required.'); return; }
     if (!language.trim()) { setErr('Outreach language is required.'); return; }
-    if (looksLikeMultipleLocationsJoined(locations)) {
-      setErr(`"${locations[0]}" looks like more than one location joined together - press Enter (or use a semicolon) after each city so they save as separate entries.`);
-      return;
-    }
+    const joinedError = joinedLocationsError(areas);
+    if (joinedError) { setErr(joinedError); return; }
     setBusy(true); setErr(null);
     const { error } = await updateCampaign(campaign.id, {
       name: name.trim(),
@@ -991,7 +994,7 @@ function EditCampaignModal({
       channel,
       language: language.trim(),
       search_queries: queries.split(',').map((s) => s.trim()).filter(Boolean),
-      target_locations: locations,
+      target_areas: areas,
       max_results: maxResults,
       scrape_enabled: scrapeEnabled,
     });
@@ -1034,25 +1037,25 @@ function EditCampaignModal({
             <SuggestForMe
               clientId={campaign.client_id}
               queries={queries.split(',').map((s) => s.trim()).filter(Boolean)}
-              locations={locations}
+              locations={areasToLocationLabels(areas)}
               onAddQuery={(term) => setQueries((q) => {
                 const parts = q.split(',').map((s) => s.trim()).filter(Boolean);
                 return parts.includes(term) ? q : [...parts, term].join(', ');
               })}
-              onAddLocation={(loc) => setLocations((l) => (l.includes(loc) ? l : [...l, loc]))}
+              onAddLocation={(loc) => setAreas((a) => (a.some((x) => x.label === loc) ? a : [...a, { mode: 'text', label: loc }]))}
             />
             <div>
               <label className={campFieldLbl}>Search terms <span className="normal-case font-normal">(comma-separated)</span></label>
               <input value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="hotels, lodges, guesthouses" style={FONT} className={campInputCls} />
               <p className="mt-1 text-[11px] text-[#9a9d92]">Business types, not job titles - 3 to 5 terms works best.</p>
             </div>
-            <TagInput
+            <LocationAreaInput
               label="Locations"
-              placeholder="Type a location and press Enter (e.g. Bloomington, IL)"
-              helper="One city per entry - press Enter after each one. Use City, State format. To add several at once, separate them with semicolons (not commas); don't put more than one city in a single entry."
-              values={locations}
-              onChange={setLocations}
-              splitOn=";"
+              helper="Add a city or area, or a radius around a point. Plain places and radius areas share one list (max 25)."
+              values={areas}
+              onChange={setAreas}
+              maxItems={25}
+              capLabel="location"
             />
             <div className="flex items-end gap-3">
               <div className="flex-1">

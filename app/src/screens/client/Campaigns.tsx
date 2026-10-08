@@ -13,12 +13,12 @@ import {
 import type { ClientCampaignRow, ClientCampaignDeleteCounts } from '../../hooks/useClientCampaigns';
 import { queryClient } from '../../lib/queryClient';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
-import { looksLikeMultipleLocationsJoined } from '../../lib/validation';
 import { SkeletonTable } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { TagInput } from '../../components/TagInput';
 import { LocationAreaInput } from '../../components/LocationAreaInput';
-import { areaDisplayLabel, areasToLocationLabels, locationsToAreas, type TargetArea } from '../../lib/targetAreas';
+import { TargetAreaChips } from '../../components/TargetAreaChips';
+import { areaDisplayLabel, areasToLocationLabels, joinedLocationsError, locationsToAreas, type TargetArea } from '../../lib/targetAreas';
 import { useToast, ToastHost } from '../../components/Toast';
 import { RefreshButton } from '../../components/RefreshButton';
 import { useRefreshHandler } from '../../hooks/useRefreshHandler';
@@ -337,9 +337,8 @@ function NewCampaignModal({
     if (n === 1) {
       if (queries.length === 0) return 'Add at least one search term.';
       if (areas.length === 0) return 'Add at least one target location.';
-      if (looksLikeMultipleLocationsJoined(locationLabels)) {
-        return `"${locationLabels[0]}" looks like more than one location joined together - press Enter (or use a semicolon) after each city so they save as separate entries.`;
-      }
+      const joinedError = joinedLocationsError(areas);
+      if (joinedError) return joinedError;
       // Belt-and-suspenders: TagInput/LocationAreaInput already refuse
       // extra entries once a limit loads, but don't block advancing on a
       // limit that hasn't loaded yet (limits == null) - the server still
@@ -817,10 +816,8 @@ function CampaignDetailModal({
     if (!name.trim()) { setErr('Campaign name is required.'); return; }
     if (queries.length === 0) { setErr('Add at least one search term.'); return; }
     if (areas.length === 0) { setErr('Add at least one target location.'); return; }
-    if (looksLikeMultipleLocationsJoined(locationLabels)) {
-      setErr(`"${locationLabels[0]}" looks like more than one location joined together - press Enter (or use a semicolon) after each city so they save as separate entries.`);
-      return;
-    }
+    const joinedError = joinedLocationsError(areas);
+    if (joinedError) { setErr(joinedError); return; }
     if (limits && queries.length > limits.max_search_terms) { setErr(`You can use up to ${limits.max_search_terms} search terms.`); return; }
     if (limits && areas.length > limits.max_locations) { setErr(`You can use up to ${limits.max_locations} locations.`); return; }
     if (!language.trim()) { setErr('Outreach language is required.'); return; }
@@ -1027,11 +1024,7 @@ function CampaignDetailModal({
 
           <div>
             <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Target locations</div>
-            <div className="flex flex-wrap gap-1.5">
-              {areas.map((a, i) => (
-                <span key={`${a.label}-${i}`} className="rounded-full bg-[#fbf9f5] border border-[#ece8df] px-2.5 py-1 text-[12px] text-[#62655c]">{areaDisplayLabel(a)}</span>
-              ))}
-            </div>
+            <TargetAreaChips areas={areas} />
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-[13px]">

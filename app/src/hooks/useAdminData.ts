@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
+import { buildAreaColumns, type TargetArea } from '../lib/targetAreas';
 
 // ─── Query keys ──────────────────────────────────────────────────────────────
 export const QK = {
@@ -157,6 +158,8 @@ export interface CampaignRow {
   last_scrape_summary: ScrapeSummary | null;
   search_queries: string[];
   target_locations: string[];
+  // Null for campaigns made of plain places only - see buildAreaColumns.
+  target_areas: TargetArea[] | null;
   max_results: number;
   created_at: string;
   client_id: string;
@@ -176,7 +179,7 @@ async function fetchCampaigns(): Promise<CampaignRow[]> {
     // also used by the client-side campaign list. Reading it straight off
     // the campaigns row (instead of a separate per-campaign count query)
     // means this number can never drift from what the client UI shows.
-    .select(`id, name, description, status, channel, language, scrape_enabled, last_scraped_at, scrape_status, scrape_started_at, scrape_error, scrape_failure_reason, scrape_attempt_count, scrape_finished_at, last_scrape_summary, search_queries, target_locations, max_results, created_at, client_id, prospect_count, client:clients ( business_name )`)
+    .select(`id, name, description, status, channel, language, scrape_enabled, last_scraped_at, scrape_status, scrape_started_at, scrape_error, scrape_failure_reason, scrape_attempt_count, scrape_finished_at, last_scrape_summary, search_queries, target_locations, target_areas, max_results, created_at, client_id, prospect_count, client:clients ( business_name )`)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -200,6 +203,7 @@ async function fetchCampaigns(): Promise<CampaignRow[]> {
       last_scrape_summary: (r.last_scrape_summary as ScrapeSummary | null) ?? null,
       search_queries: (r.search_queries as string[] | null) ?? [],
       target_locations: (r.target_locations as string[] | null) ?? [],
+      target_areas: (r.target_areas as TargetArea[] | null) ?? null,
       max_results: (r.max_results as number | null) ?? 50,
       created_at: r.created_at,
       client_id: r.client_id,
@@ -302,7 +306,7 @@ export interface NewCampaignInput {
   channel: string;
   language: string;
   search_queries: string[];
-  target_locations: string[];
+  target_areas: TargetArea[];
   max_results: number;
   scrape_enabled: boolean;
   status?: 'draft' | 'active';
@@ -328,7 +332,7 @@ export async function createCampaign(input: NewCampaignInput) {
     language: input.language,
     status: input.status ?? 'active',
     search_queries: input.search_queries,
-    target_locations: input.target_locations,
+    ...buildAreaColumns(input.target_areas),
     max_results: input.max_results,
     scrape_enabled: input.scrape_enabled,
   });
@@ -665,7 +669,7 @@ export interface UpdateCampaignInput {
   channel: string;
   language: string;
   search_queries: string[];
-  target_locations: string[];
+  target_areas: TargetArea[];
   max_results: number;
   scrape_enabled: boolean;
 }
@@ -677,7 +681,10 @@ export async function updateCampaign(id: string, input: UpdateCampaignInput) {
     channel: input.channel,
     language: input.language,
     search_queries: input.search_queries,
-    target_locations: input.target_locations,
+    // Always writes BOTH columns, with target_areas explicitly null when no
+    // radius area remains - so removing the last radius area clears it
+    // instead of leaving a stale list the scraper would keep using.
+    ...buildAreaColumns(input.target_areas),
     max_results: input.max_results,
     scrape_enabled: input.scrape_enabled,
     updated_at: new Date().toISOString(),
