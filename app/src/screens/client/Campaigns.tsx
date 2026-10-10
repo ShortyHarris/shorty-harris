@@ -28,6 +28,11 @@ import {
 } from '../../hooks/useClientIcp';
 import { PIPELINE_STATUS_LABEL, PIPELINE_STATUS_PILL } from '../../lib/pipelineStatus';
 import { Sparkles } from 'lucide-react';
+import { useClientProfile } from '../../hooks/useClientProfile';
+import { useCountrySendHolds } from '../../hooks/useCountrySendHolds';
+import { CountryHoldBanner, EuBadge } from '../../components/CountryHoldBanner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { COUNTRY_OPTIONS, countryName, defaultCampaignCountry, findCountryHold, isEuCountry } from '../../lib/countries';
 
 const HELP: HelpContent = {
   title: 'Campaigns',
@@ -80,6 +85,7 @@ export function Campaigns({
   const { rows, loading, isFetching, dataUpdatedAt, error, reload } = useClientCampaignList(clientId, client);
   const { usage } = useClientUsage(clientId, client);
   const { usage: launchUsage } = useClientLaunchUsage(clientId, client);
+  const { holds } = useCountrySendHolds(client);
   const { toasts, toast, dismiss } = useToast();
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh campaigns.');
   const [showNew, setShowNew] = useState(false);
@@ -96,6 +102,11 @@ export function Campaigns({
 
   const newCampaignDisabled = atLimit || atLaunchLimit;
   const newCampaignTitle = atLaunchLimit ? launchLimitTitle : (atLimit ? limitTitle : undefined);
+
+  // One banner per held country that at least one of this client's campaigns targets.
+  const heldGroups = holds
+    .map((h) => ({ hold: h, campaigns: rows.filter((c) => findCountryHold([h], c.country)) }))
+    .filter((g) => g.campaigns.length > 0);
 
   return (
     <div style={FONT} className="flex flex-col gap-6 content">
@@ -149,6 +160,14 @@ export function Campaigns({
         </div>
       )}
 
+      {heldGroups.map(({ hold, campaigns }) => (
+        <CountryHoldBanner
+          key={hold.country}
+          reason={hold.reason}
+          context={`${countryName(hold.country)}: ${campaigns.map((c) => c.name).join(', ')}`}
+        />
+      ))}
+
       {error && (
         <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">Couldn't load your campaigns: {error}</div>
       )}
@@ -194,7 +213,10 @@ export function Campaigns({
                   return (
                     <tr key={c.id} onClick={() => setOpenCampaign(c)} className="cursor-pointer">
                       <td className="min-w-0">
-                        <div className="truncate font-bold text-[#20211c]" title={c.name}>{c.name}</div>
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="truncate font-bold text-[#20211c]" title={c.name}>{c.name}</span>
+                          {isEuCountry(c.country) && <EuBadge />}
+                        </div>
                       </td>
                       <td>
                         <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
@@ -229,7 +251,10 @@ export function Campaigns({
                   className="cursor-pointer rounded-xl border border-[#ece8df] bg-white p-4 text-left"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="min-w-0 truncate font-bold text-[#20211c] text-[14px]" title={c.name}>{c.name}</span>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="min-w-0 truncate font-bold text-[#20211c] text-[14px]" title={c.name}>{c.name}</span>
+                      {isEuCountry(c.country) && <EuBadge />}
+                    </span>
                     <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
                       className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
                       {CAMP_STATUS_LABEL[c.status] ?? c.status}
@@ -283,6 +308,7 @@ export function Campaigns({
             client={client}
             readOnly={readOnly}
             basePath={basePath}
+            hold={findCountryHold(holds, openCampaign.country)}
             onClose={() => setOpenCampaign(null)}
             onUpdated={() => {
               reload();
@@ -320,6 +346,7 @@ function NewCampaignModal({
   onCreated: (autoApproved: boolean) => void;
 }) {
   const { profile } = useAuth();
+  const { profile: clientProfile } = useClientProfile(clientId);
   const [step, setStep]             = useState(0);
   const [name, setName]             = useState('');
   const [description, setDescription] = useState('');
@@ -327,6 +354,10 @@ function NewCampaignModal({
   const [areas, setAreas]           = useState<TargetArea[]>([]);
   const [maxResults, setMaxResults] = useState(50);
   const [language, setLanguage]     = useState('English');
+  // '' until the client picks one; until then the client's own country (once
+  // loaded) is the default. A client country outside the list falls back to Other.
+  const [pickedCountry, setPickedCountry] = useState('');
+  const country = pickedCountry || defaultCampaignCountry(clientProfile?.country);
   const [busy, setBusy]             = useState(false);
   const [err, setErr]               = useState<string | null>(null);
   const limits = useCampaignLimits(clientId);
@@ -351,6 +382,7 @@ function NewCampaignModal({
       }
     }
     if (n === 2 && !language.trim()) return 'Outreach language is required.';
+    if (n === 2 && !country) return 'Target country is required.';
     return null;
   }
 
@@ -367,6 +399,7 @@ function NewCampaignModal({
   }
 
   async function submit() {
+    if (!country) { setErr('Target country is required.'); return; }
     setBusy(true); setErr(null);
 
     const { data: validation, error: validationError } = await validateCampaignInputs({
@@ -389,6 +422,7 @@ function NewCampaignModal({
       name: name.trim(),
       description: description.trim(),
       language: language.trim(),
+      country,
       search_queries: queries,
       target_areas: areas,
       max_results: maxResults,
@@ -521,6 +555,18 @@ function NewCampaignModal({
                 </datalist>
                 <p className="mt-1 text-[11px] text-[#9a9d92]">Messages and follow-ups will be written in this language.</p>
               </div>
+              <div>
+                <label className={fieldLbl}>Target country</label>
+                <Select value={country} onValueChange={setPickedCountry}>
+                  <SelectTrigger className="h-10 rounded-lg text-[13px] border-[#ece8df] bg-[#fbf9f5] text-[#20211c]" style={FONT} aria-label="Target country">
+                    <SelectValue placeholder="Select a country" />
+                  </SelectTrigger>
+                  <SelectContent className="text-[13px]">
+                    {COUNTRY_OPTIONS.map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-[11px] text-[#9a9d92]">The country your prospects are in. EU countries have extra outreach rules.</p>
+              </div>
             </>
           )}
 
@@ -532,6 +578,7 @@ function NewCampaignModal({
               <ReviewRow label="Target locations" tags={areas.map(areaDisplayLabel)} />
               <ReviewRow label="Max results" value={String(maxResults)} />
               <ReviewRow label="Outreach language" value={language} />
+              <ReviewRow label="Target country" value={countryName(country)} />
               <p className="m-0 text-[12px] text-[#9a9d92]">
                 Double-check everything above, then create your campaign. You can't edit these details once it's running.
               </p>
@@ -769,10 +816,10 @@ function ReviewRow({ label, value, tags }: { label: string; value?: string; tags
 
 /* ── Campaign Detail Modal ─────────────────────────────────────────── */
 function CampaignDetailModal({
-  campaign, clientId, onClose, onUpdated, onDeleted, client = supabase, readOnly = false, basePath = '/app',
+  campaign, clientId, onClose, onUpdated, onDeleted, client = supabase, readOnly = false, basePath = '/app', hold = null,
 }: {
   campaign: ClientCampaignRow; clientId: string; onClose: () => void; onUpdated: () => void; onDeleted: () => void;
-  client?: SupabaseClient; readOnly?: boolean; basePath?: string;
+  client?: SupabaseClient; readOnly?: boolean; basePath?: string; hold?: { country: string; reason: string } | null;
 }) {
   const { rows: prospects, loading } = useClientCampaignProspects(campaign.id, client);
 
@@ -878,10 +925,13 @@ function CampaignDetailModal({
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#ece8df] px-5 py-4">
           <div className="min-w-0">
             <h2 className="m-0 truncate text-[18px] font-bold text-[#20211c]">{name}</h2>
-            <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-              className="mt-1.5 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
-              {CAMP_STATUS_LABEL[campaign.status] ?? campaign.status}
-            </span>
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
+                className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
+                {CAMP_STATUS_LABEL[campaign.status] ?? campaign.status}
+              </span>
+              {isEuCountry(campaign.country) && <EuBadge />}
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {!editing && !readOnly && (
@@ -986,6 +1036,8 @@ function CampaignDetailModal({
         </div>
         ) : (
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
+          {hold && <CountryHoldBanner reason={hold.reason} />}
+
           {description && (
             <p className="m-0 text-[13px] leading-relaxed text-[#62655c]">{description}</p>
           )}
@@ -1036,7 +1088,17 @@ function CampaignDetailModal({
               <div className="text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Language</div>
               <div className="mt-0.5 font-bold text-[#20211c]">{language}</div>
             </div>
+            {campaign.country && (
+              <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-3">
+                <div className="text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Target country</div>
+                <div className="mt-0.5 font-bold text-[#20211c]">{countryName(campaign.country)}</div>
+              </div>
+            )}
           </div>
+
+          <p className="m-0 text-[12.5px] leading-relaxed text-[#62655c]">
+            <span className="font-bold text-[#20211c]">Cadence:</span> follow-ups after 3, 5 and 7 business days (days 3, 7, 14), weekdays, 9am to 5pm Central.
+          </p>
 
           <div>
             <div className="mb-2 text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Prospects - {campaign.prospectCount} total</div>

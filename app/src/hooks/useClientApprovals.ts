@@ -8,6 +8,23 @@ import type { ClientMessageItem } from '../types';
 
 export const clientApprovalsKey = (clientId: string) => ['client-approvals', clientId] as const;
 export const clientApprovalsStatsKey = (clientId: string) => ['client-approvals-stats', clientId] as const;
+export const clientAwaitingProspectsKey = (clientId: string) => ['client-awaiting-prospects', clientId] as const;
+
+// Prospects still in play that have at least one drafted email waiting on
+// approval. Same exclusions as the approve_sequences RPC.
+const TERMINAL_PIPELINE_STATUSES = '(replied,hot_lead,won,lost,called,bounced)';
+
+async function fetchAwaitingProspects(clientId: string, client: SupabaseClient): Promise<number> {
+  const { count, error } = await client
+    .from('prospects')
+    .select('id, messages!inner(id)', { count: 'exact', head: true })
+    .eq('client_id', clientId)
+    .not('pipeline_status', 'in', TERMINAL_PIPELINE_STATUSES)
+    .eq('messages.approval_status', 'pending')
+    .eq('messages.send_status', 'not_sent');
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
 
 interface ClientApprovalStats {
   pending: number;
@@ -21,7 +38,7 @@ async function fetchPendingMessages(clientId: string, client: SupabaseClient): P
     .from('messages')
     .select(
       `
-      id, prospect_id, channel, subject, body, message_type,
+      id, prospect_id, campaign_id, channel, subject, body, message_type,
       approval_status, created_at,
       prospect:prospects ( id, business_name, contact_name, email, phone, category, location )
     `
@@ -92,6 +109,13 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     staleTime: 60 * 1000,
   });
 
+  const { data: awaitingProspects = 0 } = useQuery({
+    queryKey: clientAwaitingProspectsKey(clientId),
+    queryFn: () => fetchAwaitingProspects(clientId, client),
+    enabled: !!clientId && !isPreview,
+    staleTime: 30 * 1000,
+  });
+
   const removeFromCache = useCallback((ids: string[]) => {
     queryClient.setQueryData<ClientMessageItem[]>(clientApprovalsKey(clientId), (prev = []) =>
       prev.filter((i) => !ids.includes(i.id))
@@ -113,6 +137,7 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     const { error } = await supabase.from('messages').update(patch).eq('id', id);
     if (error) queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
+    queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
   }, [clientId, profile?.id, removeFromCache]);
 
   const reject = useCallback(async (id: string) => {
@@ -123,6 +148,7 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
       .eq('id', id);
     if (error) queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
+    queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
   }, [clientId, removeFromCache]);
 
   const bulkApprove = useCallback(async (ids: string[]) => {
@@ -139,6 +165,7 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
       .in('id', ids);
     if (error) queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
+    queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
   }, [clientId, profile?.id, removeFromCache]);
 
   const bulkReject = useCallback(async (ids: string[]) => {
@@ -150,11 +177,13 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
       .in('id', ids);
     if (error) queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
+    queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
   }, [clientId, removeFromCache]);
 
   return {
     items,
     stats,
+    awaitingProspects,
     loading,
     isFetching: itemsFetching || statsFetching,
     dataUpdatedAt,
@@ -167,6 +196,7 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
 
     reload: async () => {
       const [itemsRes, statsRes] = await Promise.all([refetchItems(), refetchStats()]);
+      queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
       if (itemsRes.error) throw itemsRes.error;
       if (statsRes.error) throw statsRes.error;
     },

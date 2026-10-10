@@ -32,15 +32,25 @@ export const PIPELINE_STATUS_PILL: Record<string, { bg: string; text: string; bo
 // Sequence status: what is happening to the outreach sequence, derived in the
 // database (see migration 20261008120000). When present it replaces the plain
 // pipeline status label. "Unsubscribed" and "Not interested" stay separate.
-export type SequenceStatus = 'unsubscribed' | 'hard_bounce' | 'automated_reply' | 'human_reply';
+export type SequenceStatus = 'unsubscribed' | 'hard_bounce' | 'automated_reply' | 'human_reply' | 'needs_review';
 
-export const SEQUENCE_STATUS_ORDER: SequenceStatus[] = ['human_reply', 'automated_reply', 'unsubscribed', 'hard_bounce'];
+export const SEQUENCE_STATUS_ORDER: SequenceStatus[] = ['needs_review', 'human_reply', 'automated_reply', 'unsubscribed', 'hard_bounce'];
 
 export const SEQUENCE_STATUS_LABEL: Record<SequenceStatus, string> = {
   unsubscribed: 'Unsubscribed, Outreach Suppressed',
   hard_bounce: 'Hard Bounce, Sending Stopped',
   automated_reply: 'Automated Reply, Sequence Continuing',
   human_reply: 'Human Reply, Sequence Stopped',
+  needs_review: 'Needs Your Review',
+};
+
+// Wording for the badge at the top of a prospect's sequence panel.
+export const SEQUENCE_STATUS_PANEL_LABEL: Record<SequenceStatus, string> = {
+  unsubscribed: 'Unsubscribed',
+  hard_bounce: 'Bounced',
+  automated_reply: 'Automated reply, sequence continues',
+  human_reply: 'Replied, sequence stopped',
+  needs_review: 'Needs your review',
 };
 
 export const SEQUENCE_STATUS_PILL: Record<SequenceStatus, { bg: string; text: string; border?: string }> = {
@@ -48,6 +58,7 @@ export const SEQUENCE_STATUS_PILL: Record<SequenceStatus, { bg: string; text: st
   hard_bounce:     { bg: '#f6e8e2', text: '#a8533a', border: '1px solid rgba(168,83,58,0.2)' },
   automated_reply: { bg: '#f5f2ec', text: '#62655c' },
   human_reply:     { bg: '#edf4ef', text: '#3c7a5b' },
+  needs_review:    { bg: '#f8efdb', text: '#b9831f' },
 };
 
 export function isSequenceStatus(v: unknown): v is SequenceStatus {

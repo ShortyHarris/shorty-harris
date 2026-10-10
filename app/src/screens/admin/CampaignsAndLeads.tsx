@@ -22,6 +22,9 @@ import { TargetAreaChips } from '../../components/TargetAreaChips';
 import { SuggestForMe } from '../client/Campaigns';
 import { areasToLocationLabels, campaignAreas, joinedLocationsError, type TargetArea } from '../../lib/targetAreas';
 import { getScrapeStatusDisplay } from '../../lib/scrapeFailures';
+import { useCountrySendHolds } from '../../hooks/useCountrySendHolds';
+import { CountryHoldBanner, EuBadge } from '../../components/CountryHoldBanner';
+import { COUNTRY_OPTIONS, countryName, defaultCampaignCountry, findCountryHold, isEuCountry } from '../../lib/countries';
 
 const HELP_CAMPAIGNS: HelpContent = {
   title: 'Campaigns',
@@ -342,6 +345,7 @@ const SCRAPE_POLL_MS = 17000;
 
 export function Campaigns() {
   const { rows, loading, isFetching, dataUpdatedAt, error, reload, setStatus, patchCampaign } = useCampaigns();
+  const { holds } = useCountrySendHolds();
   const { toasts, toast, dismiss } = useToast();
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh campaigns.');
   const [showNew, setShowNew]         = useState(false);
@@ -440,6 +444,11 @@ export function Campaigns() {
   const safePage   = Math.min(page, totalPages);
   const paged      = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  // One banner per held country that at least one campaign targets.
+  const heldGroups = holds
+    .map((h) => ({ hold: h, campaigns: rows.filter((c) => findCountryHold([h], c.country)) }))
+    .filter((g) => g.campaigns.length > 0);
+
   return (
     <div style={FONT} className="flex flex-col gap-6">
       <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
@@ -453,6 +462,14 @@ export function Campaigns() {
           <button onClick={() => setShowNew(true)} className={`${primaryCls} hidden md:inline-flex`}>+ New campaign</button>
         </div>
       </header>
+
+      {heldGroups.map(({ hold, campaigns }) => (
+        <CountryHoldBanner
+          key={hold.country}
+          reason={hold.reason}
+          context={`${countryName(hold.country)}: ${campaigns.map((c) => c.name).join(', ')}`}
+        />
+      ))}
 
       {error && (
         <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{error}</div>
@@ -495,6 +512,7 @@ export function Campaigns() {
                     <tr key={c.id} onClick={() => setEditCampaign(c)} className="group cursor-pointer">
                       <td className="min-w-0">
                         <div className="line-clamp-2 font-bold leading-snug text-[#20211c] group-hover:underline" title={c.name}>{c.name}</div>
+                        {isEuCountry(c.country) && <div className="mt-1"><EuBadge /></div>}
                         {c.needsReview && (
                           <span className="atbl-pill mt-1" style={{ background: '#f0ecf8', color: '#6b4fa0' }}>
                             🔔 Awaiting approval
@@ -581,6 +599,7 @@ export function Campaigns() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <span className="line-clamp-2 block font-bold leading-snug text-[#20211c] text-[14px]" title={c.name}>{c.name}</span>
+                      {isEuCountry(c.country) && <div className="mt-1"><EuBadge /></div>}
                       {c.needsReview && (
                         <div className="mt-1">
                           <span className="inline-flex items-center gap-1 rounded-full bg-[#f0ecf8] px-2 py-0.5 text-[10.5px] font-bold text-[#6b4fa0]">
@@ -683,6 +702,7 @@ export function Campaigns() {
           <EditCampaignModal
             key={`edit-camp-${editCampaign.id}`}
             campaign={editCampaign}
+            hold={findCountryHold(holds, editCampaign.country)}
             onClose={() => setEditCampaign(null)}
             onSaved={() => { setEditCampaign(null); reload(); }}
           />
@@ -787,6 +807,9 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
   const [name, setName]                 = useState('');
   const [channel, setChannel]           = useState('email');
   const [language, setLanguage]         = useState('English');
+  // '' until the admin picks one; until then the selected client's country is the default.
+  const [pickedCountry, setPickedCountry] = useState('');
+  const country = pickedCountry || defaultCampaignCountry(clients.find((c) => c.id === clientId)?.country);
   const [queries, setQueries]           = useState('');
   const [areas, setAreas]                 = useState<TargetArea[]>([]);
   const [maxResults, setMaxResults]     = useState(1000);
@@ -798,11 +821,12 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
   async function submit() {
     if (!clientId || !name.trim()) { setErr('Pick a client and enter a name.'); return; }
     if (!language.trim()) { setErr('Outreach language is required.'); return; }
+    if (!country) { setErr('Target country is required.'); return; }
     const joinedError = joinedLocationsError(areas);
     if (joinedError) { setErr(joinedError); return; }
     setBusy(true); setErr(null);
     const { error } = await createCampaign({
-      client_id: clientId, name: name.trim(), channel, language: language.trim(),
+      client_id: clientId, name: name.trim(), channel, language: language.trim(), country,
       search_queries: queries.split(',').map((s) => s.trim()).filter(Boolean),
       target_areas: areas,
       max_results: maxResults, scrape_enabled: scrapeEnabled,
@@ -859,6 +883,19 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
           </div>
 
           <LanguageField value={language} onChange={setLanguage} listId="new-campaign-languages" />
+
+          <div>
+            <label className={fieldLbl}>Target country</label>
+            <Select value={country} onValueChange={setPickedCountry}>
+              <SelectTrigger style={FONT} aria-label="Target country" className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]">
+                <SelectValue placeholder="Select a country…" />
+              </SelectTrigger>
+              <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+                {COUNTRY_OPTIONS.map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-[11px] text-[#9a9d92]">Can't be changed after the campaign is created. EU countries have extra outreach rules.</p>
+          </div>
 
           <div>
             <label className={fieldLbl}>Channel</label>
@@ -969,8 +1006,8 @@ const campInputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-
 
 /* ── Edit Campaign Modal ───────────────────────────────────────────── */
 function EditCampaignModal({
-  campaign, onClose, onSaved,
-}: { campaign: CampaignRow; onClose: () => void; onSaved: () => void }) {
+  campaign, hold = null, onClose, onSaved,
+}: { campaign: CampaignRow; hold?: { country: string; reason: string } | null; onClose: () => void; onSaved: () => void }) {
   const [name, setName]               = useState(campaign.name);
   const [description, setDescription] = useState(campaign.description ?? '');
   const [channel, setChannel]         = useState(campaign.channel);
@@ -1009,6 +1046,7 @@ function EditCampaignModal({
         <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+        {hold && <CountryHoldBanner reason={hold.reason} />}
         <div>
           <label className={campFieldLbl}>Campaign name</label>
           <input value={name} onChange={(e) => setName(e.target.value)} style={FONT} className={campInputCls} />
@@ -1019,6 +1057,16 @@ function EditCampaignModal({
         </div>
 
         <LanguageField value={language} onChange={setLanguage} listId="edit-campaign-languages" />
+
+        {/* Country is set on creation only - shown read-only here. */}
+        <div>
+          <label className={campFieldLbl}>Target country</label>
+          <div className="flex items-center gap-2 rounded-lg border border-[#ece8df] bg-[#f5f2ec] px-3.5 py-2.5 text-[13px] text-[#62655c]">
+            <span>{campaign.country ? countryName(campaign.country) : 'Not set'}</span>
+            {isEuCountry(campaign.country) && <EuBadge />}
+          </div>
+          <p className="mt-1 text-[11px] text-[#9a9d92]">Set when the campaign is created and can't be changed.</p>
+        </div>
 
         <div>
           <label className={campFieldLbl}>Channel</label>

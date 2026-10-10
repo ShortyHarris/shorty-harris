@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { useClientApprovals } from '../../hooks/useClientApprovals';
+import { useClientCampaignList } from '../../hooks/useClientCampaigns';
+import { isEuCountry } from '../../lib/countries';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { SkeletonTable } from '../../components/Skeleton';
@@ -11,6 +13,8 @@ import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { useToast, ToastHost } from '../../components/Toast';
 import { RefreshButton } from '../../components/RefreshButton';
 import { useRefreshHandler } from '../../hooks/useRefreshHandler';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { previewSequenceApproval, approveSequences, type ApprovalPreview } from '../../hooks/useSequenceActions';
 import type { ClientMessageItem } from '../../types';
 import { Clock, CheckCircle2, Send, Ban } from 'lucide-react';
 
@@ -38,6 +42,12 @@ const TYPE_LABEL: Record<string, string> = {
 
 const PAGE_SIZE = 10;
 
+const STEP_ORDER = ['initial', 'follow_up_d3', 'follow_up_d7', 'follow_up_d14'];
+const APPROVAL_EXPLAINER =
+  'Approving schedules every email. Follow-ups send 3, 5 and 7 business days after the previous email, and only if the prospect has not replied or unsubscribed.';
+const EU_RECIPIENT_NOTE =
+  'Emails to generic addresses (info@) and free-mail addresses (gmail, yahoo) are skipped automatically.';
+
 function formatPhone(raw: string): string {
   const digits = raw.replace(/\D/g, '');
   const ten = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
@@ -52,19 +62,21 @@ export function Approvals({
 }: { clientId: string; client?: SupabaseClient; readOnly?: boolean }) {
   const {
     items, stats, loading, isFetching, dataUpdatedAt, error,
-    approve: approveRaw, reject: rejectRaw, bulkApprove: bulkApproveRaw, bulkReject: bulkRejectRaw, reload,
+    approve: approveRaw, reject: rejectRaw, bulkReject: bulkRejectRaw, reload,
   } = useClientApprovals(clientId, client);
   const approve = readOnly ? async () => {} : approveRaw;
   const reject = readOnly ? async () => {} : rejectRaw;
-  const bulkApprove = readOnly ? async () => {} : bulkApproveRaw;
   const bulkReject = readOnly ? async () => {} : bulkRejectRaw;
   const { connection: gmailConnection } = useGmailConnection(clientId);
+  const { rows: campaigns } = useClientCampaignList(clientId, client);
   const { toasts, toast, dismiss } = useToast();
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh approvals.');
   const [editItem, setEditItem] = useState<ClientMessageItem | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [approvalPlan, setApprovalPlan] = useState<{ prospectIds: string[]; preview: ApprovalPreview } | null>(null);
+  const [approving, setApproving] = useState(false);
 
   // Approving an email-channel message only matters if it can actually be
   // sent - which needs the client's own connected Gmail. Non-email channels
@@ -72,6 +84,11 @@ export function Approvals({
   function needsGmail(item: ClientMessageItem) {
     return item.channel === 'email' && !gmailConnection.connected;
   }
+
+  // Show the EU recipient-filter note only when a waiting draft belongs to a
+  // campaign that targets an EU country.
+  const euCampaignIds = new Set(campaigns.filter((c) => isEuCountry(c.country)).map((c) => c.id));
+  const hasEuDrafts = items.some((i) => i.campaign_id != null && euCampaignIds.has(i.campaign_id));
 
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -104,11 +121,35 @@ export function Approvals({
     });
   }
 
+  // Sequence-level bulk approval: selected rows map to their prospects; with
+  // nothing selected it covers every prospect that has a draft waiting.
   async function handleBulkApprove() {
+    if (readOnly) return;
+    const source = selected.size > 0 ? items.filter((i) => selected.has(i.id)) : items;
+    const prospectIds = Array.from(new Set(source.map((i) => i.prospect_id)));
+    if (prospectIds.length === 0) return;
+
     setBulkBusy(true);
-    await bulkApprove(Array.from(selected));
-    setSelected(new Set());
+    const res = await previewSequenceApproval(clientId, prospectIds);
     setBulkBusy(false);
+    if (res.data === null) { toast(res.error, 'error'); return; }
+    if (res.data.emails === 0) {
+      toast('Nothing to approve - these prospects have replied or are no longer active.', 'warning');
+      return;
+    }
+    setApprovalPlan({ prospectIds, preview: res.data });
+  }
+
+  async function confirmBulkApprove() {
+    if (!approvalPlan) return;
+    setApproving(true);
+    const res = await approveSequences(clientId, approvalPlan.prospectIds);
+    setApproving(false);
+    setApprovalPlan(null);
+    if (res.data === null) { toast(res.error, 'error'); return; }
+    setSelected(new Set());
+    const { emails_approved: e, prospects: p } = res.data;
+    toast(`${e} email${e === 1 ? '' : 's'} approved across ${p} prospect${p === 1 ? '' : 's'}`);
   }
 
   async function handleBulkReject() {
@@ -196,22 +237,23 @@ export function Approvals({
       ) : (
         <>
           {/* Selection bar */}
-          <div className="flex items-center justify-between rounded-lg border border-[#ece8df] bg-white px-4 py-3">
+          <div className="rounded-lg border border-[#ece8df] bg-white px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
             <label className="flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-[#62655c]">
               <input type="checkbox" checked={allSelected} onChange={toggleAll} className="accent-[#3c7a5b]" />
               Select all
             </label>
-            {selected.size > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-[12.5px] text-[#9a9d92]">{selected.size} selected</span>
-                <button
-                  onClick={handleBulkApprove}
-                  disabled={bulkBusy || selectedBlockedByGmail}
-                  title={selectedBlockedByGmail ? GMAIL_REQUIRED_TITLE : undefined}
-                  className="cursor-pointer rounded-md border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Approve selected
-                </button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {selected.size > 0 && <span className="text-[12.5px] text-[#9a9d92]">{selected.size} selected</span>}
+              <button
+                onClick={handleBulkApprove}
+                disabled={bulkBusy || approving || (selected.size > 0 ? selectedBlockedByGmail : items.some(needsGmail))}
+                title={(selected.size > 0 ? selectedBlockedByGmail : items.some(needsGmail)) ? GMAIL_REQUIRED_TITLE : undefined}
+                className="cursor-pointer rounded-md border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {bulkBusy ? 'Checking…' : selected.size > 0 ? 'Approve selected sequences' : 'Approve all pending'}
+              </button>
+              {selected.size > 0 && (
                 <button
                   onClick={handleBulkReject}
                   disabled={bulkBusy}
@@ -219,8 +261,13 @@ export function Approvals({
                 >
                   Reject selected
                 </button>
-              </div>
-            )}
+              )}
+            </div>
+          </div>
+          <p className="m-0 mt-2 text-[12px] leading-relaxed text-[#62655c]">{APPROVAL_EXPLAINER}</p>
+          {hasEuDrafts && (
+            <p className="m-0 mt-1.5 text-[12px] leading-relaxed text-[#62655c]">{EU_RECIPIENT_NOTE}</p>
+          )}
           </div>
 
           {/* Desktop table */}
@@ -383,6 +430,29 @@ export function Approvals({
             onClose={() => setEditItem(null)}
             onApprove={(id, body, subject) => { approve(id, body, subject); setEditItem(null); }}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {approvalPlan && (
+          <ConfirmDialog
+            key="bulk-approve"
+            title={`Approve ${approvalPlan.preview.emails} email${approvalPlan.preview.emails === 1 ? '' : 's'} across ${approvalPlan.preview.prospects} prospect${approvalPlan.preview.prospects === 1 ? '' : 's'}?`}
+            confirmLabel="Approve"
+            busy={approving}
+            onConfirm={confirmBulkApprove}
+            onCancel={() => setApprovalPlan(null)}
+          >
+            <ul className="m-0 mb-3 list-none p-0">
+              {STEP_ORDER.filter((k) => (approvalPlan.preview.by_step[k] ?? 0) > 0).map((k) => (
+                <li key={k} className="flex justify-between border-b border-[#f5f2ec] py-1 last:border-0">
+                  <span>{TYPE_LABEL[k] ?? k}</span>
+                  <span className="font-bold text-[#20211c]">{approvalPlan.preview.by_step[k]}</span>
+                </li>
+              ))}
+            </ul>
+            {APPROVAL_EXPLAINER}
+          </ConfirmDialog>
         )}
       </AnimatePresence>
 

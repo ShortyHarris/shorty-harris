@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
-import { clientApprovalsKey, clientApprovalsStatsKey } from './useClientApprovals';
+import { clientApprovalsKey, clientApprovalsStatsKey, clientAwaitingProspectsKey } from './useClientApprovals';
 import { dashboardKey } from './useClientDashboard';
 import { clientHeaderKey } from './useClientHeader';
 import { billingKey } from './useBilling';
@@ -31,6 +31,7 @@ export function useClientRealtimeSync(clientId: string) {
         () => {
           queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
           queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
+          queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
         }
       )
       // New hot leads routed in, or a status change - updates the Hot Leads

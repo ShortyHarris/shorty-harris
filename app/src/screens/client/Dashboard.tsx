@@ -96,7 +96,7 @@ export function Dashboard({
   clientId, client = supabase, readOnly = false, basePath = '/app',
 }: { clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string }) {
   const { leads, loading, error, setOutcome: setOutcomeRaw, reload, isFetching, dataUpdatedAt } = useClientDashboard(clientId, client);
-  const { items: pendingApprovals } = useClientApprovals(clientId, client);
+  const { awaitingProspects = 0 } = useClientApprovals(clientId, client);
   const { prospects: warmProspects, loading: warmLoading, logCallOutcome: logCallOutcomeRaw } = useWarmProspects(clientId, client);
   const setOutcome = readOnly ? async () => ({ error: null }) : setOutcomeRaw;
   const logCallOutcome = readOnly ? async () => {} : logCallOutcomeRaw;
@@ -165,11 +165,11 @@ export function Dashboard({
       </div>
 
       {/* ─── Pending approvals banner ─── */}
-      {pendingApprovals.length > 0 && (
+      {awaitingProspects > 0 && (
         <Link to={`${basePath}/approvals`} className="appr-nudge">
           <span className="appr-nudge-icon"><ClipboardCheck size={16} strokeWidth={2} /></span>
           <span className="appr-nudge-text">
-            <strong>{pendingApprovals.length} message{pendingApprovals.length === 1 ? '' : 's'}</strong> waiting for your approval
+            <strong>{awaitingProspects} prospect{awaitingProspects === 1 ? '' : 's'}</strong> awaiting approval
           </span>
           <ChevronRight size={16} className="appr-nudge-arrow" />
         </Link>

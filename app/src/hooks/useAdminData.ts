@@ -143,6 +143,7 @@ export interface CampaignRow {
   status: string;
   channel: string;
   language: string;
+  country: string | null;
   scrape_enabled: boolean;
   last_scraped_at: string | null;
   // Backend-owned scrape lifecycle (n8n WF0 writes these) - the source of
@@ -179,7 +180,7 @@ async function fetchCampaigns(): Promise<CampaignRow[]> {
     // also used by the client-side campaign list. Reading it straight off
     // the campaigns row (instead of a separate per-campaign count query)
     // means this number can never drift from what the client UI shows.
-    .select(`id, name, description, status, channel, language, scrape_enabled, last_scraped_at, scrape_status, scrape_started_at, scrape_error, scrape_failure_reason, scrape_attempt_count, scrape_finished_at, last_scrape_summary, search_queries, target_locations, target_areas, max_results, created_at, client_id, prospect_count, client:clients ( business_name )`)
+    .select(`id, name, description, status, channel, language, country, scrape_enabled, last_scraped_at, scrape_status, scrape_started_at, scrape_error, scrape_failure_reason, scrape_attempt_count, scrape_finished_at, last_scrape_summary, search_queries, target_locations, target_areas, max_results, created_at, client_id, prospect_count, client:clients ( business_name )`)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -192,6 +193,7 @@ async function fetchCampaigns(): Promise<CampaignRow[]> {
       status: r.status,
       channel: r.channel,
       language: (r.language as string | null) ?? 'English',
+      country: (r.country as string | null) ?? null,
       scrape_enabled: r.scrape_enabled,
       last_scraped_at: r.last_scraped_at,
       scrape_status: (r.scrape_status as string | null) ?? 'idle',
@@ -305,6 +307,7 @@ export interface NewCampaignInput {
   name: string;
   channel: string;
   language: string;
+  country: string;
   search_queries: string[];
   target_areas: TargetArea[];
   max_results: number;
@@ -316,8 +319,8 @@ export function useClientsList() {
   const { data: clients = [] } = useQuery({
     queryKey: QK.clientsList,
     queryFn: async () => {
-      const { data } = await supabase.from('clients').select('id, business_name').order('business_name');
-      return (data ?? []) as { id: string; business_name: string }[];
+      const { data } = await supabase.from('clients').select('id, business_name, country').order('business_name');
+      return (data ?? []) as { id: string; business_name: string; country: string | null }[];
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -330,6 +333,7 @@ export async function createCampaign(input: NewCampaignInput) {
     name: input.name,
     channel: input.channel,
     language: input.language,
+    country: input.country,
     status: input.status ?? 'active',
     search_queries: input.search_queries,
     ...buildAreaColumns(input.target_areas),

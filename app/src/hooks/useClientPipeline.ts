@@ -109,6 +109,10 @@ export interface SequenceStep {
   message_type: string;
   day: number;
   state: SequenceStepState;
+  message_id: string | null;
+  approval_status: string | null;
+  send_status: string | null;
+  scheduled_for: string | null;
   subject: string | null;
   body: string | null;
   sent_at: string | null;
@@ -118,6 +122,8 @@ export interface SequenceStep {
 }
 
 export interface SequenceReply {
+  // Present once the uncertain_reply_hold SQL is applied.
+  id?: string;
   received_at: string;
   intent: string | null;
   body: string;
@@ -147,8 +153,22 @@ export function useProspectSequence(prospectId: string | null, client: SupabaseC
     staleTime: 30 * 1000,
   });
 
+  // prospect_sequence doesn't report the pause flag, so read it directly.
+  const { data: paused = false } = useQuery({
+    queryKey: ['prospect-sequence-paused', prospectId] as const,
+    queryFn: async () => {
+      const { data, error } = await client
+        .from('prospects').select('sequence_paused').eq('id', prospectId).maybeSingle();
+      if (error) throw new Error(error.message);
+      return Boolean(data?.sequence_paused);
+    },
+    enabled: !!prospectId,
+    staleTime: 30 * 1000,
+  });
+
   return {
     sequence: data ?? null,
+    paused,
     loading,
     error: (error as Error)?.message ?? null,
   };

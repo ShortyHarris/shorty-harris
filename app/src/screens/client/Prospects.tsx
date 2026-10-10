@@ -10,11 +10,18 @@ import {
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { SkeletonTable } from '../../components/Skeleton';
-import { Search, StickyNote, ClipboardCheck, Flame, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Search, StickyNote, ClipboardCheck, Flame, ChevronDown, ChevronUp, Pencil, Pause, Play } from 'lucide-react';
 import {
   PIPELINE_STATUS_LABEL, PIPELINE_STATUS_PILL, SEQUENCE_STATUS_LABEL, SEQUENCE_STATUS_PILL,
-  SEQUENCE_STATUS_ORDER, SEQUENCE_FILTER_PREFIX, isSequenceStatus,
+  SEQUENCE_STATUS_ORDER, SEQUENCE_STATUS_PANEL_LABEL, SEQUENCE_FILTER_PREFIX, isSequenceStatus,
 } from '../../lib/pipelineStatus';
+import { useAuth } from '../../auth/AuthProvider';
+import { useGmailConnection } from '../../hooks/useGmailConnection';
+import { useToast, ToastHost } from '../../components/Toast';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+import {
+  approveSequences, approveOneEmail, saveStepEdit, setSequencePaused, cancelUnsentSequence, resolveUncertainReply,
+} from '../../hooks/useSequenceActions';
 import './Dashboard.css';
 
 const HELP: HelpContent = {
@@ -211,6 +218,8 @@ export function Prospects({
           <SequencePanel
             key={openProspectId}
             prospectId={openProspectId}
+            clientId={clientId}
+            readOnly={readOnly}
             client={client}
             basePath={basePath}
             onClose={() => setOpenProspectId(null)}
@@ -351,19 +360,19 @@ function NoteCell({
   );
 }
 
-/* ── 18D: sequence preview panel ──────────────────────────────────────── */
+/* ── Sequence review & approval panel ─────────────────────────────────── */
 
 const STEP_STATE_LABEL: Record<SequenceStepState, string> = {
   sent: 'Sent',
-  ready: 'Ready to send',
-  awaiting_approval: 'Waiting for your approval',
-  rejected: 'You rejected this',
-  scheduled: 'Due',
-  not_written: 'Not written yet',
+  awaiting_approval: 'Awaiting approval',
+  ready: 'Approved, will send on schedule',
+  scheduled: 'Will be written later',
+  rejected: 'Rejected',
   cancelled: 'Cancelled',
-  stopped_hot_lead: 'Stopped — they replied',
-  stopped_unsubscribed: 'Stopped — unsubscribed',
   failed: 'Failed to send',
+  stopped_hot_lead: 'Stopped: they replied with interest',
+  stopped_unsubscribed: 'Stopped: unsubscribed',
+  not_written: 'Not written yet',
 };
 
 const STEP_STATE_PILL: Record<SequenceStepState, { bg: string; text: string }> = {
@@ -379,6 +388,10 @@ const STEP_STATE_PILL: Record<SequenceStepState, { bg: string; text: string }> =
   failed:               { bg: '#f6e8e2', text: '#a8533a' },
 };
 
+const GMAIL_REQUIRED_TITLE = "Connect your Gmail in Settings before approving - that's what actually sends this.";
+const APPROVAL_EXPLAINER =
+  'Approving schedules every email. Follow-ups send 3, 5 and 7 business days after the previous email, and only if the prospect has not replied or unsubscribed.';
+
 function PanelStatusBadge({
   sequenceStatus, pipelineStatus,
 }: { sequenceStatus: string | null | undefined; pipelineStatus: string }) {
@@ -389,7 +402,7 @@ function PanelStatusBadge({
       className="inline-flex items-center rounded-full px-2.5 py-1 text-[11.5px] font-bold"
       style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
     >
-      {seq ? SEQUENCE_STATUS_LABEL[seq] : STATUS_LABEL[pipelineStatus] ?? pipelineStatus}
+      {seq ? SEQUENCE_STATUS_PANEL_LABEL[seq] : STATUS_LABEL[pipelineStatus] ?? pipelineStatus}
     </span>
   );
 }
@@ -401,14 +414,91 @@ const STOPPED_BECAUSE_LABEL: Record<NonNullable<StoppedBecause>, string> = {
 
 function stepDateLabel(step: SequenceStep): string | null {
   if (step.sent_at) return `Sent ${formatShortDate(step.sent_at)}`;
+  if (step.state === 'ready' && step.scheduled_for) return `Sends ${formatShortDate(step.scheduled_for)}`;
   if (step.state === 'scheduled' && step.due_at) return `Due ${formatShortDate(step.due_at)}`;
   return null;
 }
 
+// Steps that still have something queued to go out (so "Cancel unsent" applies).
+const OPEN_STEP_STATES: SequenceStepState[] = ['awaiting_approval', 'ready', 'scheduled'];
+
 function SequencePanel({
-  prospectId, client, basePath, onClose,
-}: { prospectId: string; client: SupabaseClient; basePath: string; onClose: () => void }) {
-  const { sequence, loading, error } = useProspectSequence(prospectId, client);
+  prospectId, clientId, client, basePath, readOnly, onClose,
+}: {
+  prospectId: string; clientId: string; client: SupabaseClient; basePath: string; readOnly: boolean; onClose: () => void;
+}) {
+  const { sequence, paused, loading, error } = useProspectSequence(prospectId, client);
+  const { profile } = useAuth();
+  const { connection: gmail } = useGmailConnection(clientId);
+  const { toasts, toast, dismiss } = useToast();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const blockedByGmail = !gmail.connected;
+
+  async function approveSequence() {
+    setBusy('approve-seq');
+    const res = await approveSequences(clientId, [prospectId]);
+    setBusy(null);
+    if (res.data === null) { toast(res.error, 'error'); return; }
+    const n = res.data.emails_approved;
+    if (n === 0) toast('Nothing to approve - this prospect is no longer in an active sequence.', 'warning');
+    else toast(`${n} email${n === 1 ? '' : 's'} approved and scheduled`);
+  }
+
+  async function approveStep(step: SequenceStep) {
+    if (!step.message_id) return;
+    setBusy(`approve-${step.message_id}`);
+    const { error: err } = await approveOneEmail(clientId, step.message_id, profile?.id ?? null);
+    setBusy(null);
+    if (err) toast(err, 'error'); else toast(`${step.step} approved`);
+  }
+
+  async function saveStep(step: SequenceStep, patch: { subject?: string; body?: string }): Promise<boolean> {
+    if (!step.message_id) return false;
+    const { error: err } = await saveStepEdit(clientId, step.message_id, patch);
+    if (err) { toast(err, 'error'); return false; }
+    toast(`${step.step} saved`);
+    return true;
+  }
+
+  async function togglePause() {
+    setBusy('pause');
+    const res = await setSequencePaused(clientId, prospectId, !paused);
+    setBusy(null);
+    if (res.error) toast(res.error, 'error');
+    else toast(paused ? 'Sequence resumed' : 'Sequence paused');
+  }
+
+  async function cancelUnsent() {
+    setBusy('cancel');
+    const res = await cancelUnsentSequence(clientId, prospectId);
+    setBusy(null);
+    setConfirmCancel(false);
+    if (res.data === null) { toast(res.error, 'error'); return; }
+    const n = res.data.emails_cancelled;
+    toast(`${n} email${n === 1 ? '' : 's'} cancelled`);
+  }
+
+  async function resolveReply(replyId: string, resolution: 'automated' | 'human') {
+    setBusy(`resolve-${resolution}`);
+    const res = await resolveUncertainReply(clientId, replyId, resolution);
+    setBusy(null);
+    if (res.error) toast(res.error, 'error');
+    else toast(resolution === 'automated' ? 'Marked as automated - sequence resumed' : 'Marked as a real person - sequence stays paused');
+  }
+
+  const steps = sequence?.steps ?? [];
+  const hasAwaiting = steps.some((s) => s.state === 'awaiting_approval' && s.message_id);
+  const hasOpen = steps.some((s) => OPEN_STEP_STATES.includes(s.state));
+  const needsReview = sequence?.sequence_status === 'needs_review';
+  const reviewReply = needsReview && sequence ? sequence.replies[sequence.replies.length - 1] ?? null : null;
+  const stoppedLabel = sequence?.stopped_because
+    ? STOPPED_BECAUSE_LABEL[sequence.stopped_because] ?? sequence.stopped_because.replace(/_/g, ' ')
+    : null;
+
+  const primaryBtn = 'cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12.5px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50';
+  const ghostBtn = 'cursor-pointer rounded-lg border border-[#ddd8cb] bg-white px-3 py-1.5 text-[12.5px] font-semibold text-[#20211c] transition-colors hover:border-[#3c7a5b] disabled:cursor-not-allowed disabled:opacity-50';
+  const dangerBtn = 'cursor-pointer rounded-lg border border-[#a8533a] bg-transparent px-3 py-1.5 text-[12.5px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
     <motion.div
@@ -447,16 +537,84 @@ function SequencePanel({
               <h2 className="panel-biz">{sequence.prospect.business_name}</h2>
               {sequence.prospect.email && <p className="panel-category mono">{sequence.prospect.email}</p>}
 
-              <div className="mb-4">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
                 <PanelStatusBadge
                   sequenceStatus={sequence.sequence_status}
                   pipelineStatus={sequence.prospect.pipeline_status}
                 />
+                {paused && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#f8efdb] px-2.5 py-1 text-[11.5px] font-bold text-[#b9831f]">
+                    <Pause size={11} /> Paused
+                  </span>
+                )}
               </div>
 
-              {sequence.stopped_because && (
+              {stoppedLabel && (
                 <div className="mb-4 rounded-xl px-4 py-3 text-[13px] font-semibold" style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)' }}>
-                  {STOPPED_BECAUSE_LABEL[sequence.stopped_because]}
+                  {stoppedLabel}
+                </div>
+              )}
+
+              {/* Uncertain reply: the sequence is held until someone decides what it was. */}
+              {needsReview && (
+                <div className="mb-4 rounded-xl border px-4 py-3.5" style={{ background: 'var(--amber-tint)', borderColor: '#e8d5a8' }}>
+                  <div className="mb-1 text-[12px] font-bold uppercase tracking-[.06em]" style={{ color: 'var(--amber)' }}>
+                    We couldn't tell if this reply is from a person
+                  </div>
+                  {reviewReply ? (
+                    <p className="m-0 whitespace-pre-wrap text-[13px] leading-relaxed" style={{ color: 'var(--ink)' }}>{reviewReply.body}</p>
+                  ) : (
+                    <p className="m-0 text-[13px]" style={{ color: 'var(--ink-soft)' }}>No reply text on record.</p>
+                  )}
+                  {!readOnly && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        className={primaryBtn}
+                        disabled={!reviewReply?.id || busy !== null}
+                        onClick={() => reviewReply?.id && resolveReply(reviewReply.id, 'automated')}
+                      >
+                        Automated reply, resume sequence
+                      </button>
+                      <button
+                        className={ghostBtn}
+                        disabled={!reviewReply?.id || busy !== null}
+                        onClick={() => reviewReply?.id && resolveReply(reviewReply.id, 'human')}
+                      >
+                        Real person, keep paused
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Approve / pause / cancel */}
+              {!readOnly && (hasAwaiting || hasOpen) && (
+                <div className="mb-4 rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {hasAwaiting && (
+                      <button
+                        className={primaryBtn}
+                        onClick={approveSequence}
+                        disabled={busy !== null || blockedByGmail}
+                        title={blockedByGmail ? GMAIL_REQUIRED_TITLE : undefined}
+                      >
+                        {busy === 'approve-seq' ? 'Approving…' : 'Approve whole sequence'}
+                      </button>
+                    )}
+                    {hasOpen && (
+                      <button className={ghostBtn} onClick={togglePause} disabled={busy !== null}>
+                        {paused ? <><Play size={12} className="mr-1 inline" />Resume</> : <><Pause size={12} className="mr-1 inline" />Pause</>}
+                      </button>
+                    )}
+                    {hasOpen && (
+                      <button className={dangerBtn} onClick={() => setConfirmCancel(true)} disabled={busy !== null}>
+                        Cancel unsent emails
+                      </button>
+                    )}
+                  </div>
+                  {hasAwaiting && (
+                    <p className="m-0 mt-2.5 text-[12px] leading-relaxed text-[#62655c]">{APPROVAL_EXPLAINER}</p>
+                  )}
                 </div>
               )}
 
@@ -479,7 +637,16 @@ function SequencePanel({
                 <div className="panel-label">Sequence</div>
                 <div className="flex flex-col">
                   {sequence.steps.map((step, i) => (
-                    <SequenceStepRow key={step.message_type} step={step} isLast={i === sequence.steps.length - 1} />
+                    <SequenceStepRow
+                      key={step.message_type}
+                      step={step}
+                      isLast={i === sequence.steps.length - 1}
+                      readOnly={readOnly}
+                      busy={busy !== null}
+                      blockedByGmail={blockedByGmail}
+                      onApprove={() => approveStep(step)}
+                      onSave={(patch) => saveStep(step, patch)}
+                    />
                   ))}
                 </div>
               </div>
@@ -491,7 +658,7 @@ function SequencePanel({
                 ) : (
                   <div className="flex flex-col gap-3">
                     {sequence.replies.map((r, i) => (
-                      <div key={i} className="rounded-xl border px-3.5 py-3" style={{ borderColor: 'var(--line)' }}>
+                      <div key={r.id ?? i} className="rounded-xl border px-3.5 py-3" style={{ borderColor: 'var(--line)' }}>
                         <div className="mb-1 flex items-center justify-between gap-2">
                           {r.intent && (
                             <span className="text-[10.5px] font-bold uppercase tracking-[.06em]" style={{ color: 'var(--leaf)' }}>{r.intent.replace(/_/g, ' ')}</span>
@@ -508,6 +675,24 @@ function SequencePanel({
           ) : null}
         </div>
       </motion.aside>
+
+      <AnimatePresence>
+        {confirmCancel && (
+          <ConfirmDialog
+            key="cancel-confirm"
+            title="Cancel unsent emails?"
+            confirmLabel="Cancel unsent emails"
+            cancelLabel="Keep them"
+            danger
+            busy={busy === 'cancel'}
+            onConfirm={cancelUnsent}
+            onCancel={() => setConfirmCancel(false)}
+          >
+            Every email that hasn't been sent yet for this prospect will be cancelled. Emails already sent are not affected.
+          </ConfirmDialog>
+        )}
+      </AnimatePresence>
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
     </motion.div>
   );
 }
@@ -529,11 +714,55 @@ export function bodyToSrcDoc(body: string): string {
   </style></head><body>${html}</body></html>`;
 }
 
-function SequenceStepRow({ step, isLast }: { step: SequenceStep; isLast: boolean }) {
+function SequenceStepRow({
+  step, isLast, readOnly, busy, blockedByGmail, onApprove, onSave,
+}: {
+  step: SequenceStep; isLast: boolean; readOnly: boolean; busy: boolean; blockedByGmail: boolean;
+  onApprove: () => void;
+  onSave: (patch: { subject?: string; body?: string }) => Promise<boolean>;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [subjectDraft, setSubjectDraft] = useState('');
+  const [bodyDraft, setBodyDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [confirmSave, setConfirmSave] = useState(false);
   const pill = STEP_STATE_PILL[step.state] ?? { bg: '#f5f2ec', text: '#62655c' };
   const dateLabel = stepDateLabel(step);
   const hasBody = !!step.body;
+
+  const editable = !readOnly && step.state !== 'sent' && step.send_status !== 'sent' && !!step.message_id;
+  // Approved but not yet sent: saving keeps it approved, so it goes out with the edit.
+  const approvedUnsent = step.approval_status === 'approved' && step.send_status === 'not_sent';
+  const canApprove = !readOnly && step.state === 'awaiting_approval' && !!step.message_id;
+
+  const subjectDirty = step.subject !== null && subjectDraft.trim() !== (step.subject ?? '').trim();
+  const bodyDirty = bodyDraft.trim() !== (step.body ?? '').trim();
+
+  function startEdit() {
+    setSubjectDraft(step.subject ?? '');
+    setBodyDraft(step.body ?? '');
+    setExpanded(false);
+    setEditing(true);
+  }
+
+  async function doSave() {
+    setSaving(true);
+    const patch: { subject?: string; body?: string } = {};
+    if (subjectDirty) patch.subject = subjectDraft;
+    if (bodyDirty) patch.body = bodyDraft;
+    const ok = await onSave(patch);
+    setSaving(false);
+    setConfirmSave(false);
+    if (ok) setEditing(false);
+  }
+
+  function requestSave() {
+    if (!subjectDirty && !bodyDirty) { setEditing(false); return; }
+    if (approvedUnsent) setConfirmSave(true); else void doSave();
+  }
+
+  const smallBtn = 'cursor-pointer rounded-md border px-2.5 py-1 text-[11.5px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
     <div className="flex gap-3">
@@ -545,26 +774,87 @@ function SequenceStepRow({ step, isLast }: { step: SequenceStep; isLast: boolean
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[13.5px] font-bold" style={{ color: 'var(--ink)' }}>{step.step}</span>
           <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-bold" style={{ background: pill.bg, color: pill.text }}>
-            {STEP_STATE_LABEL[step.state]}
+            {STEP_STATE_LABEL[step.state] ?? step.state}
           </span>
           {dateLabel && <span className="text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>{dateLabel}</span>}
           {step.opened > 0 && (
             <span className="text-[11px]" style={{ color: 'var(--ink-faint)' }}>· opened {step.opened}x</span>
           )}
         </div>
-        {step.subject && (
-          <p className="m-0 mt-0.5 text-[13px]" style={{ color: 'var(--ink-soft)' }}>{step.subject}</p>
-        )}
-        {hasBody && (
+
+        {editing ? (
+          <div className="mt-2 flex flex-col gap-2">
+            {step.subject !== null && (
+              <input
+                value={subjectDraft}
+                onChange={(e) => setSubjectDraft(e.target.value)}
+                aria-label={`${step.step} subject`}
+                style={FONT}
+                className="w-full rounded-lg border border-[#3c7a5b] bg-white px-3 py-2 text-[13px] font-bold text-[#20211c] outline-none"
+              />
+            )}
+            <textarea
+              value={bodyDraft}
+              onChange={(e) => setBodyDraft(e.target.value)}
+              aria-label={`${step.step} body`}
+              rows={Math.max(6, bodyDraft.split('\n').length + 1)}
+              style={FONT}
+              className="w-full resize-y rounded-lg border border-[#3c7a5b] bg-white px-3 py-2 text-[13px] leading-relaxed text-[#20211c] outline-none"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={requestSave}
+                disabled={saving || (!subjectDirty && !bodyDirty)}
+                className={`${smallBtn} border-0 bg-[#3c7a5b] text-white hover:bg-[#2d5e46]`}
+              >
+                {saving ? 'Saving…' : 'Save changes'}
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                className={`${smallBtn} border-[#ddd8cb] bg-white text-[#62655c] hover:border-[#3c7a5b]`}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
           <>
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              className="mt-1.5 inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-[12px] font-semibold"
-              style={{ color: 'var(--leaf)' }}
-            >
-              {expanded ? <><ChevronUp size={13} /> Hide email</> : <><ChevronDown size={13} /> Show email</>}
-            </button>
-            {expanded && (
+            {step.subject && (
+              <p className="m-0 mt-0.5 text-[13px]" style={{ color: 'var(--ink-soft)' }}>{step.subject}</p>
+            )}
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              {hasBody && (
+                <button
+                  onClick={() => setExpanded((v) => !v)}
+                  className="inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-[12px] font-semibold"
+                  style={{ color: 'var(--leaf)' }}
+                >
+                  {expanded ? <><ChevronUp size={13} /> Hide email</> : <><ChevronDown size={13} /> Show email</>}
+                </button>
+              )}
+              {editable && (
+                <button
+                  onClick={startEdit}
+                  disabled={busy}
+                  className="inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-[12px] font-semibold disabled:opacity-50"
+                  style={{ color: 'var(--ink-soft)' }}
+                >
+                  <Pencil size={12} /> Edit
+                </button>
+              )}
+              {canApprove && (
+                <button
+                  onClick={onApprove}
+                  disabled={busy || blockedByGmail}
+                  title={blockedByGmail ? GMAIL_REQUIRED_TITLE : undefined}
+                  className={`${smallBtn} border-0 bg-[#3c7a5b] text-white hover:bg-[#2d5e46]`}
+                >
+                  Approve this email
+                </button>
+              )}
+            </div>
+            {expanded && hasBody && (
               <iframe
                 title={`${step.step} body`}
                 sandbox=""
@@ -576,6 +866,21 @@ function SequenceStepRow({ step, isLast }: { step: SequenceStep; isLast: boolean
           </>
         )}
       </div>
+
+      <AnimatePresence>
+        {confirmSave && (
+          <ConfirmDialog
+            key="confirm-edit"
+            title="Edit an approved email?"
+            confirmLabel="Save changes"
+            busy={saving}
+            onConfirm={() => void doSave()}
+            onCancel={() => setConfirmSave(false)}
+          >
+            This email is already approved. Saving will keep it approved and it will send with your changes.
+          </ConfirmDialog>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

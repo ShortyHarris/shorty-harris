@@ -14,6 +14,8 @@ export interface ClientProfile {
   contact_phone: string | null;
   contact_name: string | null;
   notification_channel: 'whatsapp' | 'sms';
+  country: string | null;
+  privacy_url: string | null;
 }
 
 export interface UpdateClientProfileInput {
@@ -25,6 +27,8 @@ export interface UpdateClientProfileInput {
   contact_phone: string;
   contact_name: string;
   notification_channel: 'whatsapp' | 'sms';
+  country: string;
+  privacy_url: string;
 }
 
 export const clientProfileKey = (clientId: string) => ['client-profile', clientId] as const;
@@ -32,7 +36,7 @@ export const clientProfileKey = (clientId: string) => ['client-profile', clientI
 async function fetchClientProfile(clientId: string): Promise<ClientProfile> {
   const { data, error } = await supabase
     .from('clients')
-    .select('business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, notification_channel')
+    .select('business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, notification_channel, country, privacy_url')
     .eq('id', clientId)
     .single();
   if (error) throw new Error(error.message);
@@ -61,6 +65,8 @@ export function useClientProfile(clientId: string) {
         contact_phone: input.contact_phone || null,
         contact_name: input.contact_name || null,
         notification_channel: input.notification_channel,
+        country: input.country || null,
+        privacy_url: input.privacy_url.trim() || null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', clientId);

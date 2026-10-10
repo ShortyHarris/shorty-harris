@@ -12,6 +12,7 @@ export interface ClientCampaignRow {
   description: string | null;
   status: string;
   language: string;
+  country: string | null;
   search_queries: string[];
   target_locations: string[];
   target_areas: TargetArea[] | null;
@@ -28,7 +29,7 @@ async function fetchClientCampaigns(clientId: string, client: SupabaseClient): P
     // single shared definition instead of each side running its own
     // `prospects` count query, which is what let the two numbers drift
     // apart after a scrape.
-    .select('id, name, description, status, language, search_queries, target_locations, target_areas, max_results, created_at, prospect_count')
+    .select('id, name, description, status, language, country, search_queries, target_locations, target_areas, max_results, created_at, prospect_count')
     .eq('client_id', clientId)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
@@ -40,6 +41,7 @@ async function fetchClientCampaigns(clientId: string, client: SupabaseClient): P
     target_areas: (r.target_areas as TargetArea[] | null) ?? null,
     description: (r.description as string | null) ?? null,
     language: (r.language as string | null) ?? 'English',
+    country: (r.country as string | null) ?? null,
     prospectCount: (r.prospect_count as number | null) ?? 0,
   })) as ClientCampaignRow[];
 }
@@ -71,6 +73,7 @@ export interface NewClientCampaignInput {
   name: string;
   description: string;
   language: string;
+  country: string;
   search_queries: string[];
   target_areas: TargetArea[];
   max_results: number;
@@ -102,6 +105,7 @@ export async function createClientCampaign(
       name: input.name,
       description: input.description || null,
       language: input.language,
+      country: input.country,
       channel: 'email',
       status: 'pending_review',
       search_queries: input.search_queries,

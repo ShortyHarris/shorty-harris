@@ -94,6 +94,7 @@ export interface ClientSummary {
 export interface ClientMessageItem {
   id: string;
   prospect_id: string;
+  campaign_id?: string | null;
   channel: string;
   subject: string | null;
   body: string;

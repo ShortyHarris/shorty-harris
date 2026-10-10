@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../../lib/supabase';
+import { queryClient } from '../../lib/queryClient';
+import { useToast, ToastHost } from '../../components/Toast';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, CheckCircle2, AlertTriangle, LogOut, BarChart3, ChevronRight, Lock, Building2, BookOpen, Compass, ShieldCheck, ShieldOff, Target } from 'lucide-react';
+import { Mail, Zap, CheckCircle2, AlertTriangle, LogOut, BarChart3, ChevronRight, Lock, Building2, BookOpen, Compass, ShieldCheck, ShieldOff, Target } from 'lucide-react';
 import { BlockedDomainsModal } from './BlockedDomains';
 import { openConsentPreferences } from '../../lib/consent';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
@@ -10,6 +14,7 @@ import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { useAuth } from '../../auth/AuthProvider';
 import { useTour } from '../../tour/TourProvider';
 import { isValidEmail, isValidPhone, normalizePhone } from '../../lib/validation';
+import { countryOptionsFor, privacyUrlError } from '../../lib/countries';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
@@ -97,7 +102,10 @@ function ProfileEditModal({
     contact_phone: profile.contact_phone ?? '',
     contact_name: profile.contact_name ?? '',
     notification_channel: profile.notification_channel ?? 'whatsapp',
+    country: profile.country ?? '',
+    privacy_url: profile.privacy_url ?? '',
   }));
+  const countryOptions = countryOptionsFor(profile.country);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -110,11 +118,14 @@ function ProfileEditModal({
     if (!form.contact_email.trim()) { setErr('Contact email is required.'); return; }
     if (!isValidEmail(form.contact_email)) { setErr('Enter a valid contact email address.'); return; }
     if (form.contact_phone.trim() && !isValidPhone(form.contact_phone)) { setErr('Enter a valid contact phone number.'); return; }
+    const privacyError = privacyUrlError(form.privacy_url);
+    if (privacyError) { setErr(privacyError); return; }
 
     setBusy(true); setErr(null);
     const { error } = await updateProfile({
       ...form,
       business_name: form.business_name.trim(),
+      privacy_url: form.privacy_url.trim(),
       contact_phone: form.contact_phone.trim() ? normalizePhone(form.contact_phone) : '',
     });
     setBusy(false);
@@ -197,6 +208,27 @@ function ProfileEditModal({
             </Select>
           </div>
 
+          <div className="mb-4">
+            <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Country</label>
+            <Select value={form.country} onValueChange={(v) => set('country', v)}>
+              <SelectTrigger className="h-10 rounded-lg text-[13px]" style={inputStyle} aria-label="Country"><SelectValue placeholder="Select a country" /></SelectTrigger>
+              <SelectContent className="text-[13px]" style={{ background: 'var(--surface)', color: 'var(--ink)' }}>
+                {countryOptions.map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>
+              Where your business is based. New campaigns default to this country.
+            </p>
+          </div>
+
+          <div className="mb-4">
+            <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Privacy notice URL <span className="normal-case font-normal">(optional)</span></label>
+            <input type="url" value={form.privacy_url} onChange={(e) => set('privacy_url', e.target.value)} placeholder="https://example.com/privacy" style={inputStyle} className={inputCls} />
+            <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>
+              Link to your privacy notice. Must start with https://
+            </p>
+          </div>
+
           {err && (
             <div className="mb-4 rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e6cbc0' }}>
               {err}
@@ -223,6 +255,81 @@ function ProfileEditModal({
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+/* ─── Auto-approve new campaigns ───
+   Opt-in, backed by clients.auto_approve_campaigns. Admin-only to change
+   today, so everyone else sees it read-only. */
+function AutoApproveSection({ clientId }: { clientId: string }) {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+  const { toasts, toast, dismiss } = useToast();
+  const [busy, setBusy] = useState(false);
+  const key = ['client-auto-approve', clientId] as const;
+
+  const { data: enabled, isLoading } = useQuery({
+    queryKey: key,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clients').select('auto_approve_campaigns').eq('id', clientId).single();
+      if (error) throw new Error(error.message);
+      return Boolean(data?.auto_approve_campaigns);
+    },
+    enabled: !!clientId && clientId !== '__preview__',
+    staleTime: 60 * 1000,
+  });
+
+  async function toggle() {
+    if (!isAdmin || busy || enabled === undefined) return;
+    setBusy(true);
+    const { error } = await supabase
+      .from('clients')
+      .update({ auto_approve_campaigns: !enabled, updated_at: new Date().toISOString() })
+      .eq('id', clientId);
+    setBusy(false);
+    if (error) { toast(error.message, 'error'); return; }
+    queryClient.invalidateQueries({ queryKey: key });
+  }
+
+  return (
+    <div className="p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: 'var(--leaf-tint)' }}>
+            <Zap size={16} style={{ color: 'var(--leaf)' }} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="m-0 text-[15px] font-bold" style={{ color: 'var(--ink)' }}>Auto-approve new campaigns</h2>
+            <p className="m-0 mt-0.5 text-[13px]" style={{ color: 'var(--ink-soft)' }}>
+              Auto-approve new campaigns. Emails are written and approved automatically, with no review step.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={!!enabled}
+          aria-label="Auto-approve new campaigns"
+          onClick={toggle}
+          disabled={!isAdmin || busy || isLoading}
+          className="relative mt-1 h-6 w-11 shrink-0 rounded-full border-0 transition-colors disabled:cursor-not-allowed"
+          style={{ background: enabled ? 'var(--leaf)' : 'var(--line-strong)', cursor: isAdmin ? 'pointer' : 'not-allowed', opacity: isAdmin ? 1 : 0.6 }}
+        >
+          <span
+            className="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all"
+            style={{ left: enabled ? 22 : 2 }}
+          />
+        </button>
+      </div>
+      <p className="m-0 mt-3 rounded-xl px-3.5 py-2.5 text-[12.5px]" style={{ background: 'var(--amber-tint)', color: 'var(--amber)' }}>
+        You can still pause or cancel any sequence. Replies, unsubscribes and bounces always stop sending.
+      </p>
+      {!isAdmin && (
+        <p className="m-0 mt-2 text-[12.5px]" style={{ color: 'var(--ink-faint)' }}>Ask your account manager to enable this</p>
+      )}
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
+    </div>
   );
 }
 
@@ -475,6 +582,10 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
             </a>
           </div>
         )}
+
+        <div className="border-t" style={{ borderColor: 'var(--line)' }} />
+
+        <AutoApproveSection clientId={clientId} />
 
         <div className="border-t" style={{ borderColor: 'var(--line)' }} />
 
