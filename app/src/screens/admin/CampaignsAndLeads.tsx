@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Info } from 'lucide-react';
+import { ChevronRight, Info, X, Clock, MapPin, Building2, Sparkles, ArrowRight, MessageSquare, Trophy, XCircle } from 'lucide-react';
+import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import {
   useCampaigns, useAdminHotLeads, useClientsList,
   createCampaign, updateCampaign, getCampaignDeleteCounts, deleteCampaign,
@@ -1463,12 +1464,14 @@ function LeadDetailModal({
   onClose: () => void;
   onStatus: (id: string, status: string) => void;
 }) {
-  const pill = LEAD_PILL[lead.status] ?? LEAD_PILL.new;
-  const p    = lead.prospect;
+  const pill   = LEAD_PILL[lead.status] ?? LEAD_PILL.new;
+  const p      = lead.prospect;
+  const closed = lead.status === 'won' || lead.status === 'lost';
+  const eyebrow = 'mb-2.5 flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
+      className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/50 md:p-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -1477,79 +1480,114 @@ function LeadDetailModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="hl-title"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[640px] md:rounded-md md:border md:border-(--ad-line) md:shadow-2xl"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-          <span
-            style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-            className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]"
-          >
-            {HL_STATUS_LABEL[lead.status] ?? lead.status}
-          </span>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
-        </div>
-
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
-          {/* Identity */}
-          <div>
-            <h2 className="m-0 text-[20px] font-extrabold leading-tight text-(--ad-ink)">
-              {p?.business_name ?? 'Unknown business'}
-            </h2>
-            {p?.category && (
-              <p className="m-0 mt-1 text-[13px] text-(--ad-ink-faint)">
-                {p.category}{p.location ? ` · ${p.location}` : ''}
-              </p>
-            )}
-            {lead.client?.business_name && (
-              <p className="m-0 mt-1.5 text-[12px] font-semibold text-(--ad-ink-soft)">
-                Client: {lead.client.business_name}
-              </p>
-            )}
-          </div>
-
-          {/* AI summary */}
-          {lead.ai_summary && (
-            <div className="rounded-xl border border-(--ad-line) bg-(--ad-surface-2) p-4">
-              <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[.08em] text-(--ad-ink-faint)">What they want</div>
-              <p className="m-0 text-[13.5px] leading-relaxed text-(--ad-ink)">{lead.ai_summary}</p>
-              {lead.suggested_action && (
-                <p className="m-0 mt-2 text-[12.5px] text-(--ad-green)">→ {lead.suggested_action}</p>
+        {/* ─── Header: status, who, for whom ─── */}
+        <div className="shrink-0 border-b border-(--ad-line) px-6 pt-5 pb-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
+                className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]"
+              >
+                {HL_STATUS_LABEL[lead.status] ?? lead.status}
+              </span>
+              {lead.routed_at && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-(--ad-fill) px-2.5 py-1 text-[11.5px] font-medium text-(--ad-ink-soft)">
+                  <Clock size={12} strokeWidth={2.2} /> Routed {formatRelativeTime(new Date(lead.routed_at).getTime())}
+                </span>
               )}
             </div>
-          )}
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-(--ad-fill) text-(--ad-ink-soft) transition-colors hover:bg-(--ad-line) hover:text-(--ad-ink)"
+            >
+              <X size={17} strokeWidth={2} />
+            </button>
+          </div>
 
-          {/* Their reply */}
-          {lead.reply?.body && (
-            <div>
-              <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[.08em] text-(--ad-ink-faint)">Their reply</div>
-              <blockquote className="m-0 rounded-xl border-l-4 border-(--ad-line-strong) bg-(--ad-surface-2) px-4 py-3 text-[13px] italic leading-relaxed text-(--ad-ink-soft)">
-                {lead.reply.body}
-              </blockquote>
-            </div>
-          )}
+          <h2 id="hl-title" className="m-0 mt-4 text-[24px] font-extrabold leading-[1.15] tracking-[-0.02em] text-(--ad-ink)">
+            {p?.business_name ?? 'Unknown business'}
+          </h2>
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13.5px] text-(--ad-ink-soft)">
+            {(p?.category || p?.location) && (
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin size={14} strokeWidth={2} className="text-(--ad-ink-faint)" />
+                {[p?.category, p?.location].filter(Boolean).join(' · ')}
+              </span>
+            )}
+            {lead.client?.business_name && (
+              <span className="inline-flex items-center gap-1.5">
+                <Building2 size={14} strokeWidth={2} className="text-(--ad-ink-faint)" />
+                For <span className="font-semibold text-(--ad-ink)">{lead.client.business_name}</span>
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Footer: status actions (only when not already closed) */}
-        {lead.status !== 'won' && lead.status !== 'lost' && (
-          <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex gap-2.5">
-            <button
-              onClick={() => onStatus(lead.id, 'won')}
-              className="cursor-pointer flex-1 rounded-xl border-0 bg-(--ad-green) px-4 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover)"
-            >
-              Mark as Won ✓
-            </button>
+        {/* ─── Body ─── */}
+        <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-7">
+          <section>
+            <div className={eyebrow}><Sparkles size={13} strokeWidth={2.2} /> What they want</div>
+            <p className="m-0 text-[15.5px] leading-[1.6] text-(--ad-ink)">
+              {lead.ai_summary ?? 'They replied expressing interest.'}
+            </p>
+            {lead.suggested_action && (
+              <div className="mt-4 flex items-start gap-3 rounded-lg bg-(--ad-green-tint) px-4 py-3.5">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--ad-green) text-white">
+                  <ArrowRight size={15} strokeWidth={2.4} />
+                </span>
+                <div>
+                  <div className="text-[12px] font-semibold text-(--ad-green)">Suggested next step</div>
+                  <p className="m-0 mt-0.5 text-[14px] font-medium leading-[1.5] text-(--ad-ink)">{lead.suggested_action}</p>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section>
+            <div className={eyebrow}><MessageSquare size={13} strokeWidth={2.2} /> Their reply</div>
+            {lead.reply?.body ? (
+              <blockquote className="m-0 whitespace-pre-line rounded-lg bg-(--ad-surface-2) border border-(--ad-line) px-4 py-3.5 text-[14px] leading-[1.6] text-(--ad-ink)">
+                {lead.reply.body}
+              </blockquote>
+            ) : (
+              <div className="rounded-lg border border-dashed border-(--ad-line-strong) px-4 py-3.5 text-[13.5px] text-(--ad-ink-faint)">
+                The original reply isn't on record for this lead.
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* ─── Footer: outcome ─── */}
+        {closed ? (
+          <div className="shrink-0 flex items-center gap-2.5 border-t border-(--ad-line) bg-(--ad-surface-2) px-6 py-4 text-[13.5px] text-(--ad-ink-soft)">
+            {lead.status === 'won'
+              ? <><Trophy size={16} strokeWidth={2} className="text-(--ad-green)" /> Closed as <span className="font-semibold text-(--ad-ink)">won</span></>
+              : <><XCircle size={16} strokeWidth={2} className="text-(--ad-ink-faint)" /> Closed as <span className="font-semibold text-(--ad-ink)">not interested</span></>}
+          </div>
+        ) : (
+          <div className="shrink-0 flex flex-col-reverse gap-2.5 border-t border-(--ad-line) px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
             <button
               onClick={() => onStatus(lead.id, 'lost')}
-              className="cursor-pointer flex-1 rounded-xl border border-(--ad-clay) bg-transparent px-4 py-2.5 text-[13px] font-bold text-(--ad-clay) transition-colors hover:bg-(--ad-clay-tint)"
+              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--ad-line-strong) bg-(--ad-surface) px-5 text-[14px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-clay) hover:text-(--ad-clay)"
             >
-              Not interested
+              <XCircle size={16} strokeWidth={2} /> Not interested
+            </button>
+            <button
+              onClick={() => onStatus(lead.id, 'won')}
+              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border-0 bg-(--ad-green) px-5 text-[14px] font-bold text-white transition-colors hover:bg-(--ad-green-hover)"
+            >
+              <Trophy size={16} strokeWidth={2} /> Mark as won
             </button>
           </div>
         )}
