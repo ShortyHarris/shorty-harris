@@ -83,7 +83,7 @@ export function ApprovalQueue() {
     <div style={FONT} className="flex flex-col gap-6">
 
       {/* Header */}
-      <header className="flex items-start justify-between gap-4">
+      <header className="page-header flex items-start justify-between gap-4">
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)"> <img src="https://cdn-icons-png.flaticon.com/128/5442/5442020.png" alt="Approvals" className="w-10 h-10" />Approvals</h1>
           <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">
@@ -92,7 +92,7 @@ export function ApprovalQueue() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {dataUpdatedAt > 0 && (
-            <span className="whitespace-nowrap text-[11px] text-(--ad-ink-faint)">
+            <span className="whitespace-nowrap text-[11px] text-(--ad-ink-faint) max-md:hidden">
               {isFetching ? 'Updating…' : `Updated ${formatRelativeTime(dataUpdatedAt)}`}
             </span>
           )}
@@ -100,10 +100,11 @@ export function ApprovalQueue() {
           <button
             onClick={handleRefresh}
             disabled={isFetching}
-            className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-60 max-md:px-2.5"
+            aria-label="Refresh"
           >
             <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
-            Refresh
+            <span className="max-md:hidden">Refresh</span>
           </button>
         </div>
       </header>

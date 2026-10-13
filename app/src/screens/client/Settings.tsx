@@ -444,7 +444,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
 
   return (
     <main className="content">
-      <div className="flex items-start justify-between gap-4 mb-5">
+      <div className="page-header flex items-start justify-between gap-4 mb-5">
         <div>
           <h1 className="m-0 text-[22px] font-extrabold tracking-tight" style={{ color: 'var(--ink)' }}>Settings</h1>
           <p className="m-0 mt-1 text-[13.5px]" style={{ color: 'var(--ink-soft)' }}>Manage how outreach is sent on your behalf.</p>

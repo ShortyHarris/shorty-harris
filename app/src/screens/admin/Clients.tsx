@@ -10,6 +10,7 @@ import type {
   NewClientInput, UpdateClientInput, ClientListRow, ClientDeleteCounts, ClientUsage, CreditTransaction,
 } from '../../hooks/useAdminData';
 import { SkeletonTable } from '../../components/Skeleton';
+import { MobileFab } from '../../components/MobileFab';
 import { RowMenu } from '../../components/RowMenu';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { useToast, ToastHost } from '../../components/Toast';
@@ -103,7 +104,7 @@ export function Clients() {
 
   return (
     <div style={FONT} className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
+      <header className="page-header flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-2 font-extrabold tracking-tight text-(--ad-ink)">
             <img src="https://cdn-icons-png.flaticon.com/128/143/143438.png" alt="Clients" className="w-9 h-9" />
@@ -303,13 +304,7 @@ export function Clients() {
       )}
 
       {/* Mobile FAB */}
-      <button
-        onClick={() => setShowNew(true)}
-        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-(--ad-green) text-white shadow-[0_4px_20px_rgba(60,122,91,0.35)] text-[28px] leading-none transition-colors hover:bg-(--ad-green-hover)"
-        aria-label="New client"
-      >
-        +
-      </button>
+      <MobileFab onClick={() => setShowNew(true)} label="New client" />
 
       <AnimatePresence>
         {showNew && (

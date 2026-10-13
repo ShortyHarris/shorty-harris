@@ -165,7 +165,7 @@ export function Approvals({
     <div style={FONT} className="flex flex-col gap-6 content">
 
       {/* Header */}
-      <header className="flex items-start justify-between gap-4">
+      <header className="page-header flex items-start justify-between gap-4">
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-[#20211c]"> <img src="https://cdn-icons-png.flaticon.com/128/5442/5442020.png" alt="Approvals" className="w-10 h-10" />Approvals</h1>
           <p className="m-0 mt-1 text-[13px] text-[#62655c]">

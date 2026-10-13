@@ -242,6 +242,9 @@
   letter-spacing: -0.02em;
   color: var(--ad-ink);
 }
+.theme-admin .brand-lockup { color: var(--ad-ink); }
+.amobile-nav-brand .brand-lockup { margin-bottom: 6px; }
+
 .amobile-brand-mark {
   width: 28px;
   height: 28px;
@@ -427,5 +430,5 @@
     top: 0;
     z-index: 40;
   }
-  .apage { padding: 20px 18px 32px; }
+  .apage { padding: 20px 16px 96px; }
 }

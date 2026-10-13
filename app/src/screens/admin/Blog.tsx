@@ -220,7 +220,7 @@ export function Blog() {
     <div style={FONT} className="flex flex-col gap-6">
 
       {/* Header */}
-      <header className="flex items-start justify-between gap-4">
+      <header className="page-header flex items-start justify-between gap-4">
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)"> <img src="https://cdn-icons-png.flaticon.com/128/9623/9623631.png" alt="Blog" className="w-10 h-10" />Blog</h1>
           <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">

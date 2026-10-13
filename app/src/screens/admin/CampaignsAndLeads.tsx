@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Plus, Info } from 'lucide-react';
+import { ChevronRight, Info } from 'lucide-react';
 import {
   useCampaigns, useAdminHotLeads, useClientsList,
   createCampaign, updateCampaign, getCampaignDeleteCounts, deleteCampaign,
@@ -9,6 +9,7 @@ import {
 import type { AdminHotLead, CampaignRow, CampaignDeleteCounts } from '../../hooks/useAdminData';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { useToast, ToastHost } from '../../components/Toast';
+import { MobileFab } from '../../components/MobileFab';
 import { RefreshButton } from '../../components/RefreshButton';
 import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import {
@@ -458,7 +459,7 @@ export function Campaigns() {
 
   return (
     <div style={FONT} className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
+      <header className="page-header flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)"><img src="https://cdn-icons-png.flaticon.com/128/6745/6745021.png" alt="Campaigns" className="w-10 h-10" />Campaigns</h1>
           <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">{rows.length} campaigns across all clients</p>
@@ -689,13 +690,7 @@ export function Campaigns() {
       )}
 
       {/* Mobile FAB - replaces the header button on small screens */}
-      <button
-        onClick={() => setShowNew(true)}
-        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-(--ad-green) text-white shadow-[0_6px_24px_rgba(60,122,91,0.4)] transition-all hover:bg-(--ad-green-hover) active:scale-95"
-        aria-label="New campaign"
-      >
-        <Plus size={24} strokeWidth={2.5} />
-      </button>
+      <MobileFab onClick={() => setShowNew(true)} label="New campaign" />
 
       <AnimatePresence>
         {showNew && (
@@ -1252,7 +1247,7 @@ export function HotLeads() {
 
   return (
     <div style={FONT} className="flex flex-col gap-6">
-      <header className="flex items-start justify-between gap-4">
+      <header className="page-header flex items-start justify-between gap-4">
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)">
             <img src="https://cdn-icons-png.flaticon.com/128/9679/9679459.png" className="w-10 h-10" alt="" />

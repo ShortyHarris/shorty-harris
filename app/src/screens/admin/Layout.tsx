@@ -105,9 +105,8 @@ export function AdminLayout() {
       </header>
 
       <div className="amobile-bar">
-        <Link to="/" className="amobile-brand" style={{ textDecoration: 'none', color: 'inherit' }}>
-
-          Shorty Harris
+        <Link to="/" className="amobile-brand" style={{ textDecoration: 'none' }}>
+          <BrandLockup iconSize={20} noMargin />
         </Link>
         <div className="flex items-center gap-1">
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
@@ -160,7 +159,7 @@ export function AdminLayout() {
             <div className="amobile-nav-top">
               <Link to="/" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5" style={{ textDecoration: 'none' }}>
                 <div>
-                  <div className="amobile-nav-brand">Shorty Harris</div>
+                  <div className="amobile-nav-brand"><BrandLockup iconSize={18} noMargin /></div>
                   <div className="amobile-nav-sub">Admin Dashboard</div>
                 </div>
               </Link>

@@ -100,7 +100,7 @@ export function Prospects({
 
   return (
     <div style={FONT} className="flex flex-col gap-6 content">
-      <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
+      <header className="page-header flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
           <h1 className="m-0 text-[26px] font-extrabold tracking-tight text-[#20211c]">Prospects</h1>
           <p className="m-0 mt-1 text-[13px] text-[#62655c]">{result.total} prospect{result.total !== 1 ? 's' : ''}</p>

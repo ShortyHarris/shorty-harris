@@ -69,3 +69,48 @@ input, textarea, select { font-family: inherit; }
 .modal-card .overflow-y-auto.flex-col > * {
   flex-shrink: 0;
 }
+
+/* ── Page header, mobile ─────────────────────────────────────────────
+   Every screen's header is <header|div class="page-header"> holding a
+   title block (h1 + p) and an actions cluster. On phones the title block
+   is flattened with display:contents so the h1 and the actions share the
+   first row, and the description gets the full width underneath instead
+   of being squeezed into a narrow column beside the buttons. Unlayered,
+   so it wins over the Tailwind utilities on the same elements. */
+@media (max-width: 767px) {
+  .page-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 4px;
+  }
+  .page-header > :first-child { display: contents; }
+  .page-header > :first-child > h1 {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    font-size: 22px;
+    line-height: 1.2;
+  }
+  .page-header > :first-child > h1 img { width: 30px; height: 30px; flex-shrink: 0; }
+  .page-header > :first-child > h1 svg { flex-shrink: 0; }
+  .page-header > :first-child > p {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin-top: 0;
+  }
+  .page-header > :not(:first-child) {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+  /* Headers with several labelled actions put them on their own row. */
+  .page-header.page-header--stack > :not(:first-child) {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: stretch;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+}

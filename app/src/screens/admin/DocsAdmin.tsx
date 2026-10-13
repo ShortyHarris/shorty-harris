@@ -5,6 +5,7 @@ import { Search, ExternalLink, Plus, Sparkles } from 'lucide-react';
 import { useDocsArticles, createDocsArticle, reembedAllArticles, type DocsArticle } from '../../hooks/useDocs';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { SkeletonTable } from '../../components/Skeleton';
+import { MobileFab } from '../../components/MobileFab';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { DocsEditorModal } from '../docs/DocsEditorModal';
 import { DocsSearchPanel } from '../docs/DocsSearchPanel';
@@ -76,7 +77,7 @@ export function DocsAdmin() {
 
   return (
     <div style={FONT} className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
+      <header className="page-header flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)">
             <img src="https://cdn-icons-png.flaticon.com/128/2232/2232688.png" alt="Docs" className="w-9 h-9" />
@@ -225,13 +226,7 @@ export function DocsAdmin() {
       </div>
 
       {/* Mobile FAB */}
-      <button
-        onClick={() => setCreating(true)}
-        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-(--ad-green) text-white shadow-[0_4px_20px_rgba(60,122,91,0.35)] transition-colors hover:bg-(--ad-green-hover)"
-        aria-label="New article"
-      >
-        <Plus size={24} strokeWidth={2.5} />
-      </button>
+      <MobileFab onClick={() => setCreating(true)} label="New article" />
 
       <AnimatePresence>
         {editing && (

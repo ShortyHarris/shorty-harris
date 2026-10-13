@@ -61,7 +61,7 @@ export function Analytics() {
 
   return (
     <div style={FONT} className="flex flex-col gap-6">
-      <header className="flex items-start justify-between gap-4">
+      <header className="page-header flex items-start justify-between gap-4">
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)"> <img src="https://cdn-icons-png.flaticon.com/128/5581/5581350.png" alt="Analytics" className="w-10 h-10" />Analytics</h1>
           <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">Outreach performance across all clients</p>

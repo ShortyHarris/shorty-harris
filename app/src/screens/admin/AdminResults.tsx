@@ -33,7 +33,7 @@ export function AdminResults() {
 
   return (
     <div style={FONT} className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
+      <header className="page-header flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-2 font-extrabold tracking-tight text-(--ad-ink)">
             <Filter size={22} className="text-(--ad-green)" />

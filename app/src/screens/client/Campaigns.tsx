@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ChevronRight, TriangleAlert, Plus, Pencil, Trash2 } from 'lucide-react';
+import { ChevronRight, TriangleAlert, Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import {
@@ -34,6 +34,7 @@ import { CountryHoldBanner, EuBadge } from '../../components/CountryHoldBanner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { COUNTRY_OPTIONS, countryName, defaultCampaignCountry, findCountryHold, isEuCountry } from '../../lib/countries';
 import { RequiredMark } from '../../components/RequiredMark';
+import { MobileFab } from '../../components/MobileFab';
 
 const HELP: HelpContent = {
   title: 'Campaigns',
@@ -111,16 +112,18 @@ export function Campaigns({
 
   return (
     <div style={FONT} className="flex flex-col gap-6 content">
-      <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
+      <header className="page-header flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-[#20211c]">
             <img src="https://cdn-icons-png.flaticon.com/128/6745/6745021.png" alt="Campaigns" className="w-10 h-10" />
             Campaigns
           </h1>
-          <p className="m-0 mt-1 text-[13px] text-[#62655c]">{rows.length} campaign{rows.length !== 1 ? 's' : ''}</p>
+          <p className="m-0 mt-1 text-[13px] text-[#62655c]">{rows.length} campaign{rows.length !== 1 ? 's' : ''}
+            <span className="md:hidden" title={launchLimitTitle}> · {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used</span>
+          </p>
         </div>
         <div className="flex items-center gap-2 md:gap-2.5 shrink-0">
-          <span className="text-[12px] font-semibold text-[#62655c]" title={launchLimitTitle}>
+          <span className="hidden md:inline text-[12px] font-semibold text-[#62655c]" title={launchLimitTitle}>
             {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used
           </span>
           <HelpButton content={HELP} />
@@ -271,16 +274,15 @@ export function Campaigns({
       )}
 
       {/* Mobile FAB */}
-      <button
+      <MobileFab
         onClick={() => setShowNew(true)}
+        label="New campaign"
         disabled={newCampaignDisabled}
         title={newCampaignTitle}
-        className="fixed bottom-24 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-[#3c7a5b] text-white shadow-[0_6px_24px_rgba(60,122,91,0.4)] transition-colors hover:bg-[#2d5e46] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-        aria-label="New campaign"
+        colorClass="bg-[#3c7a5b] hover:bg-[#2d5e46]"
+        offsetClass="bottom-[calc(84px+env(safe-area-inset-bottom,0px))]"
         data-tour="new-campaign-btn"
-      >
-        <Plus size={24} strokeWidth={2.5} />
-      </button>
+      />
 
       <AnimatePresence>
         {showNew && (
