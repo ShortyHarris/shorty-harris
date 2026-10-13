@@ -14,4 +14,12 @@
     margin-bottom: 24px;
     line-height: 1;
   }
+
+  /* Public site header: same lockup, a touch larger to anchor the bar. */
+  .brand-lockup.public-nav-brand {
+    @apply gap-2;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
 }

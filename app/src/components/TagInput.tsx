@@ -1,8 +1,9 @@
 import { useState, type KeyboardEvent } from 'react';
+import { RequiredMark } from './RequiredMark';
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
-const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
-const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
 /* Tag input - type + Enter (or the separator key, or clicking away) adds
    removable chips. `splitOn` also lets a single paste/typed string like
@@ -10,9 +11,10 @@ const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 
    its own array entry - this is what keeps a multi-value field (locations,
    search terms) from ever collapsing into one joined string on save. */
 export function TagInput({
-  label, placeholder, helper, values, onChange, splitOn = ',', maxItems, capLabel,
+  label, placeholder, helper, values, onChange, splitOn = ',', maxItems, capLabel, required,
 }: {
   label: string;
+  required?: boolean;
   placeholder: string;
   helper?: string;
   values: string[];
@@ -47,7 +49,7 @@ export function TagInput({
 
   return (
     <div>
-      <label className={fieldLbl}>{label}</label>
+      <label className={fieldLbl}>{label}{required && <RequiredMark />}</label>
       <input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -61,13 +63,13 @@ export function TagInput({
       {values.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {values.map((v, i) => (
-            <span key={`${v}-${i}`} className="inline-flex items-center gap-1.5 rounded-full bg-[#edf4ef] px-2.5 py-1 text-[12px] font-semibold text-[#3c7a5b]">
+            <span key={`${v}-${i}`} className="inline-flex items-center gap-1.5 rounded-full bg-(--ad-green-tint) px-2.5 py-1 text-[12px] font-semibold text-(--ad-green)">
               {v}
               <button
                 type="button"
                 onClick={() => onChange(values.filter((_, idx) => idx !== i))}
                 aria-label={`Remove ${v}`}
-                className="cursor-pointer border-0 bg-transparent p-0 text-[13px] leading-none text-[#3c7a5b]/60 hover:text-[#3c7a5b]"
+                className="cursor-pointer border-0 bg-transparent p-0 text-[13px] leading-none text-(--ad-green)/60 hover:text-(--ad-green)"
               >
                 ×
               </button>
@@ -76,11 +78,11 @@ export function TagInput({
         </div>
       )}
       {atCap ? (
-        <p className="mt-1 text-[11px] text-[#b9831f]">
+        <p className="mt-1 text-[11px] text-(--ad-amber)">
           You've reached the {maxItems}{capLabel ? ` ${capLabel}` : ''} limit. Remove one to add another.
         </p>
       ) : (
-        helper && <p className="mt-1 text-[11px] text-[#9a9d92]">{helper}</p>
+        helper && <p className="mt-1 text-[11px] text-(--ad-ink-faint)">{helper}</p>
       )}
     </div>
   );

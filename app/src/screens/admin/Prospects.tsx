@@ -14,6 +14,7 @@ import { useToast, ToastHost } from '../../components/Toast';
 import { RefreshButton } from '../../components/RefreshButton';
 import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import { isValidEmail, isValidPhone, normalizePhone } from '../../lib/validation';
+import { RequiredMark } from '../../components/RequiredMark';
 
 const HELP: HelpContent = {
   title: 'Prospects',
@@ -44,21 +45,21 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_PILL: Record<string, { bg: string; text: string; border?: string }> = {
-  new:                { bg: '#edf4ef', text: '#3c7a5b' },
-  contacted:          { bg: '#f8efdb', text: '#b9831f' },
-  replied:            { bg: '#f8efdb', text: '#b9831f' },
-  hot_lead:           { bg: '#3c7a5b', text: '#fff' },
-  won:                { bg: '#3c7a5b', text: '#fff' },
-  lost:               { bg: 'transparent', text: '#9a9d92', border: '1px solid #ddd8cb' },
-  generation_failed:  { bg: '#f6e8e2', text: '#a8533a', border: '1px solid rgba(168,83,58,0.2)' },
-  message_pending:    { bg: '#f0ecf8', text: '#6b4fa0', border: '1px solid rgba(107,79,160,0.2)' },
+  new:                { bg: 'var(--ad-green-tint)', text: 'var(--ad-green)' },
+  contacted:          { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
+  replied:            { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
+  hot_lead:           { bg: 'var(--ad-green)', text: '#fff' },
+  won:                { bg: 'var(--ad-green)', text: '#fff' },
+  lost:               { bg: 'transparent', text: 'var(--ad-ink-faint)', border: '1px solid var(--ad-line-strong)' },
+  generation_failed:  { bg: 'var(--ad-clay-tint)', text: 'var(--ad-clay)', border: '1px solid rgba(168,83,58,0.2)' },
+  message_pending:    { bg: 'var(--ad-purple-tint)', text: 'var(--ad-purple)', border: '1px solid rgba(107,79,160,0.2)' },
 };
 
 const PAGE_SIZE = 15;
 
-const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]';
-const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50';
-const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#a8533a] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#8a3f2b] disabled:opacity-50';
+const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
+const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
+const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50';
 
 export function Prospects() {
   const { rows, loading, isFetching, dataUpdatedAt, error, reload, updateStatus } = useProspects();
@@ -95,7 +96,7 @@ export function Prospects() {
   function updateFilterStatus(v: string) { setStatus(v); setPage(1); }
   function updateCat(v: string)       { setCat(v);    setPage(1); }
 
-  const pagBtnCls = 'cursor-pointer rounded-lg border border-[#ddd8cb] bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-[#20211c] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-40';
+  const pagBtnCls = 'cursor-pointer rounded-lg border border-(--ad-line-strong) bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-(--ad-ink) transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <div style={FONT} className="flex flex-col gap-6">
@@ -103,8 +104,8 @@ export function Prospects() {
       {/* Header */}
       <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
-          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-[#20211c]"> <img src="https://cdn-icons-png.flaticon.com/128/143/143438.png" alt="Prospects" className="w-10 h-10" />Prospects</h1>
-          <p className="m-0 mt-1 text-[13px] text-[#62655c]">{rows.length} total across all clients</p>
+          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)"> <img src="https://cdn-icons-png.flaticon.com/128/143/143438.png" alt="Prospects" className="w-10 h-10" />Prospects</h1>
+          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">{rows.length} total across all clients</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton content={HELP} />
@@ -114,26 +115,26 @@ export function Prospects() {
       </header>
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3  bg-white ">
+      <div className="flex flex-wrap items-center gap-3  bg-(--ad-surface) ">
         <div className="relative flex min-w-[220px] flex-1 items-center">
-          <Search className="absolute left-3 h-4 w-4 text-[#9a9d92] pointer-events-none" />
+          <Search className="absolute left-3 h-4 w-4 text-(--ad-ink-faint) pointer-events-none" />
           <input
             value={q}
             onChange={(e) => updateQ(e.target.value)}
             placeholder="Search name, email, contact…"
             style={FONT}
-            className="w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] py-2 pl-9 pr-3 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white"
+            className="w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) py-2 pl-9 pr-3 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)"
           />
         </div>
 
         <Select value={status} onValueChange={updateFilterStatus}>
           <SelectTrigger
             style={FONT}
-            className="h-9 w-[155px] rounded-lg border-[#ece8df] bg-white text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]"
+            className="h-9 w-[155px] rounded-lg border-(--ad-line) bg-(--ad-surface) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)"
           >
             <SelectValue />
           </SelectTrigger>
-          <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+          <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
             {STATUS_OPTIONS.map((s) => (
               <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
             ))}
@@ -143,11 +144,11 @@ export function Prospects() {
         <Select value={cat} onValueChange={updateCat}>
           <SelectTrigger
             style={FONT}
-            className="h-9 w-[155px] rounded-lg border-[#ece8df] bg-white text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]"
+            className="h-9 w-[155px] rounded-lg border-(--ad-line) bg-(--ad-surface) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)"
           >
             <SelectValue placeholder="All categories" />
           </SelectTrigger>
-          <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+          <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
             <SelectItem value="all">All categories</SelectItem>
             {categories.map((c) => (
               <SelectItem key={c} value={c}>{c}</SelectItem>
@@ -157,7 +158,7 @@ export function Prospects() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">
+        <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">
           {error}
         </div>
       )}
@@ -166,9 +167,9 @@ export function Prospects() {
       {loading ? (
         <SkeletonTable rows={PAGE_SIZE} cols={5} />
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-          <strong className="text-[15px] font-bold text-[#20211c]">No matches.</strong>
-          <span className="text-[13px] text-[#62655c]">Try adjusting your filters or search query.</span>
+        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
+          <strong className="text-[15px] font-bold text-(--ad-ink)">No matches.</strong>
+          <span className="text-[13px] text-(--ad-ink-soft)">Try adjusting your filters or search query.</span>
         </div>
       ) : (
         <>
@@ -199,7 +200,7 @@ export function Prospects() {
                       ...(['won','lost'] as const).map((s) => ({
                         type: 'action' as const,
                         label: STATUS_LABEL[s],
-                        dot: STATUS_PILL[s]?.text ?? '#9a9d92',
+                        dot: STATUS_PILL[s]?.text ?? 'var(--ad-ink-faint)',
                         checked: r.pipeline_status === s,
                         onClick: () => updateStatus(r.id, s),
                       })),
@@ -223,20 +224,20 @@ export function Prospects() {
                   return (
                     <tr key={r.id}>
                       <td className="min-w-0">
-                        <div className="truncate font-bold text-[#20211c]" title={r.business_name}>{r.business_name}</div>
+                        <div className="truncate font-bold text-(--ad-ink)" title={r.business_name}>{r.business_name}</div>
                       </td>
                       <td className="min-w-0">
-                        <div className="truncate text-[#20211c]" title={r.contact_name ?? undefined}>{r.contact_name ?? '-'}</div>
+                        <div className="truncate text-(--ad-ink)" title={r.contact_name ?? undefined}>{r.contact_name ?? '-'}</div>
                         {r.email && (
-                          <div className="mt-0.5 truncate font-mono text-[11px] text-[#9a9d92]" title={r.email}>
+                          <div className="mt-0.5 truncate font-mono text-[11px] text-(--ad-ink-faint)" title={r.email}>
                             {r.email}
                           </div>
                         )}
                       </td>
-                      <td className="min-w-0 text-[#62655c]">
+                      <td className="min-w-0 text-(--ad-ink-soft)">
                         <div className="truncate" title={r.category ?? undefined}>{r.category ?? '-'}</div>
                       </td>
-                      <td className="min-w-0 text-[#62655c]">
+                      <td className="min-w-0 text-(--ad-ink-soft)">
                         <div className="truncate" title={r.location ?? undefined}>{r.location ?? '-'}</div>
                       </td>
                       <td className="pr-3">
@@ -259,9 +260,9 @@ export function Prospects() {
             {paged.map((r) => {
               const pill = STATUS_PILL[r.pipeline_status] ?? STATUS_PILL.new;
               return (
-                <div key={r.id} className="rounded-xl border border-[#ece8df] bg-white p-4">
+                <div key={r.id} className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 truncate font-bold text-[#20211c]" title={r.business_name}>{r.business_name}</div>
+                    <div className="min-w-0 truncate font-bold text-(--ad-ink)" title={r.business_name}>{r.business_name}</div>
                     <span
                       style={{
                         background: pill.bg,
@@ -276,42 +277,42 @@ export function Prospects() {
                   {(r.contact_name || r.email) && (
                     <div className="mt-1.5">
                       {r.contact_name && (
-                        <div className="truncate text-[12px] text-[#20211c]">{r.contact_name}</div>
+                        <div className="truncate text-[12px] text-(--ad-ink)">{r.contact_name}</div>
                       )}
                       {r.email && (
-                        <div className="mt-0.5 truncate font-mono text-[11px] text-[#9a9d92]" title={r.email}>
+                        <div className="mt-0.5 truncate font-mono text-[11px] text-(--ad-ink-faint)" title={r.email}>
                           {r.email}
                         </div>
                       )}
                     </div>
                   )}
-                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[#62655c]">
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-(--ad-ink-soft)">
                     {r.client?.business_name && (
                       <span>{r.client.business_name}</span>
                     )}
                     {r.category && (
                       <>
-                        <span className="text-[#c4bfb5]">·</span>
+                        <span className="text-(--ad-ink-ghost)">·</span>
                         <span>{r.category}</span>
                       </>
                     )}
                     {r.location && (
                       <>
-                        <span className="text-[#c4bfb5]">·</span>
+                        <span className="text-(--ad-ink-ghost)">·</span>
                         <span>{r.location}</span>
                       </>
                     )}
                   </div>
-                  <div className="mt-3 border-t border-[#f5f2ec] pt-3 flex gap-2">
+                  <div className="mt-3 border-t border-(--ad-fill) pt-3 flex gap-2">
                     <button
                       onClick={() => setEditProspect(r)}
-                      className="cursor-pointer rounded-lg border border-[#ece8df] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                      className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => setDeleteTarget(r)}
-                      className="cursor-pointer rounded-lg border border-transparent bg-transparent px-3 py-1.5 text-[12px] font-semibold text-[#c4bfb5] transition-colors hover:border-[#a8533a]/30 hover:bg-[#fdf0ec] hover:text-[#a8533a]"
+                      className="cursor-pointer rounded-lg border border-transparent bg-transparent px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-ghost) transition-colors hover:border-(--ad-clay)/30 hover:bg-(--ad-clay-tint) hover:text-(--ad-clay)"
                     >
                       Delete
                     </button>
@@ -323,7 +324,7 @@ export function Prospects() {
 
           {/* Shared pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between rounded-lg border border-[#ece8df] bg-white px-4 py-3 text-[12.5px] text-[#9a9d92]">
+            <div className="flex items-center justify-between rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3 text-[12.5px] text-(--ad-ink-faint)">
               <span>Page {safePage} of {totalPages}</span>
               <div className="flex gap-2">
                 <button
@@ -349,7 +350,7 @@ export function Prospects() {
       {/* Mobile FAB */}
       <button
         onClick={() => setShowAdd(true)}
-        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-[#3c7a5b] text-white shadow-[0_4px_20px_rgba(60,122,91,0.35)] text-[28px] leading-none transition-colors hover:bg-[#2d5e46]"
+        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-(--ad-green) text-white shadow-[0_4px_20px_rgba(60,122,91,0.35)] text-[28px] leading-none transition-colors hover:bg-(--ad-green-hover)"
         aria-label="Add prospect"
       >
         +
@@ -360,7 +361,7 @@ export function Prospects() {
           <NewProspectModal
             key="new-prospect-modal"
             onClose={() => setShowAdd(false)}
-            onCreated={() => { setShowAdd(false); reload(); }}
+            onCreated={() => { setShowAdd(false); toast('Prospect added.'); reload(); }}
           />
         )}
         {editProspect && (
@@ -368,7 +369,7 @@ export function Prospects() {
             key={`edit-${editProspect.id}`}
             prospect={editProspect}
             onClose={() => setEditProspect(null)}
-            onSaved={() => { setEditProspect(null); reload(); }}
+            onSaved={() => { setEditProspect(null); toast('Prospect updated.'); reload(); }}
           />
         )}
         {deleteTarget && (
@@ -376,7 +377,7 @@ export function Prospects() {
             key={`delete-${deleteTarget.id}`}
             prospect={deleteTarget}
             onClose={() => setDeleteTarget(null)}
-            onDeleted={() => { setDeleteTarget(null); reload(); }}
+            onDeleted={() => { setDeleteTarget(null); toast('Prospect deleted.'); reload(); }}
           />
         )}
       </AnimatePresence>
@@ -444,8 +445,8 @@ function NewProspectModal({ onClose, onCreated }: { onClose: () => void; onCreat
     }
   }
 
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
-  const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
   return (
     <motion.div
@@ -458,7 +459,7 @@ function NewProspectModal({ onClose, onCreated }: { onClose: () => void; onCreat
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[540px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -466,45 +467,45 @@ function NewProspectModal({ onClose, onCreated }: { onClose: () => void; onCreat
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Add prospect</h2>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Add prospect</h2>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
 
         {/* Form body */}
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
           {successId && (
-            <div className="rounded-xl border border-[#3c7a5b]/20 bg-[#edf4ef] px-4 py-3 text-[13px] text-[#3c7a5b]">
+            <div className="rounded-xl border border-(--ad-green)/20 bg-(--ad-green-tint) px-4 py-3 text-[13px] text-(--ad-green)">
               Prospect imported successfully.
             </div>
           )}
 
           <div>
-            <label className={fieldLbl}>Client <span className="text-[#a8533a]">*</span></label>
+            <label className={fieldLbl}>Client<RequiredMark /></label>
             <Select value={clientId} onValueChange={handleClientChange}>
-              <SelectTrigger style={FONT} className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]">
+              <SelectTrigger style={FONT} className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)">
                 <SelectValue placeholder="Select a client…" />
               </SelectTrigger>
-              <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+              <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
                 {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.business_name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
 
           <div>
-            <label className={fieldLbl}>Campaign <span className="text-[#a8533a]">*</span></label>
+            <label className={fieldLbl}>Campaign<RequiredMark /></label>
             <Select value={campaignId} onValueChange={setCampaignId} disabled={!clientId}>
-              <SelectTrigger style={FONT} className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b] disabled:opacity-50">
+              <SelectTrigger style={FONT} className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green) disabled:opacity-50">
                 <SelectValue placeholder={clientId ? 'Select a campaign…' : 'Select a client first'} />
               </SelectTrigger>
-              <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+              <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
                 {campaigns.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
 
           <div>
-            <label className={fieldLbl}>Business name <span className="text-[#a8533a]">*</span></label>
+            <label className={fieldLbl}>Business name<RequiredMark /></label>
             <input value={businessName} onChange={(e) => setBusinessName(e.target.value)}
               placeholder="e.g. Sunrise Plumbing" style={FONT} className={inputCls} />
           </div>
@@ -542,12 +543,12 @@ function NewProspectModal({ onClose, onCreated }: { onClose: () => void; onCreat
           </div>
 
           {err && (
-            <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>
+            <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+        <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
           <button onClick={onClose} className={ghostCls}>Cancel</button>
           <button onClick={submit} disabled={busy} className={primaryCls}>
             {busy ? 'Importing…' : 'Import prospect'}
@@ -571,8 +572,8 @@ function EditProspectModal({
   const [busy, setBusy]                 = useState(false);
   const [err, setErr]                   = useState<string | null>(null);
 
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
-  const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
   async function submit() {
     if (!businessName.trim()) { setErr('Business name is required.'); return; }
@@ -603,7 +604,7 @@ function EditProspectModal({
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[540px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -611,15 +612,15 @@ function EditProspectModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Edit prospect</h2>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Edit prospect</h2>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
 
         {/* Form body */}
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
           <div>
-            <label className={fieldLbl}>Business name <span className="text-[#a8533a]">*</span></label>
+            <label className={fieldLbl}>Business name<RequiredMark /></label>
             <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} style={FONT} className={inputCls} />
           </div>
 
@@ -651,12 +652,12 @@ function EditProspectModal({
           </div>
 
           {err && (
-            <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>
+            <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+        <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
           <button onClick={onClose} className={ghostCls}>Cancel</button>
           <button onClick={submit} disabled={busy} className={primaryCls}>
             {busy ? 'Saving…' : 'Save changes'}
@@ -705,7 +706,7 @@ function DeleteProspectModal({
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[540px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -713,35 +714,35 @@ function DeleteProspectModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Delete prospect</h2>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Delete prospect</h2>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
-          <div className="rounded-xl border border-[#a8533a]/20 bg-[#fdf0ec] px-4 py-4">
-            <p className="m-0 text-[14px] font-bold text-[#a8533a]">
+          <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-4">
+            <p className="m-0 text-[14px] font-bold text-(--ad-clay)">
               Permanently delete "{prospect.business_name}"?
             </p>
-            <p className="m-0 mt-1.5 text-[13px] text-[#a8533a]/80">
+            <p className="m-0 mt-1.5 text-[13px] text-(--ad-clay)/80">
               This action cannot be undone. All data associated with this prospect will be permanently deleted.
             </p>
           </div>
 
           <div>
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">This will permanently delete:</p>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">This will permanently delete:</p>
             {!counts ? (
-              <div className="flex items-center gap-2 text-[13px] text-[#9a9d92]">
-                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#ddd8cb] border-t-[#a8533a]" />
+              <div className="flex items-center gap-2 text-[13px] text-(--ad-ink-faint)">
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-(--ad-line-strong) border-t-(--ad-clay)" />
                 Counting affected records…
               </div>
             ) : blastItems.length === 0 ? (
-              <p className="text-[13px] text-[#62655c]">No associated records - the prospect row only.</p>
+              <p className="text-[13px] text-(--ad-ink-soft)">No associated records - the prospect row only.</p>
             ) : (
               <ul className="m-0 list-none p-0 flex flex-col gap-1">
                 {blastItems.map((item) => (
-                  <li key={String(item)} className="flex items-center gap-2 text-[13px] text-[#62655c]">
-                    <span className="text-[#a8533a]">✕</span>
+                  <li key={String(item)} className="flex items-center gap-2 text-[13px] text-(--ad-ink-soft)">
+                    <span className="text-(--ad-clay)">✕</span>
                     {item}
                   </li>
                 ))}
@@ -750,12 +751,12 @@ function DeleteProspectModal({
           </div>
 
           {err && (
-            <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>
+            <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+        <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
           <button onClick={onClose} className={ghostCls}>Cancel</button>
           <button onClick={confirm} disabled={busy || !counts} className={dangerCls}>
             {busy ? 'Deleting…' : `Delete ${prospect.business_name}`}

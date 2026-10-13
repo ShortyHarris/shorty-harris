@@ -81,7 +81,7 @@ const SECTIONS: LegalSection[] = [
   {
     heading: '12. Contact us',
     body: [
-      'Questions about these Terms can be sent to support@shortyharris.com.',
+      'Questions about these Terms can be sent to hello@shortyharris.com.',
     ],
   },
 ];

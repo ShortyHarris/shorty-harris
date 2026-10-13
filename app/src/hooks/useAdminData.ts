@@ -223,7 +223,7 @@ export function useCampaigns() {
     staleTime: 3 * 60 * 1000,
   });
 
-  const setStatus = useCallback(async (id: string, status: string) => {
+  const setStatus = useCallback(async (id: string, status: string): Promise<{ error: string | null }> => {
     queryClient.setQueryData<CampaignRow[]>(QK.campaigns, (prev = []) =>
       prev.map((c) => (c.id === id ? { ...c, status, needsReview: status === 'pending_review' } : c)),
     );
@@ -233,7 +233,9 @@ export function useCampaigns() {
       .eq('id', id);
     if (error) {
       queryClient.invalidateQueries({ queryKey: QK.campaigns });
+      return { error: error.message };
     }
+    return { error: null };
   }, []);
 
   // Cache-only patch, no DB write for the scrape_status/scrape_started_at
@@ -382,14 +384,19 @@ export function useAdminHotLeads() {
   // keeps hot_leads.status and prospects.pipeline_status in step server-side
   // (a raw .update() here is exactly how leads ended up with mismatched
   // pipeline_status in the first place).
-  const setStatus = useCallback(async (id: string, status: string) => {
+  const setStatus = useCallback(async (id: string, status: string): Promise<{ error: string | null }> => {
     queryClient.setQueryData<AdminHotLead[]>(QK.adminHotLeads, (prev = []) =>
       prev.map((r) => (r.id === id ? { ...r, status } : r)),
     );
-    const { error } = await supabase.rpc('set_hot_lead_outcome', {
+    const { data, error } = await supabase.rpc('set_hot_lead_outcome', {
       p_hot_lead_id: id, p_status: status, p_note: null, p_call_outcome: null,
     });
-    if (error) queryClient.invalidateQueries({ queryKey: QK.adminHotLeads });
+    const result = data as { ok: boolean; error?: string } | null;
+    if (error || (result && result.ok === false)) {
+      queryClient.invalidateQueries({ queryKey: QK.adminHotLeads });
+      return { error: error?.message ?? result?.error ?? 'Could not update lead.' };
+    }
+    return { error: null };
   }, []);
 
   return {
@@ -424,6 +431,7 @@ export interface ClientListRow {
   auto_approve_campaigns: boolean;
   has_profile: boolean;
   activated_at: string | null;
+  credits_remaining: number;
 }
 
 async function fetchClients(): Promise<ClientListRow[]> {
@@ -433,8 +441,16 @@ async function fetchClients(): Promise<ClientListRow[]> {
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
-  const base = (data ?? []) as Omit<ClientListRow, 'has_profile' | 'activated_at'>[];
+  const base = (data ?? []) as Omit<ClientListRow, 'has_profile' | 'activated_at' | 'credits_remaining'>[];
   if (base.length === 0) return [];
+
+  const { data: billingData } = await supabase
+    .from('billing_profiles')
+    .select('client_id, credits_remaining')
+    .in('client_id', base.map((c) => c.id));
+  const creditsByClient = new Map(
+    (billingData ?? []).map((b: { client_id: string; credits_remaining: number }) => [b.client_id, b.credits_remaining]),
+  );
 
   const { data: profileData } = await supabase
     .from('profiles')
@@ -448,7 +464,49 @@ async function fetchClients(): Promise<ClientListRow[]> {
     ...c,
     has_profile: profileByClient.has(c.id),
     activated_at: profileByClient.get(c.id) ?? null,
+    credits_remaining: creditsByClient.get(c.id) ?? 0,
   }));
+}
+
+// Atomic server-side: updates billing_profiles and logs a credit_transactions
+// 'adjustment' row together (admin only, refuses a result below 0).
+export async function adjustClientCredits(
+  clientId: string, amount: number, note: string,
+): Promise<{ error: string | null; balance?: number }> {
+  const { data, error } = await supabase.rpc('admin_adjust_credits', {
+    p_client_id: clientId, p_amount: amount, p_note: note.trim() || null,
+  });
+  if (error) return { error: error.message };
+  const res = data as { ok: boolean; error?: string; balance?: number } | null;
+  if (!res?.ok) {
+    const msgs: Record<string, string> = {
+      insufficient_credits: `Not enough credits - balance is ${res?.balance ?? 0}, so that would go below 0.`,
+      not_permitted: 'Only admins can adjust credits.',
+      amount_required: 'Enter a non-zero whole number.',
+      client_not_found: 'Client not found.',
+    };
+    return { error: msgs[res?.error ?? ''] ?? res?.error ?? 'Could not adjust credits.' };
+  }
+  return { error: null, balance: res.balance };
+}
+
+export interface CreditTransaction {
+  id: string;
+  amount: number;
+  type: string;
+  description: string | null;
+  created_at: string;
+}
+
+export async function getClientCreditHistory(clientId: string): Promise<CreditTransaction[]> {
+  const { data, error } = await supabase
+    .from('credit_transactions')
+    .select('id, amount, type, description, created_at')
+    .eq('client_id', clientId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as CreditTransaction[];
 }
 
 export function useClients() {
@@ -765,7 +823,7 @@ export function useErrorLogs() {
     staleTime: Infinity, // realtime drives updates
   });
 
-  const resolve = useCallback(async (id: string) => {
+  const resolve = useCallback(async (id: string): Promise<{ error: string | null }> => {
     // Optimistic remove from list
     queryClient.setQueryData<ErrorRow[]>(QK.errorLogs(showResolved), (prev = []) =>
       showResolved ? prev.map((r) => (r.id === id ? { ...r, resolved: true } : r)) : prev.filter((r) => r.id !== id),
@@ -778,7 +836,9 @@ export function useErrorLogs() {
     }).eq('id', id);
     if (error) {
       queryClient.invalidateQueries({ queryKey: QK.errorLogs(showResolved) });
+      return { error: error.message };
     }
+    return { error: null };
   }, [showResolved]);
 
   return {

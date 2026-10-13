@@ -66,15 +66,15 @@ export function MarkdownEditor({
   }
 
   return (
-    <div className="rounded-lg border border-[#ece8df] bg-[#fbf9f5] overflow-hidden focus-within:border-[#3c7a5b] transition-colors">
-      <div className="flex items-center gap-0.5 border-b border-[#ece8df] bg-white px-2 py-1.5">
+    <div className="rounded-lg border border-(--ad-line) bg-(--ad-surface-2) overflow-hidden focus-within:border-(--ad-green) transition-colors">
+      <div className="flex items-center gap-0.5 border-b border-(--ad-line) bg-(--ad-surface) px-2 py-1.5">
         {TOOLBAR_BUTTONS.map(({ action, icon: Icon, label }) => (
           <button
             key={action}
             type="button"
             title={label}
             onClick={() => handleAction(action)}
-            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-[#62655c] transition-colors hover:bg-[#f5f2ec] hover:text-[#20211c]"
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-(--ad-ink-soft) transition-colors hover:bg-(--ad-fill) hover:text-(--ad-ink)"
           >
             <Icon size={14} strokeWidth={2} />
           </button>
@@ -86,7 +86,7 @@ export function MarkdownEditor({
         onChange={(e) => onChange(e.target.value)}
         rows={rows}
         style={{ ...font, fontFamily: font?.fontFamily ?? "ui-monospace, 'Cascadia Code', monospace" }}
-        className="w-full resize-y bg-transparent px-3.5 py-2.5 text-[12.5px] leading-relaxed text-[#20211c] outline-none"
+        className="w-full resize-y bg-transparent px-3.5 py-2.5 text-[12.5px] leading-relaxed text-(--ad-ink) outline-none"
       />
     </div>
   );

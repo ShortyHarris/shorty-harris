@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { NavLink, Link, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone, BookOpen, BarChart3, Target, Filter, Users } from 'lucide-react';
 import type { ClientNotification } from '../../hooks/useClientNotifications';
@@ -58,6 +58,7 @@ export function Shell({
             unreadCount={unreadCount}
             onMarkAsRead={onMarkAsRead}
             onMarkAllAsRead={onMarkAllAsRead}
+            basePath={basePath}
           />
           <div className="ctopbar-desktop-user">
             <div className="cside-user-avatar">{nameInitial}</div>
@@ -158,6 +159,7 @@ export function Shell({
           unreadCount={unreadCount}
           onMarkAsRead={onMarkAsRead}
           onMarkAllAsRead={onMarkAllAsRead}
+          basePath={basePath}
         />
         <Link to={`${basePath}/billing`} className="ctopbar-credits">
           <span className="ctopbar-credits-num">{credits}</span>
@@ -243,13 +245,25 @@ function NotificationBell({
   unreadCount,
   onMarkAsRead,
   onMarkAllAsRead,
+  basePath,
 }: {
   notifications: ClientNotification[];
   unreadCount: number;
   onMarkAsRead?: (id: string) => void;
   onMarkAllAsRead?: () => void;
+  basePath: string;
 }) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+
+  // Hot-lead alerts deep-link to the lead itself (Dashboard reads ?lead=).
+  function handleClick(n: ClientNotification) {
+    if (!n.read_at) onMarkAsRead?.(n.id);
+    if (n.hot_lead_id) {
+      setOpen(false);
+      navigate(`${basePath}?lead=${encodeURIComponent(n.hot_lead_id)}`);
+    }
+  }
 
   return (
     <>
@@ -284,7 +298,7 @@ function NotificationBell({
             onClick={() => setOpen(false)}
           >
             <motion.div
-              className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[80vh] md:max-w-[420px] md:rounded-2xl md:shadow-2xl"
+              className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[420px] md:rounded-md md:shadow-2xl"
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
@@ -312,7 +326,7 @@ function NotificationBell({
                   notifications.map((n) => (
                     <button
                       key={n.id}
-                      onClick={() => !n.read_at && onMarkAsRead?.(n.id)}
+                      onClick={() => handleClick(n)}
                       className="flex w-full cursor-pointer items-start gap-2.5 border-b border-[#f5f2ec] px-5 py-3.5 text-left transition-colors last:border-0 hover:bg-[#fbf9f5]"
                     >
                       <span

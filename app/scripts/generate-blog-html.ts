@@ -104,7 +104,8 @@ async function fetchPosts(slugFilter?: string): Promise<BlogPostRow[]> {
   let q = supabase
     .from('blog_posts')
     .select('id, slug, title, category, body_md, excerpt, cover_image_url, seo_title, meta_description, author, published_at')
-    .eq('status', 'published');
+    .eq('status', 'published')
+    .lte('published_at', new Date().toISOString());
   if (slugFilter) q = q.eq('slug', slugFilter);
   const { data, error } = await q;
   if (error) throw new Error(`Failed to fetch blog posts: ${error.message}`);

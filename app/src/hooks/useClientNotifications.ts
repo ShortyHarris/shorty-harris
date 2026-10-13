@@ -9,6 +9,8 @@ export interface ClientNotification {
   channel: string;
   created_at: string;
   read_at: string | null;
+  // Set for hot-lead alerts - clicking the notification opens that lead.
+  hot_lead_id: string | null;
 }
 
 export const clientNotificationsKey = (clientId: string) => ['client-notifications', clientId] as const;
@@ -16,7 +18,7 @@ export const clientNotificationsKey = (clientId: string) => ['client-notificatio
 async function fetchNotifications(clientId: string): Promise<ClientNotification[]> {
   const { data, error } = await supabase
     .from('notifications')
-    .select('id, body, channel, created_at, read_at')
+    .select('id, body, channel, created_at, read_at, hot_lead_id')
     .eq('client_id', clientId)
     .order('created_at', { ascending: false })
     .limit(30);

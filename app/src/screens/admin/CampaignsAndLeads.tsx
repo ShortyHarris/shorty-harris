@@ -25,6 +25,7 @@ import { getScrapeStatusDisplay } from '../../lib/scrapeFailures';
 import { useCountrySendHolds } from '../../hooks/useCountrySendHolds';
 import { CountryHoldBanner, EuBadge } from '../../components/CountryHoldBanner';
 import { COUNTRY_OPTIONS, countryName, defaultCampaignCountry, findCountryHold, isEuCountry } from '../../lib/countries';
+import { RequiredMark } from '../../components/RequiredMark';
 
 const HELP_CAMPAIGNS: HelpContent = {
   title: 'Campaigns',
@@ -50,11 +51,11 @@ const HELP_HOT_LEADS: HelpContent = {
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
 const CAMP_PILL: Record<string, { bg: string; text: string; border?: string }> = {
-  pending_review: { bg: '#f0ecf8', text: '#6b4fa0' },
-  draft:          { bg: '#f5f2ec', text: '#62655c', border: '1px solid #ece8df' },
-  active:         { bg: '#edf4ef', text: '#3c7a5b' },
-  paused:         { bg: '#f8efdb', text: '#b9831f' },
-  completed:      { bg: '#f0f0f0', text: '#9a9d92' },
+  pending_review: { bg: 'var(--ad-purple-tint)', text: 'var(--ad-purple)' },
+  draft:          { bg: 'var(--ad-fill)', text: 'var(--ad-ink-soft)', border: '1px solid var(--ad-line)' },
+  active:         { bg: 'var(--ad-green-tint)', text: 'var(--ad-green)' },
+  paused:         { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
+  completed:      { bg: 'var(--ad-fill)', text: 'var(--ad-ink-faint)' },
 };
 
 const CAMP_STATUS_LABEL: Record<string, string> = {
@@ -66,11 +67,11 @@ const CAMP_STATUS_LABEL: Record<string, string> = {
 };
 
 const LEAD_PILL: Record<string, { bg: string; text: string; border?: string }> = {
-  new:       { bg: '#edf4ef', text: '#3c7a5b' },
-  viewed:    { bg: '#f5f2ec', text: '#62655c', border: '1px solid #ece8df' },
-  contacted: { bg: '#f8efdb', text: '#b9831f' },
-  won:       { bg: '#3c7a5b', text: '#fff' },
-  lost:      { bg: 'transparent', text: '#9a9d92', border: '1px solid #ddd8cb' },
+  new:       { bg: 'var(--ad-green-tint)', text: 'var(--ad-green)' },
+  viewed:    { bg: 'var(--ad-fill)', text: 'var(--ad-ink-soft)', border: '1px solid var(--ad-line)' },
+  contacted: { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
+  won:       { bg: 'var(--ad-green)', text: '#fff' },
+  lost:      { bg: 'transparent', text: 'var(--ad-ink-faint)', border: '1px solid var(--ad-line-strong)' },
 };
 
 const PAGE_SIZE = 10;
@@ -83,11 +84,11 @@ const LANGUAGE_OPTIONS = [
 /* Text input + datalist (combobox) - not a Select, since the admin should be
    able to type any language, not just pick from the suggestion list. */
 function LanguageField({ value, onChange, listId }: { value: string; onChange: (v: string) => void; listId: string }) {
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
-  const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
   return (
     <div>
-      <label className={fieldLbl}>Outreach Language</label>
+      <label className={fieldLbl}>Outreach language<RequiredMark /></label>
       <input
         list={listId}
         value={value}
@@ -99,24 +100,24 @@ function LanguageField({ value, onChange, listId }: { value: string; onChange: (
       <datalist id={listId}>
         {LANGUAGE_OPTIONS.map((l) => <option key={l} value={l} />)}
       </datalist>
-      <p className="mt-1 text-[11px] text-[#9a9d92]">Messages and follow-ups will be written in this language.</p>
+      <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Messages and follow-ups will be written in this language.</p>
     </div>
   );
 }
 
 /* ── Ghost / primary button helpers ───────────────────────────────── */
-const ghostCls = 'cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]';
-const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50';
+const ghostCls = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
+const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
 
 /* ── Pagination ────────────────────────────────────────────────────── */
 function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
   if (totalPages <= 1) return null;
   return (
-    <div className="flex items-center justify-between border-t border-[#ece8df] px-4 py-3 text-[12.5px] text-[#9a9d92]">
+    <div className="flex items-center justify-between border-t border-(--ad-line) px-4 py-3 text-[12.5px] text-(--ad-ink-faint)">
       <span>Page {page} of {totalPages}</span>
       <div className="flex gap-2">
-        <button onClick={() => onChange(page - 1)} disabled={page <= 1} className="cursor-pointer rounded-lg border border-[#ddd8cb] bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-[#20211c] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-        <button onClick={() => onChange(page + 1)} disabled={page >= totalPages} className="cursor-pointer rounded-lg border border-[#ddd8cb] bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-[#20211c] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+        <button onClick={() => onChange(page - 1)} disabled={page <= 1} className="cursor-pointer rounded-lg border border-(--ad-line-strong) bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-(--ad-ink) transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+        <button onClick={() => onChange(page + 1)} disabled={page >= totalPages} className="cursor-pointer rounded-lg border border-(--ad-line-strong) bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-(--ad-ink) transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-40">Next</button>
       </div>
     </div>
   );
@@ -190,7 +191,7 @@ function scrapeChipLabel(c: Pick<CampaignRow, 'scrape_status' | 'last_scrape_sum
 function ScrapeResultChip({ campaign, onOpenDetail }: { campaign: CampaignRow; onOpenDetail: () => void }) {
   const sr = scrapeSummaryLabel(campaign);
   const hasDetail = campaign.scrape_status === 'complete' && !!campaign.last_scrape_summary;
-  const toneCls = sr.tone === 'positive' ? 'bg-[#edf4ef] text-[#3c7a5b]' : 'bg-[#f5f2ec] text-[#62655c]';
+  const toneCls = sr.tone === 'positive' ? 'bg-(--ad-green-tint) text-(--ad-green)' : 'bg-(--ad-fill) text-(--ad-ink-soft)';
   if (!hasDetail) {
     return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${toneCls}`}>{scrapeChipLabel(campaign)}</span>;
   }
@@ -230,41 +231,41 @@ function ScrapeSummaryModal({
 
     return (
       <CampModalShell onClose={onClose}>
-        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-          <h2 className="m-0 text-[16px] font-bold text-[#20211c]">Scrape failed</h2>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+          <h2 className="m-0 text-[16px] font-bold text-(--ad-ink)">Scrape failed</h2>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
           <div>
-            <p className="m-0 truncate text-[13px] text-[#9a9d92]" title={campaign.name}>{campaign.name}</p>
+            <p className="m-0 truncate text-[13px] text-(--ad-ink-faint)" title={campaign.name}>{campaign.name}</p>
             <div className="mt-1 flex items-center gap-2">
-              <p className="m-0 text-[15px] font-semibold text-[#a8533a]">{d.label}</p>
+              <p className="m-0 text-[15px] font-semibold text-(--ad-clay)">{d.label}</p>
               {d.repeatedlyFailing && (
                 <span
                   title={`Failed ${campaign.scrape_attempt_count} times in a row`}
-                  className="inline-flex items-center rounded-full bg-[#a8533a] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[.04em] text-white"
+                  className="inline-flex items-center rounded-full bg-(--ad-clay) px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[.04em] text-white"
                 >
                   Repeated
                 </span>
               )}
             </div>
           </div>
-          <p className="m-0 text-[13px] leading-relaxed text-[#62655c]">{d.detail}</p>
+          <p className="m-0 text-[13px] leading-relaxed text-(--ad-ink-soft)">{d.detail}</p>
           {d.fix && (
-            <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-4 py-3.5">
-              <p className="m-0 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">Suggested fix</p>
-              <p className="m-0 mt-1 text-[13px] leading-relaxed text-[#20211c]">{d.fix}</p>
+            <div className="rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3.5">
+              <p className="m-0 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Suggested fix</p>
+              <p className="m-0 mt-1 text-[13px] leading-relaxed text-(--ad-ink)">{d.fix}</p>
             </div>
           )}
           {d.technical && (
             <div>
-              <p className="m-0 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">Technical detail</p>
-              <p className="m-0 mt-1 break-words text-[12px] leading-relaxed text-[#9a9d92]">{d.technical}</p>
+              <p className="m-0 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Technical detail</p>
+              <p className="m-0 mt-1 break-words text-[12px] leading-relaxed text-(--ad-ink-faint)">{d.technical}</p>
             </div>
           )}
-          <p className="m-0 text-[11px] text-[#9a9d92]">{lastScrapedLabel(campaign)}</p>
+          <p className="m-0 text-[11px] text-(--ad-ink-faint)">{lastScrapedLabel(campaign)}</p>
         </div>
-        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex gap-2.5">
+        <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex gap-2.5">
           <button onClick={onClose} className={`${ghostCls} flex-1`}>Close</button>
           {d.retryable ? (
             <button onClick={() => { onScrape(); onClose(); }} className={`${primaryCls} flex-1`}>Retry scrape</button>
@@ -288,29 +289,29 @@ function ScrapeSummaryModal({
 
   return (
     <CampModalShell onClose={onClose}>
-      <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-        <h2 className="m-0 text-[16px] font-bold text-[#20211c]">Scrape results</h2>
-        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+      <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+        <h2 className="m-0 text-[16px] font-bold text-(--ad-ink)">Scrape results</h2>
+        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
         <div>
-          <p className="m-0 truncate text-[13px] text-[#9a9d92]" title={campaign.name}>{campaign.name}</p>
-          <p className={`m-0 mt-1 text-[15px] font-semibold ${sr.tone === 'positive' ? 'text-[#3c7a5b]' : 'text-[#20211c]'}`}>{sr.text}</p>
+          <p className="m-0 truncate text-[13px] text-(--ad-ink-faint)" title={campaign.name}>{campaign.name}</p>
+          <p className={`m-0 mt-1 text-[15px] font-semibold ${sr.tone === 'positive' ? 'text-(--ad-green)' : 'text-(--ad-ink)'}`}>{sr.text}</p>
         </div>
         {rows.length > 0 && (
-          <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-3.5 border-t border-[#f0ede6] pt-4">
+          <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-3.5 border-t border-(--ad-fill) pt-4">
             {rows.map(([label, value]) => (
               <div key={label}>
-                <dt className="text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">{label}</dt>
-                <dd className="m-0 mt-0.5 text-[17px] font-bold text-[#20211c]">{value}</dd>
+                <dt className="text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">{label}</dt>
+                <dd className="m-0 mt-0.5 text-[17px] font-bold text-(--ad-ink)">{value}</dd>
               </div>
             ))}
           </dl>
         )}
-        <p className="m-0 text-[11px] text-[#9a9d92]">{lastScrapedLabel(campaign)}</p>
+        <p className="m-0 text-[11px] text-(--ad-ink-faint)">{lastScrapedLabel(campaign)}</p>
       </div>
-      <div className="shrink-0 border-t border-[#ece8df] px-5 py-4">
-        <button onClick={onClose} className="w-full cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#2d5e46]">
+      <div className="shrink-0 border-t border-(--ad-line) px-5 py-4">
+        <button onClick={onClose} className="w-full cursor-pointer rounded-xl border-0 bg-(--ad-green) px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover)">
           Close
         </button>
       </div>
@@ -348,6 +349,12 @@ export function Campaigns() {
   const { holds } = useCountrySendHolds();
   const { toasts, toast, dismiss } = useToast();
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh campaigns.');
+  async function changeStatus(c: CampaignRow, status: 'active' | 'paused') {
+    const wasReview = c.needsReview;
+    const { error: err } = await setStatus(c.id, status);
+    if (err) { toast(`Couldn't update "${c.name}": ${err}`, 'error'); return; }
+    toast(wasReview ? `"${c.name}" approved and activated.` : status === 'paused' ? `"${c.name}" paused.` : `"${c.name}" activated.`);
+  }
   const [showNew, setShowNew]         = useState(false);
   const [editCampaign, setEditCampaign]     = useState<CampaignRow | null>(null);
   const [deleteCampaignTarget, setDeleteCampaignTarget] = useState<CampaignRow | null>(null);
@@ -453,8 +460,8 @@ export function Campaigns() {
     <div style={FONT} className="flex flex-col gap-6">
       <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
-          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-[#20211c]"><img src="https://cdn-icons-png.flaticon.com/128/6745/6745021.png" alt="Campaigns" className="w-10 h-10" />Campaigns</h1>
-          <p className="m-0 mt-1 text-[13px] text-[#62655c]">{rows.length} campaigns across all clients</p>
+          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)"><img src="https://cdn-icons-png.flaticon.com/128/6745/6745021.png" alt="Campaigns" className="w-10 h-10" />Campaigns</h1>
+          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">{rows.length} campaigns across all clients</p>
         </div>
         <div className="flex items-center gap-2 md:gap-2.5 shrink-0">
           <HelpButton content={HELP_CAMPAIGNS} />
@@ -472,14 +479,14 @@ export function Campaigns() {
       ))}
 
       {error && (
-        <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{error}</div>
+        <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{error}</div>
       )}
 
       {loading ? (
         <SkeletonTable rows={PAGE_SIZE} cols={6} />
       ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-          <strong className="text-[15px] font-bold text-[#20211c]">No campaigns yet.</strong>
+        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
+          <strong className="text-[15px] font-bold text-(--ad-ink)">No campaigns yet.</strong>
         </div>
       ) : (
         <>
@@ -511,24 +518,24 @@ export function Campaigns() {
                   return (
                     <tr key={c.id} onClick={() => setEditCampaign(c)} className="group cursor-pointer">
                       <td className="min-w-0">
-                        <div className="line-clamp-2 font-bold leading-snug text-[#20211c] group-hover:underline" title={c.name}>{c.name}</div>
+                        <div className="line-clamp-2 font-bold leading-snug text-(--ad-ink) group-hover:underline" title={c.name}>{c.name}</div>
                         {isEuCountry(c.country) && <div className="mt-1"><EuBadge /></div>}
                         {c.needsReview && (
-                          <span className="atbl-pill mt-1" style={{ background: '#f0ecf8', color: '#6b4fa0' }}>
+                          <span className="atbl-pill mt-1" style={{ background: 'var(--ad-purple-tint)', color: 'var(--ad-purple)' }}>
                             🔔 Awaiting approval
                           </span>
                         )}
                         {needsSetup && (
-                          <span className="atbl-pill mt-1" style={{ background: '#f8efdb', color: '#b9831f' }}>
+                          <span className="atbl-pill mt-1" style={{ background: 'var(--ad-amber-tint)', color: 'var(--ad-amber)' }}>
                             ⚠ Needs setup
                           </span>
                         )}
-                        <div className="mt-1 text-[11px] text-[#9a9d92]">{lastScrapedLabel(c)}</div>
+                        <div className="mt-1 text-[11px] text-(--ad-ink-faint)">{lastScrapedLabel(c)}</div>
                         {c.target_areas && (
                           <TargetAreaChips areas={c.target_areas} radiusOnly className="mt-1.5 flex flex-wrap gap-1" chipClassName="px-2 py-0.5 text-[11px]" />
                         )}
                       </td>
-                      <td className="min-w-0 text-[#62655c]">
+                      <td className="min-w-0 text-(--ad-ink-soft)">
                         <div className="truncate" title={c.client?.business_name ?? undefined}>{c.client?.business_name ?? '-'}</div>
                       </td>
                       <td className="min-w-0">
@@ -551,15 +558,15 @@ export function Campaigns() {
                           {draft && (
                             <button
                               onClick={() => setEditCampaign(c)}
-                              className="cursor-pointer whitespace-nowrap rounded-lg border border-[#ece8df] bg-white px-2 py-1 text-[11px] font-bold text-[#20211c] transition-colors hover:bg-[#f5f2ec]"
+                              className="cursor-pointer whitespace-nowrap rounded-lg border border-(--ad-line) bg-(--ad-surface) px-2 py-1 text-[11px] font-bold text-(--ad-ink) transition-colors hover:bg-(--ad-fill)"
                             >
                               Edit
                             </button>
                           )}
                           {c.needsReview && (
                             <button
-                              onClick={() => setStatus(c.id, 'active')}
-                              className="cursor-pointer whitespace-nowrap rounded-lg border-0 bg-[#3c7a5b] px-2 py-1 text-[11px] font-bold text-white transition-colors hover:bg-[#2d5e46]"
+                              onClick={() => changeStatus(c, 'active')}
+                              className="cursor-pointer whitespace-nowrap rounded-lg border-0 bg-(--ad-green) px-2 py-1 text-[11px] font-bold text-white transition-colors hover:bg-(--ad-green-hover)"
                             >
                               Approve
                             </button>
@@ -569,7 +576,7 @@ export function Campaigns() {
                             ...(active || paused ? [{
                               type: 'action' as const,
                               label: active ? 'Pause campaign' : 'Activate campaign',
-                              onClick: () => setStatus(c.id, active ? 'paused' : 'active'),
+                              onClick: () => changeStatus(c, active ? 'paused' : 'active'),
                             }] : []),
                             { type: 'separator' },
                             { type: 'action', label: 'Delete campaign', destructive: true, onClick: () => setDeleteCampaignTarget(c) },
@@ -594,27 +601,27 @@ export function Campaigns() {
                 <div
                   key={c.id}
                   onClick={() => setEditCampaign(c)}
-                  className="cursor-pointer rounded-xl border border-[#ece8df] bg-white p-4"
+                  className="cursor-pointer rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <span className="line-clamp-2 block font-bold leading-snug text-[#20211c] text-[14px]" title={c.name}>{c.name}</span>
+                      <span className="line-clamp-2 block font-bold leading-snug text-(--ad-ink) text-[14px]" title={c.name}>{c.name}</span>
                       {isEuCountry(c.country) && <div className="mt-1"><EuBadge /></div>}
                       {c.needsReview && (
                         <div className="mt-1">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[#f0ecf8] px-2 py-0.5 text-[10.5px] font-bold text-[#6b4fa0]">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-(--ad-purple-tint) px-2 py-0.5 text-[10.5px] font-bold text-(--ad-purple)">
                             🔔 Awaiting approval
                           </span>
                         </div>
                       )}
                       {needsSetup && (
                         <div className="mt-1">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[#f8efdb] px-2 py-0.5 text-[10.5px] font-bold text-[#b9831f]">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-(--ad-amber-tint) px-2 py-0.5 text-[10.5px] font-bold text-(--ad-amber)">
                             ⚠ Needs setup
                           </span>
                         </div>
                       )}
-                      <div className="mt-1 text-[11px] text-[#9a9d92]">{lastScrapedLabel(c)}</div>
+                      <div className="mt-1 text-[11px] text-(--ad-ink-faint)">{lastScrapedLabel(c)}</div>
                       {c.target_areas && (
                         <TargetAreaChips areas={c.target_areas} radiusOnly className="mt-1.5 flex flex-wrap gap-1" chipClassName="px-2 py-0.5 text-[11px]" />
                       )}
@@ -624,32 +631,32 @@ export function Campaigns() {
                       {CAMP_STATUS_LABEL[c.status] ?? c.status}
                     </span>
                   </div>
-                  <p className="mt-1.5 text-[12px] text-[#62655c]">
+                  <p className="mt-1.5 text-[12px] text-(--ad-ink-soft)">
                     {c.client?.business_name ?? '-'} · {c.channel} · {c.language}
                   </p>
                   <div className="mt-1.5">
                     <ScrapeResultChip campaign={c} onOpenDetail={() => setScrapeDetailCampaign(c)} />
                   </div>
-                  <div className="border-t border-[#f5f2ec] pt-3 mt-2 flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <div className="border-t border-(--ad-fill) pt-3 mt-2 flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     {c.needsReview && (
                       <button
-                        onClick={() => setStatus(c.id, 'active')}
-                        className="cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46]"
+                        onClick={() => changeStatus(c, 'active')}
+                        className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-(--ad-green-hover)"
                       >
                         Approve
                       </button>
                     )}
                     {(active || paused) && (
                       <button
-                        onClick={() => setStatus(c.id, active ? 'paused' : 'active')}
+                        onClick={() => changeStatus(c, active ? 'paused' : 'active')}
                         title={active ? 'Pause campaign' : 'Activate campaign'}
                         className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[.04em] transition-colors ${
                           active
-                            ? 'border-[#3c7a5b] bg-[#3c7a5b] text-white hover:bg-[#2d5e46]'
-                            : 'border-[#ddd8cb] bg-white text-[#62655c] hover:border-[#b9831f] hover:text-[#b9831f]'
+                            ? 'border-(--ad-green) bg-(--ad-green) text-white hover:bg-(--ad-green-hover)'
+                            : 'border-(--ad-line-strong) bg-(--ad-surface) text-(--ad-ink-soft) hover:border-(--ad-amber) hover:text-(--ad-amber)'
                         }`}
                       >
-                        <span className={`h-2 w-2 rounded-full ${active ? 'bg-white' : 'bg-[#c4bfb5]'}`} />
+                        <span className={`h-2 w-2 rounded-full ${active ? 'bg-(--ad-surface)' : 'bg-(--ad-ink-ghost)'}`} />
                         {active ? 'Active' : 'Paused'}
                       </button>
                     )}
@@ -660,13 +667,13 @@ export function Campaigns() {
                     />
                     <button
                       onClick={() => setEditCampaign(c)}
-                      className="cursor-pointer rounded-lg border border-[#ece8df] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                      className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => setDeleteCampaignTarget(c)}
-                      className="cursor-pointer rounded-lg border border-transparent bg-transparent px-3 py-1.5 text-[12px] font-semibold text-[#c4bfb5] transition-colors hover:border-[#a8533a]/30 hover:bg-[#fdf0ec] hover:text-[#a8533a]"
+                      className="cursor-pointer rounded-lg border border-transparent bg-transparent px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-ghost) transition-colors hover:border-(--ad-clay)/30 hover:bg-(--ad-clay-tint) hover:text-(--ad-clay)"
                     >
                       Delete
                     </button>
@@ -684,7 +691,7 @@ export function Campaigns() {
       {/* Mobile FAB - replaces the header button on small screens */}
       <button
         onClick={() => setShowNew(true)}
-        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-[#3c7a5b] text-white shadow-[0_6px_24px_rgba(60,122,91,0.4)] transition-all hover:bg-[#2d5e46] active:scale-95"
+        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-(--ad-green) text-white shadow-[0_6px_24px_rgba(60,122,91,0.4)] transition-all hover:bg-(--ad-green-hover) active:scale-95"
         aria-label="New campaign"
       >
         <Plus size={24} strokeWidth={2.5} />
@@ -695,7 +702,7 @@ export function Campaigns() {
           <NewCampaignModal
             key="new-campaign-modal"
             onClose={() => setShowNew(false)}
-            onCreated={() => { setShowNew(false); reload(); }}
+            onCreated={() => { setShowNew(false); toast('Campaign created.'); reload(); }}
           />
         )}
         {editCampaign && (
@@ -704,7 +711,7 @@ export function Campaigns() {
             campaign={editCampaign}
             hold={findCountryHold(holds, editCampaign.country)}
             onClose={() => setEditCampaign(null)}
-            onSaved={() => { setEditCampaign(null); reload(); }}
+            onSaved={() => { setEditCampaign(null); toast('Campaign updated.'); reload(); }}
           />
         )}
         {deleteCampaignTarget && (
@@ -712,7 +719,7 @@ export function Campaigns() {
             key={`del-camp-${deleteCampaignTarget.id}`}
             campaign={deleteCampaignTarget}
             onClose={() => setDeleteCampaignTarget(null)}
-            onDeleted={() => { setDeleteCampaignTarget(null); reload(); }}
+            onDeleted={() => { setDeleteCampaignTarget(null); toast('Campaign deleted.'); reload(); }}
           />
         )}
         {scrapeDetailCampaign && (
@@ -761,8 +768,8 @@ function ScrapeCell({
 
   if (campaign.scrape_status === 'running' && !stale) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[12px] text-[#9a9d92]">
-        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#ddd8cb] border-t-[#3c7a5b]" />
+      <span className="inline-flex items-center gap-1.5 text-[12px] text-(--ad-ink-faint)">
+        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-(--ad-line-strong) border-t-(--ad-green)" />
         Searching
       </span>
     );
@@ -781,10 +788,10 @@ function ScrapeCell({
       <button
         onClick={onOpenDetail}
         title="View failure details"
-        className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full bg-[#fdf0ec] px-2 py-0.5 text-[11.5px] font-semibold text-[#a8533a] transition-opacity hover:opacity-75"
+        className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full bg-(--ad-clay-tint) px-2 py-0.5 text-[11.5px] font-semibold text-(--ad-clay) transition-opacity hover:opacity-75"
       >
         {d.label}
-        {d.repeatedlyFailing && <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#a8533a]" title={`Failed ${campaign.scrape_attempt_count} times in a row`} />}
+        {d.repeatedlyFailing && <span className="inline-block h-1.5 w-1.5 rounded-full bg-(--ad-clay)" title={`Failed ${campaign.scrape_attempt_count} times in a row`} />}
         <Info size={11} strokeWidth={2.5} className="opacity-60" />
       </button>
     );
@@ -793,7 +800,7 @@ function ScrapeCell({
   return (
     <button
       onClick={onScrape}
-      className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-[#ece8df] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b] whitespace-nowrap"
+      className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-2.5 py-1 text-[11px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green) whitespace-nowrap"
     >
       ↻ Run scrape
     </button>
@@ -836,8 +843,8 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
     if (error) setErr(error.message); else onCreated();
   }
 
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
-  const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
   return (
     <motion.div
@@ -850,7 +857,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[540px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -858,52 +865,52 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-[#20211c]">New campaign</h2>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">New campaign</h2>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
 
         {/* Scrollable form body */}
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
           <div>
-            <label className={fieldLbl}>Client</label>
+            <label className={fieldLbl}>Client<RequiredMark /></label>
             <Select value={clientId} onValueChange={setClientId}>
-              <SelectTrigger style={FONT} className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]">
+              <SelectTrigger style={FONT} className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)">
                 <SelectValue placeholder="Select a client…" />
               </SelectTrigger>
-              <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+              <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
                 {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.business_name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
 
           <div>
-            <label className={fieldLbl}>Campaign name</label>
+            <label className={fieldLbl}>Campaign name<RequiredMark /></label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Austin gyms - Q3" style={FONT} className={inputCls} />
           </div>
 
           <LanguageField value={language} onChange={setLanguage} listId="new-campaign-languages" />
 
           <div>
-            <label className={fieldLbl}>Target country</label>
+            <label className={fieldLbl}>Target country<RequiredMark /></label>
             <Select value={country} onValueChange={setPickedCountry}>
-              <SelectTrigger style={FONT} aria-label="Target country" className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]">
+              <SelectTrigger style={FONT} aria-label="Target country" className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)">
                 <SelectValue placeholder="Select a country…" />
               </SelectTrigger>
-              <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+              <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
                 {COUNTRY_OPTIONS.map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            <p className="mt-1 text-[11px] text-[#9a9d92]">Can't be changed after the campaign is created. EU countries have extra outreach rules.</p>
+            <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Can't be changed after the campaign is created. EU countries have extra outreach rules.</p>
           </div>
 
           <div>
             <label className={fieldLbl}>Channel</label>
             <Select value={channel} onValueChange={setChannel}>
-              <SelectTrigger style={FONT} className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]">
+              <SelectTrigger style={FONT} className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+              <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
                 <SelectItem value="email">Email</SelectItem>
                 <SelectItem value="sms">SMS</SelectItem>
                 <SelectItem value="whatsapp">WhatsApp</SelectItem>
@@ -911,8 +918,8 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
             </Select>
           </div>
 
-          <div className="border-t border-[#f0ede6] pt-3">
-            <p className="mb-3 text-[11px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Prospect discovery (Apify)</p>
+          <div className="border-t border-(--ad-fill) pt-3">
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-[.08em] text-(--ad-ink-faint)">Prospect discovery (Apify)</p>
             <div className="flex flex-col gap-3">
               {clientId ? (
                 <SuggestForMe
@@ -927,12 +934,12 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
                   onAddLocation={(loc) => setAreas((a) => (a.some((x) => x.label === loc) ? a : [...a, { mode: 'text', label: loc }]))}
                 />
               ) : (
-                <p className="m-0 text-[11px] text-[#9a9d92]">Pick a client above to see targeting suggestions from their profile.</p>
+                <p className="m-0 text-[11px] text-(--ad-ink-faint)">Pick a client above to see targeting suggestions from their profile.</p>
               )}
               <div>
                 <label className={fieldLbl}>Search terms <span className="normal-case font-normal">(comma-separated)</span></label>
                 <input value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="hotels, lodges, guesthouses" style={FONT} className={inputCls} />
-                <p className="mt-1 text-[11px] text-[#9a9d92]">Business types, not job titles - 3 to 5 terms works best.</p>
+                <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Business types, not job titles - 3 to 5 terms works best.</p>
               </div>
               <LocationAreaInput
                 label="Locations"
@@ -946,29 +953,29 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
                 <div className="flex-1">
                   <label className={fieldLbl}>Max results per run</label>
                   <input type="number" min={1} max={1000} value={maxResults} onChange={(e) => setMaxResults(Math.min(1000, Number(e.target.value)))} style={FONT} className={inputCls} />
-                  <p className="mt-1 text-[11px] text-[#9a9d92]">Higher counts tend to yield more replies. Capped at 1,000 per campaign.</p>
+                  <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Higher counts tend to yield more replies. Capped at 1,000 per campaign.</p>
                 </div>
-                <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[13px] text-[#62655c]">
-                  <input type="checkbox" checked={scrapeEnabled} onChange={(e) => setScrapeEnabled(e.target.checked)} className="accent-[#3c7a5b]" />
+                <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[13px] text-(--ad-ink-soft)">
+                  <input type="checkbox" checked={scrapeEnabled} onChange={(e) => setScrapeEnabled(e.target.checked)} className="accent-(--ad-green)" />
                   Enable scraping
                 </label>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-[#f0ede6] pt-3">
-            <label className="flex cursor-pointer items-center gap-2 text-[13px] text-[#62655c]">
-              <input type="checkbox" checked={saveAsDraft} onChange={(e) => setSaveAsDraft(e.target.checked)} className="accent-[#3c7a5b]" />
+          <div className="border-t border-(--ad-fill) pt-3">
+            <label className="flex cursor-pointer items-center gap-2 text-[13px] text-(--ad-ink-soft)">
+              <input type="checkbox" checked={saveAsDraft} onChange={(e) => setSaveAsDraft(e.target.checked)} className="accent-(--ad-green)" />
               Save as draft
             </label>
-            <p className="mt-1 text-[11px] text-[#9a9d92]">Saved with status "Draft" instead of "Active" - switch its status here later when it's ready.</p>
+            <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Saved with status "Draft" instead of "Active" - switch its status here later when it's ready.</p>
           </div>
 
-          {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
+          {err && <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>}
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+        <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
           <button onClick={onClose} className={ghostCls}>Cancel</button>
           <button onClick={submit} disabled={busy} className={primaryCls}>
             {busy ? 'Creating…' : saveAsDraft ? 'Save as draft' : 'Create campaign'}
@@ -990,7 +997,7 @@ function CampModalShell({ onClose, children }: { onClose: () => void; children: 
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[540px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
@@ -1001,8 +1008,8 @@ function CampModalShell({ onClose, children }: { onClose: () => void; children: 
   );
 }
 
-const campFieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
-const campInputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+const campFieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+const campInputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
 /* ── Edit Campaign Modal ───────────────────────────────────────────── */
 function EditCampaignModal({
@@ -1041,14 +1048,14 @@ function EditCampaignModal({
 
   return (
     <CampModalShell onClose={onClose}>
-      <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-        <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Edit campaign</h2>
-        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+      <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Edit campaign</h2>
+        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
         {hold && <CountryHoldBanner reason={hold.reason} />}
         <div>
-          <label className={campFieldLbl}>Campaign name</label>
+          <label className={campFieldLbl}>Campaign name<RequiredMark /></label>
           <input value={name} onChange={(e) => setName(e.target.value)} style={FONT} className={campInputCls} />
         </div>
         <div>
@@ -1061,26 +1068,26 @@ function EditCampaignModal({
         {/* Country is set on creation only - shown read-only here. */}
         <div>
           <label className={campFieldLbl}>Target country</label>
-          <div className="flex items-center gap-2 rounded-lg border border-[#ece8df] bg-[#f5f2ec] px-3.5 py-2.5 text-[13px] text-[#62655c]">
+          <div className="flex items-center gap-2 rounded-lg border border-(--ad-line) bg-(--ad-fill) px-3.5 py-2.5 text-[13px] text-(--ad-ink-soft)">
             <span>{campaign.country ? countryName(campaign.country) : 'Not set'}</span>
             {isEuCountry(campaign.country) && <EuBadge />}
           </div>
-          <p className="mt-1 text-[11px] text-[#9a9d92]">Set when the campaign is created and can't be changed.</p>
+          <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Set when the campaign is created and can't be changed.</p>
         </div>
 
         <div>
           <label className={campFieldLbl}>Channel</label>
           <Select value={channel} onValueChange={setChannel}>
-            <SelectTrigger style={FONT} className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]"><SelectValue /></SelectTrigger>
-            <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+            <SelectTrigger style={FONT} className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)"><SelectValue /></SelectTrigger>
+            <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
               <SelectItem value="email">Email</SelectItem>
               <SelectItem value="sms">SMS</SelectItem>
               <SelectItem value="whatsapp">WhatsApp</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <div className="border-t border-[#f0ede6] pt-3">
-          <p className="mb-3 text-[11px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Prospect discovery (Apify)</p>
+        <div className="border-t border-(--ad-fill) pt-3">
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-[.08em] text-(--ad-ink-faint)">Prospect discovery (Apify)</p>
           <div className="flex flex-col gap-3">
             <SuggestForMe
               clientId={campaign.client_id}
@@ -1095,7 +1102,7 @@ function EditCampaignModal({
             <div>
               <label className={campFieldLbl}>Search terms <span className="normal-case font-normal">(comma-separated)</span></label>
               <input value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="hotels, lodges, guesthouses" style={FONT} className={campInputCls} />
-              <p className="mt-1 text-[11px] text-[#9a9d92]">Business types, not job titles - 3 to 5 terms works best.</p>
+              <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Business types, not job titles - 3 to 5 terms works best.</p>
             </div>
             <LocationAreaInput
               label="Locations"
@@ -1109,18 +1116,18 @@ function EditCampaignModal({
               <div className="flex-1">
                 <label className={campFieldLbl}>Max results per run</label>
                 <input type="number" min={1} max={1000} value={maxResults} onChange={(e) => setMaxResults(Math.min(1000, Number(e.target.value)))} style={FONT} className={campInputCls} />
-                <p className="mt-1 text-[11px] text-[#9a9d92]">Higher counts tend to yield more replies. Capped at 1,000 per campaign.</p>
+                <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Higher counts tend to yield more replies. Capped at 1,000 per campaign.</p>
               </div>
-              <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[13px] text-[#62655c]">
-                <input type="checkbox" checked={scrapeEnabled} onChange={(e) => setScrapeEnabled(e.target.checked)} className="accent-[#3c7a5b]" />
+              <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[13px] text-(--ad-ink-soft)">
+                <input type="checkbox" checked={scrapeEnabled} onChange={(e) => setScrapeEnabled(e.target.checked)} className="accent-(--ad-green)" />
                 Enable scraping
               </label>
             </div>
           </div>
         </div>
-        {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
+        {err && <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>}
       </div>
-      <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+      <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
         <button onClick={onClose} className={ghostCls}>Cancel</button>
         <button onClick={submit} disabled={busy} className={primaryCls}>{busy ? 'Saving…' : 'Save changes'}</button>
       </div>
@@ -1156,47 +1163,47 @@ function DeleteCampaignModal({
 
   return (
     <CampModalShell onClose={onClose}>
-      <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-        <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Delete campaign</h2>
-        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+      <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Delete campaign</h2>
+        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
-        <div className="rounded-xl border border-[#a8533a]/20 bg-[#fdf0ec] px-4 py-4">
-          <p className="m-0 text-[14px] font-bold text-[#a8533a]">
+        <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-4">
+          <p className="m-0 text-[14px] font-bold text-(--ad-clay)">
             Permanently delete "{campaign.name}"?
           </p>
-          <p className="m-0 mt-1.5 text-[13px] text-[#a8533a]/80">
+          <p className="m-0 mt-1.5 text-[13px] text-(--ad-clay)/80">
             This cannot be undone. All prospects, messages, and replies tied to this campaign will be deleted.
           </p>
         </div>
         <div>
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">This will permanently delete:</p>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">This will permanently delete:</p>
           {!counts ? (
-            <div className="flex items-center gap-2 text-[13px] text-[#9a9d92]">
-              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#ddd8cb] border-t-[#a8533a]" />
+            <div className="flex items-center gap-2 text-[13px] text-(--ad-ink-faint)">
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-(--ad-line-strong) border-t-(--ad-clay)" />
               Counting affected records…
             </div>
           ) : blastItems.length === 0 ? (
-            <p className="text-[13px] text-[#62655c]">No associated records - the campaign row only.</p>
+            <p className="text-[13px] text-(--ad-ink-soft)">No associated records - the campaign row only.</p>
           ) : (
             <ul className="m-0 list-none p-0 flex flex-col gap-1">
               {blastItems.map((item) => (
-                <li key={String(item)} className="flex items-center gap-2 text-[13px] text-[#62655c]">
-                  <span className="text-[#a8533a]">✕</span>
+                <li key={String(item)} className="flex items-center gap-2 text-[13px] text-(--ad-ink-soft)">
+                  <span className="text-(--ad-clay)">✕</span>
                   {item}
                 </li>
               ))}
             </ul>
           )}
         </div>
-        {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
+        {err && <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>}
       </div>
-      <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+      <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
         <button onClick={onClose} className={ghostCls}>Cancel</button>
         <button
           onClick={confirm}
           disabled={busy || !counts}
-          className="cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#a8533a] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#8a3f2b] disabled:opacity-50"
+          className="cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
         >
           {busy ? 'Deleting…' : `Delete campaign and all prospects`}
         </button>
@@ -1247,11 +1254,11 @@ export function HotLeads() {
     <div style={FONT} className="flex flex-col gap-6">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-[#20211c]">
+          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)">
             <img src="https://cdn-icons-png.flaticon.com/128/9679/9679459.png" className="w-10 h-10" alt="" />
             Hot leads
           </h1>
-          <p className="m-0 mt-1 text-[13px] text-[#62655c]">{rows.length} qualified opportunities, all clients</p>
+          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">{rows.length} qualified opportunities, all clients</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton content={HELP_HOT_LEADS} />
@@ -1260,15 +1267,15 @@ export function HotLeads() {
       </header>
 
       {error && (
-        <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{error}</div>
+        <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{error}</div>
       )}
 
       {loading ? (
         <SkeletonTable rows={PAGE_SIZE} cols={4} />
       ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-          <strong className="text-[15px] font-bold text-[#20211c]">No hot leads yet.</strong>
-          <span className="text-[13px] text-[#62655c]">Leads appear here when prospects reply with buying intent.</span>
+        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
+          <strong className="text-[15px] font-bold text-(--ad-ink)">No hot leads yet.</strong>
+          <span className="text-[13px] text-(--ad-ink-soft)">Leads appear here when prospects reply with buying intent.</span>
         </div>
       ) : (
         <>
@@ -1285,14 +1292,14 @@ export function HotLeads() {
                     onClick={() => selectFilter(tab.key)}
                     className={`shrink-0 cursor-pointer inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] whitespace-nowrap transition-all ${
                       active
-                        ? 'bg-[#edf4ef] border-transparent text-[#3c7a5b] font-bold'
-                        : 'bg-white border-[#ddd8cb] text-[#62655c] font-semibold hover:border-[#3c7a5b]'
+                        ? 'bg-(--ad-green-tint) border-transparent text-(--ad-green) font-bold'
+                        : 'bg-(--ad-surface) border-(--ad-line-strong) text-(--ad-ink-soft) font-semibold hover:border-(--ad-green)'
                     }`}
                   >
                     {tab.label}
                     {cnt > 0 && (
                       <span className={`inline-flex items-center justify-center rounded-full px-1.5 min-w-[18px] h-[18px] text-[10.5px] font-bold ${
-                        active ? 'bg-[#3c7a5b]/10 text-[#3c7a5b]' : 'bg-[#f5f2ec] text-[#9a9d92]'
+                        active ? 'bg-(--ad-green)/10 text-(--ad-green)' : 'bg-(--ad-fill) text-(--ad-ink-faint)'
                       }`}>{cnt}</span>
                     )}
                   </button>
@@ -1301,46 +1308,46 @@ export function HotLeads() {
             </div>
 
             {filtered.length === 0 ? (
-              <div className="py-10 text-center text-[13px] text-[#9a9d92] rounded-xl border border-[#e8e3da] bg-white">
+              <div className="py-10 text-center text-[13px] text-(--ad-ink-faint) rounded-xl border border-(--ad-line) bg-(--ad-surface)">
                 No leads in this category.
               </div>
             ) : (
-              <div className="rounded-xl border border-[#e8e3da] bg-white overflow-hidden">
-                <div className="divide-y divide-[#f5f2ec]">
+              <div className="rounded-xl border border-(--ad-line) bg-(--ad-surface) overflow-hidden">
+                <div className="divide-y divide-(--ad-fill)">
                   {paged.map((lead) => {
                     const pill = LEAD_PILL[lead.status] ?? LEAD_PILL.new;
-                    const dotColor = lead.status === 'won' ? '#3c7a5b'
-                      : lead.status === 'new' ? '#3c7a5b'
-                      : lead.status === 'contacted' ? '#b9831f'
-                      : '#c4bfb5';
+                    const dotColor = lead.status === 'won' ? 'var(--ad-green)'
+                      : lead.status === 'new' ? 'var(--ad-green)'
+                      : lead.status === 'contacted' ? 'var(--ad-amber)'
+                      : 'var(--ad-ink-ghost)';
                     return (
                       <button
                         key={lead.id}
                         onClick={() => setOpenId(lead.id)}
-                        className="flex w-full cursor-pointer items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-[#fbf9f5]"
+                        className="flex w-full cursor-pointer items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-(--ad-surface-2)"
                       >
                         <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: dotColor }} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
-                            <span className="font-semibold text-[14px] text-[#20211c]">{lead.prospect?.business_name ?? 'Unknown'}</span>
+                            <span className="font-semibold text-[14px] text-(--ad-ink)">{lead.prospect?.business_name ?? 'Unknown'}</span>
                             <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
                               className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
                               {HL_STATUS_LABEL[lead.status] ?? lead.status}
                             </span>
                           </div>
                           {lead.prospect?.category && (
-                            <p className="mt-0.5 text-[12px] text-[#9a9d92]">
+                            <p className="mt-0.5 text-[12px] text-(--ad-ink-faint)">
                               {lead.prospect.category}{lead.prospect.location ? ` · ${lead.prospect.location}` : ''}
                             </p>
                           )}
                           {lead.client?.business_name && (
-                            <p className="mt-0.5 text-[12px] text-[#62655c]">{lead.client.business_name}</p>
+                            <p className="mt-0.5 text-[12px] text-(--ad-ink-soft)">{lead.client.business_name}</p>
                           )}
                           {lead.ai_summary && (
-                            <p className="mt-1.5 line-clamp-2 text-[13px] text-[#62655c]">{lead.ai_summary}</p>
+                            <p className="mt-1.5 line-clamp-2 text-[13px] text-(--ad-ink-soft)">{lead.ai_summary}</p>
                           )}
                         </div>
-                        <ChevronRight size={15} className="mt-1.5 shrink-0 text-[#c4bfb5]" />
+                        <ChevronRight size={15} className="mt-1.5 shrink-0 text-(--ad-ink-ghost)" />
                       </button>
                     );
                   })}
@@ -1362,13 +1369,13 @@ export function HotLeads() {
                     key={tab.key}
                     onClick={() => selectFilter(tab.key)}
                     className={`-mb-px cursor-pointer border-b-2 px-4 py-3 text-[13px] font-semibold transition-colors ${
-                      active ? 'border-[#3c7a5b] text-[#3c7a5b]' : 'border-transparent text-[#9a9d92] hover:text-[#62655c]'
+                      active ? 'border-(--ad-green) text-(--ad-green)' : 'border-transparent text-(--ad-ink-faint) hover:text-(--ad-ink-soft)'
                     }`}
                   >
                     {tab.label}
                     {cnt > 0 && (
                       <span className={`ml-1.5 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10.5px] font-bold ${
-                        active ? 'bg-[#edf4ef] text-[#3c7a5b]' : 'bg-[#f5f2ec] text-[#9a9d92]'
+                        active ? 'bg-(--ad-green-tint) text-(--ad-green)' : 'bg-(--ad-fill) text-(--ad-ink-faint)'
                       }`}>{cnt}</span>
                     )}
                   </button>
@@ -1377,7 +1384,7 @@ export function HotLeads() {
             </div>
 
             {filtered.length === 0 ? (
-              <div className="py-10 text-center text-[13px] text-[#9a9d92]">No leads in this category.</div>
+              <div className="py-10 text-center text-[13px] text-(--ad-ink-faint)">No leads in this category.</div>
             ) : (
               <>
                 <table>
@@ -1398,16 +1405,16 @@ export function HotLeads() {
                           className="cursor-pointer"
                         >
                           <td className="align-top">
-                            <div className="font-semibold text-[#20211c]">{lead.prospect?.business_name ?? 'Unknown'}</div>
+                            <div className="font-semibold text-(--ad-ink)">{lead.prospect?.business_name ?? 'Unknown'}</div>
                             {lead.prospect?.category && (
-                              <div className="mt-0.5 text-[12px] text-[#9a9d92]">
+                              <div className="mt-0.5 text-[12px] text-(--ad-ink-faint)">
                                 {lead.prospect.category}{lead.prospect.location ? ` · ${lead.prospect.location}` : ''}
                               </div>
                             )}
                           </td>
-                          <td className="align-top text-[#62655c]">{lead.client?.business_name ?? '-'}</td>
+                          <td className="align-top text-(--ad-ink-soft)">{lead.client?.business_name ?? '-'}</td>
                           <td className="max-w-[340px] align-top">
-                            <p className="m-0 line-clamp-1 text-[#62655c]">{lead.ai_summary ?? '-'}</p>
+                            <p className="m-0 line-clamp-1 text-(--ad-ink-soft)">{lead.ai_summary ?? '-'}</p>
                           </td>
                           <td className="align-top">
                             <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
@@ -1415,7 +1422,7 @@ export function HotLeads() {
                             </span>
                           </td>
                           <td className="px-3 align-top text-right">
-                            <ChevronRight size={15} className="text-[#c4bfb5]" />
+                            <ChevronRight size={15} className="text-(--ad-ink-ghost)" />
                           </td>
                         </tr>
                       );
@@ -1435,7 +1442,13 @@ export function HotLeads() {
             key="lead-detail"
             lead={openLead}
             onClose={() => setOpenId(null)}
-            onStatus={(id, s) => { setStatus(id, s); setOpenId(null); }}
+            onStatus={(id, s) => {
+              setOpenId(null);
+              setStatus(id, s).then(({ error: err }) => {
+                if (err) toast(`Couldn't update lead: ${err}`, 'error');
+                else toast(`Lead marked ${s}.`);
+              });
+            }}
           />
         )}
       </AnimatePresence>
@@ -1469,7 +1482,7 @@ function LeadDetailModal({
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[560px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -1477,30 +1490,30 @@ function LeadDetailModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
           <span
             style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
             className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]"
           >
             {HL_STATUS_LABEL[lead.status] ?? lead.status}
           </span>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
           {/* Identity */}
           <div>
-            <h2 className="m-0 text-[20px] font-extrabold leading-tight text-[#20211c]">
+            <h2 className="m-0 text-[20px] font-extrabold leading-tight text-(--ad-ink)">
               {p?.business_name ?? 'Unknown business'}
             </h2>
             {p?.category && (
-              <p className="m-0 mt-1 text-[13px] text-[#9a9d92]">
+              <p className="m-0 mt-1 text-[13px] text-(--ad-ink-faint)">
                 {p.category}{p.location ? ` · ${p.location}` : ''}
               </p>
             )}
             {lead.client?.business_name && (
-              <p className="m-0 mt-1.5 text-[12px] font-semibold text-[#62655c]">
+              <p className="m-0 mt-1.5 text-[12px] font-semibold text-(--ad-ink-soft)">
                 Client: {lead.client.business_name}
               </p>
             )}
@@ -1508,11 +1521,11 @@ function LeadDetailModal({
 
           {/* AI summary */}
           {lead.ai_summary && (
-            <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] p-4">
-              <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">What they want</div>
-              <p className="m-0 text-[13.5px] leading-relaxed text-[#20211c]">{lead.ai_summary}</p>
+            <div className="rounded-xl border border-(--ad-line) bg-(--ad-surface-2) p-4">
+              <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[.08em] text-(--ad-ink-faint)">What they want</div>
+              <p className="m-0 text-[13.5px] leading-relaxed text-(--ad-ink)">{lead.ai_summary}</p>
               {lead.suggested_action && (
-                <p className="m-0 mt-2 text-[12.5px] text-[#3c7a5b]">→ {lead.suggested_action}</p>
+                <p className="m-0 mt-2 text-[12.5px] text-(--ad-green)">→ {lead.suggested_action}</p>
               )}
             </div>
           )}
@@ -1520,8 +1533,8 @@ function LeadDetailModal({
           {/* Their reply */}
           {lead.reply?.body && (
             <div>
-              <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Their reply</div>
-              <blockquote className="m-0 rounded-xl border-l-4 border-[#ddd8cb] bg-[#fbf9f5] px-4 py-3 text-[13px] italic leading-relaxed text-[#62655c]">
+              <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[.08em] text-(--ad-ink-faint)">Their reply</div>
+              <blockquote className="m-0 rounded-xl border-l-4 border-(--ad-line-strong) bg-(--ad-surface-2) px-4 py-3 text-[13px] italic leading-relaxed text-(--ad-ink-soft)">
                 {lead.reply.body}
               </blockquote>
             </div>
@@ -1530,16 +1543,16 @@ function LeadDetailModal({
 
         {/* Footer: status actions (only when not already closed) */}
         {lead.status !== 'won' && lead.status !== 'lost' && (
-          <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex gap-2.5">
+          <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex gap-2.5">
             <button
               onClick={() => onStatus(lead.id, 'won')}
-              className="cursor-pointer flex-1 rounded-xl border-0 bg-[#3c7a5b] px-4 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46]"
+              className="cursor-pointer flex-1 rounded-xl border-0 bg-(--ad-green) px-4 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover)"
             >
               Mark as Won ✓
             </button>
             <button
               onClick={() => onStatus(lead.id, 'lost')}
-              className="cursor-pointer flex-1 rounded-xl border border-[#a8533a] bg-transparent px-4 py-2.5 text-[13px] font-bold text-[#a8533a] transition-colors hover:bg-[#f6e8e2]"
+              className="cursor-pointer flex-1 rounded-xl border border-(--ad-clay) bg-transparent px-4 py-2.5 text-[13px] font-bold text-(--ad-clay) transition-colors hover:bg-(--ad-clay-tint)"
             >
               Not interested
             </button>

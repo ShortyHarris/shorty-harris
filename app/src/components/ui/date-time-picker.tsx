@@ -60,12 +60,12 @@ export function DateTimePicker({
           className={cn(
             "inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-[12.5px] outline-none transition-colors",
             value
-              ? "border-[#3c7a5b] bg-[#edf4ef] font-semibold text-[#3c7a5b]"
-              : "border-[#ece8df] bg-white text-[#9a9d92] hover:border-[#ddd8cb]",
+              ? "border-(--ad-green) bg-(--ad-green-tint) font-semibold text-(--ad-green)"
+              : "border-(--ad-line) bg-(--ad-surface) text-(--ad-ink-faint) hover:border-(--ad-line-strong)",
             className
           )}
         >
-          {value ? <CalendarCheck size={13} className="shrink-0" /> : <CalendarIcon size={13} className="shrink-0 text-[#9a9d92]" />}
+          {value ? <CalendarCheck size={13} className="shrink-0" /> : <CalendarIcon size={13} className="shrink-0 text-(--ad-ink-faint)" />}
           {display}
         </button>
       </PopoverTrigger>
@@ -77,13 +77,13 @@ export function DateTimePicker({
           disabled={minDate ? { before: minDate } : undefined}
           autoFocus
         />
-        <div className="flex items-center gap-2 border-t border-[#ece8df] px-3 py-2.5">
-          <Clock size={13} className="shrink-0 text-[#9a9d92]" />
+        <div className="flex items-center gap-2 border-t border-(--ad-line) px-3 py-2.5">
+          <Clock size={13} className="shrink-0 text-(--ad-ink-faint)" />
           <input
             type="time"
             value={timeValue}
             onChange={handleTimeChange}
-            className="w-full rounded-md border border-[#ece8df] bg-[#fbf9f5] px-2 py-1.5 text-[12.5px] text-[#20211c] outline-none focus:border-[#3c7a5b]"
+            className="w-full rounded-md border border-(--ad-line) bg-(--ad-surface-2) px-2 py-1.5 text-[12.5px] text-(--ad-ink) outline-none focus:border-(--ad-green)"
           />
         </div>
       </PopoverContent>

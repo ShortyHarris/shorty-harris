@@ -10,6 +10,7 @@ import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { useToast, ToastHost } from '../../components/Toast';
 import { RefreshButton } from '../../components/RefreshButton';
 import { useRefreshHandler } from '../../hooks/useRefreshHandler';
+import { PACKS } from '../../lib/pricing';
 import './Billing.css';
 
 const HELP: HelpContent = {
@@ -20,13 +21,6 @@ const HELP: HelpContent = {
     { type: 'p', text: "This page also shows your full payment history and a line-by-line breakdown of every credit spent." },
   ],
 };
-
-interface Pack { credits: number; priceUsd: number; tag?: string; }
-const PACKS: Pack[] = [
-  { credits: 2,  priceUsd: 49 },
-  { credits: 5,  priceUsd: 99,  tag: 'Most popular' },
-  { credits: 10, priceUsd: 179, tag: 'Best value' },
-];
 
 const PAGE_SIZE = 5;
 

@@ -33,6 +33,7 @@ import { useCountrySendHolds } from '../../hooks/useCountrySendHolds';
 import { CountryHoldBanner, EuBadge } from '../../components/CountryHoldBanner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { COUNTRY_OPTIONS, countryName, defaultCampaignCountry, findCountryHold, isEuCountry } from '../../lib/countries';
+import { RequiredMark } from '../../components/RequiredMark';
 
 const HELP: HelpContent = {
   title: 'Campaigns',
@@ -445,7 +446,7 @@ function NewCampaignModal({
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[540px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -477,7 +478,7 @@ function NewCampaignModal({
           {step === 0 && (
             <>
               <div>
-                <label className={fieldLbl}>Campaign name</label>
+                <label className={fieldLbl}>Campaign name<RequiredMark /></label>
                 <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Prague Restaurants Outreach" style={FONT} className={inputCls} />
               </div>
               <div>
@@ -506,6 +507,7 @@ function NewCampaignModal({
               />
               <TagInput
                 label="Search terms"
+                required
                 placeholder="Type a search term and press Enter (e.g. restaurants, cafes, hotels)"
                 helper="Business types, not job titles - e.g. 'dentists' or 'law firms', not 'dentist' or 'lawyer'. 3 to 5 terms works best; separate several with commas, or add them one at a time and press Enter."
                 values={queries}
@@ -516,6 +518,7 @@ function NewCampaignModal({
               />
               <LocationAreaInput
                 label="Target locations"
+                required
                 helper="Add a city or area, or a radius around a point. The 3-location limit counts both kinds together."
                 values={areas}
                 onChange={setAreas}
@@ -541,7 +544,7 @@ function NewCampaignModal({
                 <p className="mt-1 text-[11px] text-[#9a9d92]">Maximum number of businesses to find per search term per location.</p>
               </div>
               <div>
-                <label className={fieldLbl}>Outreach language</label>
+                <label className={fieldLbl}>Outreach language<RequiredMark /></label>
                 <input
                   list="client-new-campaign-languages"
                   value={language}
@@ -556,7 +559,7 @@ function NewCampaignModal({
                 <p className="mt-1 text-[11px] text-[#9a9d92]">Messages and follow-ups will be written in this language.</p>
               </div>
               <div>
-                <label className={fieldLbl}>Target country</label>
+                <label className={fieldLbl}>Target country<RequiredMark /></label>
                 <Select value={country} onValueChange={setPickedCountry}>
                   <SelectTrigger className="h-10 rounded-lg text-[13px] border-[#ece8df] bg-[#fbf9f5] text-[#20211c]" style={FONT} aria-label="Target country">
                     <SelectValue placeholder="Select a country" />
@@ -914,7 +917,7 @@ function CampaignDetailModal({
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[600px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[600px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -962,7 +965,7 @@ function CampaignDetailModal({
         {editing ? (
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
           <div>
-            <label className={fieldLbl}>Campaign name</label>
+            <label className={fieldLbl}>Campaign name<RequiredMark /></label>
             <input value={name} onChange={(e) => setName(e.target.value)} style={FONT} className={inputCls} />
           </div>
 
@@ -987,6 +990,7 @@ function CampaignDetailModal({
 
           <TagInput
             label="Search terms"
+            required
             placeholder="Type a search term and press Enter (e.g. restaurants, cafes, hotels)"
             helper="Separate several with commas, or add them one at a time and press Enter."
             values={queries}
@@ -998,6 +1002,7 @@ function CampaignDetailModal({
 
           <LocationAreaInput
             label="Target locations"
+            required
             helper="Add a city or area, or a radius around a point. The 3-location limit counts both kinds together."
             values={areas}
             onChange={setAreas}
@@ -1019,7 +1024,7 @@ function CampaignDetailModal({
           </div>
 
           <div>
-            <label className={fieldLbl}>Outreach language</label>
+            <label className={fieldLbl}>Outreach language<RequiredMark /></label>
             <input
               list="client-edit-campaign-languages"
               value={language}
@@ -1217,7 +1222,7 @@ function DeleteCampaignModal({
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[80vh] md:max-w-[460px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[460px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}

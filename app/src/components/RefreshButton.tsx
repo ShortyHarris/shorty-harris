@@ -17,7 +17,7 @@ export function RefreshButton({
   return (
     <span className="inline-flex items-center gap-2">
       {!!dataUpdatedAt && (
-        <span className="whitespace-nowrap text-[11px] text-[#9a9d92]">
+        <span className="whitespace-nowrap text-[11px] text-(--ad-ink-faint)">
           {isFetching ? 'Updating…' : `Updated ${formatRelativeTime(dataUpdatedAt)}`}
         </span>
       )}

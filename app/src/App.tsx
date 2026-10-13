@@ -16,6 +16,8 @@ import { initSmartlook, identifySmartlookUser } from './lib/smartlook';
 import { queryClient } from './lib/queryClient';
 import { getConsent, onConsentChange, applyStoredConsent } from './lib/consent';
 import { CookieConsent } from './components/CookieConsent';
+import { loadGoogleAnalytics, trackPageView } from './lib/googleAnalytics';
+import './styles/admin-palette.css';
 import './styles/theme-admin.css';
 import './styles/theme-client.css';
 import { Home } from './screens/Home';
@@ -421,6 +423,34 @@ function ScrollToTop() {
   return null;
 }
 
+// Sends a GA4 page_view on the first load and every client-side route change,
+// since the config call has send_page_view: false and the GA property's
+// history-based page change tracking is off. Only runs with analytics consent,
+// and also fires for the current page when consent is granted later.
+// Rendered after the routes so their effects (e.g. document.title) run first.
+function GoogleAnalyticsPageViews() {
+  const { pathname, search } = useLocation();
+  const pagePath = pathname + search;
+
+  useEffect(() => {
+    if (!getConsent().analytics) return;
+    // Idempotent; needed because this child effect runs before App's
+    // applyStoredConsent() on the first render.
+    loadGoogleAnalytics();
+    trackPageView(pagePath);
+  }, [pagePath]);
+
+  useEffect(() => {
+    return onConsentChange((state) => {
+      if (!state.analytics) return;
+      loadGoogleAnalytics();
+      trackPageView(pagePath);
+    });
+  }, [pagePath]);
+
+  return null;
+}
+
 export default function App() {
   useEffect(() => {
     applyStoredConsent();
@@ -432,6 +462,7 @@ export default function App() {
       <Suspense fallback={<Spinner />}>
         <AppRoutes />
       </Suspense>
+      <GoogleAnalyticsPageViews />
       <CookieConsent />
     </BrowserRouter>
   );

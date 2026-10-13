@@ -18,10 +18,10 @@ const HELP: HelpContent = {
 };
 
 const SEVERITY_PILL: Record<InsightSeverityRank, { bg: string; text: string; label: string }> = {
-  critical: { bg: '#f6e8e2', text: '#a8533a', label: 'Critical' },
-  warning:  { bg: '#f8efdb', text: '#b9831f', label: 'Warning' },
-  info:     { bg: '#f0ecf8', text: '#6b4fa0', label: 'Info' },
-  none:     { bg: '#f5f2ec', text: '#62655c', label: 'All clear' },
+  critical: { bg: 'var(--ad-clay-tint)', text: 'var(--ad-clay)', label: 'Critical' },
+  warning:  { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)', label: 'Warning' },
+  info:     { bg: 'var(--ad-purple-tint)', text: 'var(--ad-purple)', label: 'Info' },
+  none:     { bg: 'var(--ad-fill)', text: 'var(--ad-ink-soft)', label: 'All clear' },
 };
 
 export function AdminResults() {
@@ -29,17 +29,17 @@ export function AdminResults() {
   const { toasts, toast, dismiss } = useToast();
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh results.');
 
-  const ghostCls = 'cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]';
+  const ghostCls = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
 
   return (
     <div style={FONT} className="flex flex-col gap-6">
       <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
-          <h1 className="m-0 text-[26px] flex items-center gap-2 font-extrabold tracking-tight text-[#20211c]">
-            <Filter size={22} className="text-[#3c7a5b]" />
+          <h1 className="m-0 text-[26px] flex items-center gap-2 font-extrabold tracking-tight text-(--ad-ink)">
+            <Filter size={22} className="text-(--ad-green)" />
             Results
           </h1>
-          <p className="m-0 mt-1 text-[13px] text-[#62655c]">Every client's funnel and insights, worst first</p>
+          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">Every client's funnel and insights, worst first</p>
         </div>
         <div className="flex items-center gap-2 md:gap-2.5 shrink-0">
           <HelpButton content={HELP} />
@@ -48,14 +48,14 @@ export function AdminResults() {
       </header>
 
       {error && (
-        <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{error}</div>
+        <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{error}</div>
       )}
 
       {loading ? (
         <SkeletonTable rows={8} cols={6} />
       ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-          <strong className="text-[15px] font-bold text-[#20211c]">No clients yet.</strong>
+        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
+          <strong className="text-[15px] font-bold text-(--ad-ink)">No clients yet.</strong>
         </div>
       ) : (
         <div className="atbl">
@@ -80,23 +80,23 @@ export function AdminResults() {
                 const pill = SEVERITY_PILL[r.top_severity];
                 return (
                   <tr key={r.client_id}>
-                    <td className="min-w-0 font-semibold text-[#20211c]">
+                    <td className="min-w-0 font-semibold text-(--ad-ink)">
                       <Link
                         to={`/admin/impersonate/${r.client_id}/results`}
-                        className="block truncate no-underline text-[#20211c] hover:text-[#3c7a5b]"
+                        className="block truncate no-underline text-(--ad-ink) hover:text-(--ad-green)"
                         title={r.business_name}
                       >
                         {r.business_name}
                       </Link>
                     </td>
-                    <td className="text-[#62655c]">{r.sent}</td>
-                    <td className={r.awaiting_approval > 0 ? 'font-semibold text-[#a8533a]' : 'text-[#62655c]'}>{r.awaiting_approval}</td>
-                    <td className={r.hot_leads_open > 0 ? 'font-semibold text-[#a8533a]' : 'text-[#62655c]'}>{r.hot_leads_open}</td>
-                    <td className="text-[#62655c]">{r.bounce_rate}%</td>
+                    <td className="text-(--ad-ink-soft)">{r.sent}</td>
+                    <td className={r.awaiting_approval > 0 ? 'font-semibold text-(--ad-clay)' : 'text-(--ad-ink-soft)'}>{r.awaiting_approval}</td>
+                    <td className={r.hot_leads_open > 0 ? 'font-semibold text-(--ad-clay)' : 'text-(--ad-ink-soft)'}>{r.hot_leads_open}</td>
+                    <td className="text-(--ad-ink-soft)">{r.bounce_rate}%</td>
                     <td className="min-w-0">
                       <span className="atbl-pill" style={{ background: pill.bg, color: pill.text }}>{pill.label}</span>
                       {r.top_headline && (
-                        <div className="mt-1 truncate text-[12px] text-[#9a9d92]" title={r.top_headline}>{r.top_headline}</div>
+                        <div className="mt-1 truncate text-[12px] text-(--ad-ink-faint)" title={r.top_headline}>{r.top_headline}</div>
                       )}
                     </td>
                   </tr>

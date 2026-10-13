@@ -5,6 +5,7 @@ import {
   type TargetArea, areaDisplayLabel, clampMiles, milesToKm, MAX_RADIUS_MILES, MIN_RADIUS_MILES,
 } from '../lib/targetAreas';
 import type { MapCircle } from './RadiusMap';
+import { RequiredMark } from './RequiredMark';
 
 // mapbox-gl is large, so the map (and its CSS) loads as a separate chunk the
 // first time a place is picked.
@@ -18,16 +19,17 @@ class MapBoundary extends Component<{ onError: () => void; children: ReactNode }
 }
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
-const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
-const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
 /* Target locations - either a plain place name, or a radius around a
    geocoded point. The 3-location cap counts both kinds together, so this
    takes a single `maxItems` the same way TagInput does. */
 export function LocationAreaInput({
-  label, helper, values, onChange, maxItems, capLabel,
+  label, helper, values, onChange, maxItems, capLabel, required,
 }: {
   label: string;
+  required?: boolean;
   helper?: string;
   values: TargetArea[];
   onChange: (v: TargetArea[]) => void;
@@ -153,23 +155,23 @@ export function LocationAreaInput({
 
   return (
     <div>
-      <label className={fieldLbl}>{label}</label>
+      <label className={fieldLbl}>{label}{required && <RequiredMark />}</label>
 
       {values.length > 0 && (
         <div className="mb-2 flex flex-col gap-1.5">
           {values.map((v, i) => (
             <div
               key={`${v.label}-${i}`}
-              className={`flex items-center justify-between gap-2 rounded-lg border bg-[#fbf9f5] px-3 py-2 text-[12.5px] text-[#20211c] ${editingIndex === i ? 'border-[#3c7a5b]' : 'border-[#ece8df]'}`}
+              className={`flex items-center justify-between gap-2 rounded-lg border bg-(--ad-surface-2) px-3 py-2 text-[12.5px] text-(--ad-ink) ${editingIndex === i ? 'border-(--ad-green)' : 'border-(--ad-line)'}`}
             >
               {v.mode === 'radius' ? (
                 <button
                   type="button"
                   onClick={() => selectArea(i)}
                   title="Adjust this area"
-                  className={`flex min-w-0 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-[12.5px] text-[#20211c] ${editingIndex === i ? 'font-bold' : ''}`}
+                  className={`flex min-w-0 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-[12.5px] text-(--ad-ink) ${editingIndex === i ? 'font-bold' : ''}`}
                 >
-                  <MapPin size={12} className="shrink-0 text-[#3c7a5b]" />
+                  <MapPin size={12} className="shrink-0 text-(--ad-green)" />
                   <span className="truncate">{areaDisplayLabel(v)}</span>
                 </button>
               ) : (
@@ -179,7 +181,7 @@ export function LocationAreaInput({
                 type="button"
                 onClick={() => removeArea(i)}
                 aria-label={`Remove ${v.label}`}
-                className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-[#9a9d92] hover:text-[#20211c]"
+                className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-(--ad-ink-faint) hover:text-(--ad-ink)"
               >
                 <X size={14} />
               </button>
@@ -189,7 +191,7 @@ export function LocationAreaInput({
       )}
 
       {!showEditor ? (
-        <p className="m-0 text-[11px] text-[#b9831f]">
+        <p className="m-0 text-[11px] text-(--ad-amber)">
           You've reached the {maxItems}{capLabel ? ` ${capLabel}` : ''} limit. Remove one to add another.
         </p>
       ) : (
@@ -198,14 +200,14 @@ export function LocationAreaInput({
             <button
               type="button"
               onClick={() => setMode('text')}
-              className={`cursor-pointer rounded-md border px-2.5 py-1 text-[11.5px] font-semibold ${mode === 'text' ? 'border-[#3c7a5b] bg-[#edf4ef] text-[#3c7a5b]' : 'border-[#ece8df] bg-transparent text-[#62655c]'}`}
+              className={`cursor-pointer rounded-md border px-2.5 py-1 text-[11.5px] font-semibold ${mode === 'text' ? 'border-(--ad-green) bg-(--ad-green-tint) text-(--ad-green)' : 'border-(--ad-line) bg-transparent text-(--ad-ink-soft)'}`}
             >
               City or area
             </button>
             <button
               type="button"
               onClick={() => setMode('radius')}
-              className={`cursor-pointer rounded-md border px-2.5 py-1 text-[11.5px] font-semibold ${mode === 'radius' ? 'border-[#3c7a5b] bg-[#edf4ef] text-[#3c7a5b]' : 'border-[#ece8df] bg-transparent text-[#62655c]'}`}
+              className={`cursor-pointer rounded-md border px-2.5 py-1 text-[11.5px] font-semibold ${mode === 'radius' ? 'border-(--ad-green) bg-(--ad-green-tint) text-(--ad-green)' : 'border-(--ad-line) bg-transparent text-(--ad-ink-soft)'}`}
             >
               Within X miles of a point
             </button>
@@ -221,7 +223,7 @@ export function LocationAreaInput({
                 style={FONT}
                 className={`${inputCls} flex-1`}
               />
-              <button type="button" onClick={addTextArea} className="cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3.5 py-2.5 text-[12.5px] font-bold text-white">Add</button>
+              <button type="button" onClick={addTextArea} className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-3.5 py-2.5 text-[12.5px] font-bold text-white">Add</button>
             </div>
           )}
 
@@ -238,20 +240,20 @@ export function LocationAreaInput({
                       style={FONT}
                       className={`${inputCls} flex-1`}
                     />
-                    <button type="button" onClick={runSearch} disabled={searching} className="cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3 py-2.5 text-white disabled:opacity-50">
+                    <button type="button" onClick={runSearch} disabled={searching} className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-3 py-2.5 text-white disabled:opacity-50">
                       <Search size={14} />
                     </button>
                   </div>
-                  {searching && <p className="m-0 text-[11.5px] text-[#9a9d92]">Searching…</p>}
-                  {searchErr && <p className="m-0 text-[11.5px] text-[#a8533a]">{searchErr}</p>}
+                  {searching && <p className="m-0 text-[11.5px] text-(--ad-ink-faint)">Searching…</p>}
+                  {searchErr && <p className="m-0 text-[11.5px] text-(--ad-clay)">{searchErr}</p>}
                   {results.length > 0 && (
-                    <div className="overflow-hidden rounded-lg border border-[#ece8df]">
+                    <div className="overflow-hidden rounded-lg border border-(--ad-line)">
                       {results.map((r) => (
                         <button
                           key={`${r.lat},${r.lng}`}
                           type="button"
                           onClick={() => pickResult(r)}
-                          className="block w-full cursor-pointer border-0 border-b border-[#f5f2ec] bg-white px-3 py-2 text-left text-[12.5px] last:border-0 hover:bg-[#fbf9f5]"
+                          className="block w-full cursor-pointer border-0 border-b border-(--ad-fill) bg-(--ad-surface) px-3 py-2 text-left text-[12.5px] last:border-0 hover:bg-(--ad-surface-2)"
                         >
                           {r.label}
                         </button>
@@ -260,8 +262,8 @@ export function LocationAreaInput({
                   )}
                 </>
               ) : (
-                <div className="rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3 py-3">
-                  <label htmlFor="area-label" className="mb-1 block text-[11px] text-[#9a9d92]">Label</label>
+                <div className="rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3 py-3">
+                  <label htmlFor="area-label" className="mb-1 block text-[11px] text-(--ad-ink-faint)">Label</label>
                   <input
                     id="area-label"
                     value={picked.label}
@@ -269,11 +271,11 @@ export function LocationAreaInput({
                     style={FONT}
                     className={`${inputCls} mb-2`}
                   />
-                  {labelNote && <p className="m-0 mb-2 text-[11.5px] text-[#b9831f]">{labelNote}</p>}
+                  {labelNote && <p className="m-0 mb-2 text-[11.5px] text-(--ad-amber)">{labelNote}</p>}
                   {mapEnabled && (
                     <div className="mb-3">
                       <MapBoundary onError={failMap}>
-                        <Suspense fallback={<div className="flex h-[240px] w-full items-center justify-center rounded-lg border border-[#ece8df] bg-white text-[11.5px] text-[#9a9d92]">Loading map…</div>}>
+                        <Suspense fallback={<div className="flex h-[240px] w-full items-center justify-center rounded-lg border border-(--ad-line) bg-(--ad-surface) text-[11.5px] text-(--ad-ink-faint)">Loading map…</div>}>
                           <RadiusMap
                             center={{ lat: Number(picked.lat), lng: Number(picked.lng) }}
                             radiusKm={milesToKm(miles)}
@@ -283,10 +285,10 @@ export function LocationAreaInput({
                           />
                         </Suspense>
                       </MapBoundary>
-                      <p className="mt-1 mb-0 text-[11px] text-[#9a9d92]">Drag the pin or tap the map to move it.</p>
+                      <p className="mt-1 mb-0 text-[11px] text-(--ad-ink-faint)">Drag the pin or tap the map to move it.</p>
                     </div>
                   )}
-                  <label className="mb-1 block text-[11px] text-[#9a9d92]">Within {miles} mile{miles === 1 ? '' : 's'}</label>
+                  <label className="mb-1 block text-[11px] text-(--ad-ink-faint)">Within {miles} mile{miles === 1 ? '' : 's'}</label>
                   <input
                     type="range"
                     min={MIN_RADIUS_MILES}
@@ -296,10 +298,10 @@ export function LocationAreaInput({
                     className="w-full"
                   />
                   <div className="mt-2 flex gap-2">
-                    <button type="button" onClick={addRadiusArea} className="cursor-pointer rounded-lg border-0 bg-[#3c7a5b] px-3.5 py-2 text-[12.5px] font-bold text-white">
+                    <button type="button" onClick={addRadiusArea} className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-3.5 py-2 text-[12.5px] font-bold text-white">
                       {editingIndex !== null ? 'Update' : 'Add'} "Within {miles} mile{miles === 1 ? '' : 's'} of {picked.label}"
                     </button>
-                    <button type="button" onClick={clearPicked} className="cursor-pointer rounded-lg border border-[#ece8df] bg-transparent px-3.5 py-2 text-[12.5px] font-semibold text-[#62655c]">{editingIndex !== null ? 'Cancel' : 'Back'}</button>
+                    <button type="button" onClick={clearPicked} className="cursor-pointer rounded-lg border border-(--ad-line) bg-transparent px-3.5 py-2 text-[12.5px] font-semibold text-(--ad-ink-soft)">{editingIndex !== null ? 'Cancel' : 'Back'}</button>
                   </div>
                 </div>
               )}
@@ -308,7 +310,7 @@ export function LocationAreaInput({
         </>
       )}
 
-      {helper && showEditor && <p className="mt-1 text-[11px] text-[#9a9d92]">{helper}</p>}
+      {helper && showEditor && <p className="mt-1 text-[11px] text-(--ad-ink-faint)">{helper}</p>}
     </div>
   );
 }

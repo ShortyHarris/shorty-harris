@@ -19,9 +19,9 @@ const HELP: HelpContent = {
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
 const SEV_PILL: Record<string, { bg: string; text: string; border?: string }> = {
-  warning:  { bg: '#f8efdb', text: '#b9831f' },
-  error:    { bg: '#f6e8e2', text: '#a8533a', border: '1px solid rgba(168,83,58,0.2)' },
-  critical: { bg: '#a8533a', text: '#fff' },
+  warning:  { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
+  error:    { bg: 'var(--ad-clay-tint)', text: 'var(--ad-clay)', border: '1px solid rgba(168,83,58,0.2)' },
+  critical: { bg: 'var(--ad-clay)', text: '#fff' },
 };
 
 const PAGE_SIZE = 10;
@@ -35,12 +35,12 @@ function daysAgo(iso: string): number {
 function EscalatedLeadsTab() {
   const { rows, loading, error } = useEscalatedHotLeads();
   if (loading) return <SkeletonTable rows={PAGE_SIZE} cols={4} />;
-  if (error) return <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{error}</div>;
+  if (error) return <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{error}</div>;
   if (rows.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-        <strong className="text-[15px] font-bold text-[#20211c]">Nothing escalated.</strong>
-        <span className="text-[13px] text-[#62655c]">No hot leads are sitting unattended.</span>
+      <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
+        <strong className="text-[15px] font-bold text-(--ad-ink)">Nothing escalated.</strong>
+        <span className="text-[13px] text-(--ad-ink-soft)">No hot leads are sitting unattended.</span>
       </div>
     );
   }
@@ -57,10 +57,10 @@ function EscalatedLeadsTab() {
         <tbody>
           {rows.map((r) => (
             <tr key={r.id}>
-              <td className="font-semibold text-[#20211c]">{r.business_name}</td>
-              <td className="text-[#62655c]">{r.client?.business_name ?? 'Unknown client'}</td>
-              <td className="font-semibold text-[#a8533a]">{daysAgo(r.routed_at)}d waiting</td>
-              <td className="text-[#62655c]">{r.nudge_count} nudge{r.nudge_count === 1 ? '' : 's'}</td>
+              <td className="font-semibold text-(--ad-ink)">{r.business_name}</td>
+              <td className="text-(--ad-ink-soft)">{r.client?.business_name ?? 'Unknown client'}</td>
+              <td className="font-semibold text-(--ad-clay)">{daysAgo(r.routed_at)}d waiting</td>
+              <td className="text-(--ad-ink-soft)">{r.nudge_count} nudge{r.nudge_count === 1 ? '' : 's'}</td>
             </tr>
           ))}
         </tbody>
@@ -73,12 +73,12 @@ function EscalatedLeadsTab() {
 function FailedNotificationsTab() {
   const { rows, loading, error } = useFailedNotifications();
   if (loading) return <SkeletonTable rows={PAGE_SIZE} cols={4} />;
-  if (error) return <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{error}</div>;
+  if (error) return <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{error}</div>;
   if (rows.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-        <strong className="text-[15px] font-bold text-[#20211c]">All delivered.</strong>
-        <span className="text-[13px] text-[#62655c]">No failed or cancelled notifications.</span>
+      <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
+        <strong className="text-[15px] font-bold text-(--ad-ink)">All delivered.</strong>
+        <span className="text-[13px] text-(--ad-ink-soft)">No failed or cancelled notifications.</span>
       </div>
     );
   }
@@ -95,16 +95,16 @@ function FailedNotificationsTab() {
         <tbody>
           {rows.map((r) => (
             <tr key={r.id}>
-              <td className="font-semibold text-[#20211c]">{r.client?.business_name ?? 'Unknown client'}</td>
-              <td className="text-[#62655c]">
+              <td className="font-semibold text-(--ad-ink)">{r.client?.business_name ?? 'Unknown client'}</td>
+              <td className="text-(--ad-ink-soft)">
                 {r.channel}{r.purpose ? ` · ${r.purpose}` : ''}{r.recipient ? ` · ${r.recipient}` : ''}
               </td>
               <td>
-                <span className="atbl-pill" style={{ background: r.status === 'failed' ? '#f6e8e2' : '#f5f2ec', color: r.status === 'failed' ? '#a8533a' : '#62655c' }}>
+                <span className="atbl-pill" style={{ background: r.status === 'failed' ? 'var(--ad-clay-tint)' : 'var(--ad-fill)', color: r.status === 'failed' ? 'var(--ad-clay)' : 'var(--ad-ink-soft)' }}>
                   {r.status}
                 </span>
               </td>
-              <td className="text-[12px] text-[#9a9d92] whitespace-nowrap">{new Date(r.created_at).toLocaleDateString()}</td>
+              <td className="text-[12px] text-(--ad-ink-faint) whitespace-nowrap">{new Date(r.created_at).toLocaleDateString()}</td>
             </tr>
           ))}
         </tbody>
@@ -117,14 +117,18 @@ function ErrorLogsTab() {
   const { rows, loading, isFetching, dataUpdatedAt, error, resolve, showResolved, setShowResolved, reload } = useErrorLogs();
   const { toasts, toast, dismiss } = useToast();
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh error logs.');
+  async function doResolve(id: string) {
+    const { error: err } = await resolve(id);
+    if (err) toast(`Couldn't resolve the error: ${err}`, 'error'); else toast('Error marked as resolved.');
+  }
   const [page, setPage] = useState(1);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
   const paged      = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const ghostCls = 'cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]';
-  const pagBtnCls = 'cursor-pointer rounded-lg border border-[#ddd8cb] bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-[#20211c] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-40';
+  const ghostCls = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
+  const pagBtnCls = 'cursor-pointer rounded-lg border border-(--ad-line-strong) bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-(--ad-ink) transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <div className="flex flex-col gap-4">
@@ -133,8 +137,8 @@ function ErrorLogsTab() {
           onClick={() => { setShowResolved(!showResolved); setPage(1); }}
           className={`cursor-pointer whitespace-nowrap rounded-xl border px-4 py-2 text-[13px] font-semibold transition-colors ${
             showResolved
-              ? 'border-[#3c7a5b] bg-[#edf4ef] text-[#3c7a5b]'
-              : 'border-[#ece8df] bg-transparent text-[#62655c] hover:border-[#ddd8cb] hover:bg-[#fbf9f5]'
+              ? 'border-(--ad-green) bg-(--ad-green-tint) text-(--ad-green)'
+              : 'border-(--ad-line) bg-transparent text-(--ad-ink-soft) hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)'
           }`}
         >
           {showResolved ? 'Hiding resolved' : 'Show resolved'}
@@ -143,15 +147,15 @@ function ErrorLogsTab() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{error}</div>
+        <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{error}</div>
       )}
 
       {loading ? (
         <SkeletonTable rows={PAGE_SIZE} cols={6} />
       ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-          <strong className="text-[15px] font-bold text-[#20211c]">All clear.</strong>
-          <span className="text-[13px] text-[#62655c]">No {showResolved ? '' : 'unresolved '}errors.</span>
+        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
+          <strong className="text-[15px] font-bold text-(--ad-ink)">All clear.</strong>
+          <span className="text-[13px] text-(--ad-ink-soft)">No {showResolved ? '' : 'unresolved '}errors.</span>
         </div>
       ) : (
         <>
@@ -160,14 +164,14 @@ function ErrorLogsTab() {
             <table>
               <thead>
                 <tr>
-                  {['Severity', 'Source', 'Type', 'Message', 'When', ''].map((h) => (
+                  {['Severity', 'Source', 'Message', 'When', ''].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {paged.map((e) => {
-                  const pill = SEV_PILL[e.severity] ?? { bg: '#f5f2ec', text: '#62655c' };
+                  const pill = SEV_PILL[e.severity] ?? { bg: 'var(--ad-fill)', text: 'var(--ad-ink-soft)' };
                   return (
                     <tr key={e.id}>
                       <td>
@@ -176,23 +180,22 @@ function ErrorLogsTab() {
                         </span>
                       </td>
                       <td>
-                        <span className="rounded-sm border border-[#ece8df] bg-[#fbf9f5] px-2 py-0.5 font-mono text-[11px] text-[#62655c]">{e.source}</span>
+                        <span className="rounded-sm border border-(--ad-line) bg-(--ad-surface-2) px-2 py-0.5 font-mono text-[11px] text-(--ad-ink-soft)">{e.source}</span>
                       </td>
-                      <td className="text-[12px] font-medium text-[#62655c]">{e.error_type}</td>
-                      <td className="max-w-90 text-[#20211c]">
+                      <td className="max-w-90 text-(--ad-ink)">
                         <div className="leading-relaxed">{e.message}</div>
                         {e.retry_count > 0 && (
-                          <div className="mt-0.5 text-[12px] text-[#9a9d92]">{e.retry_count} retries</div>
+                          <div className="mt-0.5 text-[12px] text-(--ad-ink-faint)">{e.retry_count} retries</div>
                         )}
                       </td>
-                      <td className="text-[12px] text-[#9a9d92] whitespace-nowrap">
+                      <td className="text-[12px] text-(--ad-ink-faint) whitespace-nowrap">
                         {new Date(e.created_at).toLocaleString()}
                       </td>
                       <td>
                         {!e.resolved && (
                           <button
-                            onClick={() => resolve(e.id)}
-                            className="cursor-pointer rounded-lg border border-[#ece8df] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                            onClick={() => doResolve(e.id)}
+                            className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
                           >
                             Resolve
                           </button>
@@ -208,27 +211,26 @@ function ErrorLogsTab() {
           {/* Mobile cards */}
           <div className="md:hidden flex flex-col gap-3">
             {paged.map((e) => {
-              const pill = SEV_PILL[e.severity] ?? { bg: '#f5f2ec', text: '#62655c' };
+              const pill = SEV_PILL[e.severity] ?? { bg: 'var(--ad-fill)', text: 'var(--ad-ink-soft)' };
               return (
-                <div key={e.id} className="rounded-xl border border-[#ece8df] bg-white p-4">
+                <div key={e.id} className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
                   <div className="flex items-start justify-between">
                     <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
                       className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
                       {e.severity}
                     </span>
-                    <span className="rounded border border-[#ece8df] bg-[#fbf9f5] px-2 py-0.5 font-mono text-[11px] text-[#62655c]">{e.source}</span>
+                    <span className="rounded border border-(--ad-line) bg-(--ad-surface-2) px-2 py-0.5 font-mono text-[11px] text-(--ad-ink-soft)">{e.source}</span>
                   </div>
-                  <div className="mt-2 text-[12px] font-medium text-[#62655c]">{e.error_type}</div>
-                  <div className="mt-1 text-[13px] leading-relaxed text-[#20211c]">{e.message}</div>
+                  <div className="mt-2 text-[13px] leading-relaxed text-(--ad-ink)">{e.message}</div>
                   {e.retry_count > 0 && (
-                    <div className="text-[12px] text-[#9a9d92]">{e.retry_count} retries</div>
+                    <div className="text-[12px] text-(--ad-ink-faint)">{e.retry_count} retries</div>
                   )}
                   <div className="mt-3 flex items-center justify-between">
-                    <span className="text-[12px] text-[#9a9d92]">{new Date(e.created_at).toLocaleString()}</span>
+                    <span className="text-[12px] text-(--ad-ink-faint)">{new Date(e.created_at).toLocaleString()}</span>
                     {!e.resolved && (
                       <button
-                        onClick={() => resolve(e.id)}
-                        className="cursor-pointer rounded-lg border border-[#ece8df] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                        onClick={() => doResolve(e.id)}
+                        className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
                       >
                         Resolve
                       </button>
@@ -241,7 +243,7 @@ function ErrorLogsTab() {
 
           {/* Shared pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between rounded-lg border border-[#ece8df] bg-white px-4 py-3 text-[12.5px] text-[#9a9d92]">
+            <div className="flex items-center justify-between rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3 text-[12.5px] text-(--ad-ink-faint)">
               <span>Page {safePage} of {totalPages}</span>
               <div className="flex gap-2">
                 <button onClick={() => setPage(safePage - 1)} disabled={safePage <= 1} className={pagBtnCls}>Previous</button>
@@ -278,8 +280,8 @@ export function Monitoring() {
     <div style={FONT} className="flex flex-col gap-6">
       <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
-          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-[#20211c]"> <img src="https://cdn-icons-png.flaticon.com/128/15525/15525396.png" alt="Monitoring" className="w-8 h-8" />Monitoring</h1>
-          <p className="m-0 mt-1 text-[13px] text-[#62655c]">System errors and workflow failures</p>
+          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)"> <img src="https://cdn-icons-png.flaticon.com/128/15525/15525396.png" alt="Monitoring" className="w-8 h-8" />Monitoring</h1>
+          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">System errors and workflow failures</p>
         </div>
         <HelpButton content={HELP} />
       </header>
@@ -292,14 +294,14 @@ export function Monitoring() {
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`-mb-px shrink-0 cursor-pointer inline-flex items-center gap-1.5 border-b-2 px-4 py-3 text-[13px] font-semibold whitespace-nowrap transition-colors ${
-                active ? 'border-[#3c7a5b] text-[#3c7a5b]' : 'border-transparent text-[#9a9d92] hover:text-[#62655c]'
+                active ? 'border-(--ad-green) text-(--ad-green)' : 'border-transparent text-(--ad-ink-faint) hover:text-(--ad-ink-soft)'
               }`}
             >
-              {t.key === 'escalated' && <AlertTriangle size={14} className={active ? 'text-[#a8533a]' : 'text-[#c4bfb5]'} />}
+              {t.key === 'escalated' && <AlertTriangle size={14} className={active ? 'text-(--ad-clay)' : 'text-(--ad-ink-ghost)'} />}
               {t.label}
               {t.count > 0 && (
                 <span className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10.5px] font-bold ${
-                  active ? 'bg-[#edf4ef] text-[#3c7a5b]' : 'bg-[#f5f2ec] text-[#9a9d92]'
+                  active ? 'bg-(--ad-green-tint) text-(--ad-green)' : 'bg-(--ad-fill) text-(--ad-ink-faint)'
                 }`}>{t.count}</span>
               )}
             </button>

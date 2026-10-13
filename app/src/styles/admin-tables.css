@@ -10,8 +10,8 @@
     overflow-x: auto;
     overflow-y: hidden;
     border-radius: 10px;
-    border: 1px solid #e8e3da;
-    background: #ffffff;
+    border: 1px solid var(--ad-line);
+    background: var(--ad-surface);
     box-shadow: 0 1px 2px rgba(32,33,28,.04);
   }
 
@@ -26,7 +26,7 @@
 
   /* ── Head ────────────────────────────────────────────────────────── */
   .atbl thead tr {
-    border-bottom: 1px solid #ece8df;
+    border-bottom: 1px solid var(--ad-line);
   }
 
   .atbl thead th {
@@ -36,20 +36,20 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.11em;
-    color: #a8aba0;
+    color: var(--ad-ink-faint);
     white-space: nowrap;
   }
 
   /* ── Body rows ────────────────────────────────────────────────────── */
   .atbl tbody tr {
-    border-bottom: 1px solid #f2ede7;
+    border-bottom: 1px solid var(--ad-line);
     transition: background 0.1s;
   }
   .atbl tbody tr:last-child {
     border-bottom: none;
   }
   .atbl tbody tr:hover {
-    background: #faf9f7;
+    background: var(--ad-surface-2);
   }
 
   /* ── Body cells ───────────────────────────────────────────────────── */
@@ -76,7 +76,7 @@
   .atbl-tabs {
     display: flex;
     align-items: center;
-    border-bottom: 1px solid #ece8df;
+    border-bottom: 1px solid var(--ad-line);
     padding: 0 4px;
   }
 }

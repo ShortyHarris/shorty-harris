@@ -50,7 +50,7 @@
   }
   .ab-variant.winning {
     background: var(--approve-tint);
-    border-color: #a9d6c1;
+    border-color: var(--ad-green-line);
   }
   .ab-key {
     @apply text-[13px] font-semibold flex items-center gap-2;

@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   useClients, createClient, sendClientInvite, updateClientLoginEmail,
   updateClient, getClientDeleteCounts, deleteClient, getClientUsage,
+  adjustClientCredits, getClientCreditHistory,
 } from '../../hooks/useAdminData';
 import type {
-  NewClientInput, UpdateClientInput, ClientListRow, ClientDeleteCounts, ClientUsage,
+  NewClientInput, UpdateClientInput, ClientListRow, ClientDeleteCounts, ClientUsage, CreditTransaction,
 } from '../../hooks/useAdminData';
 import { SkeletonTable } from '../../components/Skeleton';
 import { RowMenu } from '../../components/RowMenu';
@@ -15,6 +16,7 @@ import { useToast, ToastHost } from '../../components/Toast';
 import { RefreshButton } from '../../components/RefreshButton';
 import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import { isValidEmail, isValidPhone, normalizePhone } from '../../lib/validation';
+import { RequiredMark } from '../../components/RequiredMark';
 
 const HELP: HelpContent = {
   title: 'Clients',
@@ -35,24 +37,24 @@ import {
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
 const CHANNEL_PILL: Record<string, { bg: string; text: string }> = {
-  whatsapp: { bg: '#edf4ef', text: '#3c7a5b' },
-  sms:      { bg: '#f8efdb', text: '#b9831f' },
+  whatsapp: { bg: 'var(--ad-green-tint)', text: 'var(--ad-green)' },
+  sms:      { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
 };
 
 const STATUS_PILL: Record<string, { bg: string; text: string }> = {
-  draft:   { bg: '#f5f2ec', text: '#62655c' },
-  active:  { bg: '#edf4ef', text: '#3c7a5b' },
-  paused:  { bg: '#f8efdb', text: '#b9831f' },
-  churned: { bg: '#f5f2ec', text: '#9a9d92' },
+  draft:   { bg: 'var(--ad-fill)', text: 'var(--ad-ink-soft)' },
+  active:  { bg: 'var(--ad-green-tint)', text: 'var(--ad-green)' },
+  paused:  { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
+  churned: { bg: 'var(--ad-fill)', text: 'var(--ad-ink-faint)' },
 };
 
-const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]';
-const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50';
-const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#a8533a] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#8a3f2b] disabled:opacity-50';
+const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
+const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
+const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50';
 const PAGE_SIZE  = 15;
 
-const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
-const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
 type InvitePhase = 'idle' | 'sending' | 'sent' | 'active' | 'error';
 
@@ -65,6 +67,7 @@ export function Clients() {
   const [editClient, setEditClient]     = useState<ClientListRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClientListRow | null>(null);
   const [changeEmailTarget, setChangeEmailTarget] = useState<ClientListRow | null>(null);
+  const [creditsTarget, setCreditsTarget] = useState<ClientListRow | null>(null);
   const [page, setPage]           = useState(1);
   const [invitePhase, setInvitePhase]   = useState<Record<string, InvitePhase>>({});
   const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
@@ -80,27 +83,33 @@ export function Clients() {
     const { error: err, alreadyActive } = await sendClientInvite(c.id, c.contact_email, c.business_name);
     if (err) {
       setInvitePhase((p) => ({ ...p, [c.id]: alreadyActive ? 'active' : 'error' }));
-      if (!alreadyActive) setInviteErrors((e) => ({ ...e, [c.id]: err }));
+      if (!alreadyActive) {
+        setInviteErrors((e) => ({ ...e, [c.id]: err }));
+        toast(`Couldn't send invite to ${c.business_name}: ${err}`, 'error');
+      } else {
+        toast(`${c.business_name} already has an active account.`, 'warning');
+      }
       // The edge function persists activated_at once it discovers a genuinely
       // active account - reload so future page loads skip the round trip and
       // show the disabled state up front instead of only finding out on click.
       if (alreadyActive) reload();
     } else {
       setInvitePhase((p) => ({ ...p, [c.id]: 'sent' }));
+      toast(`Invite sent to ${c.contact_email}.`);
     }
   }
 
-  const pagBtnCls = 'cursor-pointer rounded-lg border border-[#ddd8cb] bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-[#20211c] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-40';
+  const pagBtnCls = 'cursor-pointer rounded-lg border border-(--ad-line-strong) bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-(--ad-ink) transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <div style={FONT} className="flex flex-col gap-6">
       <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
-          <h1 className="m-0 text-[26px] flex items-center gap-2 font-extrabold tracking-tight text-[#20211c]">
+          <h1 className="m-0 text-[26px] flex items-center gap-2 font-extrabold tracking-tight text-(--ad-ink)">
             <img src="https://cdn-icons-png.flaticon.com/128/143/143438.png" alt="Clients" className="w-9 h-9" />
             Clients
           </h1>
-          <p className="m-0 mt-1 text-[13px] text-[#62655c]">{rows.length} client{rows.length !== 1 ? 's' : ''}</p>
+          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">{rows.length} client{rows.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton content={HELP} />
@@ -110,15 +119,15 @@ export function Clients() {
       </header>
 
       {error && (
-        <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{error}</div>
+        <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{error}</div>
       )}
 
       {loading ? (
-        <SkeletonTable rows={PAGE_SIZE} cols={6} />
+        <SkeletonTable rows={PAGE_SIZE} cols={7} />
       ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-          <strong className="text-[15px] font-bold text-[#20211c]">No clients yet.</strong>
-          <span className="text-[13px] text-[#62655c]">Create the first client to get started.</span>
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
+          <strong className="text-[15px] font-bold text-(--ad-ink)">No clients yet.</strong>
+          <span className="text-[13px] text-(--ad-ink-soft)">Create the first client to get started.</span>
           <button onClick={() => setShowNew(true)} className={`${primaryCls} mt-2`}>+ New client</button>
         </div>
       ) : (
@@ -127,16 +136,17 @@ export function Clients() {
           <div className="atbl hidden md:block">
             <table className="table-fixed">
               <colgroup>
-                <col className="w-[26%]" />
-                <col className="w-[18%]" />
-                <col className="w-[13%]" />
-                <col className="w-[13%]" />
-                <col className="w-[18%]" />
-                <col className="w-[12%]" />
+                <col className="w-[22%]" />
+                <col className="w-[15%]" />
+                <col className="w-[11%]" />
+                <col className="w-[10%]" />
+                <col className="w-[16%]" />
+                <col className="w-[15%]" />
+                <col className="w-[11%]" />
               </colgroup>
               <thead>
                 <tr>
-                  {['Business', 'Representative', 'Added', 'Status', 'Invite', ''].map((h) => (
+                  {['Business', 'Representative', 'Added', 'Status', 'Credits', 'Invite', ''].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -148,18 +158,29 @@ export function Clients() {
                   return (
                     <tr key={c.id} onClick={() => setEditClient(c)} className="group cursor-pointer">
                       <td className="min-w-0">
-                        <div className="truncate font-bold text-[#20211c] group-hover:underline" title={c.business_name}>{c.business_name}</div>
+                        <div className="truncate font-bold text-(--ad-ink) group-hover:underline" title={c.business_name}>{c.business_name}</div>
                       </td>
-                      <td className="min-w-0 text-[#62655c]">
+                      <td className="min-w-0 text-(--ad-ink-soft)">
                         <div className="truncate" title={c.contact_name ?? undefined}>{c.contact_name ?? '-'}</div>
                       </td>
-                      <td className="text-[12px] text-[#9a9d92] whitespace-nowrap">
+                      <td className="text-[12px] text-(--ad-ink-faint) whitespace-nowrap">
                         {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </td>
                       <td>
                         <span className="atbl-pill" style={{ background: spill.bg, color: spill.text }}>
                           {c.status}
                         </span>
+                      </td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-(--ad-ink)">{c.credits_remaining}</span>
+                          <button
+                            onClick={() => setCreditsTarget(c)}
+                            className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-2 py-1 text-[11px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
+                          >
+                            Add credits
+                          </button>
+                        </div>
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <InviteCell
@@ -173,6 +194,7 @@ export function Clients() {
                         <RowMenu items={[
                           { type: 'action', label: 'View as client', onClick: () => navigate(`/admin/impersonate/${c.id}`) },
                           { type: 'action', label: 'Edit client', onClick: () => setEditClient(c) },
+                          { type: 'action', label: 'Add credits', onClick: () => setCreditsTarget(c) },
                           {
                             type: 'action',
                             label: phase === 'sent' || c.has_profile ? 'Resend invite' : 'Send invite',
@@ -207,9 +229,9 @@ export function Clients() {
               const pill = CHANNEL_PILL[ch] ?? CHANNEL_PILL.whatsapp;
               const spill = STATUS_PILL[c.status] ?? STATUS_PILL.active;
               return (
-                <div key={c.id} className="rounded-xl border border-[#ece8df] bg-white p-4">
+                <div key={c.id} className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="min-w-0 truncate font-bold text-[14px] text-[#20211c]" title={c.business_name}>{c.business_name}</span>
+                    <span className="min-w-0 truncate font-bold text-[14px] text-(--ad-ink)" title={c.business_name}>{c.business_name}</span>
                     <div className="flex shrink-0 items-center gap-1.5">
                       <span style={{ background: spill.bg, color: spill.text }}
                         className="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[.04em]">
@@ -222,15 +244,15 @@ export function Clients() {
                     </div>
                   </div>
                   {(c.business_type || c.location) && (
-                    <p className="mt-1 text-[12px] text-[#62655c]">
+                    <p className="mt-1 text-[12px] text-(--ad-ink-soft)">
                       {[c.business_type, c.location].filter(Boolean).join(' · ')}
                     </p>
                   )}
                   <div className="mt-2 flex flex-col gap-0.5">
-                    {c.contact_email && <span className="font-mono text-[11px] text-[#9a9d92]">{c.contact_email}</span>}
-                    {c.contact_phone && <span className="font-mono text-[11px] text-[#c4bfb5]">{c.contact_phone}</span>}
+                    {c.contact_email && <span className="font-mono text-[11px] text-(--ad-ink-faint)">{c.contact_email}</span>}
+                    {c.contact_phone && <span className="font-mono text-[11px] text-(--ad-ink-ghost)">{c.contact_phone}</span>}
                   </div>
-                  <div className="mt-3 border-t border-[#f5f2ec] pt-3 flex flex-wrap items-center gap-2">
+                  <div className="mt-3 border-t border-(--ad-fill) pt-3 flex flex-wrap items-center gap-2">
                     <InviteCell
                       client={c}
                       phase={invitePhase[c.id] ?? 'idle'}
@@ -239,19 +261,25 @@ export function Clients() {
                     />
                     <button
                       onClick={() => navigate(`/admin/impersonate/${c.id}`)}
-                      className="cursor-pointer rounded-lg border border-[#ece8df] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                      className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
                     >
                       View as client
                     </button>
                     <button
+                      onClick={() => setCreditsTarget(c)}
+                      className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
+                    >
+                      Add credits ({c.credits_remaining})
+                    </button>
+                    <button
                       onClick={() => setEditClient(c)}
-                      className="cursor-pointer rounded-lg border border-[#ece8df] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                      className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => setDeleteTarget(c)}
-                      className="cursor-pointer rounded-lg border border-transparent bg-transparent px-3 py-1.5 text-[12px] font-semibold text-[#c4bfb5] transition-colors hover:border-[#a8533a]/30 hover:bg-[#fdf0ec] hover:text-[#a8533a]"
+                      className="cursor-pointer rounded-lg border border-transparent bg-transparent px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-ghost) transition-colors hover:border-(--ad-clay)/30 hover:bg-(--ad-clay-tint) hover:text-(--ad-clay)"
                     >
                       Delete
                     </button>
@@ -263,7 +291,7 @@ export function Clients() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between rounded-lg border border-[#ece8df] bg-white px-4 py-3 text-[12.5px] text-[#9a9d92]">
+            <div className="flex items-center justify-between rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3 text-[12.5px] text-(--ad-ink-faint)">
               <span>Page {safePage} of {totalPages}</span>
               <div className="flex gap-2">
                 <button onClick={() => setPage(safePage - 1)} disabled={safePage <= 1} className={pagBtnCls}>Previous</button>
@@ -277,7 +305,7 @@ export function Clients() {
       {/* Mobile FAB */}
       <button
         onClick={() => setShowNew(true)}
-        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-[#3c7a5b] text-white shadow-[0_4px_20px_rgba(60,122,91,0.35)] text-[28px] leading-none transition-colors hover:bg-[#2d5e46]"
+        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-(--ad-green) text-white shadow-[0_4px_20px_rgba(60,122,91,0.35)] text-[28px] leading-none transition-colors hover:bg-(--ad-green-hover)"
         aria-label="New client"
       >
         +
@@ -288,7 +316,7 @@ export function Clients() {
           <NewClientModal
             key="new-client-modal"
             onClose={() => setShowNew(false)}
-            onCreated={() => { setShowNew(false); reload(); }}
+            onCreated={() => { setShowNew(false); toast('Client created.'); reload(); }}
           />
         )}
         {editClient && (
@@ -296,7 +324,15 @@ export function Clients() {
             key={`edit-${editClient.id}`}
             client={editClient}
             onClose={() => setEditClient(null)}
-            onSaved={() => { setEditClient(null); reload(); }}
+            onSaved={() => { toast(`${editClient.business_name} updated.`); setEditClient(null); reload(); }}
+          />
+        )}
+        {creditsTarget && (
+          <AddCreditsModal
+            key={`credits-${creditsTarget.id}`}
+            client={creditsTarget}
+            onClose={() => setCreditsTarget(null)}
+            onAdjusted={(msg) => { toast(msg); reload(); }}
           />
         )}
         {deleteTarget && (
@@ -304,7 +340,7 @@ export function Clients() {
             key={`delete-${deleteTarget.id}`}
             client={deleteTarget}
             onClose={() => setDeleteTarget(null)}
-            onDeleted={() => { setDeleteTarget(null); reload(); }}
+            onDeleted={() => { toast(`${deleteTarget.business_name} deleted.`); setDeleteTarget(null); reload(); }}
           />
         )}
         {changeEmailTarget && (
@@ -312,7 +348,7 @@ export function Clients() {
             key={`change-email-${changeEmailTarget.id}`}
             client={changeEmailTarget}
             onClose={() => setChangeEmailTarget(null)}
-            onChanged={() => setChangeEmailTarget(null)}
+            onChanged={() => { toast('Login email updated.'); setChangeEmailTarget(null); }}
           />
         )}
       </AnimatePresence>
@@ -338,25 +374,25 @@ function InviteCell({
   const pillCls = 'atbl-pill w-[120px] justify-center';
 
   if (!client.contact_email) {
-    return <span className={pillCls} style={{ background: '#f5f2ec', color: '#c4bfb5' }}>No email</span>;
+    return <span className={pillCls} style={{ background: 'var(--ad-fill)', color: 'var(--ad-ink-ghost)' }}>No email</span>;
   }
   if (phase === 'sending') {
     return (
-      <span className={`${pillCls} inline-flex items-center gap-1.5`} style={{ background: '#f5f2ec', color: '#9a9d92' }}>
-        <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border-2 border-[#ddd8cb] border-t-[#3c7a5b]" />
+      <span className={`${pillCls} inline-flex items-center gap-1.5`} style={{ background: 'var(--ad-fill)', color: 'var(--ad-ink-faint)' }}>
+        <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border-2 border-(--ad-line-strong) border-t-(--ad-green)" />
         Sending
       </span>
     );
   }
   if (phase === 'sent') {
-    return <span className={pillCls} style={{ background: '#edf4ef', color: '#3c7a5b' }}>✓ Invite sent</span>;
+    return <span className={pillCls} style={{ background: 'var(--ad-green-tint)', color: 'var(--ad-green)' }}>✓ Invite sent</span>;
   }
   if (phase === 'active' || client.activated_at) {
     return (
       <span
         title="This client can already sign in - resending an invite won't do anything. Have them log in directly, or use “Forgot password” on the login screen if they've lost access."
         className={pillCls}
-        style={{ background: '#f0f0f0', color: '#9a9d92' }}
+        style={{ background: 'var(--ad-fill)', color: 'var(--ad-ink-faint)' }}
       >
         Account active
       </span>
@@ -368,13 +404,13 @@ function InviteCell({
         onClick={onInvite}
         className={`${pillCls} cursor-pointer border-0 font-bold transition-opacity hover:opacity-75`}
         style={client.has_profile
-          ? { background: '#f8efdb', color: '#b9831f' }
-          : { background: '#edf4ef', color: '#3c7a5b' }}
+          ? { background: 'var(--ad-amber-tint)', color: 'var(--ad-amber)' }
+          : { background: 'var(--ad-green-tint)', color: 'var(--ad-green)' }}
       >
         {client.has_profile ? 'Resend invite' : 'Send invite'}
       </button>
       {phase === 'error' && errMsg && (
-        <span className="text-[11px] leading-snug text-[#a8533a]">{errMsg}</span>
+        <span className="text-[11px] leading-snug text-(--ad-clay)">{errMsg}</span>
       )}
     </div>
   );
@@ -390,7 +426,7 @@ function ModalShell({ children }: { onClose: () => void; children: React.ReactNo
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[560px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
@@ -458,7 +494,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
   const [enrichErr, setEnrichErr]             = useState<string | null>(null);
   const [enrichResult, setEnrichResult]       = useState<EnrichResult | null>(null);
   const [notFoundFields, setNotFoundFields]   = useState<Set<EnrichableField>>(new Set());
-  const reqStar = <span className="ml-0.5 text-[#a8533a]">*</span>;
+  const reqStar = <RequiredMark />;
 
   function clearNotFound(field: EnrichableField) {
     setNotFoundFields((prev) => {
@@ -578,9 +614,9 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
 
   return (
     <ModalShell onClose={onClose}>
-      <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-        <h2 className="m-0 text-[18px] font-bold text-[#20211c]">New client</h2>
-        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+      <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">New client</h2>
+        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
         <div>
@@ -593,7 +629,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
             className={inputCls}
           />
           {notFoundFields.has('businessName') && (
-            <p className="mt-1 text-[11px] text-[#b9831f]">Not found on the site - please fill in.</p>
+            <p className="mt-1 text-[11px] text-(--ad-amber)">Not found on the site - please fill in.</p>
           )}
         </div>
         <div>
@@ -621,19 +657,19 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
               lets the admin catch a typo'd/parked domain that still "succeeds"
               against the wrong final destination. */}
           {enrichResult?.website_url && !enrichErr && (
-            <p className="mt-1 text-[11px] text-[#3c7a5b]">
+            <p className="mt-1 text-[11px] text-(--ad-green)">
               Confirmed: <span className="font-semibold">{enrichResult.website_url}</span>
             </p>
           )}
-          <p className="mt-1 text-[11px] text-[#9a9d92]">
+          <p className="mt-1 text-[11px] text-(--ad-ink-faint)">
             {enriching
               ? 'Fetching the site and running AI extraction - this can take up to 15 seconds…'
               : 'Optional - auto-fills business name, type, location, and contact details from the site (won\'t overwrite anything you\'ve already typed).'}
           </p>
-          {enrichErr && <p className="mt-1 text-[11px] text-[#a8533a]">{enrichErr}</p>}
+          {enrichErr && <p className="mt-1 text-[11px] text-(--ad-clay)">{enrichErr}</p>}
           {enrichResult && (enrichResult.services?.length || enrichResult.target_customer_profiles?.length || enrichResult.summary) && (
-            <div className="mt-2 rounded-xl border border-[#3c7a5b]/20 bg-[#edf4ef] px-3.5 py-3 text-[12px] text-[#20211c] flex flex-col gap-1.5">
-              {enrichResult.summary && <p className="m-0 text-[#3c7a5b]">{enrichResult.summary}</p>}
+            <div className="mt-2 rounded-xl border border-(--ad-green)/20 bg-(--ad-green-tint) px-3.5 py-3 text-[12px] text-(--ad-ink) flex flex-col gap-1.5">
+              {enrichResult.summary && <p className="m-0 text-(--ad-green)">{enrichResult.summary}</p>}
               {!!enrichResult.services?.length && (
                 <p className="m-0"><strong className="font-bold">Services:</strong> {enrichResult.services.join(', ')}</p>
               )}
@@ -661,7 +697,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
               className={inputCls}
             />
             {notFoundFields.has('businessType') && (
-              <p className="mt-1 text-[11px] text-[#b9831f]">Not found - please fill in.</p>
+              <p className="mt-1 text-[11px] text-(--ad-amber)">Not found - please fill in.</p>
             )}
           </div>
           <div>
@@ -674,7 +710,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
               className={inputCls}
             />
             {notFoundFields.has('location') && (
-              <p className="mt-1 text-[11px] text-[#b9831f]">Not found - please fill in.</p>
+              <p className="mt-1 text-[11px] text-(--ad-amber)">Not found - please fill in.</p>
             )}
           </div>
         </div>
@@ -689,7 +725,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
             className={inputCls}
           />
           {notFoundFields.has('contactEmail') && (
-            <p className="mt-1 text-[11px] text-[#b9831f]">Not found - please fill in.</p>
+            <p className="mt-1 text-[11px] text-(--ad-amber)">Not found - please fill in.</p>
           )}
         </div>
         <div>
@@ -703,38 +739,38 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
             className={inputCls}
           />
           {notFoundFields.has('contactPhone') && (
-            <p className="mt-1 text-[11px] text-[#b9831f]">Not found - please fill in.</p>
+            <p className="mt-1 text-[11px] text-(--ad-amber)">Not found - please fill in.</p>
           )}
-          <p className="mt-1 text-[11px] text-[#9a9d92]">Required for hot-lead WhatsApp / SMS notifications.</p>
+          <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Required for hot-lead WhatsApp / SMS notifications.</p>
         </div>
         <div>
           <label className={fieldLbl}>Notification channel</label>
           <Select value={notifChannel} onValueChange={(v) => setNotifChannel(v as NewClientInput['notification_channel'])}>
-            <SelectTrigger style={FONT} className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]"><SelectValue /></SelectTrigger>
-            <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+            <SelectTrigger style={FONT} className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)"><SelectValue /></SelectTrigger>
+            <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
               <SelectItem value="whatsapp">WhatsApp</SelectItem>
               <SelectItem value="sms">SMS</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <div className="border-t border-[#f0ede6] pt-3">
+        <div className="border-t border-(--ad-fill) pt-3">
           <label className={fieldLbl}>Starting credits</label>
           <input type="number" min={0} value={startingCredits}
             onChange={(e) => setStartingCredits(Math.max(0, Number(e.target.value)))} style={FONT} className={inputCls} />
-          <p className="mt-1 text-[11px] text-[#9a9d92]">Added to the billing profile on creation. A default campaign is also created automatically.</p>
+          <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Added to the billing profile on creation. A default campaign is also created automatically.</p>
         </div>
 
-        <div className="border-t border-[#f0ede6] pt-3">
-          <label className="flex cursor-pointer items-center gap-2 text-[13px] text-[#62655c]">
-            <input type="checkbox" checked={saveAsDraft} onChange={(e) => setSaveAsDraft(e.target.checked)} className="accent-[#3c7a5b]" />
+        <div className="border-t border-(--ad-fill) pt-3">
+          <label className="flex cursor-pointer items-center gap-2 text-[13px] text-(--ad-ink-soft)">
+            <input type="checkbox" checked={saveAsDraft} onChange={(e) => setSaveAsDraft(e.target.checked)} className="accent-(--ad-green)" />
             Save as draft
           </label>
-          <p className="mt-1 text-[11px] text-[#9a9d92]">Contact email and phone become optional - finish the profile later.</p>
+          <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Contact email and phone become optional - finish the profile later.</p>
         </div>
 
-        {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
+        {err && <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>}
       </div>
-      <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+      <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
         <button onClick={onClose} className={ghostCls}>Cancel</button>
         <button onClick={submit} disabled={busy} className={primaryCls}>
           {busy ? 'Creating…' : saveAsDraft ? 'Save as draft' : 'Create client'}
@@ -767,7 +803,7 @@ function EditClientModal({
   const [usage, setUsage] = useState<ClientUsage | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState<string | null>(null);
-  const reqStar = <span className="ml-0.5 text-[#a8533a]">*</span>;
+  const reqStar = <RequiredMark />;
 
   useEffect(() => {
     getClientUsage(client.id).then(setUsage);
@@ -794,9 +830,9 @@ function EditClientModal({
 
   return (
     <ModalShell onClose={onClose}>
-      <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-        <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Edit client</h2>
-        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+      <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Edit client</h2>
+        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
         <div>
@@ -828,9 +864,9 @@ function EditClientModal({
         <div>
           <label className={fieldLbl}>Representative name</label>
           <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="e.g. Yvonne" style={FONT} className={inputCls} />
-          <p className="mt-1 text-[11px] text-[#9a9d92]">Signs outreach emails on this client's behalf (e.g. "Have a wonderful day, Yvonne").</p>
+          <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Signs outreach emails on this client's behalf (e.g. "Have a wonderful day, Yvonne").</p>
         </div>
-        <div className="border-t border-[#f0ede6] pt-3 grid grid-cols-2 gap-3">
+        <div className="border-t border-(--ad-fill) pt-3 grid grid-cols-2 gap-3">
           <div>
             <label className={fieldLbl}>Monthly prospect limit</label>
             <input
@@ -841,7 +877,7 @@ function EditClientModal({
               style={FONT}
               className={inputCls}
             />
-            <p className="mt-1 text-[11px] text-[#9a9d92]">
+            <p className="mt-1 text-[11px] text-(--ad-ink-faint)">
               {usage
                 ? `${usage.prospects_this_month} of ${usage.monthly_prospect_limit} prospects this month, resets ${new Date(usage.limit_resets_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
                 : 'Loading usage…'}
@@ -857,29 +893,29 @@ function EditClientModal({
               style={FONT}
               className={inputCls}
             />
-            <p className="mt-1 text-[11px] text-[#9a9d92]">
+            <p className="mt-1 text-[11px] text-(--ad-ink-faint)">
               {usage ? `${usage.campaign_count} of ${usage.max_campaigns} campaigns` : 'Loading usage…'}
             </p>
           </div>
         </div>
-        <label className="flex cursor-pointer items-start gap-2 border-t border-[#f0ede6] pt-3 text-[13px] text-[#62655c]">
+        <label className="flex cursor-pointer items-start gap-2 border-t border-(--ad-fill) pt-3 text-[13px] text-(--ad-ink-soft)">
           <input
             type="checkbox"
             checked={autoApprove}
             onChange={(e) => setAutoApprove(e.target.checked)}
-            className="mt-0.5 accent-[#3c7a5b]"
+            className="mt-0.5 accent-(--ad-green)"
           />
           <span>
-            <span className="block font-semibold text-[#20211c]">Auto-approve this client's campaigns</span>
-            <span className="block text-[11px] text-[#9a9d92]">Skips the "Awaiting approval" step - campaigns they create go active immediately, no admin review.</span>
+            <span className="block font-semibold text-(--ad-ink)">Auto-approve this client's campaigns</span>
+            <span className="block text-[11px] text-(--ad-ink-faint)">Skips the "Awaiting approval" step - campaigns they create go active immediately, no admin review.</span>
           </span>
         </label>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={fieldLbl}>Notification channel</label>
             <Select value={notifChannel} onValueChange={(v) => setNotifChannel(v as UpdateClientInput['notification_channel'])}>
-              <SelectTrigger style={FONT} className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]"><SelectValue /></SelectTrigger>
-              <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+              <SelectTrigger style={FONT} className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)"><SelectValue /></SelectTrigger>
+              <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
                 <SelectItem value="whatsapp">WhatsApp</SelectItem>
                 <SelectItem value="sms">SMS</SelectItem>
               </SelectContent>
@@ -888,8 +924,8 @@ function EditClientModal({
           <div>
             <label className={fieldLbl}>Status</label>
             <Select value={status} onValueChange={(v) => setStatus(v as UpdateClientInput['status'])}>
-              <SelectTrigger style={FONT} className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]"><SelectValue /></SelectTrigger>
-              <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+              <SelectTrigger style={FONT} className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)"><SelectValue /></SelectTrigger>
+              <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="paused">Paused</SelectItem>
@@ -898,11 +934,134 @@ function EditClientModal({
             </Select>
           </div>
         </div>
-        {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
+        {err && <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>}
       </div>
-      <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+      <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
         <button onClick={onClose} className={ghostCls}>Cancel</button>
         <button onClick={submit} disabled={busy} className={primaryCls}>{busy ? 'Saving…' : 'Save changes'}</button>
+      </div>
+    </ModalShell>
+  );
+}
+
+/* ── Add Credits Modal ─────────────────────────────────────────────── */
+function AddCreditsModal({
+  client, onClose, onAdjusted,
+}: { client: ClientListRow; onClose: () => void; onAdjusted: (msg: string) => void }) {
+  const [balance, setBalance] = useState(client.credits_remaining);
+  const [amount, setAmount]   = useState('');
+  const [note, setNote]       = useState('');
+  const [busy, setBusy]       = useState(false);
+  const [err, setErr]         = useState<string | null>(null);
+  const [ok, setOk]           = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<CreditTransaction[] | null>(null);
+  const [historyErr, setHistoryErr] = useState<string | null>(null);
+
+  function loadHistory() {
+    setHistoryErr(null);
+    getClientCreditHistory(client.id).then(setHistory).catch((e: Error) => setHistoryErr(e.message));
+  }
+
+  function toggleHistory() {
+    const next = !showHistory;
+    setShowHistory(next);
+    if (next && history === null) loadHistory();
+  }
+
+  const parsed = Number(amount);
+  const valid  = amount.trim() !== '' && Number.isInteger(parsed) && parsed !== 0;
+
+  async function submit() {
+    setErr(null); setOk(null);
+    if (!valid) { setErr('Enter a whole number (positive adds, negative removes).'); return; }
+    if (balance + parsed < 0) { setErr(`That would take the balance below 0 (currently ${balance}).`); return; }
+    setBusy(true);
+    const res = await adjustClientCredits(client.id, parsed, note);
+    setBusy(false);
+    if (res.error) { setErr(res.error); return; }
+    const newBalance = res.balance ?? balance + parsed;
+    setBalance(newBalance);
+    setAmount(''); setNote('');
+    const msg = `${parsed > 0 ? 'Added' : 'Removed'} ${Math.abs(parsed)} credit${Math.abs(parsed) !== 1 ? 's' : ''} - balance is now ${newBalance}.`;
+    setOk(msg);
+    onAdjusted(msg);
+    if (showHistory) loadHistory(); else setHistory(null);
+  }
+
+  return (
+    <ModalShell onClose={onClose}>
+      <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Credits - {client.business_name}</h2>
+        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+        <div className="rounded-xl bg-(--ad-surface-2) px-4 py-3 text-[13px] text-(--ad-ink-soft)">
+          Current balance: <strong className="text-[18px] text-(--ad-ink)">{balance}</strong>
+        </div>
+        <div>
+          <label className={fieldLbl}>Amount (whole number)<RequiredMark /></label>
+          <input
+            type="number" step={1} value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="e.g. 10 to add, -5 to remove"
+            style={FONT} className={inputCls}
+          />
+          {valid && (
+            <p className="mt-1 text-[11px] text-(--ad-ink-faint)">New balance: {balance + parsed}</p>
+          )}
+        </div>
+        <div>
+          <label className={fieldLbl}>Note (optional)</label>
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Admin adjustment" style={FONT} className={inputCls} />
+        </div>
+        {err && <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>}
+        {ok && <div className="rounded-xl border border-(--ad-green)/20 bg-(--ad-green-tint) px-4 py-3 text-[13px] text-(--ad-green)">{ok}</div>}
+        <div className="border-t border-(--ad-fill) pt-3">
+          <button onClick={toggleHistory} className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-(--ad-green) hover:underline">
+            {showHistory ? 'Hide credit history' : 'Credit history'}
+          </button>
+          {showHistory && (
+            <div className="mt-3">
+              {historyErr ? (
+                <p className="text-[12px] text-(--ad-clay)">{historyErr}</p>
+              ) : history === null ? (
+                <p className="text-[12px] text-(--ad-ink-faint)">Loading…</p>
+              ) : history.length === 0 ? (
+                <p className="text-[12px] text-(--ad-ink-faint)">No credit transactions yet.</p>
+              ) : (
+                <table className="w-full text-left text-[12px]">
+                  <thead>
+                    <tr className="text-(--ad-ink-faint)">
+                      <th className="py-1 pr-2 font-semibold">Date</th>
+                      <th className="py-1 pr-2 font-semibold">Amount</th>
+                      <th className="py-1 pr-2 font-semibold">Type</th>
+                      <th className="py-1 font-semibold">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((t) => (
+                      <tr key={t.id} className="border-t border-(--ad-fill)">
+                        <td className="py-1.5 pr-2 whitespace-nowrap text-(--ad-ink-soft)">
+                          {new Date(t.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        </td>
+                        <td className={`py-1.5 pr-2 font-bold ${t.amount < 0 ? 'text-(--ad-clay)' : 'text-(--ad-green)'}`}>
+                          {t.amount > 0 ? `+${t.amount}` : t.amount}
+                        </td>
+                        <td className="py-1.5 pr-2 text-(--ad-ink-soft)">{t.type}</td>
+                        <td className="py-1.5 text-(--ad-ink-soft)">{t.description ?? '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
+        <button onClick={onClose} className={ghostCls}>Close</button>
+        <button onClick={submit} disabled={busy || !valid} className={primaryCls}>{busy ? 'Saving…' : 'Apply'}</button>
       </div>
     </ModalShell>
   );
@@ -939,49 +1098,49 @@ function DeleteClientModal({
 
   return (
     <ModalShell onClose={onClose}>
-      <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-        <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Delete client</h2>
-        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+      <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Delete client</h2>
+        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
-        <div className="rounded-xl border border-[#a8533a]/20 bg-[#fdf0ec] px-4 py-4">
-          <p className="m-0 text-[14px] font-bold text-[#a8533a]">
+        <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-4">
+          <p className="m-0 text-[14px] font-bold text-(--ad-clay)">
             Permanently delete "{client.business_name}"?
           </p>
-          <p className="m-0 mt-1.5 text-[13px] text-[#a8533a]/80">
+          <p className="m-0 mt-1.5 text-[13px] text-(--ad-clay)/80">
             This action cannot be undone. All data associated with this client will be permanently deleted.
           </p>
         </div>
 
         <div>
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">This will permanently delete:</p>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">This will permanently delete:</p>
           {!counts ? (
-            <div className="flex items-center gap-2 text-[13px] text-[#9a9d92]">
-              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#ddd8cb] border-t-[#a8533a]" />
+            <div className="flex items-center gap-2 text-[13px] text-(--ad-ink-faint)">
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-(--ad-line-strong) border-t-(--ad-clay)" />
               Counting affected records…
             </div>
           ) : blastItems.length === 0 ? (
-            <p className="text-[13px] text-[#62655c]">No associated records - the client row only.</p>
+            <p className="text-[13px] text-(--ad-ink-soft)">No associated records - the client row only.</p>
           ) : (
             <ul className="m-0 list-none p-0 flex flex-col gap-1">
               {blastItems.map((item) => (
-                <li key={String(item)} className="flex items-center gap-2 text-[13px] text-[#62655c]">
-                  <span className="text-[#a8533a]">✕</span>
+                <li key={String(item)} className="flex items-center gap-2 text-[13px] text-(--ad-ink-soft)">
+                  <span className="text-(--ad-clay)">✕</span>
                   {item}
                 </li>
               ))}
             </ul>
           )}
           {client.has_profile && (
-            <p className="mt-3 text-[12px] text-[#62655c]">
+            <p className="mt-3 text-[12px] text-(--ad-ink-soft)">
               This client has a login account - it will also be deleted.
             </p>
           )}
         </div>
 
-        {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
+        {err && <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>}
       </div>
-      <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+      <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
         <button onClick={onClose} className={ghostCls}>Cancel</button>
         <button
           onClick={confirm}
@@ -1014,16 +1173,16 @@ function ChangeLoginEmailModal({
 
   return (
     <ModalShell onClose={onClose}>
-      <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-        <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Change login email</h2>
-        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+      <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Change login email</h2>
+        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
-        <p className="m-0 text-[13px] text-[#62655c]">
+        <p className="m-0 text-[13px] text-(--ad-ink-soft)">
           This changes the email <strong className="font-bold">{client.business_name}</strong> uses to sign in to their dashboard. It's applied immediately - no confirmation email is sent to the new address.
         </p>
         <div>
-          <label className={fieldLbl}>New login email</label>
+          <label className={fieldLbl}>New login email<RequiredMark /></label>
           <input
             type="email"
             value={newEmail}
@@ -1033,9 +1192,9 @@ function ChangeLoginEmailModal({
             className={inputCls}
           />
         </div>
-        {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
+        {err && <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>}
       </div>
-      <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+      <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
         <button onClick={onClose} className={ghostCls}>Cancel</button>
         <button onClick={submit} disabled={busy} className={primaryCls}>{busy ? 'Saving…' : 'Change email'}</button>
       </div>

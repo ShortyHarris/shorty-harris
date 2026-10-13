@@ -50,6 +50,15 @@ const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif
 export function ApprovalQueue() {
   const { items, stats, loading, isFetching, dataUpdatedAt, error, approve, reject, reload } = useApprovalQueue();
   const { toasts, toast, dismiss } = useToast();
+  async function doApprove(id: string, body?: string, subject?: string) {
+    const { error: err } = await approve(id, body, subject);
+    if (err) toast(`Couldn't approve the email: ${err}`, 'error');
+    else toast(body !== undefined || subject !== undefined ? 'Edits saved and email approved.' : 'Email approved.');
+  }
+  async function doReject(id: string) {
+    const { error: err } = await reject(id);
+    if (err) toast(`Couldn't reject the email: ${err}`, 'error'); else toast('Email rejected.');
+  }
   const [editItem, setEditItem] = useState<QueueItem | null>(null);
   const [page, setPage] = useState(1);
   const queueRef = useRef<HTMLDivElement | null>(null);
@@ -68,7 +77,7 @@ export function ApprovalQueue() {
     }
   }
 
-  const pagBtnCls = 'cursor-pointer rounded-md border border-[#ddd8cb] bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-[#20211c] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-40';
+  const pagBtnCls = 'cursor-pointer rounded-md border border-(--ad-line-strong) bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-(--ad-ink) transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <div style={FONT} className="flex flex-col gap-6">
@@ -76,14 +85,14 @@ export function ApprovalQueue() {
       {/* Header */}
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-[#20211c]"> <img src="https://cdn-icons-png.flaticon.com/128/5442/5442020.png" alt="Approvals" className="w-10 h-10" />Approvals</h1>
-          <p className="m-0 mt-1 text-[13px] text-[#62655c]">
+          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)"> <img src="https://cdn-icons-png.flaticon.com/128/5442/5442020.png" alt="Approvals" className="w-10 h-10" />Approvals</h1>
+          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">
             Nothing sends until you approve it. Review each draft, edit if needed, then approve or reject.
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {dataUpdatedAt > 0 && (
-            <span className="whitespace-nowrap text-[11px] text-[#9a9d92]">
+            <span className="whitespace-nowrap text-[11px] text-(--ad-ink-faint)">
               {isFetching ? 'Updating…' : `Updated ${formatRelativeTime(dataUpdatedAt)}`}
             </span>
           )}
@@ -91,7 +100,7 @@ export function ApprovalQueue() {
           <button
             onClick={handleRefresh}
             disabled={isFetching}
-            className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
             Refresh
@@ -103,24 +112,24 @@ export function ApprovalQueue() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile
           icon={Clock}
-          iconColor="#d4870f"
+          iconColor="var(--ad-orange)"
           label="Awaiting Review"
           value={stats.pending}
           sub={stats.pending > 0 ? 'needs your decision' : 'queue is clear'}
-          subColor={stats.pending > 0 ? '#d4870f' : '#9a9d92'}
+          subColor={stats.pending > 0 ? 'var(--ad-orange)' : 'var(--ad-ink-faint)'}
           onClick={stats.pending > 0 ? scrollToQueue : undefined}
         />
         <StatTile
           icon={CheckCircle2}
-          iconColor="#3c7a5b"
+          iconColor="var(--ad-green)"
           label="Approved Today"
           value={stats.approvedToday}
           sub="emails approved"
-          subColor="#9a9d92"
+          subColor="var(--ad-ink-faint)"
         />
         <StatTile
           icon={Send}
-          iconColor="#3c7a5b"
+          iconColor="var(--ad-green)"
           label="Sent Today"
           value={stats.sentToday}
           sub="emails delivered"
@@ -129,16 +138,16 @@ export function ApprovalQueue() {
         />
         <StatTile
           icon={Ban}
-          iconColor="#a8533a"
+          iconColor="var(--ad-clay)"
           label="Rejected"
           value={stats.rejected}
           sub="drafts discarded"
-          subColor="#9a9d92"
+          subColor="var(--ad-ink-faint)"
         />
       </div>
 
       {error && (
-        <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">
+        <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">
           Couldn't load the queue: {error}
         </div>
       )}
@@ -147,9 +156,9 @@ export function ApprovalQueue() {
       {loading ? (
         <SkeletonTable rows={PAGE_SIZE} cols={5} />
       ) : items.length === 0 ? (
-        <div ref={queueRef} className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-          <strong className="text-[15px] font-bold text-[#20211c]">Queue's clear.</strong>
-          <span className="text-[13px] text-[#62655c]">No drafts waiting for review. New ones appear here as the AI writes them.</span>
+        <div ref={queueRef} className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
+          <strong className="text-[15px] font-bold text-(--ad-ink)">Queue's clear.</strong>
+          <span className="text-[13px] text-(--ad-ink-soft)">No drafts waiting for review. New ones appear here as the AI writes them.</span>
         </div>
       ) : (
         <div ref={queueRef} className="flex flex-col gap-6">
@@ -174,42 +183,42 @@ export function ApprovalQueue() {
                 {paged.map((item) => (
                   <tr key={item.id}>
                     <td className="min-w-0">
-                      <div className="truncate font-bold text-[#20211c]" title={item.prospect?.business_name ?? undefined}>
+                      <div className="truncate font-bold text-(--ad-ink)" title={item.prospect?.business_name ?? undefined}>
                         {item.prospect?.business_name ?? 'Unknown'}
                       </div>
                       {item.prospect?.contact_name && (
-                        <div className="mt-0.5 truncate text-[11px] text-[#9a9d92]">{item.prospect.contact_name}</div>
+                        <div className="mt-0.5 truncate text-[11px] text-(--ad-ink-faint)">{item.prospect.contact_name}</div>
                       )}
                       <ProspectMeta item={item} className="mt-0.5" />
                     </td>
-                    <td className="min-w-0 text-[#62655c]">
+                    <td className="min-w-0 text-(--ad-ink-soft)">
                       <div className="truncate" title={item.client?.business_name ?? undefined}>{item.client?.business_name ?? '-'}</div>
                       <SenderLine item={item} className="mt-0.5" />
                     </td>
                     <td>
-                      <span className="atbl-pill" style={{ background: '#edf4ef', color: '#3c7a5b' }}>
+                      <span className="atbl-pill" style={{ background: 'var(--ad-green-tint)', color: 'var(--ad-green)' }}>
                         {TYPE_LABEL[item.message_type] ?? item.message_type}
                       </span>
                     </td>
-                    <td className="min-w-0 text-[#62655c]">
+                    <td className="min-w-0 text-(--ad-ink-soft)">
                       <div className="truncate" title={item.subject ?? undefined}>
-                        {item.subject ?? <span className="italic text-[#c4bfb5]">No subject</span>}
+                        {item.subject ?? <span className="italic text-(--ad-ink-ghost)">No subject</span>}
                       </div>
                       <OpenBadge item={item} />
                     </td>
                     <td className="px-3">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => approve(item.id)}
+                          onClick={() => doApprove(item.id)}
                           disabled={senderBlocked(item)}
                           title={senderBlocked(item) ? GMAIL_TOOLTIP : undefined}
-                          className="cursor-pointer rounded-md border-0 bg-[#3c7a5b] px-3.5 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
+                          className="cursor-pointer rounded-md border-0 bg-(--ad-green) px-3.5 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Approve
                         </button>
                         <RowMenu items={[
                           { type: 'action', label: 'Edit', onClick: () => setEditItem(item) },
-                          { type: 'action', label: 'Reject', destructive: true, onClick: () => reject(item.id) },
+                          { type: 'action', label: 'Reject', destructive: true, onClick: () => doReject(item.id) },
                         ]} />
                       </div>
                     </td>
@@ -222,39 +231,39 @@ export function ApprovalQueue() {
           {/* Mobile cards */}
           <div className="md:hidden flex flex-col gap-3">
             {paged.map((item) => (
-              <div key={item.id} className="rounded-xl border border-[#ece8df] bg-white p-4">
+              <div key={item.id} className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="font-bold text-[#20211c] truncate">{item.prospect?.business_name ?? 'Unknown'}</div>
+                    <div className="font-bold text-(--ad-ink) truncate">{item.prospect?.business_name ?? 'Unknown'}</div>
                     {item.prospect?.contact_name && (
-                      <div className="mt-0.5 text-[11px] text-[#9a9d92]">{item.prospect.contact_name}</div>
+                      <div className="mt-0.5 text-[11px] text-(--ad-ink-faint)">{item.prospect.contact_name}</div>
                     )}
                     <ProspectMeta item={item} className="mt-0.5" />
                   </div>
-                  <span className="flex-shrink-0 inline-flex items-center whitespace-nowrap rounded-full bg-[#edf4ef] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em] text-[#3c7a5b]">
+                  <span className="flex-shrink-0 inline-flex items-center whitespace-nowrap rounded-full bg-(--ad-green-tint) px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em] text-(--ad-green)">
                     {TYPE_LABEL[item.message_type] ?? item.message_type}
                   </span>
                 </div>
                 {item.client?.business_name && (
-                  <div className="mt-1.5 truncate text-[12px] text-[#62655c]">{item.client.business_name}</div>
+                  <div className="mt-1.5 truncate text-[12px] text-(--ad-ink-soft)">{item.client.business_name}</div>
                 )}
                 <SenderLine item={item} className="mt-0.5" />
                 {item.subject && (
-                  <div className="mt-1 truncate text-[12px] text-[#9a9d92]">{item.subject}</div>
+                  <div className="mt-1 truncate text-[12px] text-(--ad-ink-faint)">{item.subject}</div>
                 )}
                 <OpenBadge item={item} className="mt-1" />
-                <div className="mt-3 flex items-center gap-2 border-t border-[#f5f2ec] pt-3">
+                <div className="mt-3 flex items-center gap-2 border-t border-(--ad-fill) pt-3">
                   <button
-                    onClick={() => approve(item.id)}
+                    onClick={() => doApprove(item.id)}
                     disabled={senderBlocked(item)}
                     title={senderBlocked(item) ? GMAIL_TOOLTIP : undefined}
-                    className="cursor-pointer flex-1 rounded-md border-0 bg-[#3c7a5b] px-3 py-2 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="cursor-pointer flex-1 rounded-md border-0 bg-(--ad-green) px-3 py-2 text-[12px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Approve
                   </button>
                   <RowMenu items={[
                     { type: 'action', label: 'Edit', onClick: () => setEditItem(item) },
-                    { type: 'action', label: 'Reject', destructive: true, onClick: () => reject(item.id) },
+                    { type: 'action', label: 'Reject', destructive: true, onClick: () => doReject(item.id) },
                   ]} />
                 </div>
               </div>
@@ -263,7 +272,7 @@ export function ApprovalQueue() {
 
           {/* Shared pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between rounded-lg border border-[#ece8df] bg-white px-4 py-3 text-[12.5px] text-[#9a9d92]">
+            <div className="flex items-center justify-between rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3 text-[12.5px] text-(--ad-ink-faint)">
               <span>Page {safePage} of {totalPages}</span>
               <div className="flex gap-2">
                 <button
@@ -292,7 +301,7 @@ export function ApprovalQueue() {
             key="edit-modal"
             item={editItem}
             onClose={() => setEditItem(null)}
-            onApprove={(id, body, subject) => { approve(id, body, subject); setEditItem(null); }}
+            onApprove={(id, body, subject) => { doApprove(id, body, subject); setEditItem(null); }}
           />
         )}
       </AnimatePresence>
@@ -307,9 +316,9 @@ function ProspectMeta({ item, className = '' }: { item: QueueItem; className?: s
   const phone    = item.prospect?.phone;
   if (!location && !phone) return null;
   return (
-    <div className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#9a9d92] ${className}`}>
+    <div className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-(--ad-ink-faint) ${className}`}>
       {location && <span>{location}</span>}
-      {location && phone && <span className="text-[#c4bfb5]">·</span>}
+      {location && phone && <span className="text-(--ad-ink-ghost)">·</span>}
       {phone && <span className="font-mono">{formatPhone(phone)}</span>}
     </div>
   );
@@ -318,15 +327,15 @@ function ProspectMeta({ item, className = '' }: { item: QueueItem; className?: s
 function SenderLine({ item, className = '' }: { item: QueueItem; className?: string }) {
   if (senderBlocked(item)) {
     return (
-      <div title={GMAIL_TOOLTIP} className={`flex min-w-0 items-center gap-1 text-[11px] font-semibold text-[#a8533a] ${className}`}>
+      <div title={GMAIL_TOOLTIP} className={`flex min-w-0 items-center gap-1 text-[11px] font-semibold text-(--ad-clay) ${className}`}>
         <AlertTriangle size={11} strokeWidth={2.2} className="shrink-0" />
         <span className="truncate">Gmail not connected</span>
       </div>
     );
   }
   return (
-    <div className={`truncate text-[11px] text-[#9a9d92] ${className}`} title={item.sender_email ?? undefined}>
-      Sending from: <span className="font-medium text-[#62655c]">{item.sender_email}</span>
+    <div className={`truncate text-[11px] text-(--ad-ink-faint) ${className}`} title={item.sender_email ?? undefined}>
+      Sending from: <span className="font-medium text-(--ad-ink-soft)">{item.sender_email}</span>
     </div>
   );
 }
@@ -339,7 +348,7 @@ function OpenBadge({ item, className = '' }: { item: QueueItem; className?: stri
   return (
     <span
       title={title}
-      className={`inline-flex items-center gap-1 text-[11px] font-semibold text-[#b9831f] ${className}`}
+      className={`inline-flex items-center gap-1 text-[11px] font-semibold text-(--ad-amber) ${className}`}
     >
       <Eye size={11} strokeWidth={2.2} />
       Opened {item.originalOpenCount}x
@@ -366,10 +375,10 @@ function StatTile({
   accent?: boolean;
   onClick?: () => void;
 }) {
-  const bg   = accent ? '#3c7a5b' : '#ffffff';
-  const bdr  = accent ? '#3c7a5b' : '#ece8df';
-  const inkC = accent ? '#ffffff' : '#20211c';
-  const lblC = accent ? 'rgba(255,255,255,0.65)' : '#9a9d92';
+  const bg   = accent ? 'var(--ad-green)' : 'var(--ad-surface)';
+  const bdr  = accent ? 'var(--ad-green)' : 'var(--ad-line)';
+  const inkC = accent ? '#ffffff' : 'var(--ad-ink)';
+  const lblC = accent ? 'rgba(255,255,255,0.65)' : 'var(--ad-ink-faint)';
   const icnC = accent ? 'rgba(255,255,255,0.7)' : iconColor;
 
   return (
@@ -434,7 +443,7 @@ function EditModal({
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[600px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[600px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -442,48 +451,48 @@ function EditModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#ece8df] px-5 py-4">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-(--ad-line) px-5 py-4">
           <div>
-            <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Edit draft</h2>
-            <p className="m-0 mt-0.5 text-[12px] text-[#62655c]">
+            <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Edit draft</h2>
+            <p className="m-0 mt-0.5 text-[12px] text-(--ad-ink-soft)">
               {item.prospect?.business_name ?? 'Unknown'}
-              <span className="mx-1.5 text-[#c4bfb5]">·</span>
+              <span className="mx-1.5 text-(--ad-ink-ghost)">·</span>
               {TYPE_LABEL[item.message_type] ?? item.message_type}
             </p>
           </div>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] transition-colors hover:text-[#20211c]">×</button>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) transition-colors hover:text-(--ad-ink)">×</button>
         </div>
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
           {item.subject !== null && (
             <div>
-              <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">Subject</div>
+              <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Subject</div>
               <input
                 value={subjectDraft}
                 onChange={(e) => setSubjectDraft(e.target.value)}
                 style={{ ...FONT, boxShadow: '0 0 0 3px rgba(60,122,91,0.12)' }}
-                className="w-full rounded-xl border border-[#3c7a5b] bg-white px-3.5 py-2.5 text-[13px] font-bold text-[#20211c] outline-none"
+                className="w-full rounded-xl border border-(--ad-green) bg-(--ad-surface) px-3.5 py-2.5 text-[13px] font-bold text-(--ad-ink) outline-none"
               />
             </div>
           )}
           <div>
-            <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">Message body</div>
+            <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Message body</div>
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               rows={Math.max(6, draft.split('\n').length + 1)}
               style={{ ...FONT, boxShadow: '0 0 0 3px rgba(60,122,91,0.12)' }}
-              className="w-full resize-y rounded-xl border border-[#3c7a5b] bg-white px-4 py-3 text-[13px] leading-relaxed text-[#20211c] outline-none"
+              className="w-full resize-y rounded-xl border border-(--ad-green) bg-(--ad-surface) px-4 py-3 text-[13px] leading-relaxed text-(--ad-ink) outline-none"
             />
           </div>
-          <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[12px] text-[#62655c]">
-            For <strong className="font-bold text-[#20211c]">{item.client?.business_name ?? 'unknown client'}</strong>
-            {item.prospect?.category && <><span className="mx-1.5 text-[#c4bfb5]">·</span>{item.prospect.category}</>}
-            {item.prospect?.location && <><span className="mx-1.5 text-[#c4bfb5]">·</span>{item.prospect.location}</>}
+          <div className="rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[12px] text-(--ad-ink-soft)">
+            For <strong className="font-bold text-(--ad-ink)">{item.client?.business_name ?? 'unknown client'}</strong>
+            {item.prospect?.category && <><span className="mx-1.5 text-(--ad-ink-ghost)">·</span>{item.prospect.category}</>}
+            {item.prospect?.location && <><span className="mx-1.5 text-(--ad-ink-ghost)">·</span>{item.prospect.location}</>}
           </div>
           {senderBlocked(item) && (
-            <div className="flex items-center gap-1.5 rounded-xl border border-[#a8533a]/20 bg-[#fdf0ec] px-3.5 py-2.5 text-[12px] font-semibold text-[#a8533a]">
+            <div className="flex items-center gap-1.5 rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-3.5 py-2.5 text-[12px] font-semibold text-(--ad-clay)">
               <AlertTriangle size={13} strokeWidth={2.2} className="shrink-0" />
               {GMAIL_TOOLTIP}
             </div>
@@ -491,15 +500,15 @@ function EditModal({
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
-          <button onClick={onClose} className="cursor-pointer rounded-md border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:bg-[#fbf9f5]">
+        <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
+          <button onClick={onClose} className="cursor-pointer rounded-md border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:bg-(--ad-surface-2)">
             Cancel
           </button>
           <button
             onClick={() => onApprove(item.id, bodyDirty ? draft : undefined, subjectDirty ? subjectDraft : undefined)}
             disabled={senderBlocked(item)}
             title={senderBlocked(item) ? GMAIL_TOOLTIP : undefined}
-            className="cursor-pointer rounded-md border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
+            className="cursor-pointer rounded-md border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
           >
             {dirty ? 'Save & approve' : 'Approve'}
           </button>

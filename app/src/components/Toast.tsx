@@ -6,9 +6,9 @@ export type ToastKind = 'success' | 'warning' | 'error';
 export interface ToastItem { id: number; kind: ToastKind; message: string; }
 
 const KIND_STYLE: Record<ToastKind, { icon: React.ElementType; iconColor: string; iconBg: string }> = {
-  success: { icon: CheckCircle2, iconColor: '#3c7a5b', iconBg: '#edf4ef' },
-  warning: { icon: TriangleAlert, iconColor: '#b9831f', iconBg: '#f8efdb' },
-  error:   { icon: TriangleAlert, iconColor: '#a8533a', iconBg: '#f6e8e2' },
+  success: { icon: CheckCircle2, iconColor: 'var(--ad-green)', iconBg: 'var(--ad-green-tint)' },
+  warning: { icon: TriangleAlert, iconColor: 'var(--ad-amber)', iconBg: 'var(--ad-amber-tint)' },
+  error:   { icon: TriangleAlert, iconColor: 'var(--ad-clay)', iconBg: 'var(--ad-clay-tint)' },
 };
 
 /* Self-contained toast state - no provider needed. A screen calls useToast(),
@@ -48,15 +48,15 @@ export function ToastHost({ toasts, onDismiss }: { toasts: ToastItem[]; onDismis
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.98 }}
               transition={{ duration: 0.18 }}
-              className="pointer-events-auto flex w-full max-w-[380px] items-start gap-2.5 rounded-xl border border-[#ece8df] bg-white px-4 py-3 shadow-[0_8px_24px_rgba(20,20,15,0.14)]"
+              className="pointer-events-auto flex w-full max-w-[380px] items-start gap-2.5 rounded-xl border border-(--ad-line) bg-(--ad-surface) px-4 py-3 shadow-[0_8px_24px_rgba(20,20,15,0.14)]"
             >
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: iconBg }}>
                 <Icon size={15} strokeWidth={2.2} style={{ color: iconColor }} />
               </span>
-              <span className="flex-1 pt-0.5 text-[13px] leading-snug text-[#20211c]">{t.message}</span>
+              <span className="flex-1 pt-0.5 text-[13px] leading-snug text-(--ad-ink)">{t.message}</span>
               <button
                 onClick={() => onDismiss(t.id)}
-                className="cursor-pointer shrink-0 border-0 bg-transparent p-0.5 text-[#c4bfb5] transition-colors hover:text-[#62655c]"
+                className="cursor-pointer shrink-0 border-0 bg-transparent p-0.5 text-(--ad-ink-ghost) transition-colors hover:text-(--ad-ink-soft)"
                 aria-label="Dismiss"
               >
                 <X size={14} />

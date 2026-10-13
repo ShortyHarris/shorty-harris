@@ -19,6 +19,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
+import { RequiredMark } from '../../components/RequiredMark';
 
 const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em]';
 const inputCls = 'w-full rounded-lg border px-3.5 py-2.5 text-[13px] outline-none transition-colors';
@@ -41,7 +42,7 @@ function formatLastUsed(iso: string): string {
 /* ─── Business profile: name, type, address, contact info, signature name ───
    Shown as a tappable summary row (like the Analytics link below it) rather
    than an always-open form - tapping it opens an edit modal. */
-function ProfileSection({ clientId }: { clientId: string }) {
+function ProfileSection({ clientId, onSaved }: { clientId: string; onSaved?: () => void }) {
   const { profile, loading, updateProfile } = useClientProfile(clientId);
   const [editing, setEditing] = useState(false);
 
@@ -76,7 +77,7 @@ function ProfileSection({ clientId }: { clientId: string }) {
 
       <AnimatePresence>
         {editing && (
-          <ProfileEditModal profile={profile} updateProfile={updateProfile} onClose={() => setEditing(false)} />
+          <ProfileEditModal profile={profile} updateProfile={updateProfile} onClose={() => setEditing(false)} onSaved={onSaved} />
         )}
       </AnimatePresence>
     </>
@@ -84,11 +85,12 @@ function ProfileSection({ clientId }: { clientId: string }) {
 }
 
 function ProfileEditModal({
-  profile, updateProfile, onClose,
+  profile, updateProfile, onClose, onSaved,
 }: {
   profile: ClientProfile;
   updateProfile: (input: UpdateClientProfileInput) => Promise<{ error: string | null }>;
   onClose: () => void;
+  onSaved?: () => void;
 }) {
   // Lazy initializer, not an effect - `profile` is already loaded by the time
   // this component mounts (ProfileSection gates on it), so the form's local
@@ -129,7 +131,7 @@ function ProfileEditModal({
       contact_phone: form.contact_phone.trim() ? normalizePhone(form.contact_phone) : '',
     });
     setBusy(false);
-    if (error) setErr(error); else onClose();
+    if (error) setErr(error); else { onSaved?.(); onClose(); }
   }
 
   return (
@@ -143,7 +145,7 @@ function ProfileEditModal({
       {...useOverlayClose(onClose)}
     >
       <motion.div
-        className="flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[560px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:shadow-2xl"
         style={{ background: 'var(--surface)' }}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
@@ -166,7 +168,7 @@ function ProfileEditModal({
           </div>
 
           <div className="mb-4">
-            <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Business name</label>
+            <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Business name<RequiredMark /></label>
             <input value={form.business_name} onChange={(e) => set('business_name', e.target.value)} style={inputStyle} className={inputCls} />
           </div>
 
@@ -188,7 +190,7 @@ function ProfileEditModal({
 
           <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Contact email</label>
+              <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Contact email<RequiredMark /></label>
               <input type="email" value={form.contact_email} onChange={(e) => set('contact_email', e.target.value)} style={inputStyle} className={inputCls} />
             </div>
             <div>
@@ -289,6 +291,7 @@ function AutoApproveSection({ clientId }: { clientId: string }) {
       .eq('id', clientId);
     setBusy(false);
     if (error) { toast(error.message, 'error'); return; }
+    toast(enabled ? 'Auto-approve turned off.' : 'Auto-approve turned on.');
     queryClient.invalidateQueries({ queryKey: key });
   }
 
@@ -411,6 +414,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
   const [banner, setBanner] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
   const [showBlockedDomains, setShowBlockedDomains] = useState(false);
+  const { toasts, toast, dismiss } = useToast();
 
   useEffect(() => {
     const connected = searchParams.get('gmail_connected');
@@ -433,8 +437,9 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
 
   async function handleDisconnect() {
     setDisconnecting(true);
-    await disconnect();
+    const res = await disconnect();
     setDisconnecting(false);
+    if (res.error) toast(res.error, 'error'); else toast('Gmail disconnected.');
   }
 
   return (
@@ -469,7 +474,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
         Business profile
       </div>
       <div className="mb-6 overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
-        <ProfileSection clientId={clientId} />
+        <ProfileSection clientId={clientId} onSaved={() => toast('Profile saved.')} />
 
         <div className="border-t" style={{ borderColor: 'var(--line)' }} />
 
@@ -641,7 +646,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
       </div>
 
       {showBlockedDomains && (
-        <BlockedDomainsModal clientId={clientId} onClose={() => setShowBlockedDomains(false)} />
+        <BlockedDomainsModal clientId={clientId} onClose={() => setShowBlockedDomains(false)} onNotify={toast} />
       )}
 
       {/* ─── Account ─── */}
@@ -681,6 +686,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
           </button>
         </div>
       </div>
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
     </main>
   );
 }

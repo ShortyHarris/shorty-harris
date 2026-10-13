@@ -15,11 +15,12 @@ function formatDate(iso: string): string {
 }
 
 export function BlockedDomainsModal({
-  clientId, client = supabase, onClose,
+  clientId, client = supabase, onClose, onNotify,
 }: {
   clientId: string;
   client?: SupabaseClient;
   onClose: () => void;
+  onNotify?: (message: string, kind?: 'success' | 'warning' | 'error') => void;
 }) {
   const { ownRows, globalRows, loading, error, addDomain, deleteDomain } = useClientBlacklist(clientId, client);
   const [input, setInput] = useState('');
@@ -45,13 +46,16 @@ export function BlockedDomainsModal({
     const { error } = await addDomain(domain, reason);
     setBusy(false);
     if (error) { setFormErr(error); return; }
+    onNotify?.(`Blocked ${domain}.`);
     setInput(''); setReason('');
   }
 
   async function handleDelete(id: string) {
     setDeletingId(id);
-    await deleteDomain(id);
+    const res = await deleteDomain(id);
     setDeletingId(null);
+    const err = (res as { error?: string | null } | undefined)?.error;
+    if (err) onNotify?.(err, 'error'); else onNotify?.('Domain unblocked.');
   }
 
   return (
@@ -65,7 +69,7 @@ export function BlockedDomainsModal({
       {...useOverlayClose(onClose)}
     >
       <motion.div
-        className="flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[560px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:shadow-2xl"
         style={{ background: 'var(--surface)' }}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}

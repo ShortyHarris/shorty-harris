@@ -1,53 +1,92 @@
 import { Link } from 'react-router-dom';
 import { openConsentPreferences } from '../lib/consent';
+import { BrandLockup } from './BrandLockup';
 
-// Shared footer for every public-facing page (Home, Blog, BlogPost, …).
-// "How it works" / "Results" link back to the home page's sections (with a
-// leading "/") rather than a bare "#hash", so they resolve correctly from
-// any page, not just from "/" itself.
+// Shared footer for every public-facing page (Home, Blog, BlogPost, legal,
+// 404). Home-page sections are linked as "/#id" (not a bare "#id") so they
+// resolve from any page - PublicNav scrolls to the section on arrival.
 
-const FOOT_LINKS = [
-  { title: "Product", links: [["How it works", "/#how"], ["Results", "/#results"]] as const },
-  { title: "Company", links: [["Blog", "/blog"], ["Privacy", "/privacy"], ["Terms", "/terms"], ["Cookies", "/cookies"]] as const },
+const CONTACT_EMAIL = 'hello@shortyharris.com';
+
+const FOOT_LINKS: { title: string; links: { label: string; href: string; route?: boolean }[] }[] = [
+  {
+    title: 'Product',
+    links: [
+      { label: 'How it works', href: '/#how' },
+      { label: 'Pricing', href: '/#pricing' },
+      { label: 'FAQ', href: '/#faq' },
+    ],
+  },
+  {
+    title: 'Resources',
+    links: [
+      { label: 'Blog', href: '/blog', route: true },
+      { label: 'Log in', href: '/login', route: true },
+      { label: 'Contact', href: `mailto:${CONTACT_EMAIL}` },
+    ],
+  },
+  {
+    title: 'Legal',
+    links: [
+      { label: 'Privacy', href: '/privacy', route: true },
+      { label: 'Terms', href: '/terms', route: true },
+      { label: 'Cookies', href: '/cookies', route: true },
+    ],
+  },
 ];
+
+const linkCls = 'text-[14px] text-[#525252] no-underline hover:text-[#0a0a0a] transition-colors';
 
 export function PublicFooter() {
   return (
-    <footer className="border-t border-[#e5ddd3] max-w-[1200px] mx-auto w-full px-6 lg:px-12 pt-14 pb-10">
-      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_2fr] gap-10 lg:gap-16 pb-12">
-        <div className="flex flex-col gap-3.5 max-w-full lg:max-w-[300px]">
-          <div className="text-[17px] tracking-[-0.025em] leading-none">
-            <span className="font-medium text-[#54574e]">Shorty</span>
-            <span className="font-extrabold text-[#1a1b17]"> Harris</span>
-          </div>
-          <p className="text-[13.5px] leading-[1.55] text-[#54574e] m-0">
-            AI-powered outbound that finds ideal customers and delivers warm, qualified leads straight to your inbox.
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-6">
-          {FOOT_LINKS.map((col) => (
-            <div key={col.title} className="flex flex-col gap-2.5">
-              <div className="text-[12px] font-bold tracking-[0.05em] uppercase text-[#1a1b17] mb-1">{col.title}</div>
-              {col.links.map(([label, href]) => (
-                <a key={label} href={href} className="text-[14px] text-[#54574e] no-underline hover:text-[#3c7a5b] transition-colors">{label}</a>
-              ))}
+    <footer className="mt-auto border-t border-[#e5e5e5] bg-[#fafafa]">
+      <div className="max-w-300 mx-auto w-full px-6 lg:px-12 pt-14 pb-10">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_2fr] gap-10 lg:gap-16 pb-12">
+          <div className="flex flex-col gap-4 max-w-full lg:max-w-[320px]">
+            <Link to="/" aria-label="Shorty Harris home" className="no-underline self-start">
+              <BrandLockup iconSize={22} noMargin className="public-nav-brand" />
+            </Link>
+            <p className="text-[14px] leading-[1.6] text-[#525252] m-0">
+              AI-powered outbound that finds ideal customers and delivers warm, qualified leads straight to your inbox.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 mt-1">
+              <Link
+                to="/signup"
+                className="inline-flex items-center justify-center h-10 px-5 rounded-full bg-[#0a0a0a] text-white text-[14px] font-semibold no-underline hover:bg-[#3c7a5b] transition-colors"
+              >
+                Get started
+              </Link>
+              <a href={`mailto:${CONTACT_EMAIL}`} className="text-[14px] font-semibold text-[#3c7a5b] no-underline hover:underline">
+                {CONTACT_EMAIL}
+              </a>
             </div>
-          ))}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-8">
+            {FOOT_LINKS.map((col) => (
+              <div key={col.title} className="flex flex-col gap-3">
+                <div className="text-[12px] font-bold tracking-[0.06em] uppercase text-[#0a0a0a] mb-1">{col.title}</div>
+                {col.links.map((l) =>
+                  l.route ? (
+                    <Link key={l.label} to={l.href} className={linkCls}>{l.label}</Link>
+                  ) : (
+                    <a key={l.label} href={l.href} className={linkCls}>{l.label}</a>
+                  ),
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-t border-[#e5ddd3] pt-6 text-[13px] text-[#6b6e65]">
-        <span>© {new Date().getFullYear()} Shorty Harris. All rights reserved.</span>
-        <div className="flex items-center gap-5">
+
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-t border-[#e5e5e5] pt-6 text-[13px] text-[#737373]">
+          <span>© {new Date().getFullYear()} Shorty Harris. All rights reserved.</span>
           <button
             type="button"
             onClick={openConsentPreferences}
-            className="text-[13px] text-[#54574e] no-underline font-semibold hover:text-[#3c7a5b] transition-colors bg-transparent border-0 p-0 cursor-pointer"
+            className="self-start sm:self-auto text-[13px] text-[#525252] font-semibold hover:text-[#0a0a0a] transition-colors bg-transparent border-0 p-0 cursor-pointer"
           >
             Cookie settings
           </button>
-          <Link to="/login" className="text-[13px] text-[#54574e] no-underline font-semibold hover:text-[#3c7a5b] transition-colors">
-            Sign in
-          </Link>
         </div>
       </div>
     </footer>

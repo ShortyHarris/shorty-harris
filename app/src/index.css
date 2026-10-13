@@ -49,3 +49,23 @@ input, textarea, select { font-family: inherit; }
 .theme-client {
   min-height: 100%;
 }
+
+/* Modal cards size to their content (up to the window height) with no
+   visible scrollbar - overflow only kicks in on very short windows, and
+   then scrolls without the bar. */
+.modal-card,
+.modal-card * {
+  scrollbar-width: none;
+}
+.modal-card::-webkit-scrollbar,
+.modal-card *::-webkit-scrollbar {
+  display: none;
+}
+
+/* A modal body is a scrolling flex column - its children must keep their
+   natural height and let the body scroll. Without this, any child with
+   overflow:hidden (min-height becomes 0) gets squashed to its border when
+   the content is taller than the window. */
+.modal-card .overflow-y-auto.flex-col > * {
+  flex-shrink: 0;
+}

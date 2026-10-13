@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
@@ -8,7 +8,7 @@ import { useClientApprovals } from '../../hooks/useClientApprovals';
 import { useWarmProspects, useProspectMessages, type WarmProspect, type CallOutcome } from '../../hooks/useWarmProspects';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import type { HotLead, HotLeadStatus, CallOutcomeValue } from '../../types';
-import { RefreshCw, ChevronRight, Zap, MessageSquare, Trophy, XCircle, TrendingUp, Minus, ClipboardCheck, Flame, Phone, PhoneCall, Mail, PauseCircle } from 'lucide-react';
+import { RefreshCw, ChevronRight, Zap, MessageSquare, Trophy, XCircle, TrendingUp, Minus, ClipboardCheck, Flame, Phone, PhoneCall, Mail, PauseCircle, X, Sparkles, ArrowRight, BellRing, Search, ChevronLeft } from 'lucide-react';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { useToast, ToastHost } from '../../components/Toast';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
@@ -20,8 +20,8 @@ const HELP: HelpContent = {
     { type: 'p', text: "Here you'll find every business that replied to your outreach with genuine interest. We contact them on your behalf - when one sounds serious, they appear here as a Hot Lead." },
     { type: 'p', text: "Tap any lead to read what they said and see our suggested next step. Update the status as your conversation progresses." },
     { type: 'ul', items: [
-      "New - just arrived, call or email them first",
-      "In Progress - you're already in conversation",
+      "Open - new or seen, call or email them first",
+      "Contacted - you're already in conversation",
       "Won - deal closed",
       "Lost - didn't work out this time",
     ]},
@@ -31,28 +31,34 @@ const HELP: HelpContent = {
 
 const PAGE_SIZE = 8;
 
-type Filter = 'new' | 'active' | 'all' | 'closed';
+// Mirrors the hot_leads.status CHECK constraint: new | viewed | contacted | won | lost.
+// hot_lead_queue returns every status, so all filtering happens here.
+type Filter = 'all' | 'open' | 'contacted' | 'won' | 'lost';
 
 const FILTER_TABS: { key: Filter; label: string }[] = [
-  { key: 'new', label: 'New' },
-  { key: 'active', label: 'In Progress' },
   { key: 'all', label: 'All' },
-  { key: 'closed', label: 'Closed' },
+  { key: 'open', label: 'Open' },
+  { key: 'contacted', label: 'Contacted' },
+  { key: 'won', label: 'Won' },
+  { key: 'lost', label: 'Lost' },
 ];
 
 const STATUS_LABEL: Record<HotLeadStatus, string> = {
   new: 'New',
   viewed: 'Seen',
-  contacted: 'In progress',
+  contacted: 'Contacted',
   won: 'Won',
   lost: 'Lost',
 };
 
+function isOpen(lead: HotLead): boolean {
+  return lead.status === 'new' || lead.status === 'viewed';
+}
+
 function matchesFilter(lead: HotLead, filter: Filter): boolean {
-  if (filter === 'new') return lead.status === 'new';
-  if (filter === 'active') return lead.status === 'viewed' || lead.status === 'contacted';
-  if (filter === 'closed') return lead.status === 'won' || lead.status === 'lost';
-  return true;
+  if (filter === 'all') return true;
+  if (filter === 'open') return isOpen(lead);
+  return lead.status === filter;
 }
 
 function isClosed(lead: HotLead): boolean {
@@ -98,13 +104,35 @@ export function Dashboard({
   const { leads, loading, error, setOutcome: setOutcomeRaw, reload, isFetching, dataUpdatedAt } = useClientDashboard(clientId, client);
   const { awaitingProspects = 0 } = useClientApprovals(clientId, client);
   const { prospects: warmProspects, loading: warmLoading, logCallOutcome: logCallOutcomeRaw } = useWarmProspects(clientId, client);
-  const setOutcome = readOnly ? async () => ({ error: null }) : setOutcomeRaw;
-  const logCallOutcome = readOnly ? async () => {} : logCallOutcomeRaw;
   const { toasts, toast, dismiss } = useToast();
+  // Toast every real action. The automatic new -> viewed flip on open stays
+  // silent on success (it isn't something the user did on purpose).
+  const OUTCOME_TOAST: Partial<Record<HotLeadStatus, string>> = {
+    contacted: 'Lead marked as in progress.',
+    won: 'Lead marked as won.',
+    lost: 'Lead marked as lost.',
+  };
+  const setOutcome: typeof setOutcomeRaw = readOnly
+    ? async () => ({ error: null })
+    : async (...args) => {
+        const [, status] = args;
+        const res = await setOutcomeRaw(...args);
+        if (res.error) toast(res.error, 'error');
+        else if (status && OUTCOME_TOAST[status]) toast(OUTCOME_TOAST[status]!);
+        return res;
+      };
+  const logCallOutcome = readOnly
+    ? async () => {}
+    : async (prospectId: string, outcome: Parameters<typeof logCallOutcomeRaw>[1]) => {
+        const res = await logCallOutcomeRaw(prospectId, outcome);
+        if (res.error) toast(res.error, 'error'); else toast('Call outcome logged.');
+      };
   const [historyProspect, setHistoryProspect] = useState<WarmProspect | null>(null);
   const [openId, setOpenId] = useState<string | null>(clientId === '__preview__' ? 'mock-0' : null);
-  const [filter, setFilter] = useState<Filter>('new');
+  const [filter, setFilter] = useState<Filter>('all');
   const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkId = searchParams.get('lead');
 
   const openLead = leads.find((l) => l.hot_lead_id === openId) ?? null;
   const filtered = leads
@@ -113,7 +141,8 @@ export function Dashboard({
     .sort(sortLeads);
 
   const newCount = leads.filter((l) => l.status === 'new').length;
-  const inProgressCount = leads.filter((l) => l.status === 'viewed' || l.status === 'contacted').length;
+  const openCount = leads.filter(isOpen).length;
+  const contactedCount = leads.filter((l) => l.status === 'contacted').length;
   const wonCount = leads.filter((l) => l.status === 'won').length;
   const lostCount = leads.filter((l) => l.status === 'lost').length;
   const closedTotal = wonCount + lostCount;
@@ -135,6 +164,16 @@ export function Dashboard({
     // attended-to when nobody had read them.
     if (lead.status === 'new') setOutcome(lead.hot_lead_id, 'viewed');
   }
+
+  // ?lead=<hot_lead_id> (from a notification click) opens that lead once the
+  // queue has loaded, then drops the param so closing the panel sticks.
+  useEffect(() => {
+    if (!deepLinkId || loading) return;
+    const lead = leads.find((l) => l.hot_lead_id === deepLinkId);
+    if (lead) openLead_(lead);
+    setSearchParams((prev) => { prev.delete('lead'); return prev; }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkId, loading, leads]);
 
   async function handleRefresh() {
     try {
@@ -184,8 +223,8 @@ export function Dashboard({
 
       {/* ─── Stat cards ─── */}
       <StatGrid
-        newCount={newCount}
-        inProgressCount={inProgressCount}
+        openCount={openCount}
+        contactedCount={contactedCount}
         wonCount={wonCount}
         lostCount={lostCount}
         closeRate={closeRate}
@@ -347,33 +386,17 @@ function EmptyLeads({
   leads: HotLead[];
   onSwitchFilter: (f: Filter) => void;
 }) {
-  const inProgressCount = leads.filter(
-    (l) => l.status === 'viewed' || l.status === 'contacted',
-  ).length;
-  const closedCount = leads.filter(
-    (l) => l.status === 'won' || l.status === 'lost',
-  ).length;
+  const closedCount = leads.filter(isClosed).length;
+  const allNudge = leads.length > 0 && (
+    <button className="empty-nudge-btn" onClick={() => onSwitchFilter('all')}>
+      See all {leads.length} lead{leads.length !== 1 ? 's' : ''} →
+    </button>
+  );
 
-  if (filter === 'new') {
-    if (inProgressCount > 0) {
-      return (
-        <div className="leads-empty">
-          <strong>No new leads right now</strong>
-          <span>We're still reaching out - new leads will appear here when businesses reply.</span>
-
-          <button
-            className="empty-nudge-btn"
-            onClick={() => onSwitchFilter('active')}
-          >
-            Go to In Progress ({inProgressCount}) →
-          </button>
-
-        </div>
-      );
-    }
+  if (filter === 'open') {
     return (
       <div className="leads-empty">
-        <strong>No new leads yet - we're on it</strong>
+        <strong>No open leads right now - we're on it</strong>
         <span>
           We're reaching out to businesses on your behalf right now.
           As soon as one replies with interest, they'll show up here.
@@ -383,40 +406,33 @@ function EmptyLeads({
             You've closed {closedCount} lead{closedCount !== 1 ? 's' : ''} so far - great work!
           </span>
         )}
+        {allNudge}
       </div>
     );
   }
 
-  if (filter === 'active') {
-    const newCount = leads.filter((l) => l.status === 'new').length;
+  if (filter === 'contacted') {
     return (
       <div className="leads-empty">
-        <strong>Nothing in progress</strong>
+        <strong>No contacted leads</strong>
         <span>
-          When you open a new lead for the first time it moves here automatically.
-          From here, tap a lead to call, email or message them directly.
+          Leads move here once you reply, call or log a call outcome.
         </span>
-        {newCount > 0 && (
-          <button
-            className="empty-nudge-btn"
-            onClick={() => onSwitchFilter('new')}
-          >
-            See {newCount} new lead{newCount !== 1 ? 's' : ''} →
-          </button>
-        )}
+        {allNudge}
       </div>
     );
   }
 
-  if (filter === 'closed') {
+  if (filter === 'won' || filter === 'lost') {
     return (
       <div className="leads-empty">
-        <strong>No closed leads yet</strong>
+        <strong>No {filter} leads yet</strong>
         <span>
           After you contact a business, open them here and tap{' '}
-          <strong>"Mark as Won"</strong> or <strong>"Not interested"</strong>{' '}
+          <strong>"Mark as Won"</strong> or <strong>"Not a fit"</strong>{' '}
           to keep everything organised.
         </span>
+        {allNudge}
       </div>
     );
   }
@@ -471,30 +487,29 @@ function ReplyQuote({ body, receivedAt }: { body: string; receivedAt: string | n
   const [expanded, setExpanded] = useState(false);
   const isLong = body.length > 320 || body.split('\n').length > 6;
   return (
-    <div className="panel-section">
-      <div className="panel-label">What they said</div>
-      <blockquote className="panel-reply" style={!expanded && isLong ? { display: '-webkit-box', WebkitLineClamp: 6, WebkitBoxOrient: 'vertical', overflow: 'hidden' } : undefined}>
+    <>
+      <blockquote
+        className="lp-quote"
+        style={!expanded && isLong ? { display: '-webkit-box', WebkitLineClamp: 6, WebkitBoxOrient: 'vertical', overflow: 'hidden' } : undefined}
+      >
         {body}
       </blockquote>
-      {isLong && (
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="cursor-pointer border-0 bg-transparent p-0 text-[12.5px] font-semibold text-(--leaf) hover:underline"
-        >
-          {expanded ? 'Show less' : 'Show more'}
-        </button>
-      )}
-      {receivedAt && (
-        <p className="m-0 mt-1.5 text-[11.5px] text-(--ink-faint)">
-          Received {new Date(receivedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-        </p>
-      )}
-    </div>
+      <div className="lp-quote-meta">
+        {receivedAt && (
+          <span>Received {new Date(receivedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+        )}
+        {isLong && (
+          <button onClick={() => setExpanded((v) => !v)} className="lp-link">
+            {expanded ? 'Show less' : 'Show more'}
+          </button>
+        )}
+      </div>
+    </>
   );
 }
 
 const CALL_OUTCOME_LABEL: Record<CallOutcomeValue, string> = {
-  meeting_agreed: "We're meeting - 🔥",
+  meeting_agreed: "We're meeting",
   call_later: 'Maybe later - call again',
   rejected: 'Not interested',
 };
@@ -518,6 +533,7 @@ function LeadPanel({
   const waiting = waitingInfo(lead);
   const reply = lead.reply ?? lead.latest_reply;
   const replyIsFallback = !lead.reply && !!lead.latest_reply;
+  const followUpsPaused = lead.status === 'new' || lead.status === 'viewed' || lead.status === 'contacted';
 
   async function replyNow() {
     if (lead.email) window.location.href = `mailto:${lead.email}`;
@@ -561,7 +577,10 @@ function LeadPanel({
       {...useOverlayClose(onClose)}
     >
       <motion.aside
-        className="panel rounded-lg"
+        className="modal-card panel lead-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="lp-title"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -570,170 +589,176 @@ function LeadPanel({
       >
         <div className="panel-handle" />
 
-        <div className="panel-scroll">
-          {/* Status + close */}
-          <div className="panel-top">
-            <span className={`status-pill pill-${lead.status}`}>{STATUS_LABEL[lead.status]}</span>
-            <button className="panel-close-btn" onClick={onClose} aria-label="Close">✕</button>
-          </div>
-
-          {/* Identity */}
-          <h2 className="panel-biz">{lead.business_name}</h2>
-          {lead.contact_name && <p className="panel-category">{lead.contact_name}</p>}
+        <div className="panel-scroll lp-scroll">
+          {/* ─── Header: status, name, urgency ─── */}
+          <header className="lp-header">
+            <div className="lp-header-top">
+              <div className="lp-chips">
+                <span className={`status-pill pill-${lead.status}`}>{STATUS_LABEL[lead.status]}</span>
+                {!closed && waiting && (
+                  <span className={`waiting-pill waiting-${waiting.tone}`}>{waiting.text}</span>
+                )}
+              </div>
+              <button className="lp-close" onClick={onClose} aria-label="Close">
+                <X size={18} strokeWidth={2} />
+              </button>
+            </div>
+            <h2 id="lp-title" className="lp-title">{lead.business_name}</h2>
+            {lead.contact_name && <p className="lp-subtitle">{lead.contact_name}</p>}
+            {!closed && lead.escalated && (
+              <p className="lp-escalated">
+                <BellRing size={14} strokeWidth={2} /> We've let the Shorty Harris team know.
+              </p>
+            )}
+          </header>
 
           {closed ? (
-            /* ─── Closed: collapsed, no actions - just the record of what happened ─── */
-            <div className="panel-section">
-              <div className="panel-label">Outcome</div>
-              <p className="m-0 text-[14px] font-semibold text-(--ink)">
-                {lead.status === 'won' ? 'Won ✓' : 'Not a fit'}
-              </p>
-              {lead.closed_at && (
-                <p className="m-0 mt-1 text-[12.5px] text-(--ink-faint)">Closed {formatClosedDate(lead.closed_at)}</p>
-              )}
-              {lead.outcome_note && (
-                <p className="m-0 mt-2 text-[13px] text-(--ink-soft)">{lead.outcome_note}</p>
-              )}
+            /* ─── Closed: just the record of what happened ─── */
+            <div className="lp-closed">
+              <div className="lp-eyebrow">Outcome</div>
+              <p className="lp-closed-outcome">{lead.status === 'won' ? 'Won' : 'Not a fit'}</p>
+              {lead.closed_at && <p className="lp-muted">Closed {formatClosedDate(lead.closed_at)}</p>}
+              {lead.outcome_note && <p className="lp-closed-note">{lead.outcome_note}</p>}
             </div>
           ) : (
-            <div className="md:grid md:grid-cols-[1.3fr_1fr] md:gap-8 md:items-start">
-              <div>
-                {waiting && (
-                  <div className={`waiting-pill waiting-${waiting.tone}`} style={{ marginBottom: 10 }}>{waiting.text}</div>
-                )}
-                {lead.escalated && (
-                  <p className="m-0 mb-2 text-[12px] text-(--ink-faint)">We've let the Shorty Harris team know.</p>
-                )}
-
-                {/* AI summary + suggested action - the specific, useful part, kept prominent */}
-                <div className="panel-ai">
-                  <div className="panel-label">What they want</div>
-                  <p>{lead.ai_summary ?? 'They replied expressing interest.'}</p>
+            <div className="lp-body">
+              {/* ─── Left: what happened ─── */}
+              <div className="lp-main">
+                <section className="lp-section">
+                  <div className="lp-eyebrow"><Sparkles size={13} strokeWidth={2.2} /> What they want</div>
+                  <p className="lp-summary">{lead.ai_summary ?? 'They replied expressing interest.'}</p>
                   {lead.suggested_action && (
-                    <p className="panel-action">→ {lead.suggested_action}</p>
+                    <div className="lp-next">
+                      <span className="lp-next-icon"><ArrowRight size={15} strokeWidth={2.4} /></span>
+                      <div>
+                        <div className="lp-next-label">Suggested next step</div>
+                        <p className="lp-next-text">{lead.suggested_action}</p>
+                      </div>
+                    </div>
                   )}
-                </div>
+                </section>
 
-                {/* Their reply */}
-                {reply?.body ? (
-                  <ReplyQuote body={reply.body} receivedAt={reply.received_at} />
-                ) : (
-                  <div className="panel-section">
-                    <div className="panel-label">What they said</div>
-                    <p className="m-0 text-[13px] text-(--ink-faint)">The original reply isn't on record for this lead.</p>
-                  </div>
-                )}
-                {replyIsFallback && reply?.body && (
-                  <p className="m-0 -mt-2 mb-2 text-[11px] text-(--ink-faint)">Showing their most recent reply - the original isn't on record.</p>
-                )}
+                <section className="lp-section">
+                  <div className="lp-eyebrow"><MessageSquare size={13} strokeWidth={2.2} /> What they said</div>
+                  {reply?.body ? (
+                    <>
+                      <ReplyQuote body={reply.body} receivedAt={reply.received_at} />
+                      {replyIsFallback && (
+                        <p className="lp-muted lp-tight">Showing their most recent reply - the original isn't on record.</p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="lp-empty">The original reply isn't on record for this lead.</div>
+                  )}
+                </section>
 
-                {(lead.status === 'new' || lead.status === 'viewed' || lead.status === 'contacted') && (
-                  <p className="m-0 mt-1 flex items-center gap-1.5 text-[12px] text-(--ink-faint)">
-                    <PauseCircle size={13} /> Automated follow-ups to this person are paused - the conversation is yours now.
+                {followUpsPaused && (
+                  <p className="lp-footnote">
+                    <PauseCircle size={15} strokeWidth={2} />
+                    <span>Automated follow-ups to this person are paused - the conversation is yours now.</span>
                   </p>
                 )}
               </div>
 
-              <div>
-                {/* Contact info */}
-                {(lead.contact_name || lead.email || lead.phone) && (
-                  <div className="panel-section">
-                    <div className="panel-label">Contact info</div>
-                    <dl className="contact-dl">
-                      {lead.contact_name && (<><dt>Name</dt><dd>{lead.contact_name}</dd></>)}
-                      {lead.email && (<><dt>Email</dt><dd className="mono">{lead.email}</dd></>)}
-                      {lead.phone && (<><dt>Phone</dt><dd className="mono">{lead.phone}</dd></>)}
-                    </dl>
+              {/* ─── Right: who + what to do ─── */}
+              <aside className="lp-rail">
+                {(lead.email || lead.phone) && (
+                  <div className="lp-contact">
+                    <div className="lp-eyebrow">Contact</div>
+                    {lead.email && (
+                      <a className="lp-contact-row" href={`mailto:${lead.email}`} title={lead.email}>
+                        <Mail size={16} strokeWidth={2} />
+                        <span className="lp-contact-value">{lead.email}</span>
+                      </a>
+                    )}
+                    {lead.phone && (
+                      <a className="lp-contact-row" href={`tel:${lead.phone}`}>
+                        <Phone size={16} strokeWidth={2} />
+                        <span className="lp-contact-value">{formatPhone(lead.phone)}</span>
+                      </a>
+                    )}
                   </div>
                 )}
 
-                {/* Primary action - one obvious next step, not a status dropdown */}
-                {lead.email && (
-                  <button
-                    onClick={replyNow}
-                    disabled={busy}
-                    className="reach-btn p-2 rounded-md reach-primary w-full justify-center mb-2 disabled:opacity-60"
-                  >
-                    <span className="reach-icon reach-icon-on-primary"><MailIcon /></span>
-                    <span className="text-white">Reply now</span>
-                  </button>
-                )}
-                {lead.phone && (
-                  <div className="reach-row mb-2">
-                    <a className="reach-btn p-2 rounded-md" href={`tel:${lead.phone}`}>
-                      <span className="reach-icon"><PhoneIcon /></span>
-                      <span>Call</span>
-                    </a>
-                    <a
-                      className="reach-btn p-2 rounded-md"
-                      href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span className="reach-icon reach-icon-whatsapp"><WhatsAppIcon /></span>
-                      <span>WhatsApp</span>
-                    </a>
-                  </div>
-                )}
+                <div className="lp-actions">
+                  {lead.email && (
+                    <button onClick={replyNow} disabled={busy} className="lp-btn lp-btn-primary">
+                      <MailIcon /> Reply now
+                    </button>
+                  )}
+                  {lead.phone && (
+                    <div className="lp-btn-row">
+                      <a className="lp-btn lp-btn-secondary" href={`tel:${lead.phone}`}>
+                        <PhoneIcon /> Call
+                      </a>
+                      <a
+                        className="lp-btn lp-btn-secondary"
+                        href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <span className="lp-wa"><WhatsAppIcon /></span> WhatsApp
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                <div className="lp-divider" />
 
                 {/* Secondary: log a call outcome */}
                 {!showCallOutcomes && !confirmWon && (
-                  <button
-                    onClick={() => setShowCallOutcomes(true)}
-                    className="cursor-pointer w-full rounded-md border border-(--line) bg-transparent px-3 py-2 text-[12.5px] font-semibold text-(--ink-soft) transition-colors hover:border-(--line-strong) mb-2"
-                  >
-                    Log a call outcome
+                  <button onClick={() => setShowCallOutcomes(true)} className="lp-btn lp-btn-ghost">
+                    <PhoneCall size={15} strokeWidth={2} /> Log a call outcome
                   </button>
                 )}
                 {showCallOutcomes && !confirmWon && (
-                  <div className="panel-outcomes mb-2">
+                  <div className="lp-choices">
+                    <div className="lp-choices-head">
+                      <span className="lp-eyebrow lp-eyebrow-flat">How did the call go?</span>
+                      <button className="lp-link" onClick={() => setShowCallOutcomes(false)}>Cancel</button>
+                    </div>
                     {(Object.keys(CALL_OUTCOME_LABEL) as CallOutcomeValue[]).map((o) => (
                       <button
                         key={o}
                         disabled={busy}
-                        className={`outcome-btn p-2 rounded-md ${o === 'rejected' ? 'outcome-lost' : o === 'meeting_agreed' ? 'outcome-won' : 'outcome-later'}`}
+                        className={`lp-choice ${o === 'meeting_agreed' ? 'lp-choice-won' : o === 'rejected' ? 'lp-choice-lost' : ''}`}
                         onClick={() => logCallOutcome(o)}
                       >
                         {CALL_OUTCOME_LABEL[o]}
+                        <ChevronRight size={16} strokeWidth={2} />
                       </button>
                     ))}
                   </div>
                 )}
                 {confirmWon && (
-                  <div className="panel-section mb-2">
-                    <p className="m-0 mb-2 text-[13px] text-(--ink)">Mark this lead as Won too?</p>
-                    <div className="panel-outcomes">
-                      <button disabled={busy} className="outcome-btn p-2 rounded-md outcome-won" onClick={() => confirmMeetingOutcome(true)}>Yes, mark Won</button>
-                      <button disabled={busy} className="outcome-btn p-2 rounded-md outcome-later" onClick={() => confirmMeetingOutcome(false)}>Not yet</button>
+                  <div className="lp-choices">
+                    <p className="lp-confirm">Great news. Mark this lead as won too?</p>
+                    <div className="lp-btn-row">
+                      <button disabled={busy} className="lp-btn lp-btn-primary lp-btn-sm" onClick={() => confirmMeetingOutcome(true)}>Yes, mark won</button>
+                      <button disabled={busy} className="lp-btn lp-btn-secondary lp-btn-sm" onClick={() => confirmMeetingOutcome(false)}>Not yet</button>
                     </div>
                   </div>
                 )}
 
                 {/* Tertiary: not a fit */}
                 {!showNotAFit ? (
-                  <button
-                    onClick={() => setShowNotAFit(true)}
-                    className="cursor-pointer w-full rounded-md border-0 bg-transparent px-3 py-1.5 text-[12px] text-(--ink-faint) transition-colors hover:text-(--clay)"
-                  >
-                    Not a fit
-                  </button>
+                  <button onClick={() => setShowNotAFit(true)} className="lp-not-fit">Not a fit</button>
                 ) : (
-                  <div className="panel-section">
+                  <div className="lp-choices">
                     <textarea
                       value={notAFitNote}
                       onChange={(e) => setNotAFitNote(e.target.value)}
                       placeholder="Optional note - why it's not a fit"
-                      rows={2}
-                      className="w-full rounded-md border px-3 py-2 text-[12.5px]"
-                      style={{ borderColor: 'var(--line)' }}
+                      rows={3}
+                      className="lp-textarea"
                     />
-                    <div className="mt-2 flex gap-2">
-                      <button disabled={busy} onClick={markNotAFit} className="outcome-btn p-2 rounded-md outcome-lost flex-1">Confirm not a fit</button>
-                      <button onClick={() => setShowNotAFit(false)} className="outcome-btn p-2 rounded-md outcome-later flex-1">Cancel</button>
+                    <div className="lp-btn-row">
+                      <button disabled={busy} onClick={markNotAFit} className="lp-btn lp-btn-danger lp-btn-sm">Confirm</button>
+                      <button onClick={() => setShowNotAFit(false)} className="lp-btn lp-btn-secondary lp-btn-sm">Cancel</button>
                     </div>
                   </div>
                 )}
-              </div>
+              </aside>
             </div>
           )}
         </div>
@@ -819,8 +844,8 @@ function WarmProspectsPanel({
   prospects: WarmProspect[];
   onSelect: (prospect: WarmProspect) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const visible = expanded ? prospects : prospects.slice(0, 3);
+  const [showAll, setShowAll] = useState(false);
+  const visible = prospects.slice(0, 3);
 
   return (
     <div className="dash-leads" data-tour="warm-prospects">
@@ -836,47 +861,189 @@ function WarmProspectsPanel({
 
       <div className="warm-list">
         {visible.map((p) => (
-          <div className="warm-row" key={p.prospect_id} onClick={() => onSelect(p)}>
-            <div className="warm-row-main">
-              <span className="warm-row-name">{p.business_name}</span>
-              <span className="warm-row-meta">
-                {p.category ? `${p.category} · ` : ''}{p.location ?? ''}
-              </span>
-              {p.phone && <span className="warm-row-phone">{formatPhone(p.phone)}</span>}
-            </div>
-            <div className="warm-row-side">
-              <span className="warm-opens-badge">{p.total_opens}x opened</span>
-              <span className="warm-row-when">last opened {timeAgo(p.last_opened_at)}</span>
-              <div className="warm-row-actions">
-                {p.phone && (
-                  <a
-                    href={`tel:${p.phone}`}
-                    className="warm-call-btn"
-                    aria-label={`Call ${p.business_name}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Phone size={14} />
-                  </a>
-                )}
-                <button
-                  className="warm-called-btn"
-                  onClick={(e) => { e.stopPropagation(); onSelect(p); }}
-                  title="Log how the call went"
-                >
-                  <PhoneCall size={13} /> Log call
-                </button>
-              </div>
-            </div>
-          </div>
+          <WarmRow key={p.prospect_id} p={p} onSelect={onSelect} />
         ))}
       </div>
 
       {prospects.length > 3 && (
-        <button className="warm-toggle" onClick={() => setExpanded((v) => !v)}>
-          {expanded ? 'Show less' : `Show all ${prospects.length}`}
+        <button className="warm-toggle" onClick={() => setShowAll(true)}>
+          View all {prospects.length}
         </button>
       )}
+
+      <AnimatePresence>
+        {showAll && (
+          <WarmProspectsModal
+            key="warm-all"
+            prospects={prospects}
+            onClose={() => setShowAll(false)}
+            onSelect={onSelect}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function WarmRow({ p, onSelect }: { p: WarmProspect; onSelect: (prospect: WarmProspect) => void }) {
+  return (
+    <div className="warm-row" onClick={() => onSelect(p)}>
+      <div className="warm-row-main">
+        <span className="warm-row-name">{p.business_name}</span>
+        <span className="warm-row-meta">
+          {p.category ? `${p.category} · ` : ''}{p.location ?? ''}
+        </span>
+        {p.phone && <span className="warm-row-phone">{formatPhone(p.phone)}</span>}
+      </div>
+      <div className="warm-row-side">
+        <span className="warm-opens-badge">{p.total_opens}x opened</span>
+        <span className="warm-row-when">last opened {timeAgo(p.last_opened_at)}</span>
+        <div className="warm-row-actions">
+          {p.phone && (
+            <a
+              href={`tel:${p.phone}`}
+              className="warm-call-btn"
+              aria-label={`Call ${p.business_name}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Phone size={14} />
+            </a>
+          )}
+          <button
+            className="warm-called-btn"
+            onClick={(e) => { e.stopPropagation(); onSelect(p); }}
+            title="Log how the call went"
+          >
+            <PhoneCall size={13} /> Log call
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ───── all warm prospects: searchable, sortable, paged - no scrolling ───── */
+const WARM_PAGE_SIZE = 8;
+type WarmSort = 'opens' | 'recent';
+
+function WarmProspectsModal({
+  prospects, onClose, onSelect,
+}: {
+  prospects: WarmProspect[];
+  onClose: () => void;
+  onSelect: (prospect: WarmProspect) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<WarmSort>('opens');
+  const [phoneOnly, setPhoneOnly] = useState(false);
+  const [page, setPage] = useState(1);
+
+  const q = query.trim().toLowerCase();
+  const filtered = prospects
+    .filter((p) => !phoneOnly || !!p.phone)
+    .filter((p) => !q || [p.business_name, p.category, p.location, p.phone]
+      .some((v) => v?.toLowerCase().includes(q)))
+    .sort((a, b) => sort === 'opens'
+      ? b.total_opens - a.total_opens
+      : new Date(b.last_opened_at ?? 0).getTime() - new Date(a.last_opened_at ?? 0).getTime());
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / WARM_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const rows = filtered.slice((safePage - 1) * WARM_PAGE_SIZE, safePage * WARM_PAGE_SIZE);
+  const from = filtered.length === 0 ? 0 : (safePage - 1) * WARM_PAGE_SIZE + 1;
+  const to = Math.min(safePage * WARM_PAGE_SIZE, filtered.length);
+
+  return (
+    <motion.div
+      className="panel-overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+      {...useOverlayClose(onClose)}
+    >
+      <motion.aside
+        className="modal-card panel lead-sheet warm-all"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="warm-all-title"
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="panel-handle" />
+
+        <header className="warm-all-head">
+          <div className="lp-header-top">
+            <div className="flex items-center gap-2.5">
+              <span className="warm-panel-icon"><Flame size={18} strokeWidth={2} /></span>
+              <h2 id="warm-all-title" className="warm-all-title">Worth a call</h2>
+            </div>
+            <button className="lp-close" onClick={onClose} aria-label="Close">
+              <X size={18} strokeWidth={2} />
+            </button>
+          </div>
+          <p className="warm-all-sub">
+            {prospects.length} {prospects.length === 1 ? 'business has' : 'businesses have'} opened your emails multiple times without replying. A quick call usually lands well.
+          </p>
+
+          <div className="warm-all-tools">
+            <label className="warm-all-search">
+              <Search size={15} strokeWidth={2} />
+              <input
+                value={query}
+                onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+                placeholder="Search name, type, town or phone"
+                autoFocus
+              />
+            </label>
+            <div className="warm-all-seg" role="tablist" aria-label="Sort">
+              {([['opens', 'Most opens'], ['recent', 'Most recent']] as [WarmSort, string][]).map(([key, label]) => (
+                <button
+                  key={key}
+                  role="tab"
+                  aria-selected={sort === key}
+                  className={sort === key ? 'active' : ''}
+                  onClick={() => { setSort(key); setPage(1); }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              className={`warm-all-chip ${phoneOnly ? 'active' : ''}`}
+              onClick={() => { setPhoneOnly((v) => !v); setPage(1); }}
+              aria-pressed={phoneOnly}
+            >
+              <Phone size={13} strokeWidth={2} /> Has phone
+            </button>
+          </div>
+        </header>
+
+        <div className="warm-all-list">
+          {rows.length === 0 ? (
+            <div className="warm-all-empty">No businesses match “{query}”.</div>
+          ) : (
+            rows.map((p) => <WarmRow key={p.prospect_id} p={p} onSelect={onSelect} />)
+          )}
+        </div>
+
+        <footer className="warm-all-foot">
+          <span>{from}–{to} of {filtered.length}</span>
+          <div className="flex items-center gap-2">
+            <button className="warm-all-page" onClick={() => setPage(safePage - 1)} disabled={safePage <= 1} aria-label="Previous page">
+              <ChevronLeft size={16} strokeWidth={2} />
+            </button>
+            <span className="warm-all-pageno">{safePage} / {totalPages}</span>
+            <button className="warm-all-page" onClick={() => setPage(safePage + 1)} disabled={safePage >= totalPages} aria-label="Next page">
+              <ChevronRight size={16} strokeWidth={2} />
+            </button>
+          </div>
+        </footer>
+      </motion.aside>
+    </motion.div>
   );
 }
 
@@ -892,6 +1059,8 @@ function WarmProspectHistoryModal({
   prospect, onClose, onLogOutcome, client = supabase,
 }: { prospect: WarmProspect; onClose: () => void; onLogOutcome: (outcome: CallOutcome) => void; client?: SupabaseClient }) {
   const { messages, loading, error } = useProspectMessages(prospect.prospect_id, client);
+  const sentCount = messages.filter((m) => m.sent_at).length;
+  const subtitle = [prospect.category, prospect.location].filter(Boolean).join(' · ');
 
   return (
     <motion.div
@@ -903,7 +1072,10 @@ function WarmProspectHistoryModal({
       {...useOverlayClose(onClose)}
     >
       <motion.aside
-        className="panel rounded-lg"
+        className="modal-card panel lead-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wp-title"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -912,102 +1084,126 @@ function WarmProspectHistoryModal({
       >
         <div className="panel-handle" />
 
-        <div className="panel-scroll">
-          <div className="panel-top">
-            <span className="warm-opens-badge">{prospect.total_opens}x opened</span>
-            <button className="panel-close-btn" onClick={onClose} aria-label="Close">✕</button>
-          </div>
-
-          <h2 className="panel-biz">{prospect.business_name}</h2>
-          {prospect.category && (
-            <p className="panel-category">{prospect.category}{prospect.location ? ` · ${prospect.location}` : ''}</p>
-          )}
-
-          {(prospect.phone || prospect.email) && (
-            <div className="panel-section">
-              <div className="panel-label">Contact info</div>
-              <dl className="contact-dl">
-                {prospect.phone && (<><dt>Phone</dt><dd className="mono">{formatPhone(prospect.phone)}</dd></>)}
-                {prospect.email && (<><dt>Email</dt><dd className="mono">{prospect.email}</dd></>)}
-              </dl>
+        <div className="panel-scroll lp-scroll">
+          {/* ─── Header ─── */}
+          <header className="lp-header">
+            <div className="lp-header-top">
+              <div className="lp-chips">
+                <span className="warm-opens-badge">{prospect.total_opens}x opened</span>
+                {prospect.last_opened_at && (
+                  <span className="waiting-pill waiting-neutral">Last opened {timeAgo(prospect.last_opened_at)}</span>
+                )}
+              </div>
+              <button className="lp-close" onClick={onClose} aria-label="Close">
+                <X size={18} strokeWidth={2} />
+              </button>
             </div>
-          )}
+            <h2 id="wp-title" className="lp-title">{prospect.business_name}</h2>
+            {subtitle && <p className="lp-subtitle">{subtitle}</p>}
+          </header>
 
-          <div className="panel-section">
-            <div className="panel-label">Email history</div>
-            {loading ? (
-              <p className="text-[13px]" style={{ color: 'var(--ink-faint)' }}>Loading…</p>
-            ) : error ? (
-              <p className="text-[13px]" style={{ color: 'var(--clay)' }}>{error}</p>
-            ) : messages.length === 0 ? (
-              <p className="text-[13px]" style={{ color: 'var(--ink-faint)' }}>No emails sent yet.</p>
-            ) : (
-              <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
-                {messages.map((m) => (
-                  <li
-                    key={m.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border px-3.5 py-2.5"
-                    style={{ borderColor: 'var(--line)' }}
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-[13px] font-semibold" style={{ color: 'var(--ink)' }} title={m.subject ?? undefined}>
-                        {m.subject ?? MSG_TYPE_LABEL[m.message_type] ?? m.message_type}
-                      </div>
-                      <div className="text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
-                        {MSG_TYPE_LABEL[m.message_type] ?? m.message_type}
-                        {m.sent_at ? ` · sent ${timeAgo(m.sent_at)}` : ' · not sent yet'}
-                      </div>
-                    </div>
-                    {m.open_count > 0 ? (
-                      <span className="warm-opens-badge shrink-0">{m.open_count}x opened</span>
-                    ) : (
-                      <span className="shrink-0 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>Not opened</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <div className="lp-body">
+            {/* ─── Left: what they've seen ─── */}
+            <div className="lp-main">
+              <section className="lp-section">
+                <div className="wp-history-head">
+                  <div className="lp-eyebrow lp-eyebrow-flat"><Mail size={13} strokeWidth={2.2} /> Email history</div>
+                  {!loading && !error && messages.length > 0 && (
+                    <span className="wp-history-count">{sentCount} sent · {prospect.total_opens} opens</span>
+                  )}
+                </div>
+                {loading ? (
+                  <div className="lp-empty">Loading…</div>
+                ) : error ? (
+                  <div className="lp-empty" style={{ color: 'var(--clay)' }}>{error}</div>
+                ) : messages.length === 0 ? (
+                  <div className="lp-empty">No emails sent yet.</div>
+                ) : (
+                  <ol className="wp-timeline">
+                    {messages.map((m) => {
+                      const sent = !!m.sent_at;
+                      const opened = m.open_count > 0;
+                      return (
+                        <li key={m.id} className="wp-item">
+                          <span className={`wp-dot ${opened ? 'wp-dot-opened' : sent ? 'wp-dot-sent' : 'wp-dot-pending'}`} aria-hidden />
+                          <div className="wp-item-main">
+                            <div className="wp-item-subject" title={m.subject ?? undefined}>
+                              {m.subject ?? MSG_TYPE_LABEL[m.message_type] ?? m.message_type}
+                            </div>
+                            <div className="wp-item-meta">
+                              {MSG_TYPE_LABEL[m.message_type] ?? m.message_type}
+                              {sent ? ` · sent ${timeAgo(m.sent_at)}` : ' · scheduled'}
+                            </div>
+                          </div>
+                          {opened ? (
+                            <span className="warm-opens-badge">{m.open_count}x</span>
+                          ) : (
+                            <span className="wp-item-status">{sent ? 'Not opened' : 'Not sent'}</span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
+              </section>
 
-          {(prospect.phone || prospect.email) && (
-            <div className="reach-row mb-2">
-              {prospect.phone && (
-                <a className="reach-btn p-2 rounded-md reach-primary" href={`tel:${prospect.phone}`}>
-                  <span className="reach-icon reach-icon-on-primary"><Phone size={14} /></span>
-                  <span className="text-white">Call</span>
-                </a>
+              <p className="lp-footnote">
+                <Flame size={15} strokeWidth={2} />
+                <span>They keep opening but haven't replied - a short, friendly call often turns this into a conversation.</span>
+              </p>
+            </div>
+
+            {/* ─── Right: reach out + log it ─── */}
+            <aside className="lp-rail">
+              {(prospect.phone || prospect.email) && (
+                <div className="lp-contact">
+                  <div className="lp-eyebrow">Contact</div>
+                  {prospect.phone && (
+                    <a className="lp-contact-row" href={`tel:${prospect.phone}`}>
+                      <Phone size={16} strokeWidth={2} />
+                      <span className="lp-contact-value">{formatPhone(prospect.phone)}</span>
+                    </a>
+                  )}
+                  {prospect.email && (
+                    <a className="lp-contact-row" href={`mailto:${prospect.email}`} title={prospect.email}>
+                      <Mail size={16} strokeWidth={2} />
+                      <span className="lp-contact-value">{prospect.email}</span>
+                    </a>
+                  )}
+                </div>
               )}
-              {prospect.email && (
-                <a className="reach-btn p-2 rounded-md" href={`mailto:${prospect.email}`}>
-                  <span className="reach-icon reach-icon-mail"><Mail size={14} /></span>
-                  <span>Email</span>
-                </a>
-              )}
-            </div>
-          )}
 
-          <div className="panel-section">
-            <div className="panel-label">How did the call go?</div>
-            <div className="panel-outcomes">
-              <button
-                className="outcome-btn p-2 rounded-md outcome-won"
-                onClick={() => onLogOutcome('meeting_agreed')}
-              >
-                🔥 Let&apos;s meet - hot lead
-              </button>
-              <button
-                className="outcome-btn p-2 rounded-md outcome-later"
-                onClick={() => onLogOutcome('call_later')}
-              >
-                Maybe later - call again
-              </button>
-              <button
-                className="outcome-btn p-2 rounded-md outcome-lost"
-                onClick={() => onLogOutcome('rejected')}
-              >
-                Not interested
-              </button>
-            </div>
+              <div className="lp-actions">
+                {prospect.phone && (
+                  <a className="lp-btn lp-btn-primary" href={`tel:${prospect.phone}`}>
+                    <Phone size={16} strokeWidth={2.2} /> Call now
+                  </a>
+                )}
+                {prospect.email && (
+                  <a className={`lp-btn ${prospect.phone ? 'lp-btn-secondary' : 'lp-btn-primary'}`} href={`mailto:${prospect.email}`}>
+                    <Mail size={16} strokeWidth={2} /> Email
+                  </a>
+                )}
+              </div>
+
+              <div className="lp-divider" />
+
+              <div className="lp-choices">
+                <div className="lp-eyebrow lp-eyebrow-flat">How did the call go?</div>
+                <button className="lp-choice lp-choice-won" onClick={() => onLogOutcome('meeting_agreed')}>
+                  Let's meet - make it a hot lead
+                  <ChevronRight size={16} strokeWidth={2} />
+                </button>
+                <button className="lp-choice" onClick={() => onLogOutcome('call_later')}>
+                  Maybe later - call again
+                  <ChevronRight size={16} strokeWidth={2} />
+                </button>
+                <button className="lp-choice lp-choice-lost" onClick={() => onLogOutcome('rejected')}>
+                  Not interested
+                  <ChevronRight size={16} strokeWidth={2} />
+                </button>
+              </div>
+            </aside>
           </div>
         </div>
       </motion.aside>
@@ -1015,11 +1211,12 @@ function WarmProspectHistoryModal({
   );
 }
 
+
 /* ───── stat cards ───── */
 function StatGrid({
-  newCount, inProgressCount, wonCount, lostCount, closeRate, onFilter,
+  openCount, contactedCount, wonCount, lostCount, closeRate, onFilter,
 }: {
-  newCount: number; inProgressCount: number;
+  openCount: number; contactedCount: number;
   wonCount: number; lostCount: number;
   closeRate: number | null;
   onFilter: (f: Filter) => void;
@@ -1028,22 +1225,22 @@ function StatGrid({
     {
       icon: Zap,
       iconColor: 'var(--amber)',
-      label: 'New Leads',
-      value: newCount,
-      TrendIcon: newCount > 0 ? TrendingUp : Minus,
-      trendText: newCount > 0 ? 'needs your call' : 'all caught up',
-      trendColor: newCount > 0 ? 'var(--amber)' : 'var(--ink-faint)',
-      filter: 'new' as Filter,
+      label: 'Open',
+      value: openCount,
+      TrendIcon: openCount > 0 ? TrendingUp : Minus,
+      trendText: openCount > 0 ? 'needs your call' : 'all caught up',
+      trendColor: openCount > 0 ? 'var(--amber)' : 'var(--ink-faint)',
+      filter: 'open' as Filter,
     },
     {
       icon: MessageSquare,
       iconColor: 'var(--leaf)',
-      label: 'In Progress',
-      value: inProgressCount,
+      label: 'Contacted',
+      value: contactedCount,
       TrendIcon: Minus,
       trendText: 'active conversations',
       trendColor: 'var(--ink-faint)',
-      filter: 'active' as Filter,
+      filter: 'contacted' as Filter,
     },
     {
       icon: Trophy,
@@ -1053,7 +1250,7 @@ function StatGrid({
       TrendIcon: closeRate !== null ? TrendingUp : Minus,
       trendText: closeRate !== null ? `${closeRate}% close rate` : '-',
       trendColor: closeRate !== null && closeRate > 0 ? 'var(--leaf)' : 'var(--ink-faint)',
-      filter: 'closed' as Filter,
+      filter: 'won' as Filter,
     },
     {
       icon: XCircle,
@@ -1063,7 +1260,7 @@ function StatGrid({
       TrendIcon: Minus,
       trendText: lostCount > 0 ? 'closed without deal' : '-',
       trendColor: 'var(--ink-faint)',
-      filter: 'closed' as Filter,
+      filter: 'lost' as Filter,
     },
   ];
 

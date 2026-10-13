@@ -53,7 +53,7 @@ function actionHref(action: InsightAction, basePath: string): string | null {
     case 'review_targeting': return `${basePath}/targeting`;
     case 'create_campaign': return `${basePath}/campaigns`;
     case 'open_icp': return `${basePath}/targeting`;
-    case 'contact_support': return 'mailto:support@shortyharris.com?subject=Help%20with%20my%20outreach%20results';
+    case 'contact_support': return 'mailto:hello@shortyharris.com?subject=Help%20with%20my%20outreach%20results';
     case 'retry_generation': return null;
     case 'none': return null;
     default: return null;

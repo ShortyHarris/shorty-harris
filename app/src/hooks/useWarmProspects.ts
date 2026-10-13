@@ -64,7 +64,7 @@ export function useWarmProspects(clientId: string, client: SupabaseClient = supa
   // cancel any pending automated follow-up for them - so the bot doesn't
   // email someone the client just spoke to on the phone, regardless of how
   // the call went.
-  const logCallOutcome = useCallback(async (prospectId: string, outcome: CallOutcome) => {
+  const logCallOutcome = useCallback(async (prospectId: string, outcome: CallOutcome): Promise<{ error: string | null }> => {
     queryClient.setQueryData<WarmProspect[]>(warmProspectsKey(clientId), (prev = []) =>
       prev.filter((p) => p.prospect_id !== prospectId)
     );
@@ -81,7 +81,9 @@ export function useWarmProspects(clientId: string, client: SupabaseClient = supa
 
     if (updateError) {
       queryClient.invalidateQueries({ queryKey: warmProspectsKey(clientId) });
+      return { error: updateError.message };
     }
+    return { error: null };
   }, [clientId]);
 
   return {

@@ -23,7 +23,7 @@ export function HelpButton({ content }: { content: HelpContent }) {
       <button
         onClick={() => setOpen(true)}
         aria-label={`About this page: ${content.title}`}
-        className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent text-[#c4bfb5] transition-all hover:border-[#ece8df] hover:bg-[#f5f2ec] hover:text-[#62655c]"
+        className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent text-(--ad-ink-ghost) transition-all hover:border-(--ad-line) hover:bg-(--ad-fill) hover:text-(--ad-ink-soft)"
       >
         <Info size={14} strokeWidth={2.2} />
       </button>
@@ -40,7 +40,7 @@ export function HelpButton({ content }: { content: HelpContent }) {
           >
             <motion.div
               style={FONT}
-              className="flex w-full flex-col overflow-hidden bg-white h-full md:h-auto md:max-h-[80vh] md:max-w-[460px] md:rounded-2xl md:shadow-2xl"
+              className="modal-card flex w-full flex-col overflow-hidden bg-(--ad-surface) h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[460px] md:rounded-md md:shadow-2xl"
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
@@ -48,14 +48,14 @@ export function HelpButton({ content }: { content: HelpContent }) {
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#ece8df] px-5 py-4">
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-(--ad-line) px-5 py-4">
                 <div className="flex items-center gap-2">
-                  <Info size={15} className="shrink-0 text-[#3c7a5b]" />
-                  <h2 className="m-0 text-[16px] font-bold text-[#20211c]">{content.title}</h2>
+                  <Info size={15} className="shrink-0 text-(--ad-green)" />
+                  <h2 className="m-0 text-[16px] font-bold text-(--ad-ink)">{content.title}</h2>
                 </div>
                 <button
                   onClick={() => setOpen(false)}
-                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-[22px] leading-none text-[#9a9d92] transition-colors hover:text-[#20211c]"
+                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-[22px] leading-none text-(--ad-ink-faint) transition-colors hover:text-(--ad-ink)"
                   aria-label="Close"
                 >
                   ×
@@ -66,13 +66,13 @@ export function HelpButton({ content }: { content: HelpContent }) {
               <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-3">
                 {content.body.map((item, i) =>
                   item.type === 'p' ? (
-                    <p key={i} className="m-0 text-[14px] leading-relaxed text-[#62655c]">
+                    <p key={i} className="m-0 text-[14px] leading-relaxed text-(--ad-ink-soft)">
                       {item.text}
                     </p>
                   ) : (
                     <ul key={i} className="m-0 flex flex-col gap-1.5 pl-5">
                       {(item.items ?? []).map((line, j) => (
-                        <li key={j} className="text-[14px] leading-relaxed text-[#62655c]">
+                        <li key={j} className="text-[14px] leading-relaxed text-(--ad-ink-soft)">
                           {line}
                         </li>
                       ))}
@@ -82,10 +82,10 @@ export function HelpButton({ content }: { content: HelpContent }) {
               </div>
 
               {/* Footer */}
-              <div className="shrink-0 border-t border-[#ece8df] px-5 py-4">
+              <div className="shrink-0 border-t border-(--ad-line) px-5 py-4">
                 <button
                   onClick={() => setOpen(false)}
-                  className="w-full cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#2d5e46]"
+                  className="w-full cursor-pointer rounded-xl border-0 bg-(--ad-green) px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover)"
                 >
                   Got it
                 </button>

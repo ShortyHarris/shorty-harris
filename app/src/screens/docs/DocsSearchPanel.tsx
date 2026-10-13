@@ -103,13 +103,13 @@ export function DocsSearchPanel({
     >
       <motion.div
         style={FONT}
-        className="flex w-full max-w-[620px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="modal-card flex w-full max-w-[620px] flex-col overflow-hidden rounded-md bg-(--ad-surface) shadow-2xl"
         initial={{ y: -16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -16, opacity: 0 }}
         transition={{ duration: 0.18 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2.5 border-b border-[#ece8df] px-4 py-3.5">
-          <Sparkles size={16} className="shrink-0 text-[#9a9d92]" />
+        <div className="flex items-center gap-2.5 border-b border-(--ad-line) px-4 py-3.5">
+          <Sparkles size={16} className="shrink-0 text-(--ad-ink-faint)" />
           <div className="flex-1 min-w-0">
             <input
               ref={inputRef}
@@ -118,39 +118,39 @@ export function DocsSearchPanel({
               onKeyDown={handleKeyDown}
               placeholder="Ask a question about Shorty Harris…"
               style={FONT}
-              className="w-full border-0 bg-transparent text-[14px] text-[#20211c] outline-none placeholder:text-[#c4bfb5]"
+              className="w-full border-0 bg-transparent text-[14px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost)"
             />
           </div>
-          <button onClick={onClose} className="cursor-pointer shrink-0 border-0 bg-transparent p-1 text-[#9a9d92] hover:text-[#20211c]" aria-label="Close">
+          <button onClick={onClose} className="cursor-pointer shrink-0 border-0 bg-transparent p-1 text-(--ad-ink-faint) hover:text-(--ad-ink)" aria-label="Close">
             <X size={18} />
           </button>
         </div>
 
         {(asked || busy) && (
           <div className="max-h-[50vh] overflow-y-auto px-4 py-4">
-            {asked && <p className="m-0 mb-3 text-[12px] font-semibold text-[#9a9d92]">"{asked}"</p>}
+            {asked && <p className="m-0 mb-3 text-[12px] font-semibold text-(--ad-ink-faint)">"{asked}"</p>}
 
             {err ? (
-              <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>
+              <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>
             ) : (
               <>
                 {!answer && busy && (
-                  <div className="flex items-center gap-2 text-[13px] text-[#9a9d92]">
+                  <div className="flex items-center gap-2 text-[13px] text-(--ad-ink-faint)">
                     <Loader2 size={14} className="animate-spin" />
                     Thinking…
                   </div>
                 )}
                 {answer && (
-                  <p className="m-0 whitespace-pre-wrap text-[14px] leading-relaxed text-[#20211c]">{answer}</p>
+                  <p className="m-0 whitespace-pre-wrap text-[14px] leading-relaxed text-(--ad-ink)">{answer}</p>
                 )}
                 {sources.length > 0 && (
-                  <div className="mt-4 flex flex-col gap-1.5 border-t border-[#f5f2ec] pt-3">
-                    <span className="text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">Sources</span>
+                  <div className="mt-4 flex flex-col gap-1.5 border-t border-(--ad-fill) pt-3">
+                    <span className="text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Sources</span>
                     {sources.map((s) => (
                       <button
                         key={s.slug}
                         onClick={() => goToSource(s.slug)}
-                        className="cursor-pointer self-start border-0 bg-transparent p-0 text-left text-[13px] font-semibold text-[#3c7a5b] underline decoration-[#3c7a5b]/30 underline-offset-2 hover:decoration-[#3c7a5b]"
+                        className="cursor-pointer self-start border-0 bg-transparent p-0 text-left text-[13px] font-semibold text-(--ad-green) underline decoration-(--ad-green)/30 underline-offset-2 hover:decoration-(--ad-green)"
                       >
                         {s.title}
                       </button>

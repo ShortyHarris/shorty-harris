@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
 import { DateTimePicker } from '../../components/ui/date-time-picker';
-import { ChevronRight, ExternalLink, Link2, Sparkles, Clock } from 'lucide-react';
+import { ChevronRight, ExternalLink, Link2, Sparkles, Clock, CalendarClock } from 'lucide-react';
 
 const HELP: HelpContent = {
   title: 'Blog',
@@ -39,10 +39,10 @@ const CATEGORY_LABEL: Record<BlogCategory, string> = {
 };
 
 const CATEGORY_PILL: Record<BlogCategory, { bg: string; text: string }> = {
-  family_business:             { bg: '#edf4ef', text: '#3c7a5b' },
-  small_business:               { bg: '#f8efdb', text: '#b9831f' },
-  business_development_rural:  { bg: '#f0ecf8', text: '#6b4fa0' },
-  general:                      { bg: '#f5f2ec', text: '#62655c' },
+  family_business:             { bg: 'var(--ad-green-tint)', text: 'var(--ad-green)' },
+  small_business:               { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
+  business_development_rural:  { bg: 'var(--ad-purple-tint)', text: 'var(--ad-purple)' },
+  general:                      { bg: 'var(--ad-fill)', text: 'var(--ad-ink-soft)' },
 };
 
 const PAGE_SIZE = 10;
@@ -53,6 +53,17 @@ function formatScheduled(iso: string): string {
   return new Date(iso).toLocaleString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
   });
+}
+
+// "in 26 days" / "in 5 hours" / "any minute now" - relative to now.
+function timeUntil(iso: string): string {
+  const mins = Math.round((new Date(iso).getTime() - Date.now()) / 60000);
+  if (mins <= 1) return 'any minute now';
+  if (mins < 60) return `in ${mins} minutes`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `in ${hours} hour${hours === 1 ? '' : 's'}`;
+  const days = Math.round(hours / 24);
+  return `in ${days} day${days === 1 ? '' : 's'}`;
 }
 
 export function Blog() {
@@ -98,6 +109,9 @@ export function Blog() {
     try {
       await approveAndPublish(post.id, edits);
       setActivePost(null);
+      toast('Post approved and published.');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not approve the post.', 'error');
     } finally {
       setBusyId(null);
     }
@@ -108,6 +122,9 @@ export function Blog() {
     try {
       await scheduleForLater(post.id, scheduledFor, edits);
       setActivePost(null);
+      toast('Post scheduled.');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not schedule the post.', 'error');
     } finally {
       setBusyId(null);
     }
@@ -118,6 +135,9 @@ export function Blog() {
     try {
       await rescheduleFor(post.id, scheduledFor);
       setActivePost(null);
+      toast('Post rescheduled.');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not reschedule the post.', 'error');
     } finally {
       setBusyId(null);
     }
@@ -128,6 +148,9 @@ export function Blog() {
     try {
       await publishNow(post.id);
       setActivePost(null);
+      toast('Post published.');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not publish the post.', 'error');
     } finally {
       setBusyId(null);
     }
@@ -138,6 +161,9 @@ export function Blog() {
     try {
       await cancelSchedule(post.id);
       setActivePost(null);
+      toast('Schedule cancelled.');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not cancel the schedule.', 'error');
     } finally {
       setBusyId(null);
     }
@@ -149,6 +175,9 @@ export function Blog() {
     try {
       await reject(rejectTarget.id, reason);
       setRejectTarget(null);
+      toast('Post rejected.');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not reject the post.', 'error');
     } finally {
       setBusyId(null);
     }
@@ -163,7 +192,10 @@ export function Blog() {
       } else {
         await deleteForRegeneration(deleteTarget.id);
       }
+      toast('Post deleted.');
       setDeleteTarget(null);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not delete the post.', 'error');
     } finally {
       setBusyId(null);
     }
@@ -174,12 +206,15 @@ export function Blog() {
     try {
       await saveEdits(post.id, edits);
       setActivePost(null);
+      toast('Changes saved.');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not save changes.', 'error');
     } finally {
       setBusyId(null);
     }
   }
 
-  const pagBtnCls = 'cursor-pointer rounded-lg border border-[#ddd8cb] bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-[#20211c] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-40';
+  const pagBtnCls = 'cursor-pointer rounded-lg border border-(--ad-line-strong) bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-(--ad-ink) transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <div style={FONT} className="flex flex-col gap-6">
@@ -187,8 +222,8 @@ export function Blog() {
       {/* Header */}
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-[#20211c]"> <img src="https://cdn-icons-png.flaticon.com/128/9623/9623631.png" alt="Blog" className="w-10 h-10" />Blog</h1>
-          <p className="m-0 mt-1 text-[13px] text-[#62655c]">
+          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)"> <img src="https://cdn-icons-png.flaticon.com/128/9623/9623631.png" alt="Blog" className="w-10 h-10" />Blog</h1>
+          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">
             Review AI-drafted posts before they go live on the public site.
           </p>
         </div>
@@ -198,17 +233,17 @@ export function Blog() {
             onRefresh={handleRefresh}
             isFetching={viewFetching}
             dataUpdatedAt={viewUpdatedAt}
-            className="cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]"
+            className="cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)"
           />
         </div>
       </header>
 
       {/* Segmented view toggle */}
-      <div className="inline-flex w-fit rounded-xl border border-[#ece8df] bg-white p-1">
+      <div className="inline-flex w-fit rounded-xl border border-(--ad-line) bg-(--ad-surface) p-1">
         <button
           onClick={() => switchView('pending')}
           className={`cursor-pointer rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-colors ${
-            view === 'pending' ? 'bg-[#3c7a5b] text-white' : 'text-[#62655c] hover:bg-[#fbf9f5]'
+            view === 'pending' ? 'bg-(--ad-green) text-white' : 'text-(--ad-ink-soft) hover:bg-(--ad-surface-2)'
           }`}
         >
           Pending ({pending.length})
@@ -216,7 +251,7 @@ export function Blog() {
         <button
           onClick={() => switchView('published')}
           className={`cursor-pointer rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-colors ${
-            view === 'published' ? 'bg-[#3c7a5b] text-white' : 'text-[#62655c] hover:bg-[#fbf9f5]'
+            view === 'published' ? 'bg-(--ad-green) text-white' : 'text-(--ad-ink-soft) hover:bg-(--ad-surface-2)'
           }`}
         >
           Published ({published.length})
@@ -226,7 +261,7 @@ export function Blog() {
       <GeneratePostPanel />
 
       {error && (
-        <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">
+        <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">
           Couldn't load the queue: {error}
         </div>
       )}
@@ -234,15 +269,15 @@ export function Blog() {
       {isLoading ? (
         <div className="flex flex-col gap-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-14 animate-pulse rounded-xl border border-[#ece8df] bg-[#fbf9f5]" />
+            <div key={i} className="h-14 animate-pulse rounded-xl border border-(--ad-line) bg-(--ad-surface-2)" />
           ))}
         </div>
       ) : list.length === 0 ? (
-        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-          <strong className="text-[15px] font-bold text-[#20211c]">
+        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
+          <strong className="text-[15px] font-bold text-(--ad-ink)">
             {view === 'pending' ? 'Nothing waiting for review.' : 'Nothing published yet.'}
           </strong>
-          <span className="text-[13px] text-[#62655c]">
+          <span className="text-[13px] text-(--ad-ink-soft)">
             {view === 'pending'
               ? 'New drafts from WF12 will appear here.'
               : 'Approved posts show up here once they go live.'}
@@ -250,14 +285,14 @@ export function Blog() {
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-xl border border-[#ece8df] bg-white">
+          <div className="overflow-hidden rounded-xl border border-(--ad-line) bg-(--ad-surface)">
             {paged.map((post, i) => {
               const pill = CATEGORY_PILL[post.category] ?? CATEGORY_PILL.general;
               return (
                 <div
                   key={post.id}
-                  className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[#fbf9f5] ${
-                    i > 0 ? 'border-t border-[#ece8df]' : ''
+                  className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-(--ad-surface-2) ${
+                    i > 0 ? 'border-t border-(--ad-line)' : ''
                   }`}
                 >
                   <button
@@ -270,12 +305,12 @@ export function Blog() {
                     >
                       {CATEGORY_LABEL[post.category] ?? post.category}
                     </span>
-                    <span className="min-w-0 flex-1 truncate font-semibold text-[#20211c]">{post.title}</span>
+                    <span className="min-w-0 flex-1 truncate font-semibold text-(--ad-ink)">{post.title}</span>
                     {post.status === 'rejected' && (
-                      <span className="shrink-0 text-[11px] font-semibold text-[#a8533a]">Rejected</span>
+                      <span className="shrink-0 text-[11px] font-semibold text-(--ad-clay)">Rejected</span>
                     )}
                     {post.status === 'scheduled' && post.scheduled_for && (
-                      <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-[#b9831f]">
+                      <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-(--ad-amber)">
                         <Clock size={11} strokeWidth={2.2} />
                         {formatScheduled(post.scheduled_for)}
                       </span>
@@ -288,14 +323,14 @@ export function Blog() {
                       rel="noreferrer"
                       onClick={(e) => e.stopPropagation()}
                       title="View on public site"
-                      className="flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-[#ece8df] bg-transparent px-2.5 py-1.5 text-[11.5px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                      className="flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-(--ad-line) bg-transparent px-2.5 py-1.5 text-[11.5px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
                     >
                       <ExternalLink size={12} strokeWidth={2} />
                       View blog
                     </a>
                   )}
                   <button onClick={() => setActivePost(post)} className="shrink-0 cursor-pointer border-0 bg-transparent p-0">
-                    <ChevronRight size={16} className="text-[#c4bfb5]" />
+                    <ChevronRight size={16} className="text-(--ad-ink-ghost)" />
                   </button>
                 </div>
               );
@@ -303,7 +338,7 @@ export function Blog() {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between rounded-lg border border-[#ece8df] bg-white px-4 py-3 text-[12.5px] text-[#9a9d92]">
+            <div className="flex items-center justify-between rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3 text-[12.5px] text-(--ad-ink-faint)">
               <span>Page {safePage} of {totalPages}</span>
               <div className="flex gap-2">
                 <button onClick={() => setPage(safePage - 1)} disabled={safePage <= 1} className={pagBtnCls}>Previous</button>
@@ -393,23 +428,23 @@ function GeneratePostPanel() {
   }
 
   return (
-    <div className="rounded-xl border border-[#ece8df] bg-white p-4 flex flex-col gap-3">
+    <div className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4 flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="m-0 text-[13.5px] font-bold text-[#20211c]">Generate new post</p>
-          <p className="m-0 mt-0.5 text-[12px] text-[#9a9d92]">Pulls the next topic from the bank, same as the weekly automatic run.</p>
+          <p className="m-0 text-[13.5px] font-bold text-(--ad-ink)">Generate new post</p>
+          <p className="m-0 mt-0.5 text-[12px] text-(--ad-ink-faint)">Pulls the next topic from the bank, same as the weekly automatic run.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowModal(true)}
-            className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-3.5 py-2 text-[12.5px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]"
+            className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-3.5 py-2 text-[12.5px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)"
           >
             Specify a topic
           </button>
           <button
             onClick={() => submitGenerate({})}
             disabled={generating}
-            className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50"
+            className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
           >
             <Sparkles size={14} strokeWidth={2} />
             {generating ? 'Starting…' : 'Generate now'}
@@ -421,8 +456,8 @@ function GeneratePostPanel() {
         <div
           className={`rounded-lg px-3.5 py-2.5 text-[12.5px] ${
             notice.type === 'success'
-              ? 'border border-[#3c7a5b]/20 bg-[#edf4ef] text-[#3c7a5b]'
-              : 'border border-[#a8533a]/20 bg-[#fdf0ec] text-[#a8533a]'
+              ? 'border border-(--ad-green)/20 bg-(--ad-green-tint) text-(--ad-green)'
+              : 'border border-(--ad-clay)/20 bg-(--ad-clay-tint) text-(--ad-clay)'
           }`}
         >
           {notice.message}
@@ -451,8 +486,8 @@ function TopicModal({
   const [category, setCategory]           = useState<BlogCategory | ''>('');
   const [targetKeyword, setTargetKeyword] = useState('');
 
-  const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
+  const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
 
   function submit() {
     const fields: Record<string, string> = {};
@@ -472,17 +507,17 @@ function TopicModal({
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[520px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[520px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Specify a topic</h2>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Specify a topic</h2>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
-          <p className="m-0 text-[12.5px] text-[#9a9d92]">Leave any field blank to fall back to the topic bank / General category.</p>
+          <p className="m-0 text-[12.5px] text-(--ad-ink-faint)">Leave any field blank to fall back to the topic bank / General category.</p>
           <div>
             <label className={fieldLbl}>Topic</label>
             <input
@@ -506,10 +541,10 @@ function TopicModal({
           <div>
             <label className={fieldLbl}>Category</label>
             <Select value={category} onValueChange={(v) => setCategory(v as BlogCategory)}>
-              <SelectTrigger style={FONT} className="h-10 rounded-lg border-[#ece8df] bg-[#fbf9f5] text-[13px] text-[#20211c] focus:ring-0 focus:ring-offset-0 focus:border-[#3c7a5b]">
+              <SelectTrigger style={FONT} className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)">
                 <SelectValue placeholder="Auto (defaults to General)" />
               </SelectTrigger>
-              <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+              <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
                 {(Object.keys(CATEGORY_LABEL) as BlogCategory[]).map((c) => (
                   <SelectItem key={c} value={c}>{CATEGORY_LABEL[c]}</SelectItem>
                 ))}
@@ -527,14 +562,14 @@ function TopicModal({
             />
           </div>
         </div>
-        <div className="shrink-0 flex justify-end gap-2.5 border-t border-[#ece8df] px-5 py-4">
-          <button onClick={onClose} className="cursor-pointer rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:bg-[#fbf9f5]">
+        <div className="shrink-0 flex justify-end gap-2.5 border-t border-(--ad-line) px-5 py-4">
+          <button onClick={onClose} className="cursor-pointer rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:bg-(--ad-surface-2)">
             Cancel
           </button>
           <button
             onClick={submit}
             disabled={busy}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
           >
             <Sparkles size={14} strokeWidth={2} />
             {busy ? 'Starting…' : 'Generate'}
@@ -554,16 +589,16 @@ function LinkedPostsPreview({ postId }: { postId: string }) {
 
   if (isLoading) return null;
   if (links.length === 0) {
-    return <p className="m-0 text-[12px] italic text-[#c4bfb5]">No planned interlinks yet.</p>;
+    return <p className="m-0 text-[12px] italic text-(--ad-ink-ghost)">No planned interlinks yet.</p>;
   }
 
   return (
     <div className="flex flex-col gap-1.5">
       {links.map((l) => (
-        <div key={l.id} className="flex min-w-0 items-center gap-2 text-[12.5px] text-[#62655c]">
-          <Link2 size={12} className="shrink-0 text-[#9a9d92]" />
+        <div key={l.id} className="flex min-w-0 items-center gap-2 text-[12.5px] text-(--ad-ink-soft)">
+          <Link2 size={12} className="shrink-0 text-(--ad-ink-faint)" />
           <span className="min-w-0 flex-1 truncate">{l.title}</span>
-          {l.anchor_text && <span className="max-w-[40%] shrink-0 truncate text-[11px] italic text-[#9a9d92]">"{l.anchor_text}"</span>}
+          {l.anchor_text && <span className="max-w-[40%] shrink-0 truncate text-[11px] italic text-(--ad-ink-faint)">"{l.anchor_text}"</span>}
         </div>
       ))}
     </div>
@@ -596,12 +631,13 @@ function ReviewModal({
   const [metaDescription, setMetaDescription]   = useState(post.meta_description ?? '');
   const [lightboxOpen, setLightboxOpen]         = useState(false);
   const [scheduling, setScheduling]             = useState(false);
+  const [reschedulingOpen, setReschedulingOpen] = useState(false);
   const [scheduledDate, setScheduledDate]       = useState<Date | null>(post.scheduled_for ? new Date(post.scheduled_for) : null);
 
   const isScheduled = post.status === 'scheduled';
   const pill = CATEGORY_PILL[post.category] ?? CATEGORY_PILL.general;
-  const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
+  const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
 
   function currentEdits(): EditableFields {
     return {
@@ -633,12 +669,12 @@ function ReviewModal({
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[680px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[680px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#ece8df] px-5 py-4">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-(--ad-line) px-5 py-4">
           <div className="min-w-0">
             <span
               className="rounded-full px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[.04em]"
@@ -646,46 +682,86 @@ function ReviewModal({
             >
               {CATEGORY_LABEL[post.category] ?? post.category}
             </span>
-            <h2 className="m-0 mt-2 truncate text-[17px] font-bold text-[#20211c]">{post.title}</h2>
+            <h2 className="m-0 mt-2 truncate text-[17px] font-bold text-(--ad-ink)">{post.title}</h2>
           </div>
-          <button onClick={onClose} className="cursor-pointer shrink-0 border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+          <button onClick={onClose} className="cursor-pointer shrink-0 border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
           {post.status === 'rejected' && post.rejection_reason && (
-            <div className="rounded-lg border border-[#a8533a]/20 bg-[#fdf0ec] px-3.5 py-2.5 text-[12.5px] text-[#a8533a]">
+            <div className="rounded-lg border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-3.5 py-2.5 text-[12.5px] text-(--ad-clay)">
               Rejected: {post.rejection_reason}
             </div>
           )}
 
-          {isScheduled && (
-            <div className="flex flex-col gap-2.5 rounded-lg border border-[#b9831f]/25 bg-[#fdf6e8] px-3.5 py-3">
-              <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-[#b9831f]">
-                <Clock size={13} strokeWidth={2.2} />
-                Scheduled to publish {post.scheduled_for && formatScheduled(post.scheduled_for)}
+          {isScheduled && post.scheduled_for && (
+            <div className="shrink-0 overflow-hidden rounded-lg border border-(--ad-amber)/20 bg-(--ad-amber-wash)">
+              {/* Status: the date once, big, with how long until it goes live */}
+              <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--ad-surface) text-(--ad-amber) shadow-[0_1px_2px_rgba(185,131,31,0.15)]">
+                    <CalendarClock size={18} strokeWidth={2} />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-amber)">Scheduled</div>
+                    <div className="truncate text-[15px] font-bold text-(--ad-ink)">{formatScheduled(post.scheduled_for)}</div>
+                    <div className="text-[12px] text-(--ad-ink-faint)">
+                      Goes live automatically {timeUntil(post.scheduled_for)}
+                    </div>
+                  </div>
+                </div>
+                {!reschedulingOpen && (
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      onClick={() => setReschedulingOpen(true)}
+                      disabled={busy}
+                      className="cursor-pointer rounded-lg border border-(--ad-line-strong) bg-(--ad-surface) px-3.5 py-2 text-[12.5px] font-semibold text-(--ad-ink) transition-colors hover:bg-(--ad-surface-2) disabled:opacity-50"
+                    >
+                      Reschedule
+                    </button>
+                    <button
+                      onClick={onPublishNow}
+                      disabled={busy}
+                      className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-3.5 py-2 text-[12.5px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
+                    >
+                      Publish now
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <DateTimePicker value={scheduledDate} onChange={setScheduledDate} minDate={new Date()} />
-                <button
-                  onClick={submitReschedule}
-                  disabled={busy || !scheduledDate || scheduledDate.toISOString() === post.scheduled_for}
-                  className="cursor-pointer rounded-lg border-0 bg-[#b9831f] px-3 py-2 text-[12px] font-bold text-white transition-colors hover:bg-[#9c6f1a] disabled:opacity-50"
-                >
-                  Update time
-                </button>
-                <button
-                  onClick={onPublishNow}
-                  disabled={busy}
-                  className="cursor-pointer rounded-lg border border-[#3c7a5b] bg-transparent px-3 py-2 text-[12px] font-bold text-[#3c7a5b] transition-colors hover:bg-[#3c7a5b] hover:text-white disabled:opacity-50"
-                >
-                  Publish now
-                </button>
+
+              {/* Reschedule: picker only when asked for */}
+              {reschedulingOpen && (
+                <div className="flex flex-wrap items-center gap-2 border-t border-(--ad-amber)/15 bg-(--ad-surface)/60 px-4 py-3">
+                  <span className="text-[12px] font-semibold text-(--ad-ink-soft)">New time</span>
+                  <DateTimePicker value={scheduledDate} onChange={setScheduledDate} minDate={new Date()} />
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      onClick={() => { setReschedulingOpen(false); setScheduledDate(new Date(post.scheduled_for!)); }}
+                      className="cursor-pointer rounded-lg border-0 bg-transparent px-3 py-2 text-[12.5px] font-semibold text-(--ad-ink-soft) transition-colors hover:text-(--ad-ink)"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={submitReschedule}
+                      disabled={busy || !scheduledDate || scheduledDate.toISOString() === post.scheduled_for}
+                      className="cursor-pointer rounded-lg border-0 bg-(--ad-ink) px-3.5 py-2 text-[12.5px] font-bold text-white transition-colors hover:bg-(--ad-green) disabled:opacity-50"
+                    >
+                      Save new time
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tertiary: unschedule */}
+              <div className="flex items-center justify-between gap-3 border-t border-(--ad-amber)/15 bg-(--ad-amber-tint) px-4 py-2.5">
+                <span className="text-[12px] text-(--ad-ink-faint)">Changed your mind? It goes back to the review queue.</span>
                 <button
                   onClick={onCancelSchedule}
                   disabled={busy}
-                  className="cursor-pointer rounded-lg border border-transparent bg-transparent px-3 py-2 text-[12px] font-semibold text-[#9a9d92] transition-colors hover:text-[#a8533a]"
+                  className="cursor-pointer shrink-0 border-0 bg-transparent p-0 text-[12.5px] font-semibold text-(--ad-ink-faint) transition-colors hover:text-(--ad-clay) disabled:opacity-50"
                 >
-                  Cancel schedule
+                  Unschedule
                 </button>
               </div>
             </div>
@@ -716,7 +792,7 @@ function ReviewModal({
               <button
                 type="button"
                 onClick={() => setLightboxOpen(true)}
-                className="block h-24 w-40 cursor-zoom-in overflow-hidden rounded-lg border border-[#ece8df] bg-[#f5f2ec] p-0"
+                className="block h-24 w-40 cursor-zoom-in overflow-hidden rounded-lg border border-(--ad-line) bg-(--ad-fill) p-0"
               >
                 <img src={post.cover_image_url} alt="" className="h-full w-full object-cover" />
               </button>
@@ -734,15 +810,15 @@ function ReviewModal({
           </div>
         </div>
 
-        <div className="shrink-0 flex flex-col gap-3 border-t border-[#ece8df] px-5 py-4">
+        <div className="shrink-0 flex flex-col gap-3 border-t border-(--ad-line) px-5 py-4">
           {mode === 'pending' && (
-            <div className="flex flex-wrap items-center gap-2.5 rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5">
-              <label className="flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-[#62655c]">
+            <div className="flex flex-wrap items-center gap-2.5 rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5">
+              <label className="flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-(--ad-ink-soft)">
                 <input
                   type="checkbox"
                   checked={scheduling}
                   onChange={(e) => setScheduling(e.target.checked)}
-                  className="accent-[#3c7a5b]"
+                  className="accent-(--ad-green)"
                 />
                 Schedule for later instead of publishing immediately
               </label>
@@ -757,21 +833,21 @@ function ReviewModal({
               <button
                 onClick={onDelete}
                 disabled={busy}
-                className="cursor-pointer rounded-xl border border-transparent bg-transparent px-4 py-2 text-[13px] font-semibold text-[#c4bfb5] transition-colors hover:border-[#a8533a]/30 hover:bg-[#fdf0ec] hover:text-[#a8533a] disabled:opacity-50"
+                className="cursor-pointer rounded-xl border border-transparent bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-ghost) transition-colors hover:border-(--ad-clay)/30 hover:bg-(--ad-clay-tint) hover:text-(--ad-clay) disabled:opacity-50"
               >
                 Delete (regenerate)
               </button>
               <button
                 onClick={onReject}
                 disabled={busy}
-                className="cursor-pointer rounded-xl border border-[#a8533a] bg-transparent px-4 py-2 text-[13px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white disabled:opacity-50"
+                className="cursor-pointer rounded-xl border border-(--ad-clay) bg-transparent px-4 py-2 text-[13px] font-bold text-(--ad-clay) transition-colors hover:bg-(--ad-clay) hover:text-white disabled:opacity-50"
               >
                 Reject
               </button>
               <button
                 onClick={submitApprove}
                 disabled={busy || !title.trim() || (scheduling && !scheduledDate)}
-                className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50"
+                className="cursor-pointer rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
               >
                 {busy ? (scheduling ? 'Scheduling…' : 'Publishing…') : scheduling ? 'Schedule post' : 'Approve & publish'}
               </button>
@@ -781,14 +857,14 @@ function ReviewModal({
               <button
                 onClick={onDelete}
                 disabled={busy}
-                className="cursor-pointer rounded-xl border border-transparent bg-transparent px-4 py-2 text-[13px] font-semibold text-[#c4bfb5] transition-colors hover:border-[#a8533a]/30 hover:bg-[#fdf0ec] hover:text-[#a8533a] disabled:opacity-50"
+                className="cursor-pointer rounded-xl border border-transparent bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-ghost) transition-colors hover:border-(--ad-clay)/30 hover:bg-(--ad-clay-tint) hover:text-(--ad-clay) disabled:opacity-50"
               >
                 Delete
               </button>
               <button
                 onClick={submitSave}
                 disabled={busy || !title.trim()}
-                className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50"
+                className="cursor-pointer rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
               >
                 {busy ? 'Saving…' : 'Save changes'}
               </button>
@@ -836,37 +912,37 @@ function RejectModal({
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[480px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[480px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Reject post</h2>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Reject post</h2>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-3">
-          <p className="m-0 text-[13px] text-[#62655c]">
-            Rejecting <strong className="font-bold text-[#20211c]">{post.title}</strong>. WF12 won't retry this exact draft.
+          <p className="m-0 text-[13px] text-(--ad-ink-soft)">
+            Rejecting <strong className="font-bold text-(--ad-ink)">{post.title}</strong>. WF12 won't retry this exact draft.
           </p>
           <div>
-            <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">Reason</label>
+            <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Reason</label>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={3}
               placeholder="e.g. Off-brand tone, factually wrong, duplicate topic…"
               style={FONT}
-              className="w-full resize-y rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white"
+              className="w-full resize-y rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)"
             />
           </div>
         </div>
-        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
-          <button onClick={onClose} className="cursor-pointer rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:bg-[#fbf9f5]">Cancel</button>
+        <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
+          <button onClick={onClose} className="cursor-pointer rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:bg-(--ad-surface-2)">Cancel</button>
           <button
             onClick={() => onConfirm(reason.trim())}
             disabled={busy || !reason.trim()}
-            className="cursor-pointer rounded-xl border-0 bg-[#a8533a] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#8a3f2b] disabled:opacity-50"
+            className="cursor-pointer rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
           >
             {busy ? 'Rejecting…' : 'Reject post'}
           </button>
@@ -890,31 +966,31 @@ function DeleteModal({
     >
       <motion.div
         style={FONT}
-        className="flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[90vh] md:max-w-[480px] md:rounded-2xl md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[480px] md:rounded-md md:shadow-2xl"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-[#20211c]">{isPublished ? 'Delete post' : 'Delete draft'}</h2>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">{isPublished ? 'Delete post' : 'Delete draft'}</h2>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-3">
-          <div className="rounded-xl border border-[#a8533a]/20 bg-[#fdf0ec] px-4 py-4">
-            <p className="m-0 text-[14px] font-bold text-[#a8533a]">Delete "{post.title}"?</p>
-            <p className="m-0 mt-1.5 text-[13px] text-[#a8533a]/80">
+          <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-4">
+            <p className="m-0 text-[14px] font-bold text-(--ad-clay)">Delete "{post.title}"?</p>
+            <p className="m-0 mt-1.5 text-[13px] text-(--ad-clay)/80">
               {isPublished
                 ? 'This permanently removes it from the public site. This cannot be undone.'
                 : "This isn't a rejection - WF12 will treat the topic as still needing a post and draft a fresh one on its next scheduled run."}
             </p>
           </div>
         </div>
-        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
-          <button onClick={onClose} className="cursor-pointer rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:bg-[#fbf9f5]">Cancel</button>
+        <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
+          <button onClick={onClose} className="cursor-pointer rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:bg-(--ad-surface-2)">Cancel</button>
           <button
             onClick={onConfirm}
             disabled={busy}
-            className="cursor-pointer rounded-xl border-0 bg-[#a8533a] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#8a3f2b] disabled:opacity-50"
+            className="cursor-pointer rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
           >
             {busy ? 'Deleting…' : isPublished ? 'Delete post' : 'Delete draft'}
           </button>

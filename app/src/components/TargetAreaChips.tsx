@@ -16,9 +16,9 @@ export function TargetAreaChips({
         <span
           key={`${a.label}-${i}`}
           title={areaDisplayLabel(a)}
-          className={`inline-flex max-w-full items-center gap-1 rounded-full border border-[#ece8df] bg-[#fbf9f5] px-2.5 py-1 text-[12px] text-[#62655c] ${chipClassName}`}
+          className={`inline-flex max-w-full items-center gap-1 rounded-full border border-(--ad-line) bg-(--ad-surface-2) px-2.5 py-1 text-[12px] text-(--ad-ink-soft) ${chipClassName}`}
         >
-          {a.mode === 'radius' && <MapPin size={11} className="shrink-0 text-[#3c7a5b]" />}
+          {a.mode === 'radius' && <MapPin size={11} className="shrink-0 text-(--ad-green)" />}
           <span className="truncate">{areaDisplayLabel(a)}</span>
         </span>
       ))}

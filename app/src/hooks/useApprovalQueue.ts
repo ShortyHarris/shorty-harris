@@ -137,7 +137,7 @@ export function useApprovalQueue() {
   // subscription with a fixed name breaks the moment this hook is mounted
   // more than once at a time (e.g. the sidebar badge + the page itself).
 
-  const approve = useCallback(async (id: string, editedBody?: string, editedSubject?: string) => {
+  const approve = useCallback(async (id: string, editedBody?: string, editedSubject?: string): Promise<{ error: string | null }> => {
     queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) =>
       prev.filter((i) => i.id !== id)
     );
@@ -166,9 +166,10 @@ export function useApprovalQueue() {
     }
 
     queryClient.invalidateQueries({ queryKey: AQ_KEYS.stats });
+    return { error: error?.message ?? null };
   }, []);
 
-  const reject = useCallback(async (id: string) => {
+  const reject = useCallback(async (id: string): Promise<{ error: string | null }> => {
     queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) =>
       prev.filter((i) => i.id !== id)
     );
@@ -186,6 +187,7 @@ export function useApprovalQueue() {
     }
 
     queryClient.invalidateQueries({ queryKey: AQ_KEYS.stats });
+    return { error: error?.message ?? null };
   }, []);
 
   return {

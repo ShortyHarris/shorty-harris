@@ -57,8 +57,8 @@ export function RowMenu({ items }: { items: MenuItem[] }) {
         aria-label="Row actions"
         className={`flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border text-[17px] leading-none transition-all ${
           open
-            ? 'border-[#ddd8cb] bg-[#f5f2ec] text-[#20211c]'
-            : 'border-transparent bg-transparent text-[#c4bfb5] hover:border-[#ece8df] hover:bg-[#f5f2ec] hover:text-[#62655c]'
+            ? 'border-(--ad-line-strong) bg-(--ad-fill) text-(--ad-ink)'
+            : 'border-transparent bg-transparent text-(--ad-ink-ghost) hover:border-(--ad-line) hover:bg-(--ad-fill) hover:text-(--ad-ink-soft)'
         }`}
       >
         ⋮
@@ -75,15 +75,15 @@ export function RowMenu({ items }: { items: MenuItem[] }) {
             maxHeight: pos.maxHeight,
             zIndex: 9999,
           }}
-          className="w-48 overflow-y-auto overscroll-contain rounded-xl border border-[#ece8df] bg-white py-1 shadow-[0_8px_28px_rgba(0,0,0,0.12)]"
+          className="w-48 overflow-y-auto overscroll-contain rounded-xl border border-(--ad-line) bg-(--ad-surface) py-1 shadow-[0_8px_28px_rgba(0,0,0,0.12)]"
         >
           {items.map((item, i) => {
             if (item.type === 'separator') {
-              return <hr key={i} className="my-1 border-[#f5f2ec]" />;
+              return <hr key={i} className="my-1 border-(--ad-fill)" />;
             }
             if (item.type === 'header') {
               return (
-                <div key={i} className="px-3 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-[.07em] text-[#c4bfb5]">
+                <div key={i} className="px-3 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-[.07em] text-(--ad-ink-ghost)">
                   {item.label}
                 </div>
               );
@@ -98,15 +98,15 @@ export function RowMenu({ items }: { items: MenuItem[] }) {
                   item.disabled ? 'cursor-not-allowed' : 'cursor-pointer'
                 } ${
                   item.destructive
-                    ? 'text-[#a8533a] hover:bg-[#fdf0ec]'
-                    : 'text-[#20211c] hover:bg-[#fbf9f5]'
+                    ? 'text-(--ad-clay) hover:bg-(--ad-clay-tint)'
+                    : 'text-(--ad-ink) hover:bg-(--ad-surface-2)'
                 }`}
               >
                 {item.dot !== undefined && (
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: item.dot }} />
                 )}
                 <span className="flex-1">{item.label}</span>
-                {item.checked && <span className="text-[11px] text-[#3c7a5b]">✓</span>}
+                {item.checked && <span className="text-[11px] text-(--ad-green)">✓</span>}
               </button>
             );
           })}

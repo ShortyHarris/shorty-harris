@@ -1,0 +1,124 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Admin colour palette - light + dark.
+
+   Every colour in the admin screens (and the shared components they use)
+   comes from these tokens, so dark mode is just a second set of values.
+   Light values live on :root so shared components look unchanged wherever
+   they're used (client app, public pages). Dark values only apply while the
+   admin layout has set <html data-admin-theme="dark"> - it's on <html>, not
+   the admin wrapper, so portalled UI (toasts, dropdowns, modals) follows.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* text */
+  --ad-ink:          #20211c;
+  --ad-black:        #0a0a0a;
+  --ad-ink-2:        #3f4038;
+  --ad-ink-soft:     #62655c;
+  --ad-ink-faint:    #9a9d92;
+  --ad-ink-ghost:    #c4bfb5;
+
+  /* surfaces + lines */
+  --ad-page:         #f5f5f5;
+  --ad-page-sunken:  #efeded;
+  --ad-surface:      #ffffff;
+  --ad-surface-2:    #fbf9f5;
+  --ad-fill:         #f5f2ec;
+  --ad-line:         #ece8df;
+  --ad-line-strong:  #ddd8cb;
+
+  /* brand green */
+  --ad-green:        #3c7a5b;
+  --ad-green-hover:  #2d5e46;
+  --ad-green-tint:   #edf4ef;
+  --ad-green-line:   #b4d5c0;
+
+  /* clay (danger / destructive) */
+  --ad-clay:         #a8533a;
+  --ad-clay-hover:   #8a3f2b;
+  --ad-clay-tint:    #f6e8e2;
+  --ad-clay-line:    #e0b8ae;
+  --ad-red:          #ba1a1a;
+
+  /* amber (warning / scheduled / pending) */
+  --ad-amber:        #b9831f;
+  --ad-orange:       #d4870f;
+  --ad-amber-ink:    #8a6417;
+  --ad-amber-tint:   #f8efdb;
+  --ad-amber-wash:   #fdf8ee;
+  --ad-amber-line:   #e8d5a8;
+
+  /* accents */
+  --ad-purple:       #6b4fa0;
+  --ad-purple-tint:  #f0ecf8;
+  --ad-blue:         #2f6690;
+  --ad-blue-tint:    #e7f0f7;
+}
+
+html[data-admin-theme="dark"] {
+  color-scheme: dark;
+
+  --ad-ink:          #ecebe6;
+  --ad-black:        #f4f3ef;
+  --ad-ink-2:        #cfcec7;
+  --ad-ink-soft:     #a9aaa2;
+  --ad-ink-faint:    #82847b;
+  --ad-ink-ghost:    #595b53;
+
+  --ad-page:         #121310;
+  --ad-page-sunken:  #0e0f0d;
+  --ad-surface:      #1a1b18;
+  --ad-surface-2:    #20211e;
+  --ad-fill:         #272824;
+  --ad-line:         #2e302b;
+  --ad-line-strong:  #3e403a;
+
+  --ad-green:        #3f9469;
+  --ad-green-hover:  #357f59;
+  --ad-green-tint:   #1d2b23;
+  --ad-green-line:   #2f4c3c;
+
+  --ad-clay:         #d0704f;
+  --ad-clay-hover:   #b85e40;
+  --ad-clay-tint:    #3a2621;
+  --ad-clay-line:    #5c362b;
+  --ad-red:          #e0524a;
+
+  --ad-amber:        #e2b456;
+  --ad-orange:       #c47d12;
+  --ad-amber-ink:    #e9c47c;
+  --ad-amber-tint:   #33291a;
+  --ad-amber-wash:   #2a2318;
+  --ad-amber-line:   #5a4721;
+
+  --ad-purple:       #8f74c9;
+  --ad-purple-tint:  #2a2438;
+  --ad-blue:         #6ea4cf;
+  --ad-blue-tint:    #1c2a36;
+
+  /* page background behind the admin shell */
+  background: #121310;
+}
+
+/* Inverted buttons: near-black background + white text in light mode
+   becomes a light background in dark mode, so the white label has to flip
+   to the dark surface colour to stay readable. */
+html[data-admin-theme="dark"] :is(.bg-\(--ad-black\), .bg-\(--ad-ink\)).text-white:not(:hover),
+html[data-admin-theme="dark"] :is(.hover\:bg-\(--ad-black\), .hover\:bg-\(--ad-ink\)).hover\:text-white:hover,
+html[data-admin-theme="dark"] :is(.bg-\(--ad-black\), .bg-\(--ad-ink\)):not(:hover) > .text-white,
+html[data-admin-theme="dark"] .primary-btn,
+html[data-admin-theme="dark"] .pill.green,
+html[data-admin-theme="dark"] .pill.green-solid,
+html[data-admin-theme="dark"] .resolve-btn:hover {
+  color: var(--ad-surface);
+}
+
+/* Native form controls + scrollbars follow the scheme. */
+html[data-admin-theme="dark"] .theme-admin input,
+html[data-admin-theme="dark"] .theme-admin textarea,
+html[data-admin-theme="dark"] .theme-admin select {
+  color: var(--ad-ink);
+}
+html[data-admin-theme="dark"] .theme-admin ::placeholder {
+  color: var(--ad-ink-ghost);
+}

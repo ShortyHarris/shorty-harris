@@ -64,9 +64,10 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
     setErr(null);
     const { error } = await saveClientIcp(clientId, { [key]: values } as ClientIcpPatch);
     setSavingField(null);
-    if (error) { setErr(error); return; }
+    if (error) { setErr(error); toast(error, 'error'); return; }
     await reload();
     setDraft((prev) => { const next = { ...prev }; delete next[key]; return next; });
+    toast('Targeting profile saved.');
   }
 
   async function commitNotes() {
@@ -75,9 +76,10 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
     setErr(null);
     const { error } = await saveClientIcp(clientId, { notes: notesDraft });
     setSavingField(null);
-    if (error) { setErr(error); return; }
+    if (error) { setErr(error); toast(error, 'error'); return; }
     await reload();
     setNotesDraft(null);
+    toast('Notes saved.');
   }
 
   async function handleRebuild() {
