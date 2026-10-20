@@ -62,9 +62,10 @@ Martin Vitek, or any other brand.
 
 | PostKing status | Admin Blog (`/admin/blog`) |
 |---|---|
-| `scheduled` | `scheduled` with the same `scheduled_for` date — ready to go out |
-| `published` | `published` (live when `published_at` has arrived) |
-| `draft` or anything else | `draft` (not public, not in the approval queue) |
+| `scheduled` with a date | **Imported** as `scheduled` with the same `scheduled_for` — ready to go out |
+| `scheduled` with no date | **Skipped** (never inserted as draft) |
+| already-imported, later `published` | **Updated** in place (`scheduled` → `published`) |
+| `unpublished` / `draft` / never-imported `published` | **Skipped** — no new `blog_posts` row |
 
 Reruns are idempotent: they match on `postking_article_id`, then slug, and
 skip when `content_hash` is unchanged. WF12 (`generate-blog-post`) is untouched.
@@ -103,6 +104,6 @@ POSTKING_API_TOKEN=… SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
 ```
 
 After the first real run, scheduled posts show under Admin → Blog (the
-scheduled/published list). Drafts stay in `blog_posts` as `draft` until
-PostKing schedules or publishes them, then the next daily sync updates
-the same row.
+scheduled/published list). Unpublished and draft PostKing articles are
+not imported. When an already-imported article is later published in
+PostKing, the next daily sync updates that same row.
