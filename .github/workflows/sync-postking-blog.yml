@@ -1,0 +1,39 @@
+name: Sync Postking blog
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'List planned inserts/updates without writing to Supabase'
+        type: boolean
+        default: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install
+        working-directory: app
+        run: npm ci --no-audit --no-fund
+
+      - name: Sync Shorty Harris PostKing articles
+        working-directory: app
+        env:
+          POSTKING_API_TOKEN: ${{ secrets.POSTKING_API_TOKEN }}
+          POSTKING_API_URL: ${{ secrets.POSTKING_API_URL }}
+          POSTKING_BRAND_ID: cmvgju3fk1bg9g07zorefgwgu
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' && '1' || '' }}
+        run: npm run sync:postking-blog
