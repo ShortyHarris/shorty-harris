@@ -55,9 +55,10 @@ See `docs/DEPLOYMENT.md` for full setup.
 
 ## PostKing blog sync (Shorty Harris only)
 
-An hourly GitHub Action pulls **Shorty Harris** PostKing articles
-(`cmvgju3fk1bg9g07zorefgwgu`) into the admin Blog CMS (`blog_posts`).
-It never reads Jackies, TUTEL, Martin Vitek, or any other brand.
+A daily GitHub Action (05:00 UTC, about 06:00–07:00 Prague) pulls
+**Shorty Harris** PostKing articles (`cmvgju3fk1bg9g07zorefgwgu`) into
+the admin Blog CMS (`blog_posts`). It never reads Jackies, TUTEL,
+Martin Vitek, or any other brand.
 
 | PostKing status | Admin Blog (`/admin/blog`) |
 |---|---|
@@ -103,5 +104,5 @@ POSTKING_API_TOKEN=… SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
 
 After the first real run, scheduled posts show under Admin → Blog (the
 scheduled/published list). Drafts stay in `blog_posts` as `draft` until
-PostKing schedules or publishes them, then the next hourly sync updates
+PostKing schedules or publishes them, then the next daily sync updates
 the same row.

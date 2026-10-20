@@ -1,4 +1,4 @@
-// Hourly (and manual) importer: Shorty Harris PostKing blog → this app's
+// Daily (05:00 UTC) and manual importer: Shorty Harris PostKing blog → this app's
 // `blog_posts` CMS (the /admin/blog queue).
 //
 // Hard-wired to brand cmvgju3fk1bg9g07zorefgwgu. Never lists or writes any
