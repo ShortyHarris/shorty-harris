@@ -1,5 +1,6 @@
 // Daily (05:00 UTC) and manual importer: Shorty Harris PostKing blog → this app's
-// `blog_posts` CMS (the /admin/blog queue).
+// `blog_posts` CMS (the /admin/blog queue). New rows are created only for
+// PostKing `scheduled` articles that have a schedule date.
 //
 // Hard-wired to brand cmvgju3fk1bg9g07zorefgwgu. Never lists or writes any
 // other PostKing brand. Does not call the WF12 generate-blog-post webhook.
@@ -14,10 +15,12 @@ import { createClient } from '@supabase/supabase-js';
 import {
   SHORTY_HARRIS_POSTKING_BRAND_ID,
   assertShortyHarrisBrand,
+  mapPostkingStatus,
   parseTags,
   planSync,
   type ExistingBlogPost,
   type PostkingArticle,
+  type SkipReason,
   type SyncAction,
   type UpsertRow,
 } from '../src/lib/postkingBlogSync.ts';
@@ -295,14 +298,40 @@ async function applyAction(supabase: BlogPostsWriter, action: SyncAction): Promi
 }
 
 function summarize(actions: SyncAction[]): string {
-  const counts = { insert: 0, update: 0, unchanged: 0, slug_conflict: 0 };
+  const counts = {
+    insert: 0,
+    update: 0,
+    skipped: 0,
+    not_scheduled: 0,
+    missing_schedule_date: 0,
+    unchanged: 0,
+    slug_conflict: 0,
+  };
   for (const a of actions) {
-    if (a.type === 'insert') counts.insert += 1;
-    else if (a.type === 'update') counts.update += 1;
-    else if (a.reason === 'unchanged') counts.unchanged += 1;
+    if (a.type === 'insert') {
+      counts.insert += 1;
+      continue;
+    }
+    if (a.type === 'update') {
+      counts.update += 1;
+      continue;
+    }
+    counts.skipped += 1;
+    const reason: SkipReason = a.reason;
+    if (reason === 'not_scheduled') counts.not_scheduled += 1;
+    else if (reason === 'missing_schedule_date') counts.missing_schedule_date += 1;
+    else if (reason === 'unchanged') counts.unchanged += 1;
     else counts.slug_conflict += 1;
   }
-  return `insert=${counts.insert} update=${counts.update} unchanged=${counts.unchanged} slug_conflict=${counts.slug_conflict}`;
+  return [
+    `insert=${counts.insert}`,
+    `update=${counts.update}`,
+    `skipped=${counts.skipped}`,
+    `(not_scheduled=${counts.not_scheduled}`,
+    `missing_schedule_date=${counts.missing_schedule_date}`,
+    `unchanged=${counts.unchanged}`,
+    `slug_conflict=${counts.slug_conflict})`,
+  ].join(' ');
 }
 
 async function main() {
@@ -323,6 +352,19 @@ async function main() {
   const actions: SyncAction[] = [];
 
   for (const item of listed) {
+    const alreadyImported = existing.byId.has(item.id);
+    if (!alreadyImported && mapPostkingStatus(item.status) !== 'scheduled') {
+      const action: SyncAction = {
+        type: 'skip',
+        reason: 'not_scheduled',
+        articleId: item.id,
+        slug: item.slug || item.id,
+      };
+      actions.push(action);
+      console.log(`  ${(item.status || 'unknown').padEnd(12)} ${item.slug || item.id} (not_scheduled)`);
+      continue;
+    }
+
     const full = await loadFullArticle(opts, item);
     if (full.brandId) assertShortyHarrisBrand(full.brandId);
     const action = planSync(full, existing.byId, existing.bySlug, nowIso, opts.apiUrl);

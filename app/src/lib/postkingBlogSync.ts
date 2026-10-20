@@ -65,9 +65,14 @@ export interface UpsertRow {
   content_hash: string;
 }
 
+export type SkipReason =
+  | 'unchanged'
+  | 'slug_conflict'
+  | 'not_scheduled'
+  | 'missing_schedule_date';
+
 export type SyncAction =
-  | { type: 'skip'; reason: 'unchanged'; articleId: string; slug: string }
-  | { type: 'skip'; reason: 'slug_conflict'; articleId: string; slug: string; conflictingId: string }
+  | { type: 'skip'; reason: SkipReason; articleId: string; slug: string; conflictingId?: string }
   | { type: 'insert'; articleId: string; slug: string; row: UpsertRow }
   | { type: 'update'; articleId: string; slug: string; existingId: string; row: UpsertRow };
 
@@ -91,6 +96,17 @@ export function mapPostkingStatus(status: string | null | undefined): CmsStatus 
   if (normalized === 'published' || normalized === 'live') return 'published';
   if (normalized === 'scheduled' || normalized === 'schedule') return 'scheduled';
   return 'draft';
+}
+
+export function parseScheduleDate(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const t = Date.parse(value);
+  return Number.isNaN(t) ? null : new Date(t).toISOString();
+}
+
+/** New rows are only created for PostKing `scheduled` articles that have a date. */
+export function isScheduledImport(article: Pick<PostkingArticle, 'status' | 'scheduledAt'>): boolean {
+  return mapPostkingStatus(article.status) === 'scheduled' && parseScheduleDate(article.scheduledAt) !== null;
 }
 
 export function mapCategory(raw: string | null | undefined): BlogCategory {
@@ -157,11 +173,6 @@ export function slugify(input: string): string {
   return slug || 'post';
 }
 
-function isoOrNull(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const t = Date.parse(value);
-  return Number.isNaN(t) ? null : new Date(t).toISOString();
-}
 
 export function computeContentHash(parts: {
   title: string;
@@ -218,14 +229,9 @@ export function toUpsertRow(
   const metaDescription = article.metaDescription?.trim() || excerpt;
   const coverImageUrl = resolveMediaUrl(article.coverImageUrl, apiBase);
   const category = mapCategory(article.category);
-  const publishedAt = status === 'published' ? isoOrNull(article.publishedAt) ?? nowIso : null;
-  const scheduledFor = status === 'scheduled' ? isoOrNull(article.scheduledAt) : null;
+  const publishedAt = status === 'published' ? parseScheduleDate(article.publishedAt) ?? nowIso : null;
+  const scheduledFor = status === 'scheduled' ? parseScheduleDate(article.scheduledAt) : null;
   const approvedAt = status === 'draft' ? null : nowIso;
-
-  if (status === 'scheduled' && !scheduledFor) {
-    // Scheduled in PostKing but missing a date — keep it off the public site.
-    return toUpsertRow({ ...article, status: 'draft' }, nowIso, apiBase);
-  }
 
   const contentHash = article.contentHash?.trim()
     || computeContentHash({
@@ -271,8 +277,27 @@ export function planSync(
 ): SyncAction {
   if (article.brandId) assertShortyHarrisBrand(article.brandId);
 
-  const row = toUpsertRow(article, nowIso, apiBase);
+  const cmsStatus = mapPostkingStatus(article.status);
+  const slug = (article.slug || '').trim() || slugify(article.title);
   const byId = existingByPostkingId.get(article.id);
+
+  if (cmsStatus === 'scheduled' && !parseScheduleDate(article.scheduledAt)) {
+    return { type: 'skip', reason: 'missing_schedule_date', articleId: article.id, slug };
+  }
+
+  // New rows: scheduled-with-date only. Unpublished/draft/published-never-imported
+  // are skipped so they never land in blog_posts as drafts.
+  if (!byId && cmsStatus !== 'scheduled') {
+    return { type: 'skip', reason: 'not_scheduled', articleId: article.id, slug };
+  }
+
+  // Already imported: allow scheduled updates and scheduled → published.
+  // Do not rewrite an imported row back to draft if PostKing unpublishes it.
+  if (byId && cmsStatus !== 'scheduled' && cmsStatus !== 'published') {
+    return { type: 'skip', reason: 'not_scheduled', articleId: article.id, slug };
+  }
+
+  const row = toUpsertRow(article, nowIso, apiBase);
   const bySlug = existingBySlug.get(row.slug);
 
   if (byId) {

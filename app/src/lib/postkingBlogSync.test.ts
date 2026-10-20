@@ -4,6 +4,7 @@ import {
   absolutizeHtml,
   assertShortyHarrisBrand,
   computeContentHash,
+  isScheduledImport,
   mapCategory,
   mapPostkingStatus,
   parseTags,
@@ -67,13 +68,21 @@ describe('assertShortyHarrisBrand', () => {
 });
 
 describe('status mapping', () => {
-  it('maps published and scheduled, and treats everything else as draft', () => {
+  it('maps published and scheduled, and treats unpublished/draft as draft', () => {
     expect(mapPostkingStatus('published')).toBe('published');
     expect(mapPostkingStatus('SCHEDULED')).toBe('scheduled');
+    expect(mapPostkingStatus('unpublished')).toBe('draft');
     expect(mapPostkingStatus('draft')).toBe('draft');
     expect(mapPostkingStatus('pending')).toBe('draft');
     expect(mapPostkingStatus('')).toBe('draft');
     expect(mapPostkingStatus(undefined)).toBe('draft');
+  });
+
+  it('treats only scheduled-with-a-date as a new import', () => {
+    expect(isScheduledImport({ status: 'scheduled', scheduledAt: '2026-10-22T09:00:00.000Z' })).toBe(true);
+    expect(isScheduledImport({ status: 'scheduled', scheduledAt: null })).toBe(false);
+    expect(isScheduledImport({ status: 'unpublished', scheduledAt: '2026-10-22T09:00:00.000Z' })).toBe(false);
+    expect(isScheduledImport({ status: 'published', scheduledAt: null })).toBe(false);
   });
 });
 
@@ -89,7 +98,7 @@ describe('toUpsertRow', () => {
     expect(row.cover_image_url).toBe('https://try.postking.app/api/uploads/cover.jpg');
   });
 
-  it('publishes an already-published PostKing article', () => {
+  it('maps a published payload for in-place updates of already-imported rows', () => {
     const row = toUpsertRow(article({
       status: 'published',
       publishedAt: '2026-09-01T12:00:00.000Z',
@@ -99,34 +108,57 @@ describe('toUpsertRow', () => {
     expect(row.published_at).toBe('2026-09-01T12:00:00.000Z');
     expect(row.scheduled_for).toBeNull();
   });
-
-  it('imports PostKing drafts as draft, never scheduled or published', () => {
-    const row = toUpsertRow(article({
-      status: 'draft',
-      scheduledAt: '2026-10-22T09:00:00.000Z',
-      publishedAt: '2026-09-01T12:00:00.000Z',
-    }), NOW, API);
-    expect(row.status).toBe('draft');
-    expect(row.scheduled_for).toBeNull();
-    expect(row.published_at).toBeNull();
-    expect(row.approved_at).toBeNull();
-  });
-
-  it('falls back to draft when scheduled is missing a date', () => {
-    const row = toUpsertRow(article({ scheduledAt: null }), NOW, API);
-    expect(row.status).toBe('draft');
-    expect(row.scheduled_for).toBeNull();
-  });
 });
 
 describe('planSync', () => {
-  it('inserts when neither PostKing id nor slug exists', () => {
+  it('inserts a scheduled article with a date when neither PostKing id nor slug exists', () => {
     const action = planSync(article(), new Map(), new Map(), NOW, API);
     expect(action.type).toBe('insert');
     if (action.type === 'insert') {
       expect(action.row.status).toBe('scheduled');
       expect(action.row.scheduled_for).toBe('2026-10-22T09:00:00.000Z');
     }
+  });
+
+  it('skips unpublished and draft articles instead of inserting them', () => {
+    expect(planSync(article({ status: 'unpublished' }), new Map(), new Map(), NOW, API))
+      .toMatchObject({ type: 'skip', reason: 'not_scheduled' });
+    expect(planSync(article({ status: 'draft' }), new Map(), new Map(), NOW, API))
+      .toMatchObject({ type: 'skip', reason: 'not_scheduled' });
+  });
+
+  it('skips a scheduled article that has no schedule date', () => {
+    expect(planSync(article({ scheduledAt: null }), new Map(), new Map(), NOW, API))
+      .toMatchObject({ type: 'skip', reason: 'missing_schedule_date' });
+  });
+
+  it('does not insert a published article that was never imported', () => {
+    expect(planSync(article({
+      status: 'published',
+      publishedAt: '2026-09-01T12:00:00.000Z',
+      scheduledAt: null,
+    }), new Map(), new Map(), NOW, API)).toMatchObject({ type: 'skip', reason: 'not_scheduled' });
+  });
+
+  it('updates an already-imported row when PostKing later publishes it', () => {
+    const byId = new Map([['pk_sched_1', existing()]]);
+    const action = planSync(article({
+      status: 'published',
+      publishedAt: '2026-10-22T09:00:00.000Z',
+      scheduledAt: null,
+    }), byId, new Map(), NOW, API);
+    expect(action.type).toBe('update');
+    if (action.type === 'update') {
+      expect(action.existingId).toBe('cms-uuid-1');
+      expect(action.row.status).toBe('published');
+      expect(action.row.published_at).toBe('2026-10-22T09:00:00.000Z');
+    }
+  });
+
+  it('does not rewrite an imported row back to draft if PostKing unpublishes it', () => {
+    const byId = new Map([['pk_sched_1', existing()]]);
+    expect(planSync(article({ status: 'unpublished' }), byId, new Map(), NOW, API))
+      .toMatchObject({ type: 'skip', reason: 'not_scheduled' });
   });
 
   it('updates in place when the PostKing id matches and content changed', () => {
