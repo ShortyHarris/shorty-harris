@@ -83,8 +83,8 @@ const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-[#
 const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50';
 
 export function Campaigns({
-  clientId, client = supabase, readOnly = false, basePath = '/app',
-}: { clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string }) {
+  clientId, client = supabase, readOnly = false, canDelete = true, basePath = '/app',
+}: { clientId: string; client?: SupabaseClient; readOnly?: boolean; canDelete?: boolean; basePath?: string }) {
   const { rows, loading, isFetching, dataUpdatedAt, error, reload } = useClientCampaignList(clientId, client);
   const { usage } = useClientUsage(clientId, client);
   const { usage: launchUsage } = useClientLaunchUsage(clientId, client);
@@ -316,6 +316,7 @@ export function Campaigns({
             clientId={clientId}
             client={client}
             readOnly={readOnly}
+            canDelete={canDelete}
             basePath={basePath}
             hold={findCountryHold(holds, openCampaign.country)}
             onClose={() => setOpenCampaign(null)}
@@ -837,10 +838,10 @@ function ReviewRow({ label, value, tags }: { label: string; value?: string; tags
 
 /* ── Campaign Detail Modal ─────────────────────────────────────────── */
 function CampaignDetailModal({
-  campaign, clientId, onClose, onUpdated, onDeleted, client = supabase, readOnly = false, basePath = '/app', hold = null,
+  campaign, clientId, onClose, onUpdated, onDeleted, client = supabase, readOnly = false, canDelete = true, basePath = '/app', hold = null,
 }: {
   campaign: ClientCampaignRow; clientId: string; onClose: () => void; onUpdated: () => void; onDeleted: () => void;
-  client?: SupabaseClient; readOnly?: boolean; basePath?: string; hold?: { country: string; reason: string } | null;
+  client?: SupabaseClient; readOnly?: boolean; canDelete?: boolean; basePath?: string; hold?: { country: string; reason: string } | null;
 }) {
   const { rows: prospects, loading } = useClientCampaignProspects(campaign.id, client);
 
@@ -972,14 +973,16 @@ function CampaignDetailModal({
                 >
                   <Pencil size={15} />
                 </button>
-                <button
-                  onClick={() => setDeleting(true)}
-                  aria-label="Delete campaign"
-                  title="Delete campaign"
-                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-[#9a9d92] transition-colors hover:bg-[#fdf0ec] hover:text-[#a8533a]"
-                >
-                  <Trash2 size={15} />
-                </button>
+                {canDelete && (
+                  <button
+                    onClick={() => setDeleting(true)}
+                    aria-label="Delete campaign"
+                    title="Delete campaign"
+                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-[#9a9d92] transition-colors hover:bg-[#fdf0ec] hover:text-[#a8533a]"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
               </>
             )}
             <button onClick={requestClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>

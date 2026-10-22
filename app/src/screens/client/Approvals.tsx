@@ -58,7 +58,7 @@ function formatPhone(raw: string): string {
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
-const READ_ONLY_MSG = 'View-as-client is read-only. Approve or reject this client\'s drafts from Admin > Approval Queue.';
+const READ_ONLY_MSG = 'You\'re viewing read-only. Turn on "Edit as admin" in the banner to approve or reject.';
 
 export function Approvals({
   clientId, client = supabase, readOnly = false, basePath = '/app',

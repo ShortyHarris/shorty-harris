@@ -88,9 +88,12 @@ async function fetchClientAnalytics(clientId: string, client: SupabaseClient): P
       .from('replies')
       .select('prospect_id, intent, classified_at, prospect:prospects ( campaign_id )')
       .eq('client_id', clientId),
+    // do_not_contact has no client_id: scope through the source prospect.
+    // RLS alone isn't enough - an admin session can read every client's rows.
     client
       .from('do_not_contact')
-      .select('id, created_at, prospect:prospects!source_prospect_id ( campaign_id )'),
+      .select('id, created_at, prospect:prospects!source_prospect_id!inner ( campaign_id, client_id )')
+      .eq('prospect.client_id', clientId),
   ]);
 
   if (campaignsRes.error) throw new Error(campaignsRes.error.message);
@@ -143,7 +146,7 @@ async function fetchClientAnalytics(clientId: string, client: SupabaseClient): P
   dnc.forEach((d) => {
     const prospect = firstOf(d.prospect);
     const campaignId = prospect?.campaign_id;
-    if (!campaignId) return;
+    if (!campaignId || !campaignNames.has(campaignId)) return;
     const b = bucketFor(campaignId);
     b.optOuts.add(d.id);
   });

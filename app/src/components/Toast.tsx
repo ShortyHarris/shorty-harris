@@ -35,8 +35,10 @@ export function useToast() {
 export function ToastHost({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
   return (
     <div
-      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-      className="pointer-events-none fixed top-4 inset-x-4 z-110 flex flex-col items-center gap-2 md:inset-x-auto md:right-4 md:items-end"
+      // --impersonation-banner-h is set by ImpersonationBanner while it's up,
+      // so toasts land below the banner instead of sliding under it.
+      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", top: 'calc(var(--impersonation-banner-h, 0px) + 16px)' }}
+      className="pointer-events-none fixed inset-x-4 z-110 flex flex-col items-center gap-2 md:inset-x-auto md:right-4 md:items-end"
     >
       <AnimatePresence>
         {toasts.map((t) => {

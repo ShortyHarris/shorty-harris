@@ -3,7 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, usePa
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useAuth } from './auth/AuthProvider';
 import { startImpersonation, endImpersonation } from './lib/impersonation';
+import { AnimatePresence } from 'framer-motion';
 import { ImpersonationBanner } from './components/ImpersonationBanner';
+import { ConfirmDialog } from './components/ConfirmDialog';
+import { supabase } from './lib/supabase';
 import { useClientHeader, clientHeaderKey } from './hooks/useClientHeader';
 import { useClientDashboard, dashboardKey } from './hooks/useClientDashboard';
 import { billingKey } from './hooks/useBilling';
@@ -195,22 +198,31 @@ function ClientZone() {
   );
 }
 
-// ── Impersonation zone - admin "View as client", read-only ──────────────────
+// ── Impersonation zone - admin "View as client" ─────────────────────────────
 // Deliberately NOT a parameterized variant of ClientZone: it skips realtime
 // sync, Smartlook identity, notifications, Gmail status, and Settings
-// entirely (none of those matter for a point-in-time read-only view, and
-// skipping them avoids threading the impersonation client into hooks that
-// don't need it). The actual read-only guarantee is enforced two ways: the
-// injected client throws on any write before hitting the network, and -
-// the one that really matters - the impersonation_read-only RLS policies
-// (see supabase/migrations/20261002090000_impersonation_rls.sql), which
-// block writes at the database level regardless of what the frontend does.
+// entirely (skipping them avoids threading the impersonation client into
+// hooks that don't need it).
+//
+// Opens read-only. Reads go through the impersonation token, whose client
+// throws on writes and which RLS only grants SELECT (see
+// supabase/migrations/20261002090000_impersonation_rls.sql). Note the write
+// hooks use the app's own `supabase` (the admin session), not the injected
+// client - so in view mode it's the pages' readOnly gating that stops writes.
+//
+// "Edit as admin" (banner) switches the pages to the admin's own session, so
+// writes go through the normal admin policies and are attributed to the admin.
+// Billing, Gmail/Settings and campaign deletion stay unavailable either way.
 
 function ImpersonateZone() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const [session, setSession] = useState<{ client: SupabaseClient; businessName: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // "Edit as admin": off by default. Lives here so it survives moving between
+  // this client's pages, and resets on exit (the zone unmounts).
+  const [editMode, setEditMode] = useState(false);
+  const [confirmEdit, setConfirmEdit] = useState(false);
 
   useEffect(() => {
     if (!clientId) return;
@@ -226,6 +238,19 @@ function ImpersonateZone() {
     navigate('/admin/clients', { replace: true });
   }
 
+  // Back to view only: mint a fresh read-only token first - the old one has
+  // a 15 minute TTL and isn't refreshed, so it may have expired while editing.
+  async function leaveEditMode() {
+    if (!clientId) return;
+    try {
+      const s = await startImpersonation(clientId);
+      setSession({ client: s.client, businessName: s.businessName });
+      setEditMode(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to restart the read-only view.');
+    }
+  }
+
   if (error) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
@@ -239,9 +264,22 @@ function ImpersonateZone() {
 
   if (!session || !clientId) return <Spinner />;
 
+  const basePath = `/admin/impersonate/${clientId}`;
+  // View mode reads through the read-only impersonation token. Edit mode uses
+  // the admin's own session instead: every client write RPC accepts is_admin(),
+  // writes are attributed to the admin (approved_by etc.), and the session
+  // doesn't expire after 15 minutes the way the impersonation token does.
+  const client = editMode ? supabase : session.client;
+  const readOnly = !editMode;
+
   return (
     <div className="theme-client">
-      <ImpersonationBanner businessName={session.businessName} onExit={exit} />
+      <ImpersonationBanner
+        businessName={session.businessName}
+        editMode={editMode}
+        onToggleEdit={() => (editMode ? leaveEditMode() : setConfirmEdit(true))}
+        onExit={exit}
+      />
       <Shell
         businessName={session.businessName}
         credits="-"
@@ -249,20 +287,36 @@ function ImpersonateZone() {
         hideSettings
         signOutLabel="Exit impersonation"
         onSignOut={exit}
-        basePath={`/admin/impersonate/${clientId}`}
+        basePath={basePath}
       >
         <Routes>
-          <Route index element={<Dashboard clientId={clientId} client={session.client} readOnly basePath={`/admin/impersonate/${clientId}`} />} />
-          <Route path="campaigns" element={<ClientCampaigns clientId={clientId} client={session.client} readOnly basePath={`/admin/impersonate/${clientId}`} />} />
-          <Route path="prospects" element={<Prospects clientId={clientId} client={session.client} readOnly basePath={`/admin/impersonate/${clientId}`} />} />
-          <Route path="approvals" element={<Approvals clientId={clientId} client={session.client} readOnly basePath={`/admin/impersonate/${clientId}`} />} />
-          <Route path="analytics" element={<ClientAnalytics clientId={clientId} client={session.client} />} />
-          <Route path="results" element={<Results clientId={clientId} client={session.client} basePath={`/admin/impersonate/${clientId}`} />} />
-          <Route path="targeting" element={<TargetingProfile clientId={clientId} client={session.client} readOnly />} />
-          <Route path="billing" element={<Billing clientId={clientId} client={session.client} readOnly />} />
+          <Route index element={<Dashboard clientId={clientId} client={client} readOnly={readOnly} markViewedOnOpen={false} basePath={basePath} />} />
+          {/* Deleting a campaign wipes its prospects and messages - never from here. */}
+          <Route path="campaigns" element={<ClientCampaigns clientId={clientId} client={client} readOnly={readOnly} canDelete={false} basePath={basePath} />} />
+          <Route path="prospects" element={<Prospects clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} />} />
+          <Route path="approvals" element={<Approvals clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} />} />
+          <Route path="analytics" element={<ClientAnalytics clientId={clientId} client={client} />} />
+          <Route path="results" element={<Results clientId={clientId} client={client} basePath={basePath} />} />
+          <Route path="targeting" element={<TargetingProfile clientId={clientId} client={client} readOnly={readOnly} />} />
+          {/* Buying credits charges the client - read-only even in edit mode. */}
+          <Route path="billing" element={<Billing clientId={clientId} client={client} readOnly />} />
           <Route path="*" element={<Navigate to="" replace />} />
         </Routes>
       </Shell>
+
+      <AnimatePresence>
+        {confirmEdit && (
+          <ConfirmDialog
+            key="confirm-edit-mode"
+            title={`Edit ${session.businessName} as admin?`}
+            confirmLabel="Start editing"
+            onConfirm={() => { setEditMode(true); setConfirmEdit(false); }}
+            onCancel={() => setConfirmEdit(false)}
+          >
+            Approvals, lead updates, notes, campaign and targeting changes go live immediately and are recorded under your name. Billing, Gmail and deleting campaigns stay off.
+          </ConfirmDialog>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

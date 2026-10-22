@@ -99,8 +99,12 @@ function formatClosedDate(iso: string | null): string {
 }
 
 export function Dashboard({
-  clientId, client = supabase, readOnly = false, basePath = '/app',
-}: { clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string }) {
+  clientId, client = supabase, readOnly = false, basePath = '/app', markViewedOnOpen = true,
+}: {
+  clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string;
+  /** False when an admin is acting for the client - their look shouldn't clear the client's "New". */
+  markViewedOnOpen?: boolean;
+}) {
   const { leads, loading, error, setOutcome: setOutcomeRaw, reload, isFetching, dataUpdatedAt } = useClientDashboard(clientId, client);
   const { awaitingProspects = 0 } = useClientApprovals(clientId, client);
   const { prospects: warmProspects, loading: warmLoading, logCallOutcome: logCallOutcomeRaw } = useWarmProspects(clientId, client);
@@ -162,7 +166,7 @@ export function Dashboard({
     // Only flip new -> viewed on an actual open, not on list render - marking
     // everything viewed on page load is what made four leads look
     // attended-to when nobody had read them.
-    if (lead.status === 'new') setOutcome(lead.hot_lead_id, 'viewed');
+    if (lead.status === 'new' && markViewedOnOpen) setOutcome(lead.hot_lead_id, 'viewed');
   }
 
   // ?lead=<hot_lead_id> (from a notification click) opens that lead once the
