@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ChevronRight, TriangleAlert, Pencil, Trash2 } from 'lucide-react';
+import { ChevronRight, TriangleAlert, Pencil, Trash2, Megaphone } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import {
@@ -13,6 +13,7 @@ import {
 import type { ClientCampaignRow, ClientCampaignDeleteCounts } from '../../hooks/useClientCampaigns';
 import { queryClient } from '../../lib/queryClient';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
+import { confirmDiscard } from '../../lib/confirmDiscard';
 import { SkeletonTable } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { TagInput } from '../../components/TagInput';
@@ -114,8 +115,8 @@ export function Campaigns({
     <div style={FONT} className="flex flex-col gap-6 content">
       <header className="page-header flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
-          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-[#20211c]">
-            <img src="https://cdn-icons-png.flaticon.com/128/6745/6745021.png" alt="Campaigns" className="w-10 h-10" />
+          <h1 className="m-0 text-[26px] flex items-center gap-2 font-extrabold tracking-tight text-[#20211c]">
+            <Megaphone size={24} strokeWidth={2} className="text-[#3c7a5b]" aria-hidden />
             Campaigns
           </h1>
           <p className="m-0 mt-1 text-[13px] text-[#62655c]">{rows.length} campaign{rows.length !== 1 ? 's' : ''}
@@ -182,14 +183,16 @@ export function Campaigns({
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
           <strong className="text-[15px] font-bold text-[#20211c]">No campaigns yet.</strong>
           <span className="text-[13px] text-[#62655c]">Create your first campaign to tell us who to target.</span>
-          <button
-            onClick={() => setShowNew(true)}
-            disabled={newCampaignDisabled}
-            title={newCampaignTitle}
-            className={`${primaryCls} mt-2`}
-          >
-            + New campaign
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => setShowNew(true)}
+              disabled={newCampaignDisabled}
+              title={newCampaignTitle}
+              className={`${primaryCls} mt-2`}
+            >
+              + New campaign
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -274,21 +277,24 @@ export function Campaigns({
       )}
 
       {/* Mobile FAB */}
-      <MobileFab
-        onClick={() => setShowNew(true)}
-        label="New campaign"
-        disabled={newCampaignDisabled}
-        title={newCampaignTitle}
-        colorClass="bg-[#3c7a5b] hover:bg-[#2d5e46]"
-        offsetClass="bottom-[calc(84px+env(safe-area-inset-bottom,0px))]"
-        data-tour="new-campaign-btn"
-      />
+      {!readOnly && (
+        <MobileFab
+          onClick={() => setShowNew(true)}
+          label="New campaign"
+          disabled={newCampaignDisabled}
+          title={newCampaignTitle}
+          colorClass="bg-[#3c7a5b] hover:bg-[#2d5e46]"
+          offsetClass="bottom-[calc(84px+env(safe-area-inset-bottom,0px))]"
+          data-tour="new-campaign-btn"
+        />
+      )}
 
       <AnimatePresence>
         {showNew && (
           <NewCampaignModal
             key="new-campaign-modal"
             clientId={clientId}
+            basePath={basePath}
             atLaunchLimit={atLaunchLimit}
             launchLimitTitle={launchLimitTitle}
             onClose={() => setShowNew(false)}
@@ -340,9 +346,10 @@ export function Campaigns({
 const STEP_LABELS = ['Basics', 'Who to target', 'Details', 'Review'];
 
 function NewCampaignModal({
-  clientId, atLaunchLimit, launchLimitTitle, onClose, onCreated,
+  clientId, basePath, atLaunchLimit, launchLimitTitle, onClose, onCreated,
 }: {
   clientId: string;
+  basePath: string;
   atLaunchLimit: boolean;
   launchLimitTitle: string;
   onClose: () => void;
@@ -365,6 +372,9 @@ function NewCampaignModal({
   const [err, setErr]               = useState<string | null>(null);
   const limits = useCampaignLimits(clientId);
   const locationLabels = areasToLocationLabels(areas);
+  const dirty = !!name.trim() || !!description.trim() || queries.length > 0 || areas.length > 0
+    || maxResults !== 50 || language !== 'English' || pickedCountry !== '';
+  const requestClose = () => { if (confirmDiscard(dirty)) onClose(); };
 
   function validateStep(n: number): string | null {
     if (n === 0 && !name.trim()) return 'Campaign name is required.';
@@ -444,7 +454,7 @@ function NewCampaignModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      {...useOverlayClose(onClose)}
+      {...useOverlayClose(requestClose, { escape: true })}
     >
       <motion.div
         style={FONT}
@@ -459,7 +469,7 @@ function NewCampaignModal({
         <div className="shrink-0 border-b border-[#ece8df] px-5 py-4">
           <div className="flex items-center justify-between">
             <h2 className="m-0 text-[18px] font-bold text-[#20211c]">New campaign</h2>
-            <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+            <button onClick={requestClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
           </div>
           <div className="mt-3 flex items-center gap-1.5">
             {STEP_LABELS.map((_, i) => (
@@ -502,6 +512,7 @@ function NewCampaignModal({
             <>
               <SuggestForMe
                 clientId={clientId}
+                targetingPath={`${basePath}/targeting`}
                 queries={queries}
                 locations={locationLabels}
                 onAddQuery={(term) => setQueries((q) => (q.includes(term) ? q : [...q, term]))}
@@ -623,14 +634,19 @@ function NewCampaignModal({
    Caps are enforced here too so the client never gets as far as the raw
    Postgres rejection the database would otherwise throw. */
 export function SuggestForMe({
-  clientId, queries, locations, onAddQuery, onAddLocation,
+  clientId, queries, locations, onAddQuery, onAddLocation, targetingPath,
 }: {
   clientId: string;
   queries: string[];
   locations: string[];
   onAddQuery: (term: string) => void;
   onAddLocation: (loc: string) => void;
+  /** Client zone only - admin screens have no targeting page to send them to. */
+  targetingPath?: string;
 }) {
+  const targetingLink = targetingPath
+    ? <Link to={targetingPath} className="font-semibold text-[#3c7a5b] underline">your targeting profile</Link>
+    : 'your targeting profile';
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -688,7 +704,7 @@ export function SuggestForMe({
     <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-4 py-3.5 flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#3c7a5b]"><Sparkles size={13} /> Suggestions</span>
-        <button type="button" onClick={() => setOpen(false)} className="cursor-pointer border-0 bg-transparent text-[18px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        <button type="button" onClick={() => setOpen(false)} aria-label="Hide suggestions" className="cursor-pointer border-0 bg-transparent text-[18px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
       </div>
 
       {loading && <p className="m-0 text-[12.5px] text-[#9a9d92]">Looking up your targeting profile…</p>}
@@ -697,14 +713,14 @@ export function SuggestForMe({
       {result && !result.has_icp && (
         <p className="m-0 text-[12.5px] text-[#62655c]">
           We don't have a targeting profile for you yet. Add your website in{' '}
-          <Link to="/app/targeting" className="font-semibold text-[#3c7a5b] underline">your targeting profile</Link> and we'll read it.
+          {targetingLink} and we'll read it.
         </p>
       )}
 
       {result && result.has_icp && resultTerms.length === 0 && resultLocations.length === 0 && (
         <p className="m-0 text-[12.5px] text-[#62655c]">
           We don't have enough to suggest yet. Add your website in{' '}
-          <Link to="/app/targeting" className="font-semibold text-[#3c7a5b] underline">your targeting profile</Link> and we'll read it.
+          {targetingLink} and we'll read it.
         </p>
       )}
 
@@ -840,6 +856,12 @@ function CampaignDetailModal({
   const [err, setErr]               = useState<string | null>(null);
   const limits = useCampaignLimits(clientId);
   const locationLabels = areasToLocationLabels(areas);
+  // Snapshot of the form when editing started; the `campaign` prop goes stale
+  // after a save, so it can't be the baseline for a second edit.
+  const formSnapshot = JSON.stringify([name, description, queries, areas, maxResults, language]);
+  const [editBaseline, setEditBaseline] = useState<string | null>(null);
+  const dirty = editing && editBaseline !== null && formSnapshot !== editBaseline;
+  const requestClose = () => { if (confirmDiscard(dirty)) onClose(); };
 
   const pill = CAMP_PILL[campaign.status] ?? CAMP_PILL.draft;
 
@@ -850,6 +872,7 @@ function CampaignDetailModal({
 
   function startEdit() {
     setErr(null);
+    setEditBaseline(formSnapshot);
     setEditing(true);
   }
 
@@ -915,7 +938,7 @@ function CampaignDetailModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      {...useOverlayClose(onClose)}
+      {...useOverlayClose(requestClose, { escape: true })}
     >
       <motion.div
         style={FONT}
@@ -959,7 +982,7 @@ function CampaignDetailModal({
                 </button>
               </>
             )}
-            <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+            <button onClick={requestClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
           </div>
         </div>
 
@@ -984,6 +1007,7 @@ function CampaignDetailModal({
 
           <SuggestForMe
             clientId={clientId}
+            targetingPath={`${basePath}/targeting`}
             queries={queries}
             locations={locationLabels}
             onAddQuery={(term) => setQueries((q) => (q.includes(term) ? q : [...q, term]))}
@@ -1220,7 +1244,7 @@ function DeleteCampaignModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      {...useOverlayClose(onClose)}
+      {...useOverlayClose(busy ? () => {} : onClose, { escape: true })}
     >
       <motion.div
         style={FONT}
@@ -1233,7 +1257,7 @@ function DeleteCampaignModal({
       >
         <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
           <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Delete campaign</h2>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+          <button onClick={onClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
           <div className="rounded-xl border border-[#a8533a]/20 bg-[#fdf0ec] px-4 py-4">

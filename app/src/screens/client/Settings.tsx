@@ -20,6 +20,8 @@ import {
 } from '../../components/ui/select';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { RequiredMark } from '../../components/RequiredMark';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { confirmDiscard } from '../../lib/confirmDiscard';
 
 const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em]';
 const inputCls = 'w-full rounded-lg border px-3.5 py-2.5 text-[13px] outline-none transition-colors';
@@ -107,6 +109,8 @@ function ProfileEditModal({
     country: profile.country ?? '',
     privacy_url: profile.privacy_url ?? '',
   }));
+  const [initialForm] = useState(() => JSON.stringify(form));
+  const requestClose = () => { if (confirmDiscard(JSON.stringify(form) !== initialForm)) onClose(); };
   const countryOptions = countryOptionsFor(profile.country);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -142,7 +146,7 @@ function ProfileEditModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      {...useOverlayClose(onClose)}
+      {...useOverlayClose(requestClose, { escape: true })}
     >
       <motion.div
         className="modal-card flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:shadow-2xl"
@@ -155,7 +159,7 @@ function ProfileEditModal({
       >
         <div className="flex shrink-0 items-center justify-between border-b px-5 py-4" style={{ borderColor: 'var(--line)' }}>
           <h2 className="m-0 text-[18px] font-bold" style={{ color: 'var(--ink)' }}>Edit business profile</h2>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none" style={{ color: 'var(--ink-faint)' }}>×</button>
+          <button onClick={requestClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none" style={{ color: 'var(--ink-faint)' }}>×</button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5">
@@ -413,6 +417,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
   const [searchParams, setSearchParams] = useSearchParams();
   const [banner, setBanner] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [showBlockedDomains, setShowBlockedDomains] = useState(false);
   const { toasts, toast, dismiss } = useToast();
 
@@ -439,6 +444,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
     setDisconnecting(true);
     const res = await disconnect();
     setDisconnecting(false);
+    setConfirmDisconnect(false);
     if (res.error) toast(res.error, 'error'); else toast('Gmail disconnected.');
   }
 
@@ -531,7 +537,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
               )}
             </div>
             <button
-              onClick={handleDisconnect}
+              onClick={() => setConfirmDisconnect(true)}
               disabled={disconnecting}
               className="cursor-pointer rounded-lg border px-4 py-2 text-[13px] font-bold transition-colors disabled:opacity-50"
               style={{ borderColor: '#e0b8ae', color: 'var(--clay)', background: 'transparent' }}
@@ -581,9 +587,10 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
             </p>
             <a
               href={connectUrl}
-              className="inline-flex items-center shadow-sm hover:shadow-md border-gray-500 gap-2 cursor-pointer bg-white rounded-lg border-0 px-4 py-2 text-[13px] font-bold text-white transition-colors"
+              className="inline-flex items-center gap-2 cursor-pointer rounded-lg border-0 px-4 py-2 text-[13px] font-bold text-white no-underline transition-colors"
+              style={{ background: 'var(--leaf)' }}
             >
-              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gmail_icon_%282020%29.svg/1280px-Gmail_icon_%282020%29.svg.png" alt="Gmail" className="w-5 h-4" /> Connect Gmail
+              <Mail size={15} /> Connect Gmail
             </a>
           </div>
         )}
@@ -644,6 +651,23 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
 
         <TourReplayRow />
       </div>
+
+      <AnimatePresence>
+        {confirmDisconnect && (
+          <ConfirmDialog
+            key="disconnect-gmail"
+            title="Disconnect Gmail?"
+            confirmLabel="Disconnect"
+            cancelLabel="Stay connected"
+            danger
+            busy={disconnecting}
+            onConfirm={handleDisconnect}
+            onCancel={() => setConfirmDisconnect(false)}
+          >
+            Outreach stops sending from {connection.email ?? 'your address'}, and you won't be able to approve new emails until you reconnect.
+          </ConfirmDialog>
+        )}
+      </AnimatePresence>
 
       {showBlockedDomains && (
         <BlockedDomainsModal clientId={clientId} onClose={() => setShowBlockedDomains(false)} onNotify={toast} />

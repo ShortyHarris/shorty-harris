@@ -63,6 +63,7 @@ export function Prospects({
   const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
   const [openProspectId, setOpenProspectId] = useState<string | null>(null);
+  const { toasts, toast, dismiss } = useToast();
 
   const { result, loading, isFetching, error, reload } = useClientPipeline(
     clientId, { status, search, offset }, client,
@@ -183,6 +184,7 @@ export function Prospects({
                     basePath={basePath}
                     onOpen={() => setOpenProspectId(row.prospect_id)}
                     onNoteSaved={reload}
+                    onNoteError={(msg) => toast(msg, 'error')}
                   />
                 ))}
               </tbody>
@@ -226,14 +228,16 @@ export function Prospects({
           />
         )}
       </AnimatePresence>
+
+      <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }
 
 function ProspectRow({
-  row, readOnly, basePath, onOpen, onNoteSaved,
+  row, readOnly, basePath, onOpen, onNoteSaved, onNoteError,
 }: {
-  row: PipelineRow; readOnly: boolean; basePath: string; onOpen: () => void; onNoteSaved: () => void;
+  row: PipelineRow; readOnly: boolean; basePath: string; onOpen: () => void; onNoteSaved: () => void; onNoteError: (msg: string) => void;
 }) {
   const seq = isSequenceStatus(row.sequence_status) ? row.sequence_status : null;
   const pill = seq
@@ -296,15 +300,15 @@ function ProspectRow({
         {lastActivity ? `${lastActivity.label} ${formatShortDate(lastActivity.date)}` : '—'}
       </td>
       <td className="min-w-0">
-        <NoteCell key={row.client_note ?? ''} prospectId={row.prospect_id} note={row.client_note} readOnly={readOnly} onSaved={onNoteSaved} />
+        <NoteCell key={row.client_note ?? ''} prospectId={row.prospect_id} note={row.client_note} readOnly={readOnly} onSaved={onNoteSaved} onError={onNoteError} />
       </td>
     </tr>
   );
 }
 
 function NoteCell({
-  prospectId, note, readOnly, onSaved,
-}: { prospectId: string; note: string | null; readOnly: boolean; onSaved: () => void }) {
+  prospectId, note, readOnly, onSaved, onError,
+}: { prospectId: string; note: string | null; readOnly: boolean; onSaved: () => void; onError: (msg: string) => void }) {
   const [editing, setEditing] = useState(false);
   // Re-synced from `note` by remounting (see the `key` passed where NoteCell
   // is used) rather than an effect — this is the only place the draft needs
@@ -317,8 +321,11 @@ function NoteCell({
     setBusy(true);
     const { error } = await setProspectNote(prospectId, draft.trim());
     setBusy(false);
+    // On failure keep the editor (and the typed note) open rather than
+    // closing as if it had saved.
+    if (error) { onError(`Couldn't save the note: ${error}`); return; }
     setEditing(false);
-    if (!error) onSaved();
+    onSaved();
   }
 
   if (readOnly) {

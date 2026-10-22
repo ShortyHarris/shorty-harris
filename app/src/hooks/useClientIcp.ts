@@ -205,6 +205,7 @@ export interface TargetingPerformanceRow {
   replied: number;
   positive: number;
   bounced: number;
+  // Both rates are already percentages (0-100), rounded to 1dp by the RPC.
   positive_rate: number;
   bounce_rate: number;
 }

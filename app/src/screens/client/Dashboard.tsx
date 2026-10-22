@@ -280,8 +280,10 @@ export function Dashboard({
             {/* Desktop table */}
             <div className="hidden md:block">
               <LeadsTable leads={paged} onOpen={openLead_} />
-              <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
             </div>
+
+            {/* Shared by both layouts - phones were stuck on the first page. */}
+            <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
           </>
         )}
       </div>
@@ -574,7 +576,7 @@ function LeadPanel({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
-      {...useOverlayClose(onClose)}
+      {...useOverlayClose(onClose, { escape: true })}
     >
       <motion.aside
         className="modal-card panel lead-sheet"
@@ -960,7 +962,7 @@ function WarmProspectsModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
-      {...useOverlayClose(onClose)}
+      {...useOverlayClose(onClose, { escape: true })}
     >
       <motion.aside
         className="modal-card panel lead-sheet warm-all"
@@ -1069,7 +1071,7 @@ function WarmProspectHistoryModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
-      {...useOverlayClose(onClose)}
+      {...useOverlayClose(onClose, { escape: true })}
     >
       <motion.aside
         className="modal-card panel lead-sheet"

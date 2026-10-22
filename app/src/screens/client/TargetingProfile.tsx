@@ -248,7 +248,7 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
                     <td className="px-3 py-3" style={{ color: 'var(--ink-soft)' }}>{row.emailed}</td>
                     <td className="px-3 py-3" style={{ color: 'var(--ink-soft)' }}>{row.replied}</td>
                     <td className="px-3 py-3 font-semibold" style={{ color: 'var(--leaf)' }}>{row.positive}</td>
-                    <td className="px-3 py-3" style={{ color: 'var(--ink-soft)' }}>{(row.bounce_rate * 100).toFixed(0)}%</td>
+                    <td className="px-3 py-3" style={{ color: 'var(--ink-soft)' }}>{Number(row.bounce_rate ?? 0).toFixed(1)}%</td>
                   </tr>
                 ))}
               </tbody>

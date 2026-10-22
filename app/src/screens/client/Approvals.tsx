@@ -8,6 +8,7 @@ import { useClientCampaignList } from '../../hooks/useClientCampaigns';
 import { isEuCountry } from '../../lib/countries';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
+import { confirmDiscard } from '../../lib/confirmDiscard';
 import { SkeletonTable } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { useToast, ToastHost } from '../../components/Toast';
@@ -16,7 +17,7 @@ import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { previewSequenceApproval, approveSequences, type ApprovalPreview } from '../../hooks/useSequenceActions';
 import type { ClientMessageItem } from '../../types';
-import { Clock, CheckCircle2, Send, Ban } from 'lucide-react';
+import { Clock, CheckCircle2, Send, Ban, ClipboardCheck } from 'lucide-react';
 
 const GMAIL_REQUIRED_TITLE = "Connect your Gmail in Settings before approving - that's what actually sends this.";
 
@@ -28,7 +29,7 @@ const HELP: HelpContent = {
     { type: 'ul', items: [
       "Approve - sends the message exactly as written",
       "Edit then approve - change the copy first, then send",
-      "Reject - discards the draft; the prospect receives nothing",
+      "Reject - discards the draft and cancels that prospect's remaining follow-ups",
     ]},
   ],
 };
@@ -57,21 +58,61 @@ function formatPhone(raw: string): string {
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
+const READ_ONLY_MSG = 'View-as-client is read-only. Approve or reject this client\'s drafts from Admin > Approval Queue.';
+
 export function Approvals({
-  clientId, client = supabase, readOnly = false,
-}: { clientId: string; client?: SupabaseClient; readOnly?: boolean }) {
+  clientId, client = supabase, readOnly = false, basePath = '/app',
+}: { clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string }) {
   const {
     items, stats, loading, isFetching, dataUpdatedAt, error,
-    approve: approveRaw, reject: rejectRaw, bulkReject: bulkRejectRaw, reload,
+    approve: approveRaw, saveEdits, reject: rejectRaw, bulkReject: bulkRejectRaw, reload,
   } = useClientApprovals(clientId, client);
-  const approve = readOnly ? async () => {} : approveRaw;
-  const reject = readOnly ? async () => {} : rejectRaw;
-  const bulkReject = readOnly ? async () => {} : bulkRejectRaw;
   const { connection: gmailConnection } = useGmailConnection(clientId);
   const { rows: campaigns } = useClientCampaignList(clientId, client);
   const { toasts, toast, dismiss } = useToast();
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh approvals.');
   const [editItem, setEditItem] = useState<ClientMessageItem | null>(null);
+  // Drafts waiting on the reject confirmation - one row, or the bulk selection.
+  const [rejectIds, setRejectIds] = useState<string[] | null>(null);
+  const [rejecting, setRejecting] = useState(false);
+
+  // View-as-client is read-only; every action says so instead of silently doing nothing.
+  async function doApprove(id: string, body?: string, subject?: string) {
+    if (readOnly) { toast(READ_ONLY_MSG, 'warning'); return; }
+    const { error: err } = await approveRaw(id, body, subject);
+    if (err) toast(`Couldn't approve the email: ${err}`, 'error');
+    else toast(body !== undefined || subject !== undefined ? 'Edits saved and email approved.' : 'Email approved.');
+  }
+
+  function askReject(ids: string[]) {
+    if (readOnly) { toast(READ_ONLY_MSG, 'warning'); return; }
+    if (ids.length > 0) setRejectIds(ids);
+  }
+
+  async function confirmReject() {
+    if (!rejectIds) return;
+    setRejecting(true);
+    const { error: err } = rejectIds.length === 1 ? await rejectRaw(rejectIds[0]) : await bulkRejectRaw(rejectIds);
+    setRejecting(false);
+    const n = rejectIds.length;
+    setRejectIds(null);
+    if (err) { toast(`Couldn't reject: ${err}`, 'error'); return; }
+    setSelected((prev) => {
+      const next = new Set(prev);
+      rejectIds.forEach((id) => next.delete(id));
+      return next;
+    });
+    toast(n === 1 ? 'Draft rejected.' : `${n} drafts rejected.`);
+  }
+
+  async function handleSaveDraft(id: string, body?: string, subject?: string) {
+    if (readOnly) { toast(READ_ONLY_MSG, 'warning'); return; }
+    const { error: err } = await saveEdits(id, body, subject);
+    if (err) { toast(`Couldn't save the draft: ${err}`, 'error'); return; }
+    toast('Draft saved');
+    // Re-baseline the open modal so it's no longer dirty.
+    setEditItem((cur) => (cur?.id === id ? { ...cur, body: body ?? cur.body, subject: subject ?? cur.subject } : cur));
+  }
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -124,7 +165,7 @@ export function Approvals({
   // Sequence-level bulk approval: selected rows map to their prospects; with
   // nothing selected it covers every prospect that has a draft waiting.
   async function handleBulkApprove() {
-    if (readOnly) return;
+    if (readOnly) { toast(READ_ONLY_MSG, 'warning'); return; }
     const source = selected.size > 0 ? items.filter((i) => selected.has(i.id)) : items;
     const prospectIds = Array.from(new Set(source.map((i) => i.prospect_id)));
     if (prospectIds.length === 0) return;
@@ -152,13 +193,6 @@ export function Approvals({
     toast(`${e} email${e === 1 ? '' : 's'} approved across ${p} prospect${p === 1 ? '' : 's'}`);
   }
 
-  async function handleBulkReject() {
-    setBulkBusy(true);
-    await bulkReject(Array.from(selected));
-    setSelected(new Set());
-    setBulkBusy(false);
-  }
-
   const pagBtnCls = 'cursor-pointer rounded-md border border-[#ddd8cb] bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-[#20211c] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
@@ -167,7 +201,10 @@ export function Approvals({
       {/* Header */}
       <header className="page-header flex items-start justify-between gap-4">
         <div>
-          <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-[#20211c]"> <img src="https://cdn-icons-png.flaticon.com/128/5442/5442020.png" alt="Approvals" className="w-10 h-10" />Approvals</h1>
+          <h1 className="m-0 text-[26px] flex items-center gap-2 font-extrabold tracking-tight text-[#20211c]">
+            <ClipboardCheck size={24} strokeWidth={2} className="text-[#3c7a5b]" aria-hidden />
+            Approvals
+          </h1>
           <p className="m-0 mt-1 text-[13px] text-[#62655c]">
             Nothing sends until you approve it. Review each draft, edit if needed, then approve or reject.
           </p>
@@ -255,8 +292,8 @@ export function Approvals({
               </button>
               {selected.size > 0 && (
                 <button
-                  onClick={handleBulkReject}
-                  disabled={bulkBusy}
+                  onClick={() => askReject(Array.from(selected))}
+                  disabled={bulkBusy || rejecting}
                   className="cursor-pointer rounded-md border border-[#a8533a] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white disabled:opacity-50"
                 >
                   Reject selected
@@ -316,7 +353,7 @@ export function Approvals({
                     <td className="px-3">
                       <div className="flex flex-wrap items-center justify-end gap-1.5">
                         <button
-                          onClick={() => approve(item.id)}
+                          onClick={() => doApprove(item.id)}
                           disabled={needsGmail(item)}
                           title={needsGmail(item) ? GMAIL_REQUIRED_TITLE : undefined}
                           className="cursor-pointer whitespace-nowrap rounded-md border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
@@ -330,7 +367,7 @@ export function Approvals({
                           Edit
                         </button>
                         <button
-                          onClick={() => reject(item.id)}
+                          onClick={() => askReject([item.id])}
                           className="cursor-pointer whitespace-nowrap rounded-md border border-[#a8533a] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white"
                         >
                           Reject
@@ -372,7 +409,7 @@ export function Approvals({
                 )}
                 <div className="mt-3 flex items-center gap-2 border-t border-[#f5f2ec] pt-3">
                   <button
-                    onClick={() => approve(item.id)}
+                    onClick={() => doApprove(item.id)}
                     disabled={needsGmail(item)}
                     title={needsGmail(item) ? GMAIL_REQUIRED_TITLE : undefined}
                     className="cursor-pointer flex-1 rounded-md border-0 bg-[#3c7a5b] px-3 py-2 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
@@ -386,7 +423,7 @@ export function Approvals({
                     Edit
                   </button>
                   <button
-                    onClick={() => reject(item.id)}
+                    onClick={() => askReject([item.id])}
                     className="cursor-pointer flex-1 rounded-md border border-[#a8533a] bg-transparent px-3 py-2 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white"
                   >
                     Reject
@@ -427,9 +464,33 @@ export function Approvals({
             key="edit-modal"
             item={editItem}
             blockedByGmail={needsGmail(editItem)}
+            settingsPath={readOnly ? null : `${basePath}/settings`}
             onClose={() => setEditItem(null)}
-            onApprove={(id, body, subject) => { approve(id, body, subject); setEditItem(null); }}
+            onSave={handleSaveDraft}
+            onApprove={(id, body, subject) => {
+              // Read-only: warn and leave the modal (and its edits) open.
+              if (readOnly) { toast(READ_ONLY_MSG, 'warning'); return; }
+              doApprove(id, body, subject);
+              setEditItem(null);
+            }}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {rejectIds && (
+          <ConfirmDialog
+            key="reject-confirm"
+            title={rejectIds.length === 1 ? 'Reject this draft?' : `Reject ${rejectIds.length} drafts?`}
+            confirmLabel="Reject"
+            cancelLabel="Keep"
+            danger
+            busy={rejecting}
+            onConfirm={confirmReject}
+            onCancel={() => setRejectIds(null)}
+          >
+            {rejectIds.length === 1 ? 'It' : 'They'} won't be sent, and any follow-ups still planned for {rejectIds.length === 1 ? 'that prospect' : 'those prospects'} are cancelled too. This can't be undone.
+          </ConfirmDialog>
         )}
       </AnimatePresence>
 
@@ -532,19 +593,32 @@ function StatTile({
 function EditModal({
   item,
   blockedByGmail,
+  settingsPath,
   onClose,
+  onSave,
   onApprove,
 }: {
   item: ClientMessageItem;
   blockedByGmail: boolean;
+  /** null in view-as-client, which has no Settings page to link to. */
+  settingsPath: string | null;
   onClose: () => void;
+  onSave: (id: string, body?: string, subject?: string) => Promise<void>;
   onApprove: (id: string, body?: string, subject?: string) => void;
 }) {
   const [draft, setDraft] = useState(item.body);
   const [subjectDraft, setSubjectDraft] = useState(item.subject ?? '');
+  const [saving, setSaving] = useState(false);
   const bodyDirty    = draft.trim() !== item.body.trim();
   const subjectDirty = subjectDraft.trim() !== (item.subject ?? '').trim();
   const dirty = bodyDirty || subjectDirty;
+  const requestClose = () => { if (confirmDiscard(dirty)) onClose(); };
+
+  async function handleSave() {
+    setSaving(true);
+    try { await onSave(item.id, bodyDirty ? draft : undefined, subjectDirty ? subjectDraft : undefined); }
+    finally { setSaving(false); }
+  }
 
   return (
     <motion.div
@@ -553,7 +627,7 @@ function EditModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      {...useOverlayClose(onClose)}
+      {...useOverlayClose(requestClose, { escape: true })}
     >
       <motion.div
         style={FONT}
@@ -574,7 +648,7 @@ function EditModal({
               {TYPE_LABEL[item.message_type] ?? item.message_type}
             </p>
           </div>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] transition-colors hover:text-[#20211c]">×</button>
+          <button onClick={requestClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] transition-colors hover:text-[#20211c]">×</button>
         </div>
 
         {/* Scrollable content */}
@@ -606,7 +680,9 @@ function EditModal({
           </div>
           {blockedByGmail && (
             <div className="rounded-xl border border-[#e8d5a8] bg-[#f8efdb] px-3.5 py-2.5 text-[12px] text-[#8a6417]">
-              <Link to="/app/settings" className="font-bold underline">Connect your Gmail</Link> in Settings before approving - that's what actually sends this.
+              {settingsPath
+                ? <Link to={settingsPath} className="font-bold underline">Connect your Gmail</Link>
+                : <strong className="font-bold">Connect your Gmail</strong>} in Settings before approving - that's what actually sends this.
             </div>
           )}
         </div>
@@ -617,8 +693,15 @@ function EditModal({
             Cancel
           </button>
           <button
+            onClick={handleSave}
+            disabled={!dirty || saving}
+            className="cursor-pointer rounded-xl border border-[#3c7a5b] bg-transparent px-4 py-2 text-[13px] font-bold text-[#3c7a5b] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button
             onClick={() => onApprove(item.id, bodyDirty ? draft : undefined, subjectDirty ? subjectDraft : undefined)}
-            disabled={blockedByGmail}
+            disabled={blockedByGmail || saving}
             title={blockedByGmail ? GMAIL_REQUIRED_TITLE : undefined}
             className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
           >

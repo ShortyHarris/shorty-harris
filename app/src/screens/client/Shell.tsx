@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone, BookOpen, BarChart3, Target, Filter, Users } from 'lucide-react';
+import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone, BookOpen, BarChart3, Target, Filter, Users, Mail } from 'lucide-react';
 import type { ClientNotification } from '../../hooks/useClientNotifications';
+import { useOverlayClose } from '../../hooks/useOverlayClose';
 import '../../styles/admin-tables.css';
 import './Shell.css';
 
@@ -175,7 +176,7 @@ export function Shell({
             className="flex items-center bg-yellow-400 border border-gray-200 shadow-sm gap-2.5 no-underline px-4 py-3 md:mx-7 md:mt-6 md:rounded-md"
            
           >
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gmail_icon_%282020%29.svg/1280px-Gmail_icon_%282020%29.svg.png" alt="Gmail" className="w-5 h-4" /> 
+            <Mail size={17} strokeWidth={2} className="shrink-0" aria-hidden />
             <span className="flex-1 text-[13px] leading-snug">
               <strong className="font-bold">Connect your Gmail</strong> to start sending outreach - approvals are disabled until it's set up.
             </span>
@@ -187,14 +188,19 @@ export function Shell({
 
       </div>
 
-      {/* ═══ MOBILE BOTTOM NAV ═══ */}
+      {/* ═══ MOBILE BOTTOM NAV ═══
+           Six tabs is the most that fit at phone width. Billing lives on the
+           top bar's credits chip and Targeting is a row in Settings, so those
+           two give their slots to Prospects and Results. */}
       <nav className="cbnav">
         <MobileNavItem to={basePath} end icon={Inbox} label="Leads" badge={newHotLeads} />
         <MobileNavItem to={`${basePath}/campaigns`} icon={Megaphone} label="Campaigns" />
+        <MobileNavItem to={`${basePath}/prospects`} icon={Users} label="Prospects" />
         <MobileNavItem to={`${basePath}/approvals`} icon={ClipboardCheck} label="Approvals" badge={pendingApprovals} />
-        <MobileNavItem to={`${basePath}/targeting`} icon={Target} label="Targeting" />
-        <MobileNavItem to={`${basePath}/billing`} icon={CreditCard} label="Billing" />
-        {!hideSettings && <MobileNavItem to={`${basePath}/settings`} icon={Settings} label="Settings" />}
+        <MobileNavItem to={`${basePath}/results`} icon={Filter} label="Results" />
+        {hideSettings
+          ? <MobileNavItem to={`${basePath}/targeting`} icon={Target} label="Targeting" />
+          : <MobileNavItem to={`${basePath}/settings`} icon={Settings} label="Settings" />}
       </nav>
     </div>
   );
@@ -285,68 +291,94 @@ function NotificationBell({
 
       <AnimatePresence>
         {open && (
-          <motion.div
-            // z-100 rather than the usual z-50: on the Analytics page, recharts
-            // portals each chart's tooltip into its own chart container (not into
-            // <body>), so it isn't a sibling this overlay can out-rank just by
-            // being later in the DOM - bumping z-index is the reliable fix.
-            className="fixed inset-0 z-100 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            onClick={() => setOpen(false)}
-          >
-            <motion.div
-              className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[420px] md:rounded-md md:shadow-2xl"
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-                <span className="text-[15px] font-bold text-[#20211c]">Notifications</span>
-                <div className="flex items-center gap-3">
-                  {unreadCount > 0 && (
-                    <button
-                      onClick={() => onMarkAllAsRead?.()}
-                      className="cursor-pointer border-0 bg-transparent text-[12px] font-semibold text-[#3c7a5b] hover:underline"
-                    >
-                      Mark all as read
-                    </button>
-                  )}
-                  <button onClick={() => setOpen(false)} className="cursor-pointer border-0 bg-transparent text-[22px] leading-none text-[#9a9d92] transition-colors hover:text-[#20211c]">×</button>
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {notifications.length === 0 ? (
-                  <div className="px-5 py-14 text-center text-[13px] text-[#9a9d92]">Nothing yet.</div>
-                ) : (
-                  notifications.map((n) => (
-                    <button
-                      key={n.id}
-                      onClick={() => handleClick(n)}
-                      className="flex w-full cursor-pointer items-start gap-2.5 border-b border-[#f5f2ec] px-5 py-3.5 text-left transition-colors last:border-0 hover:bg-[#fbf9f5]"
-                    >
-                      <span
-                        className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-                        style={{ background: n.read_at ? 'transparent' : 'var(--leaf)' }}
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className={`block text-[13px] leading-snug ${n.read_at ? 'text-[#62655c]' : 'font-semibold text-[#20211c]'}`}>
-                          {n.body}
-                        </span>
-                        <span className="mt-0.5 block text-[11.5px] text-[#9a9d92]">{formatNotifTime(n.created_at)}</span>
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
+          <NotificationPanel
+            key="notifications"
+            notifications={notifications}
+            unreadCount={unreadCount}
+            onMarkAllAsRead={onMarkAllAsRead}
+            onSelect={handleClick}
+            onClose={() => setOpen(false)}
+          />
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+/* Split out from NotificationBell so useOverlayClose (and its Escape
+   handling) is only live while the panel is actually open. */
+function NotificationPanel({
+  notifications, unreadCount, onMarkAllAsRead, onSelect, onClose,
+}: {
+  notifications: ClientNotification[];
+  unreadCount: number;
+  onMarkAllAsRead?: () => void;
+  onSelect: (n: ClientNotification) => void;
+  onClose: () => void;
+}) {
+  return (
+    <motion.div
+      // z-100 rather than the usual z-50: on the Analytics page, recharts
+      // portals each chart's tooltip into its own chart container (not into
+      // <body>), so it isn't a sibling this overlay can out-rank just by
+      // being later in the DOM - bumping z-index is the reliable fix.
+      className="fixed inset-0 z-100 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      {...useOverlayClose(onClose, { escape: true })}
+    >
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Notifications"
+        className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[420px] md:rounded-md md:shadow-2xl"
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
+          <span className="text-[15px] font-bold text-[#20211c]">Notifications</span>
+          <div className="flex items-center gap-3">
+            {unreadCount > 0 && (
+              <button
+                onClick={() => onMarkAllAsRead?.()}
+                className="cursor-pointer border-0 bg-transparent text-[12px] font-semibold text-[#3c7a5b] hover:underline"
+              >
+                Mark all as read
+              </button>
+            )}
+            <button onClick={onClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[22px] leading-none text-[#9a9d92] transition-colors hover:text-[#20211c]">×</button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="px-5 py-14 text-center text-[13px] text-[#9a9d92]">Nothing yet.</div>
+          ) : (
+            notifications.map((n) => (
+              <button
+                key={n.id}
+                onClick={() => onSelect(n)}
+                className="flex w-full cursor-pointer items-start gap-2.5 border-b border-[#f5f2ec] px-5 py-3.5 text-left transition-colors last:border-0 hover:bg-[#fbf9f5]"
+              >
+                <span
+                  className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: n.read_at ? 'transparent' : 'var(--leaf)' }}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className={`block text-[13px] leading-snug ${n.read_at ? 'text-[#62655c]' : 'font-semibold text-[#20211c]'}`}>
+                    {n.body}
+                  </span>
+                  <span className="mt-0.5 block text-[11.5px] text-[#9a9d92]">{formatNotifTime(n.created_at)}</span>
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

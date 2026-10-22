@@ -255,7 +255,7 @@ function ImpersonateZone() {
           <Route index element={<Dashboard clientId={clientId} client={session.client} readOnly basePath={`/admin/impersonate/${clientId}`} />} />
           <Route path="campaigns" element={<ClientCampaigns clientId={clientId} client={session.client} readOnly basePath={`/admin/impersonate/${clientId}`} />} />
           <Route path="prospects" element={<Prospects clientId={clientId} client={session.client} readOnly basePath={`/admin/impersonate/${clientId}`} />} />
-          <Route path="approvals" element={<Approvals clientId={clientId} client={session.client} readOnly />} />
+          <Route path="approvals" element={<Approvals clientId={clientId} client={session.client} readOnly basePath={`/admin/impersonate/${clientId}`} />} />
           <Route path="analytics" element={<ClientAnalytics clientId={clientId} client={session.client} />} />
           <Route path="results" element={<Results clientId={clientId} client={session.client} basePath={`/admin/impersonate/${clientId}`} />} />
           <Route path="targeting" element={<TargetingProfile clientId={clientId} client={session.client} readOnly />} />

@@ -37,16 +37,17 @@ export function RowMenu({ items }: { items: MenuItem[] }) {
 
   useEffect(() => {
     if (!open) return;
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setOpen(false); }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') { e.preventDefault(); setOpen(false); } }
     function onDown(e: MouseEvent) {
       if (
         menuRef.current && !menuRef.current.contains(e.target as Node) &&
         btnRef.current  && !btnRef.current.contains(e.target as Node)
       ) setOpen(false);
     }
-    document.addEventListener('keydown', onKey);
+    // Capture phase so the menu sees Escape before an enclosing modal's handler.
+    document.addEventListener('keydown', onKey, true);
     document.addEventListener('mousedown', onDown);
-    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDown); };
+    return () => { document.removeEventListener('keydown', onKey, true); document.removeEventListener('mousedown', onDown); };
   }, [open]);
 
   return (

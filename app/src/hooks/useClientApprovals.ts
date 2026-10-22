@@ -6,7 +6,11 @@ import { queryClient } from '../lib/queryClient';
 import { useAuth } from '../auth/AuthProvider';
 import type { ClientMessageItem } from '../types';
 
-export const clientApprovalsKey = (clientId: string) => ['client-approvals', clientId] as const;
+// Returned when an update matched no pending row (already approved or
+// rejected elsewhere, or not visible to this user).
+const ALREADY_HANDLED = 'this draft was already handled - the list has been refreshed';
+
+export const clientApprovalsKey =(clientId: string) => ['client-approvals', clientId] as const;
 export const clientApprovalsStatsKey = (clientId: string) => ['client-approvals-stats', clientId] as const;
 export const clientAwaitingProspectsKey = (clientId: string) => ['client-awaiting-prospects', clientId] as const;
 
@@ -122,7 +126,7 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     );
   }, [clientId]);
 
-  const approve = useCallback(async (id: string, editedBody?: string, editedSubject?: string) => {
+  const approve = useCallback(async (id: string, editedBody?: string, editedSubject?: string): Promise<{ error: string | null }> => {
     removeFromCache([id]);
 
     const patch: Record<string, unknown> = {
@@ -134,25 +138,47 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     if (editedBody !== undefined) patch.body = editedBody;
     if (editedSubject !== undefined) patch.subject = editedSubject;
 
-    const { error } = await supabase.from('messages').update(patch).eq('id', id);
-    if (error) queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
+    const { data, error } = await supabase
+      .from('messages').update(patch).eq('id', id).eq('approval_status', 'pending').select('id');
+    const missed = !error && (data?.length ?? 0) === 0;
+    if (error || missed) queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
+    return { error: error?.message ?? (missed ? ALREADY_HANDLED : null) };
   }, [clientId, profile?.id, removeFromCache]);
 
-  const reject = useCallback(async (id: string) => {
+  // Same edit patch as approve(), minus the approval fields - the draft stays pending.
+  const saveEdits = useCallback(async (id: string, editedBody?: string, editedSubject?: string): Promise<{ error: string | null }> => {
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (editedBody !== undefined) patch.body = editedBody;
+    if (editedSubject !== undefined) patch.subject = editedSubject;
+
+    const { error } = await supabase.from('messages').update(patch).eq('id', id);
+    if (!error) {
+      queryClient.setQueryData<ClientMessageItem[]>(clientApprovalsKey(clientId), (prev = []) =>
+        prev.map((i) => (i.id === id ? { ...i, ...patch } as ClientMessageItem : i))
+      );
+    }
+    return { error: error?.message ?? null };
+  }, [clientId]);
+
+  const reject = useCallback(async (id: string): Promise<{ error: string | null }> => {
     removeFromCache([id]);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('messages')
       .update({ approval_status: 'rejected', updated_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
+      .eq('id', id)
+      .eq('approval_status', 'pending')
+      .select('id');
+    const missed = !error && (data?.length ?? 0) === 0;
+    if (error || missed) queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
+    return { error: error?.message ?? (missed ? ALREADY_HANDLED : null) };
   }, [clientId, removeFromCache]);
 
-  const bulkApprove = useCallback(async (ids: string[]) => {
-    if (ids.length === 0) return;
+  const bulkApprove = useCallback(async (ids: string[]): Promise<{ error: string | null }> => {
+    if (ids.length === 0) return { error: null };
     removeFromCache(ids);
     const { error } = await supabase
       .from('messages')
@@ -166,10 +192,11 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     if (error) queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
+    return { error: error?.message ?? null };
   }, [clientId, profile?.id, removeFromCache]);
 
-  const bulkReject = useCallback(async (ids: string[]) => {
-    if (ids.length === 0) return;
+  const bulkReject = useCallback(async (ids: string[]): Promise<{ error: string | null }> => {
+    if (ids.length === 0) return { error: null };
     removeFromCache(ids);
     const { error } = await supabase
       .from('messages')
@@ -178,6 +205,7 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     if (error) queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
+    return { error: error?.message ?? null };
   }, [clientId, removeFromCache]);
 
   return {
@@ -190,6 +218,7 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     error: (error as Error)?.message ?? null,
 
     approve,
+    saveEdits,
     reject,
     bulkApprove,
     bulkReject,

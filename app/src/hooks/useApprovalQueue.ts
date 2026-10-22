@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
+import { useAuth } from '../auth/AuthProvider';
 import type { QueueItem } from '../types';
 
 export const AQ_KEYS = {
@@ -104,6 +105,7 @@ async function fetchQueueStats(): Promise<Stats> {
 }
 
 export function useApprovalQueue() {
+  const { profile } = useAuth();
   const {
     data: items = [],
     isLoading: loading,
@@ -145,6 +147,8 @@ export function useApprovalQueue() {
     const patch: Record<string, unknown> = {
       approval_status: 'approved',
       approved_at: new Date().toISOString(),
+      // Records the admin, so approvals made on a client's behalf are attributable.
+      approved_by: profile?.id ?? null,
       updated_at: new Date().toISOString(),
     };
 
@@ -166,6 +170,49 @@ export function useApprovalQueue() {
     }
 
     queryClient.invalidateQueries({ queryKey: AQ_KEYS.stats });
+    return { error: error?.message ?? null };
+  }, [profile?.id]);
+
+  // Approves a set of drafts in one update (used for "approve all for this client").
+  // The pending guard skips anything another admin already handled.
+  const bulkApprove = useCallback(async (ids: string[]): Promise<{ approved: number; error: string | null }> => {
+    if (ids.length === 0) return { approved: 0, error: null };
+    queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) =>
+      prev.filter((i) => !ids.includes(i.id))
+    );
+
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('messages')
+      .update({ approval_status: 'approved', approved_at: now, approved_by: profile?.id ?? null, updated_at: now })
+      .in('id', ids)
+      .eq('approval_status', 'pending')
+      .select('id');
+
+    if (error) {
+      queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
+    }
+
+    queryClient.invalidateQueries({ queryKey: AQ_KEYS.stats });
+    return { approved: data?.length ?? 0, error: error?.message ?? null };
+  }, [profile?.id]);
+
+  // Same edit patch as approve(), minus the approval fields - the draft stays pending.
+  const saveEdits = useCallback(async (id: string, editedBody?: string, editedSubject?: string): Promise<{ error: string | null }> => {
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (editedBody !== undefined) patch.body = editedBody;
+    if (editedSubject !== undefined) patch.subject = editedSubject;
+
+    const { error } = await supabase
+      .from('messages')
+      .update(patch)
+      .eq('id', id);
+
+    if (!error) {
+      queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) =>
+        prev.map((i) => (i.id === id ? { ...i, ...patch } as QueueItem : i))
+      );
+    }
     return { error: error?.message ?? null };
   }, []);
 
@@ -199,6 +246,8 @@ export function useApprovalQueue() {
     error: (error as Error)?.message ?? null,
 
     approve,
+    bulkApprove,
+    saveEdits,
     reject,
 
     reload: async () => {

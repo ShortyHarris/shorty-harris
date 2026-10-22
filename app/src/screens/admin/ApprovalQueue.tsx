@@ -6,6 +6,10 @@ import { SkeletonTable } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { RowMenu } from '../../components/RowMenu';
 import { useToast, ToastHost } from '../../components/Toast';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '../../components/ui/select';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import type { QueueItem } from '../../types';
 import { Clock, CheckCircle2, Send, Ban, Eye, AlertTriangle, RefreshCw } from 'lucide-react';
@@ -37,6 +41,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 const PAGE_SIZE = 10;
+const ALL_CLIENTS = 'all';
 
 function formatPhone(raw: string): string {
   const digits = raw.replace(/\D/g, '');
@@ -48,12 +53,19 @@ function formatPhone(raw: string): string {
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
 export function ApprovalQueue() {
-  const { items, stats, loading, isFetching, dataUpdatedAt, error, approve, reject, reload } = useApprovalQueue();
+  const { items: allItems, stats, loading, isFetching, dataUpdatedAt, error, approve, bulkApprove, saveEdits, reject, reload } = useApprovalQueue();
   const { toasts, toast, dismiss } = useToast();
   async function doApprove(id: string, body?: string, subject?: string) {
     const { error: err } = await approve(id, body, subject);
     if (err) toast(`Couldn't approve the email: ${err}`, 'error');
     else toast(body !== undefined || subject !== undefined ? 'Edits saved and email approved.' : 'Email approved.');
+  }
+  async function doSave(id: string, body?: string, subject?: string) {
+    const { error: err } = await saveEdits(id, body, subject);
+    if (err) { toast(`Couldn't save the draft: ${err}`, 'error'); return; }
+    toast('Draft saved');
+    // Re-baseline the open modal so it's no longer dirty.
+    setEditItem((cur) => (cur?.id === id ? { ...cur, body: body ?? cur.body, subject: subject ?? cur.subject } : cur));
   }
   async function doReject(id: string) {
     const { error: err } = await reject(id);
@@ -61,7 +73,35 @@ export function ApprovalQueue() {
   }
   const [editItem, setEditItem] = useState<QueueItem | null>(null);
   const [page, setPage] = useState(1);
+  const [clientFilter, setClientFilter] = useState<string>(ALL_CLIENTS);
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const queueRef = useRef<HTMLDivElement | null>(null);
+
+  // Clients with drafts waiting, busiest first, for the filter dropdown.
+  const clientOptions = Array.from(
+    allItems.reduce((acc, i) => {
+      if (!i.client_id) return acc;
+      const cur = acc.get(i.client_id);
+      acc.set(i.client_id, { id: i.client_id, name: i.client?.business_name ?? 'Unknown client', count: (cur?.count ?? 0) + 1 });
+      return acc;
+    }, new Map<string, { id: string; name: string; count: number }>()).values()
+  ).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+  // Fall back to everything once the filtered client's queue empties out.
+  const activeFilter = clientOptions.some((c) => c.id === clientFilter) ? clientFilter : ALL_CLIENTS;
+  const items = activeFilter === ALL_CLIENTS ? allItems : allItems.filter((i) => i.client_id === activeFilter);
+  const activeClient = clientOptions.find((c) => c.id === activeFilter) ?? null;
+  const approvable = items.filter((i) => !senderBlocked(i));
+
+  async function doBulkApprove() {
+    setBulkBusy(true);
+    const { approved, error: err } = await bulkApprove(approvable.map((i) => i.id));
+    setBulkBusy(false);
+    setConfirmBulk(false);
+    if (err) { toast(`Couldn't approve the emails: ${err}`, 'error'); return; }
+    toast(`${approved} email${approved === 1 ? '' : 's'} approved for ${activeClient?.name ?? 'this client'}.`);
+  }
 
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -150,6 +190,31 @@ export function ApprovalQueue() {
       {error && (
         <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">
           Couldn't load the queue: {error}
+        </div>
+      )}
+
+      {/* Client filter + per-client bulk approve */}
+      {!loading && clientOptions.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={activeFilter} onValueChange={(v) => { setClientFilter(v); setPage(1); }}>
+            <SelectTrigger style={FONT} aria-label="Filter by client" className="h-10 w-70 max-w-full rounded-lg border-(--ad-line) bg-(--ad-surface) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)"><SelectValue /></SelectTrigger>
+            <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
+              <SelectItem value={ALL_CLIENTS}>All clients ({allItems.length})</SelectItem>
+              {clientOptions.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name} ({c.count})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {activeClient && (
+            <button
+              onClick={() => setConfirmBulk(true)}
+              disabled={approvable.length === 0}
+              title={approvable.length === 0 ? GMAIL_TOOLTIP : undefined}
+              className="cursor-pointer rounded-md border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Approve all {approvable.length} for {activeClient.name}
+            </button>
+          )}
         </div>
       )}
 
@@ -302,8 +367,24 @@ export function ApprovalQueue() {
             key="edit-modal"
             item={editItem}
             onClose={() => setEditItem(null)}
+            onSave={doSave}
             onApprove={(id, body, subject) => { doApprove(id, body, subject); setEditItem(null); }}
           />
+        )}
+        {confirmBulk && activeClient && (
+          <ConfirmDialog
+            key="bulk-confirm"
+            title={`Approve ${approvable.length} email${approvable.length === 1 ? '' : 's'} for ${activeClient.name}?`}
+            confirmLabel="Approve all"
+            busy={bulkBusy}
+            onConfirm={doBulkApprove}
+            onCancel={() => setConfirmBulk(false)}
+          >
+            They'll go out from {activeClient.name}'s mailbox exactly as drafted, and you'll be recorded as the approver.
+            {approvable.length < items.length && (
+              <> {items.length - approvable.length} draft{items.length - approvable.length === 1 ? ' is' : 's are'} skipped because the sender's Gmail isn't connected.</>
+            )}
+          </ConfirmDialog>
         )}
       </AnimatePresence>
 
@@ -421,17 +502,26 @@ function StatTile({
 function EditModal({
   item,
   onClose,
+  onSave,
   onApprove,
 }: {
   item: QueueItem;
   onClose: () => void;
+  onSave: (id: string, body?: string, subject?: string) => Promise<void>;
   onApprove: (id: string, body?: string, subject?: string) => void;
 }) {
   const [draft, setDraft] = useState(item.body);
   const [subjectDraft, setSubjectDraft] = useState(item.subject ?? '');
+  const [saving, setSaving] = useState(false);
   const bodyDirty    = draft.trim() !== item.body.trim();
   const subjectDirty = subjectDraft.trim() !== (item.subject ?? '').trim();
   const dirty = bodyDirty || subjectDirty;
+
+  async function handleSave() {
+    setSaving(true);
+    try { await onSave(item.id, bodyDirty ? draft : undefined, subjectDirty ? subjectDraft : undefined); }
+    finally { setSaving(false); }
+  }
 
   return (
     <motion.div
@@ -506,8 +596,15 @@ function EditModal({
             Cancel
           </button>
           <button
+            onClick={handleSave}
+            disabled={!dirty || saving}
+            className="cursor-pointer rounded-md border border-(--ad-green) bg-transparent px-4 py-2 text-[13px] font-bold text-(--ad-green) transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button
             onClick={() => onApprove(item.id, bodyDirty ? draft : undefined, subjectDirty ? subjectDraft : undefined)}
-            disabled={senderBlocked(item)}
+            disabled={senderBlocked(item) || saving}
             title={senderBlocked(item) ? GMAIL_TOOLTIP : undefined}
             className="cursor-pointer rounded-md border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
           >

@@ -66,7 +66,7 @@ export function BlockedDomainsModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      {...useOverlayClose(onClose)}
+      {...useOverlayClose(onClose, { escape: true })}
     >
       <motion.div
         className="modal-card flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:shadow-2xl"
@@ -84,7 +84,7 @@ export function BlockedDomainsModal({
               We'll never send outreach to an address at a domain on this list.
             </p>
           </div>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none" style={{ color: 'var(--ink-faint)' }}>×</button>
+          <button onClick={onClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none" style={{ color: 'var(--ink-faint)' }}>×</button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5">

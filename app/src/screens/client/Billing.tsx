@@ -11,6 +11,7 @@ import { useToast, ToastHost } from '../../components/Toast';
 import { RefreshButton } from '../../components/RefreshButton';
 import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import { PACKS } from '../../lib/pricing';
+import { CreditCard } from 'lucide-react';
 import './Billing.css';
 
 const HELP: HelpContent = {
@@ -133,7 +134,10 @@ export function Billing({
       <div className="lg:grid  lg:gap-6 lg:items-start">
 
           <div className="bill-section-head">
-             <h2 className='text-2xl font-bold flex items-center gap-2'> <img src='https://cdn-icons-png.flaticon.com/128/1052/1052815.png' className='w-8' /> Billing & Activity</h2>
+             <h1 className='m-0 text-2xl font-bold flex items-center gap-2' style={{ color: 'var(--ink)', letterSpacing: '-0.01em' }}>
+               <CreditCard size={24} strokeWidth={2} style={{ color: 'var(--leaf)' }} aria-hidden />
+               Billing & Activity
+             </h1>
              <HelpButton content={HELP} />
           </div>
 

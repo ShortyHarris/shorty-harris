@@ -86,7 +86,7 @@ export function DocsSearchPanel({
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') { e.preventDefault(); ask(); }
-    else if (e.key === 'Escape') onClose();
+    else if (e.key === 'Escape') { e.preventDefault(); onClose(); }
   }
 
   function goToSource(slug: string) {

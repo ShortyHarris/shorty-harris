@@ -23,7 +23,7 @@ export function ConfirmDialog({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      {...useOverlayClose(busy ? () => {} : onCancel)}
+      {...useOverlayClose(busy ? () => {} : onCancel, { escape: true })}
     >
       <motion.div
         role="alertdialog"
