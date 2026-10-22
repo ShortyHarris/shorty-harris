@@ -3,7 +3,7 @@ name: Sync Postking blog
 on:
   schedule:
     # Daily 05:00 UTC ≈ 06:00–07:00 Prague (CET/CEST).
-    - cron: '0 5 * * *'
+    - cron: '17 5 * * 1'
   workflow_dispatch:
     inputs:
       dry_run:
