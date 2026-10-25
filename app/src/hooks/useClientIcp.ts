@@ -3,6 +3,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
 import type { TargetArea } from '../lib/targetAreas';
+import {
+  getActiveCampaignLimits, mergeServerLimits, setActiveCampaignLimits, type CampaignLimits,
+} from '../lib/campaignLimits';
 
 export interface IcpEvidence {
   emailed?: number;
@@ -34,7 +37,7 @@ export interface SuggestCampaignInputsResult {
   locations: IcpLocationSuggestion[];
   pain_points: string[];
   value_props: string[];
-  limits: { max_search_terms: number; max_locations: number; max_term_location_pairs: number };
+  limits: { max_search_terms: number; max_locations: number; max_term_location_pairs: number; max_results?: number };
 }
 
 export async function suggestCampaignInputs(
@@ -47,11 +50,12 @@ export async function suggestCampaignInputs(
   return { data: result, error: null };
 }
 
-// Campaign term/location caps the form must enforce before launch -
-// read from the server (suggest_campaign_inputs carries the same limits
-// validate_campaign_inputs checks), never hardcoded. Returns null until
-// loaded, so callers must treat an unloaded limit as "don't block yet".
-export function useCampaignLimits(clientId: string, client: SupabaseClient = supabase) {
+// Campaign caps the forms enforce before launch. Starts from the constants in
+// lib/campaignLimits and switches to the server's scrape_limits (carried by
+// suggest_campaign_inputs, the same row validate_campaign_inputs checks) once
+// loaded. Always returns usable limits, so forms never run unchecked while the
+// request is in flight or if it fails.
+export function useCampaignLimits(clientId: string, client: SupabaseClient = supabase): CampaignLimits {
   const { data } = useQuery({
     queryKey: ['campaign-limits', clientId],
     queryFn: async () => {
@@ -59,11 +63,14 @@ export function useCampaignLimits(clientId: string, client: SupabaseClient = sup
       if (error) throw new Error(error.message);
       const result = data as SuggestCampaignInputsResult;
       if (!result?.ok) throw new Error(result?.error ?? 'not_permitted');
-      return result.limits;
+      const merged = mergeServerLimits(result.limits);
+      setActiveCampaignLimits(merged);
+      return merged;
     },
+    enabled: !!clientId,
     staleTime: 5 * 60 * 1000,
   });
-  return data ?? null;
+  return data ?? getActiveCampaignLimits();
 }
 
 export interface ValidateCampaignInputsResult {

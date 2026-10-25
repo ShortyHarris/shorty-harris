@@ -50,7 +50,7 @@ export function BlogPost() {
 
   if (loading) {
     return (
-      <div style={FONT} className="min-h-screen flex flex-col bg-white">
+      <div style={FONT} className="min-h-screen flex flex-col bg-cream">
         <PublicNav />
         <div className="max-w-[680px] mx-auto px-6 py-24">
           <div className="h-4 w-24 animate-pulse rounded-full bg-[#f5f5f5]" />
@@ -65,7 +65,7 @@ export function BlogPost() {
 
   if (!post) {
     return (
-      <div style={FONT} className="min-h-screen flex flex-col bg-white text-[#0a0a0a]">
+      <div style={FONT} className="min-h-screen flex flex-col bg-cream text-[#0a0a0a]">
         <PublicNav />
         <main className="max-w-[680px] mx-auto px-6 py-24 text-center">
           <h1 className="m-0 text-[22px] font-extrabold">Post not found</h1>
@@ -91,7 +91,7 @@ export function BlogPost() {
   };
 
   return (
-    <div style={FONT} className="min-h-screen flex flex-col bg-white text-[#0a0a0a]">
+    <div style={FONT} className="min-h-screen flex flex-col bg-cream text-[#0a0a0a]">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <PublicNav />
 

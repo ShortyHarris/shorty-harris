@@ -223,7 +223,7 @@ function buildHtml(template: string, post: BlogPostRow): string {
   return html;
 }
 
-const STATIC_ROUTES = ['/', '/blog', '/privacy', '/terms', '/cookies'];
+const STATIC_ROUTES = ['/', '/blog', '/pricing', '/privacy', '/terms', '/cookies', '/gmail-data-use'];
 
 // The sitemap always reflects every published post, regardless of whether
 // this run was scoped to a single --slug for HTML generation — a partial

@@ -27,6 +27,8 @@ import {
   suggestCampaignInputs, useCampaignLimits, validateCampaignInputs, describeViolation,
   type SuggestCampaignInputsResult,
 } from '../../hooks/useClientIcp';
+import { validateCampaignLimits } from '../../lib/campaignLimits';
+import { LimitCounter, LimitMessages } from '../../components/LimitCounter';
 import { PIPELINE_STATUS_LABEL, PIPELINE_STATUS_PILL } from '../../lib/pipelineStatus';
 import { Sparkles } from 'lucide-react';
 import { useClientProfile } from '../../hooks/useClientProfile';
@@ -373,6 +375,10 @@ function NewCampaignModal({
   const [err, setErr]               = useState<string | null>(null);
   const limits = useCampaignLimits(clientId);
   const locationLabels = areasToLocationLabels(areas);
+  const check = validateCampaignLimits({ searchQueries: queries, locationCount: areas.length, maxResults }, limits);
+  // Over-limit errors on the fields shown on the current step stop Next; the
+  // "add at least one" ones are reported by validateStep when Next is clicked.
+  const stepOverLimit = check.errors.some((e) => e.over && (step === 1 ? e.field !== 'max_results' : step === 2 && e.field === 'max_results'));
   const dirty = !!name.trim() || !!description.trim() || queries.length > 0 || areas.length > 0
     || maxResults !== 50 || language !== 'English' || pickedCountry !== '';
   const requestClose = () => { if (confirmDiscard(dirty)) onClose(); };
@@ -384,16 +390,10 @@ function NewCampaignModal({
       if (areas.length === 0) return 'Add at least one target location.';
       const joinedError = joinedLocationsError(areas);
       if (joinedError) return joinedError;
-      // Belt-and-suspenders: TagInput/LocationAreaInput already refuse
-      // extra entries once a limit loads, but don't block advancing on a
-      // limit that hasn't loaded yet (limits == null) - the server still
-      // enforces the real cap either way.
-      if (limits && queries.length > limits.max_search_terms) {
-        return `You can use up to ${limits.max_search_terms} search terms.`;
-      }
-      if (limits && areas.length > limits.max_locations) {
-        return `You can use up to ${limits.max_locations} locations.`;
-      }
+      // TagInput/LocationAreaInput refuse extra entries, but a pasted list or
+      // the terms x locations cap can still be over.
+      const overLimit = check.errors.find((e) => e.over && e.field !== 'max_results');
+      if (overLimit) return overLimit.message;
     }
     if (n === 2 && !language.trim()) return 'Outreach language is required.';
     if (n === 2 && !country) return 'Target country is required.';
@@ -414,6 +414,7 @@ function NewCampaignModal({
 
   async function submit() {
     if (!country) { setErr('Target country is required.'); return; }
+    if (!check.valid) { setErr(check.errors.map((e) => e.message).join(' ')); return; }
     setBusy(true); setErr(null);
 
     const { data: validation, error: validationError } = await validateCampaignInputs({
@@ -527,18 +528,21 @@ function NewCampaignModal({
                 values={queries}
                 onChange={setQueries}
                 splitOn=","
-                maxItems={limits?.max_search_terms}
+                maxItems={limits.maxSearchTerms}
                 capLabel="search term"
               />
+              <LimitCounter count={queries.length} max={limits.maxSearchTerms} noun="search terms" />
               <LocationAreaInput
                 label="Target locations"
                 required
-                helper="Add a city or area, or a radius around a point. The 3-location limit counts both kinds together."
+                helper={`Add a city or area, or a radius around a point. The ${limits.maxLocations}-location limit counts both kinds together.`}
                 values={areas}
                 onChange={setAreas}
-                maxItems={limits?.max_locations}
+                maxItems={limits.maxLocations}
                 capLabel="location"
               />
+              <LimitCounter count={areas.length} max={limits.maxLocations} noun="locations" />
+              <LimitMessages errors={check.errors} fields={['pairs']} />
             </>
           )}
 
@@ -549,13 +553,14 @@ function NewCampaignModal({
                 <input
                   type="number"
                   min={10}
-                  max={500}
+                  max={limits.maxResults}
                   value={maxResults}
-                  onChange={(e) => setMaxResults(Math.min(500, Math.max(10, Number(e.target.value))))}
+                  onChange={(e) => setMaxResults(Math.min(limits.maxResults, Math.max(10, Number(e.target.value))))}
                   style={FONT}
                   className={inputCls}
                 />
-                <p className="mt-1 text-[11px] text-[#9a9d92]">Maximum number of businesses to find per search term per location.</p>
+                <p className="mt-1 text-[11px] text-[#9a9d92]">Maximum number of businesses to find per search term per location (up to {limits.maxResults}).</p>
+                <LimitMessages errors={check.errors} fields={['max_results']} />
               </div>
               <div>
                 <label className={fieldLbl}>Outreach language<RequiredMark /></label>
@@ -616,9 +621,9 @@ function NewCampaignModal({
             <button onClick={goBack} className={ghostCls}>Back</button>
           )}
           {step < STEP_LABELS.length - 1 ? (
-            <button onClick={goNext} className={primaryCls}>Next</button>
+            <button onClick={goNext} disabled={stepOverLimit} className={primaryCls}>Next</button>
           ) : (
-            <button onClick={submit} disabled={busy || atLaunchLimit} title={atLaunchLimit ? launchLimitTitle : undefined} className={primaryCls}>
+            <button onClick={submit} disabled={busy || atLaunchLimit || !check.valid} title={atLaunchLimit ? launchLimitTitle : undefined} className={primaryCls}>
               {busy ? 'Creating…' : 'Create Campaign'}
             </button>
           )}
@@ -857,6 +862,7 @@ function CampaignDetailModal({
   const [err, setErr]               = useState<string | null>(null);
   const limits = useCampaignLimits(clientId);
   const locationLabels = areasToLocationLabels(areas);
+  const check = validateCampaignLimits({ searchQueries: queries, locationCount: areas.length, maxResults }, limits);
   // Snapshot of the form when editing started; the `campaign` prop goes stale
   // after a save, so it can't be the baseline for a second edit.
   const formSnapshot = JSON.stringify([name, description, queries, areas, maxResults, language]);
@@ -892,12 +898,9 @@ function CampaignDetailModal({
 
   async function saveEdit() {
     if (!name.trim()) { setErr('Campaign name is required.'); return; }
-    if (queries.length === 0) { setErr('Add at least one search term.'); return; }
-    if (areas.length === 0) { setErr('Add at least one target location.'); return; }
+    if (!check.valid) { setErr(check.errors.map((e) => e.message).join(' ')); return; }
     const joinedError = joinedLocationsError(areas);
     if (joinedError) { setErr(joinedError); return; }
-    if (limits && queries.length > limits.max_search_terms) { setErr(`You can use up to ${limits.max_search_terms} search terms.`); return; }
-    if (limits && areas.length > limits.max_locations) { setErr(`You can use up to ${limits.max_locations} locations.`); return; }
     if (!language.trim()) { setErr('Outreach language is required.'); return; }
 
     setBusy(true); setErr(null);
@@ -1027,31 +1030,36 @@ function CampaignDetailModal({
             values={queries}
             onChange={setQueries}
             splitOn=","
-            maxItems={limits?.max_search_terms}
+            maxItems={limits.maxSearchTerms}
             capLabel="search term"
           />
+          <LimitCounter count={queries.length} max={limits.maxSearchTerms} noun="search terms" />
+          <LimitMessages errors={check.errors} fields={['search_queries']} />
 
           <LocationAreaInput
             label="Target locations"
             required
-            helper="Add a city or area, or a radius around a point. The 3-location limit counts both kinds together."
+            helper={`Add a city or area, or a radius around a point. The ${limits.maxLocations}-location limit counts both kinds together.`}
             values={areas}
             onChange={setAreas}
-            maxItems={limits?.max_locations}
+            maxItems={limits.maxLocations}
             capLabel="location"
           />
+          <LimitCounter count={areas.length} max={limits.maxLocations} noun="locations" />
+          <LimitMessages errors={check.errors} fields={['target_locations', 'pairs']} />
 
           <div>
             <label className={fieldLbl}>Max results</label>
             <input
               type="number"
               min={10}
-              max={500}
+              max={limits.maxResults}
               value={maxResults}
-              onChange={(e) => setMaxResults(Math.min(500, Math.max(10, Number(e.target.value))))}
+              onChange={(e) => setMaxResults(Math.min(limits.maxResults, Math.max(10, Number(e.target.value))))}
               style={FONT}
               className={inputCls}
             />
+            <LimitMessages errors={check.errors} fields={['max_results']} />
           </div>
 
           <div>
@@ -1191,7 +1199,7 @@ function CampaignDetailModal({
         {editing && (
           <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
             <button onClick={cancelEdit} className={ghostCls}>Cancel</button>
-            <button onClick={saveEdit} disabled={busy} className={primaryCls}>
+            <button onClick={saveEdit} disabled={busy || !check.valid} className={primaryCls}>
               {busy ? 'Saving…' : 'Save changes'}
             </button>
           </div>

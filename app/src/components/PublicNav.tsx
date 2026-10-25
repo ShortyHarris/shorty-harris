@@ -7,7 +7,7 @@ import { BrandLockup } from './BrandLockup';
 
 // The one header for every public page (Home, Blog, BlogPost, legal pages,
 // 404). Same logo, same links, same buttons everywhere - only the active
-// state changes. "How it works" / "Pricing" / "FAQ" are home-page sections:
+// state changes. "How it works" / "FAQ" are home-page sections:
 // clicked from home they smooth-scroll, clicked from anywhere else they go
 // to /#id and scroll once the home page has rendered.
 
@@ -17,7 +17,7 @@ type NavItem =
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'How it works', kind: 'section', id: 'how' },
-  { label: 'Pricing', kind: 'section', id: 'pricing' },
+  { label: 'Pricing', kind: 'route', to: '/pricing' },
   { label: 'FAQ', kind: 'section', id: 'faq' },
   { label: 'Blog', kind: 'route', to: '/blog' },
 ];
@@ -59,8 +59,8 @@ function useActiveSection(enabled: boolean, ids: string[]) {
 
 const linkBase =
   'relative inline-flex items-center h-9 px-3.5 rounded-full text-[14px] no-underline whitespace-nowrap transition-colors cursor-pointer border-0 bg-transparent';
-const linkIdle = 'font-medium text-[#525252] hover:text-[#0a0a0a] hover:bg-[#f5f5f5]';
-const linkActive = 'font-semibold text-[#0a0a0a] bg-[#f0f0f0]';
+const linkIdle = 'font-medium text-[#5b5648] hover:text-[#1a1c17] hover:bg-[#efe6d3]';
+const linkActive = 'font-semibold text-[#1a1c17] bg-[#e9dfca]';
 
 export function PublicNav() {
   const location = useLocation();
@@ -116,10 +116,8 @@ export function PublicNav() {
 
   return (
     <header
-      className={`sticky top-0 z-50 transition-[background-color,border-color,box-shadow] duration-200 border-b ${
-        scrolled || !isHome
-          ? 'bg-white/90 backdrop-blur-xl border-[#e5e5e5] shadow-[0_1px_12px_rgba(26,27,23,0.04)]'
-          : 'bg-white border-transparent'
+      className={`sticky top-0 z-50 transition-[background-color] duration-200 ${
+        scrolled ? 'bg-cream/85 backdrop-blur-xl' : 'bg-cream'
       }`}
     >
       <div className="max-w-300 mx-auto w-full h-16 px-5 lg:px-12 flex items-center">
@@ -166,7 +164,7 @@ export function PublicNav() {
           {isAuthed ? (
             <Link
               to={dashboardPath}
-              className="hidden md:inline-flex items-center h-10 px-5 rounded-full bg-[#0a0a0a] text-white text-[14px] font-semibold no-underline hover:bg-[#3c7a5b] transition-colors whitespace-nowrap"
+              className="hidden md:inline-flex items-center h-10 px-5 rounded-full bg-forest text-white text-[14px] font-semibold no-underline hover:bg-forest-deep transition-colors whitespace-nowrap"
             >
               Go to dashboard
             </Link>
@@ -180,7 +178,7 @@ export function PublicNav() {
               </Link>
               <Link
                 to="/signup"
-                className="hidden md:inline-flex items-center h-10 px-5 rounded-full bg-[#0a0a0a] text-white text-[14px] font-semibold no-underline hover:bg-[#3c7a5b] transition-colors whitespace-nowrap"
+                className="hidden md:inline-flex items-center h-10 px-5 rounded-full bg-forest text-white text-[14px] font-semibold no-underline hover:bg-forest-deep transition-colors whitespace-nowrap"
               >
                 Get started
               </Link>
@@ -190,7 +188,7 @@ export function PublicNav() {
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={menuOpen}
-            className="flex md:hidden h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#0a0a0a] hover:bg-[#f5f5f5] transition-colors"
+            className="flex md:hidden h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[#e4dbc8] bg-white text-[#1a1c17] hover:bg-[#efe6d3] transition-colors"
           >
             <MenuToggleIcon open={menuOpen} className="size-5" />
           </button>
@@ -198,7 +196,7 @@ export function PublicNav() {
       </div>
 
       {menuOpen && typeof window !== 'undefined' && createPortal(
-        <div className="fixed inset-0 top-16 z-40 flex flex-col bg-white md:hidden">
+        <div className="fixed inset-0 top-16 z-40 flex flex-col bg-cream md:hidden">
           <nav aria-label="Main" className="flex flex-col gap-1 p-4">
             {NAV_ITEMS.map((item) => {
               const active = isActive(item);
@@ -208,7 +206,7 @@ export function PublicNav() {
                   onClick={() => go(item)}
                   aria-current={active ? 'page' : undefined}
                   className={`flex items-center justify-between rounded-xl px-4 h-13 text-[16px] text-left border-0 cursor-pointer transition-colors ${
-                    active ? 'bg-[#f0f0f0] text-[#0a0a0a] font-semibold' : 'bg-transparent text-[#404040] font-medium hover:bg-[#f5f5f5]'
+                    active ? 'bg-[#e9dfca] text-[#1a1c17] font-semibold' : 'bg-transparent text-[#46423a] font-medium hover:bg-[#efe6d3]'
                   }`}
                 >
                   {item.label}
@@ -217,12 +215,12 @@ export function PublicNav() {
               );
             })}
           </nav>
-          <div className="mt-auto flex flex-col gap-2 border-t border-[#e5e5e5] p-4 pb-[max(16px,env(safe-area-inset-bottom))]">
+          <div className="mt-auto flex flex-col gap-2 border-t border-[#e4dbc8] p-4 pb-[max(16px,env(safe-area-inset-bottom))]">
             {isAuthed ? (
               <Link
                 to={dashboardPath}
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center justify-center h-12 rounded-full bg-[#0a0a0a] text-[15px] font-semibold text-white no-underline hover:bg-[#3c7a5b] transition-colors"
+                className="flex items-center justify-center h-12 rounded-full bg-forest text-[15px] font-semibold text-white no-underline hover:bg-forest-deep transition-colors"
               >
                 Go to dashboard
               </Link>
@@ -231,14 +229,14 @@ export function PublicNav() {
                 <Link
                   to="/signup"
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center justify-center h-12 rounded-full bg-[#0a0a0a] text-[15px] font-semibold text-white no-underline hover:bg-[#3c7a5b] transition-colors"
+                  className="flex items-center justify-center h-12 rounded-full bg-forest text-[15px] font-semibold text-white no-underline hover:bg-forest-deep transition-colors"
                 >
                   Get started
                 </Link>
                 <Link
                   to="/login"
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center justify-center h-12 rounded-full border border-[#e5e5e5] bg-white text-[15px] font-semibold text-[#0a0a0a] no-underline hover:bg-[#f5f5f5] transition-colors"
+                  className="flex items-center justify-center h-12 rounded-full border border-[#e4dbc8] bg-white text-[15px] font-semibold text-[#1a1c17] no-underline hover:bg-[#efe6d3] transition-colors"
                 >
                   Log in
                 </Link>

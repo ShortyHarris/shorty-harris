@@ -22,7 +22,7 @@ export function LegalPage({
   useSeo({ title, description, path });
 
   return (
-    <div style={FONT} className="min-h-screen flex flex-col bg-white text-[#0a0a0a]">
+    <div style={FONT} className="min-h-screen flex flex-col bg-cream text-[#0a0a0a]">
       <PublicNav />
 
       <main className="max-w-[720px] mx-auto px-6 pt-14 pb-24">

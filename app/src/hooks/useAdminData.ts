@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
 import { applyProspectFilters, mapCategoryRows, pageRange } from '../lib/prospectQuery';
 import { buildAreaColumns, type TargetArea } from '../lib/targetAreas';
+import { CAMPAIGN_LIMITS, campaignLimitsError } from '../lib/campaignLimits';
 
 // ─── Query keys ──────────────────────────────────────────────────────────────
 export const QK = {
@@ -380,6 +381,15 @@ export function useClientsList() {
 }
 
 export async function createCampaign(input: NewCampaignInput) {
+  // Admin writes skip the database's limit trigger, so the caps are checked here.
+  const limitError = campaignLimitsError({
+    searchQueries: input.search_queries,
+    locationCount: input.target_areas.length,
+    maxResults: input.max_results,
+    allowEmpty: input.status === 'draft',
+  });
+  if (limitError) return { error: { message: limitError } };
+
   return supabase.from('campaigns').insert({
     client_id: input.client_id,
     name: input.name,
@@ -602,7 +612,21 @@ export interface NewClientInput {
   target_locations?: string[];
 }
 
+// Same as the discovery cap, so the auto-created campaign can't be rejected at launch.
+const DEFAULT_CAMPAIGN_MAX_RESULTS = CAMPAIGN_LIMITS.maxResults;
+
 export async function createClient(input: NewClientInput) {
+  // Checked before the client row is written so a rejected default campaign
+  // doesn't leave a client behind with no campaign. The default campaign may
+  // start blank, so only the upper caps apply.
+  const limitError = campaignLimitsError({
+    searchQueries: input.search_queries ?? [],
+    locationCount: (input.target_locations ?? []).length,
+    maxResults: DEFAULT_CAMPAIGN_MAX_RESULTS,
+    allowEmpty: true,
+  });
+  if (limitError) return { error: { message: limitError } };
+
   const { data: clientData, error: clientError } = await supabase
     .from('clients')
     .insert({
@@ -638,7 +662,7 @@ export async function createClient(input: NewClientInput) {
       status: 'active',
       search_queries: input.search_queries ?? [],
       target_locations: input.target_locations ?? [],
-      max_results: 1000,
+      max_results: DEFAULT_CAMPAIGN_MAX_RESULTS,
       scrape_enabled: false,
     });
   if (campaignError) return { error: campaignError };
@@ -799,9 +823,19 @@ export interface UpdateCampaignInput {
   target_areas: TargetArea[];
   max_results: number;
   scrape_enabled: boolean;
+  /** Draft campaigns may be saved with no terms or locations. */
+  allow_empty?: boolean;
 }
 
 export async function updateCampaign(id: string, input: UpdateCampaignInput) {
+  const limitError = campaignLimitsError({
+    searchQueries: input.search_queries,
+    locationCount: input.target_areas.length,
+    maxResults: input.max_results,
+    allowEmpty: input.allow_empty,
+  });
+  if (limitError) return { error: { message: limitError } };
+
   return supabase.from('campaigns').update({
     name: input.name,
     description: input.description || null,

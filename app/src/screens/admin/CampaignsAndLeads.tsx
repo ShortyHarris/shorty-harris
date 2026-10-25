@@ -22,6 +22,10 @@ import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { LocationAreaInput } from '../../components/LocationAreaInput';
 import { TargetAreaChips } from '../../components/TargetAreaChips';
 import { SuggestForMe } from '../client/Campaigns';
+import { TagInput } from '../../components/TagInput';
+import { LimitCounter, LimitMessages } from '../../components/LimitCounter';
+import { useCampaignLimits } from '../../hooks/useClientIcp';
+import { getActiveCampaignLimits, validateCampaignLimits } from '../../lib/campaignLimits';
 import { areasToLocationLabels, campaignAreas, joinedLocationsError, type TargetArea } from '../../lib/targetAreas';
 import { getScrapeStatusDisplay } from '../../lib/scrapeFailures';
 import { useCountrySendHolds } from '../../hooks/useCountrySendHolds';
@@ -813,24 +817,29 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
   // '' until the admin picks one; until then the selected client's country is the default.
   const [pickedCountry, setPickedCountry] = useState('');
   const country = pickedCountry || defaultCampaignCountry(clients.find((c) => c.id === clientId)?.country);
-  const [queries, setQueries]           = useState('');
+  const [queries, setQueries]           = useState<string[]>([]);
   const [areas, setAreas]                 = useState<TargetArea[]>([]);
-  const [maxResults, setMaxResults]     = useState(1000);
+  const [maxResults, setMaxResults]     = useState(() => getActiveCampaignLimits().maxResults);
   const [scrapeEnabled, setScrapeEnabled] = useState(true);
   const [saveAsDraft, setSaveAsDraft]   = useState(false);
   const [busy, setBusy]                 = useState(false);
   const [err, setErr]                   = useState<string | null>(null);
+  const limits = useCampaignLimits(clientId);
+  const check = validateCampaignLimits(
+    { searchQueries: queries, locationCount: areas.length, maxResults, allowEmpty: saveAsDraft }, limits,
+  );
 
   async function submit() {
     if (!clientId || !name.trim()) { setErr('Pick a client and enter a name.'); return; }
     if (!language.trim()) { setErr('Outreach language is required.'); return; }
     if (!country) { setErr('Target country is required.'); return; }
+    if (!check.valid) { setErr(check.errors.map((e) => e.message).join(' ')); return; }
     const joinedError = joinedLocationsError(areas);
     if (joinedError) { setErr(joinedError); return; }
     setBusy(true); setErr(null);
     const { error } = await createCampaign({
       client_id: clientId, name: name.trim(), channel, language: language.trim(), country,
-      search_queries: queries.split(',').map((s) => s.trim()).filter(Boolean),
+      search_queries: queries,
       target_areas: areas,
       max_results: maxResults, scrape_enabled: scrapeEnabled,
       status: saveAsDraft ? 'draft' : 'active',
@@ -921,35 +930,44 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
                 <SuggestForMe
                   key={clientId}
                   clientId={clientId}
-                  queries={queries.split(',').map((s) => s.trim()).filter(Boolean)}
+                  queries={queries}
                   locations={areasToLocationLabels(areas)}
-                  onAddQuery={(term) => setQueries((q) => {
-                    const parts = q.split(',').map((s) => s.trim()).filter(Boolean);
-                    return parts.includes(term) ? q : [...parts, term].join(', ');
-                  })}
+                  onAddQuery={(term) => setQueries((q) => (q.includes(term) ? q : [...q, term]))}
                   onAddLocation={(loc) => setAreas((a) => (a.some((x) => x.label === loc) ? a : [...a, { mode: 'text', label: loc }]))}
                 />
               ) : (
                 <p className="m-0 text-[11px] text-(--ad-ink-faint)">Pick a client above to see targeting suggestions from their profile.</p>
               )}
               <div>
-                <label className={fieldLbl}>Search terms <span className="normal-case font-normal">(comma-separated)</span></label>
-                <input value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="hotels, lodges, guesthouses" style={FONT} className={inputCls} />
-                <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Business types, not job titles - 3 to 5 terms works best.</p>
+                <TagInput
+                  label="Search terms"
+                  placeholder="Type a search term and press Enter (e.g. hotels, lodges, guesthouses)"
+                  helper="Business types, not job titles - 3 to 5 terms works best. Separate several with commas."
+                  values={queries}
+                  onChange={setQueries}
+                  maxItems={limits.maxSearchTerms}
+                  capLabel="search term"
+                />
+                <LimitCounter count={queries.length} max={limits.maxSearchTerms} noun="search terms" />
               </div>
-              <LocationAreaInput
-                label="Locations"
-                helper="Add a city or area, or a radius around a point. Plain places and radius areas share one list (max 25)."
-                values={areas}
-                onChange={setAreas}
-                maxItems={25}
-                capLabel="location"
-              />
+              <div>
+                <LocationAreaInput
+                  label="Locations"
+                  helper="Add a city or area, or a radius around a point. Plain places and radius areas share one list."
+                  values={areas}
+                  onChange={setAreas}
+                  maxItems={limits.maxLocations}
+                  capLabel="location"
+                />
+                <LimitCounter count={areas.length} max={limits.maxLocations} noun="locations" />
+                <LimitMessages errors={check.errors} fields={['pairs']} />
+              </div>
               <div className="flex items-end gap-3">
                 <div className="flex-1">
                   <label className={fieldLbl}>Max results per run</label>
-                  <input type="number" min={1} max={1000} value={maxResults} onChange={(e) => setMaxResults(Math.min(1000, Number(e.target.value)))} style={FONT} className={inputCls} />
-                  <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Higher counts tend to yield more replies. Capped at 1,000 per campaign.</p>
+                  <input type="number" min={1} max={limits.maxResults} value={maxResults} onChange={(e) => setMaxResults(Number(e.target.value))} style={FONT} className={inputCls} />
+                  <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Higher counts tend to yield more replies. Capped at {limits.maxResults.toLocaleString()} per campaign.</p>
+                  <LimitMessages errors={check.errors} fields={['max_results']} />
                 </div>
                 <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[13px] text-(--ad-ink-soft)">
                   <input type="checkbox" checked={scrapeEnabled} onChange={(e) => setScrapeEnabled(e.target.checked)} className="accent-(--ad-green)" />
@@ -973,7 +991,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
         {/* Footer */}
         <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
           <button onClick={onClose} className={ghostCls}>Cancel</button>
-          <button onClick={submit} disabled={busy} className={primaryCls}>
+          <button onClick={submit} disabled={busy || !check.valid} className={primaryCls}>
             {busy ? 'Creating…' : saveAsDraft ? 'Save as draft' : 'Create campaign'}
           </button>
         </div>
@@ -1015,16 +1033,24 @@ function EditCampaignModal({
   const [description, setDescription] = useState(campaign.description ?? '');
   const [channel, setChannel]         = useState(campaign.channel);
   const [language, setLanguage]       = useState(campaign.language);
-  const [queries, setQueries]         = useState(campaign.search_queries.join(', '));
+  const [queries, setQueries]         = useState<string[]>(campaign.search_queries);
   const [areas, setAreas]         = useState<TargetArea[]>(campaignAreas(campaign));
   const [maxResults, setMaxResults]   = useState(campaign.max_results);
   const [scrapeEnabled, setScrapeEnabled] = useState(campaign.scrape_enabled);
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState<string | null>(null);
+  const limits = useCampaignLimits(campaign.client_id);
+  // WF0 applies the caps to any campaign it runs, so an existing campaign that
+  // is already over a cap can't be saved until it is brought under it.
+  const allowEmpty = campaign.status === 'draft';
+  const check = validateCampaignLimits(
+    { searchQueries: queries, locationCount: areas.length, maxResults, allowEmpty }, limits,
+  );
 
   async function submit() {
     if (!name.trim()) { setErr('Campaign name is required.'); return; }
     if (!language.trim()) { setErr('Outreach language is required.'); return; }
+    if (!check.valid) { setErr(check.errors.map((e) => e.message).join(' ')); return; }
     const joinedError = joinedLocationsError(areas);
     if (joinedError) { setErr(joinedError); return; }
     setBusy(true); setErr(null);
@@ -1033,10 +1059,11 @@ function EditCampaignModal({
       description: description.trim(),
       channel,
       language: language.trim(),
-      search_queries: queries.split(',').map((s) => s.trim()).filter(Boolean),
+      search_queries: queries,
       target_areas: areas,
       max_results: maxResults,
       scrape_enabled: scrapeEnabled,
+      allow_empty: allowEmpty,
     });
     setBusy(false);
     if (error) setErr(error.message); else onSaved();
@@ -1087,32 +1114,42 @@ function EditCampaignModal({
           <div className="flex flex-col gap-3">
             <SuggestForMe
               clientId={campaign.client_id}
-              queries={queries.split(',').map((s) => s.trim()).filter(Boolean)}
+              queries={queries}
               locations={areasToLocationLabels(areas)}
-              onAddQuery={(term) => setQueries((q) => {
-                const parts = q.split(',').map((s) => s.trim()).filter(Boolean);
-                return parts.includes(term) ? q : [...parts, term].join(', ');
-              })}
+              onAddQuery={(term) => setQueries((q) => (q.includes(term) ? q : [...q, term]))}
               onAddLocation={(loc) => setAreas((a) => (a.some((x) => x.label === loc) ? a : [...a, { mode: 'text', label: loc }]))}
             />
             <div>
-              <label className={campFieldLbl}>Search terms <span className="normal-case font-normal">(comma-separated)</span></label>
-              <input value={queries} onChange={(e) => setQueries(e.target.value)} placeholder="hotels, lodges, guesthouses" style={FONT} className={campInputCls} />
-              <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Business types, not job titles - 3 to 5 terms works best.</p>
+              <TagInput
+                label="Search terms"
+                placeholder="Type a search term and press Enter (e.g. hotels, lodges, guesthouses)"
+                helper="Business types, not job titles - 3 to 5 terms works best. Separate several with commas."
+                values={queries}
+                onChange={setQueries}
+                maxItems={limits.maxSearchTerms}
+                capLabel="search term"
+              />
+              <LimitCounter count={queries.length} max={limits.maxSearchTerms} noun="search terms" />
+              <LimitMessages errors={check.errors} fields={['search_queries']} />
             </div>
-            <LocationAreaInput
-              label="Locations"
-              helper="Add a city or area, or a radius around a point. Plain places and radius areas share one list (max 25)."
-              values={areas}
-              onChange={setAreas}
-              maxItems={25}
-              capLabel="location"
-            />
+            <div>
+              <LocationAreaInput
+                label="Locations"
+                helper="Add a city or area, or a radius around a point. Plain places and radius areas share one list."
+                values={areas}
+                onChange={setAreas}
+                maxItems={limits.maxLocations}
+                capLabel="location"
+              />
+              <LimitCounter count={areas.length} max={limits.maxLocations} noun="locations" />
+              <LimitMessages errors={check.errors} fields={['target_locations', 'pairs']} />
+            </div>
             <div className="flex items-end gap-3">
               <div className="flex-1">
                 <label className={campFieldLbl}>Max results per run</label>
-                <input type="number" min={1} max={1000} value={maxResults} onChange={(e) => setMaxResults(Math.min(1000, Number(e.target.value)))} style={FONT} className={campInputCls} />
-                <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Higher counts tend to yield more replies. Capped at 1,000 per campaign.</p>
+                <input type="number" min={1} max={limits.maxResults} value={maxResults} onChange={(e) => setMaxResults(Number(e.target.value))} style={FONT} className={campInputCls} />
+                <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Higher counts tend to yield more replies. Capped at {limits.maxResults.toLocaleString()} per campaign.</p>
+                <LimitMessages errors={check.errors} fields={['max_results']} />
               </div>
               <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[13px] text-(--ad-ink-soft)">
                 <input type="checkbox" checked={scrapeEnabled} onChange={(e) => setScrapeEnabled(e.target.checked)} className="accent-(--ad-green)" />
@@ -1125,7 +1162,7 @@ function EditCampaignModal({
       </div>
       <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
         <button onClick={onClose} className={ghostCls}>Cancel</button>
-        <button onClick={submit} disabled={busy} className={primaryCls}>{busy ? 'Saving…' : 'Save changes'}</button>
+        <button onClick={submit} disabled={busy || !check.valid} className={primaryCls}>{busy ? 'Saving…' : 'Save changes'}</button>
       </div>
     </CampModalShell>
   );
