@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  useProspects, useClientsList, useClientCampaigns,
+  useProspects, useProspectCategories, useClientsList, useClientCampaigns,
   updateProspect, getProspectDeleteCounts, deleteProspect,
 } from '../../hooks/useAdminData';
+import { clampPage, rangeLabel, totalPages } from '../../lib/prospectQuery';
 import type { ProspectListRow, UpdateProspectInput, ProspectDeleteCounts } from '../../hooks/useAdminData';
 import { SkeletonTable } from '../../components/Skeleton';
 import { MobileFab } from '../../components/MobileFab';
@@ -56,44 +57,42 @@ const STATUS_PILL: Record<string, { bg: string; text: string; border?: string }>
   message_pending:    { bg: 'var(--ad-purple-tint)', text: 'var(--ad-purple)', border: '1px solid rgba(107,79,160,0.2)' },
 };
 
-const PAGE_SIZE = 15;
+const SEARCH_DEBOUNCE_MS = 300;
 
 const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
 const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
 const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50';
 
 export function Prospects() {
-  const { rows, loading, isFetching, dataUpdatedAt, error, reload, updateStatus } = useProspects();
-  const { toasts, toast, dismiss } = useToast();
-  const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh prospects.');
-  const [q, setQ]           = useState('');
+  const [qInput, setQInput] = useState('');
+  const [q, setQ]           = useState('');   // debounced copy of qInput, what the query uses
   const [status, setStatus] = useState('all');
   const [cat, setCat]       = useState('all');
   const [page, setPage]     = useState(1);
+  const { rows: paged, total, loading, isFetching, isPlaceholderData, dataUpdatedAt, error, reload, updateStatus } =
+    useProspects({ q: q.trim(), status, category: cat, page });
+  const categories = useProspectCategories();
+  const { toasts, toast, dismiss } = useToast();
+  const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh prospects.');
   const [showAdd, setShowAdd] = useState(false);
   const [editProspect, setEditProspect]   = useState<ProspectListRow | null>(null);
   const [deleteTarget, setDeleteTarget]   = useState<ProspectListRow | null>(null);
 
-  const categories = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.category).filter(Boolean))) as string[],
-    [rows],
-  );
+  useEffect(() => {
+    if (qInput === q) return;
+    const t = setTimeout(() => { setQ(qInput); setPage(1); }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [qInput, q]);
 
-  const filtered = rows.filter((r) => {
-    if (status !== 'all' && r.pipeline_status !== status) return false;
-    if (cat !== 'all' && r.category !== cat) return false;
-    if (q) {
-      const hay = `${r.business_name} ${r.email ?? ''} ${r.contact_name ?? ''}`.toLowerCase();
-      if (!hay.includes(q.toLowerCase())) return false;
-    }
-    return true;
-  });
+  const pages    = totalPages(total);
+  const safePage = clampPage(page, total);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage   = Math.min(page, totalPages);
-  const paged      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  // A delete (or a filter change landing elsewhere) can leave the current page past the end.
+  useEffect(() => {
+    if (!isPlaceholderData && !loading && page !== safePage) setPage(safePage);
+  }, [isPlaceholderData, loading, page, safePage]);
 
-  function updateQ(v: string)         { setQ(v);      setPage(1); }
+  function updateQ(v: string)         { setQInput(v); }
   function updateFilterStatus(v: string) { setStatus(v); setPage(1); }
   function updateCat(v: string)       { setCat(v);    setPage(1); }
 
@@ -106,7 +105,7 @@ export function Prospects() {
       <header className="page-header flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)"> <img src="https://cdn-icons-png.flaticon.com/128/143/143438.png" alt="Prospects" className="w-10 h-10" />Prospects</h1>
-          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">{rows.length} total across all clients</p>
+          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">{total.toLocaleString()} {q.trim() || status !== 'all' || cat !== 'all' ? 'matching' : 'total across all clients'}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton content={HELP} />
@@ -120,7 +119,7 @@ export function Prospects() {
         <div className="relative flex min-w-[220px] flex-1 items-center">
           <Search className="absolute left-3 h-4 w-4 text-(--ad-ink-faint) pointer-events-none" />
           <input
-            value={q}
+            value={qInput}
             onChange={(e) => updateQ(e.target.value)}
             placeholder="Search name, email, contact…"
             style={FONT}
@@ -152,8 +151,12 @@ export function Prospects() {
           <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
             <SelectItem value="all">All categories</SelectItem>
             {categories.map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
+              <SelectItem key={c.category} value={c.category}>{c.category} ({c.n.toLocaleString()})</SelectItem>
             ))}
+            {/* Keep a selected category visible even if the RPC list hasn't loaded or dropped it. */}
+            {cat !== 'all' && !categories.some((c) => c.category === cat) && (
+              <SelectItem value={cat}>{cat}</SelectItem>
+            )}
           </SelectContent>
         </Select>
       </div>
@@ -166,14 +169,14 @@ export function Prospects() {
 
       {/* Table / Cards */}
       {loading ? (
-        <SkeletonTable rows={PAGE_SIZE} cols={5} />
-      ) : filtered.length === 0 ? (
+        <SkeletonTable rows={10} cols={5} />
+      ) : total === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
           <strong className="text-[15px] font-bold text-(--ad-ink)">No matches.</strong>
           <span className="text-[13px] text-(--ad-ink-soft)">Try adjusting your filters or search query.</span>
         </div>
       ) : (
-        <>
+        <div className={`flex flex-col gap-6 transition-opacity ${isPlaceholderData ? 'opacity-60' : ''}`}>
           {/* Desktop table */}
           <div className="atbl hidden md:block">
             <table className="table-fixed">
@@ -324,28 +327,28 @@ export function Prospects() {
           </div>
 
           {/* Shared pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3 text-[12.5px] text-(--ad-ink-faint)">
-              <span>Page {safePage} of {totalPages}</span>
+          <div className="flex items-center justify-between rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3 text-[12.5px] text-(--ad-ink-faint)">
+            <span>{rangeLabel(safePage, total)}{pages > 1 && ` · Page ${safePage} of ${pages}`}</span>
+            {pages > 1 && (
               <div className="flex gap-2">
                 <button
                   onClick={() => setPage(safePage - 1)}
-                  disabled={safePage <= 1}
+                  disabled={safePage <= 1 || isPlaceholderData}
                   className={pagBtnCls}
                 >
                   Previous
                 </button>
                 <button
                   onClick={() => setPage(safePage + 1)}
-                  disabled={safePage >= totalPages}
+                  disabled={safePage >= pages || isPlaceholderData}
                   className={pagBtnCls}
                 >
                   Next
                 </button>
               </div>
-            </div>
-          )}
-        </>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Mobile FAB */}
