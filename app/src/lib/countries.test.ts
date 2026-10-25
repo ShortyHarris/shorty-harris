@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  COUNTRY_OPTIONS, EU_COUNTRIES, OTHER_COUNTRY_CODE,
+  COUNTRY_OPTIONS, EU_COUNTRIES, OTHER_COUNTRY_CODE, allCountryOptions, anyCountryName,
   countryName, countryOptionsFor, defaultCampaignCountry, findCountryHold, isEuCountry, privacyUrlError,
 } from './countries';
 
@@ -30,6 +30,33 @@ describe('country list', () => {
     const withNz = countryOptionsFor('nz');
     expect(withNz).toHaveLength(COUNTRY_OPTIONS.length + 1);
     expect(withNz[withNz.length - 1]).toEqual({ code: 'NZ', name: 'NZ' });
+  });
+});
+
+describe('allCountryOptions', () => {
+  it('lists every country alphabetically with Other last', () => {
+    const all = allCountryOptions();
+    expect(all.length).toBeGreaterThan(200);
+    expect(all.slice(-1)[0]).toEqual({ code: OTHER_COUNTRY_CODE, name: 'Other' });
+    const names = all.slice(0, -1).map((c) => c.name);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'en')));
+  });
+  it('contains every code from the short compliance list', () => {
+    const codes = new Set(allCountryOptions().map((c) => c.code));
+    COUNTRY_OPTIONS.forEach((c) => expect(codes.has(c.code)).toBe(true));
+  });
+  it('has unique codes and readable names', () => {
+    const all = allCountryOptions();
+    expect(new Set(all.map((c) => c.code)).size).toBe(all.length);
+    expect(anyCountryName('jp')).toBe('Japan');
+    expect(anyCountryName('CZ')).toBe('Czechia');
+    expect(anyCountryName('XX')).toBe('Other');
+    expect(anyCountryName('ZZ')).toBe('ZZ');
+    expect(anyCountryName('')).toBe('');
+  });
+  it("leaves the compliance list and campaign default untouched", () => {
+    expect(COUNTRY_OPTIONS).toHaveLength(32);
+    expect(defaultCampaignCountry('JP')).toBe(OTHER_COUNTRY_CODE);
   });
 });
 

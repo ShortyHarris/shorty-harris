@@ -16,6 +16,7 @@ export interface ClientProfile {
   notification_channel: 'whatsapp' | 'sms';
   country: string | null;
   privacy_url: string | null;
+  send_timezone: string;
 }
 
 export interface UpdateClientProfileInput {
@@ -29,6 +30,7 @@ export interface UpdateClientProfileInput {
   notification_channel: 'whatsapp' | 'sms';
   country: string;
   privacy_url: string;
+  send_timezone: string;
 }
 
 export const clientProfileKey = (clientId: string) => ['client-profile', clientId] as const;
@@ -36,7 +38,7 @@ export const clientProfileKey = (clientId: string) => ['client-profile', clientI
 async function fetchClientProfile(clientId: string): Promise<ClientProfile> {
   const { data, error } = await supabase
     .from('clients')
-    .select('business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, notification_channel, country, privacy_url')
+    .select('business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, notification_channel, country, privacy_url, send_timezone')
     .eq('id', clientId)
     .single();
   if (error) throw new Error(error.message);
@@ -67,6 +69,7 @@ export function useClientProfile(clientId: string) {
         notification_channel: input.notification_channel,
         country: input.country || null,
         privacy_url: input.privacy_url.trim() || null,
+        send_timezone: input.send_timezone,
         updated_at: new Date().toISOString(),
       })
       .eq('id', clientId);

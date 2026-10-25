@@ -14,10 +14,13 @@ import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { useAuth } from '../../auth/AuthProvider';
 import { useTour } from '../../tour/TourProvider';
 import { isValidEmail, isValidPhone, normalizePhone } from '../../lib/validation';
-import { countryOptionsFor, privacyUrlError } from '../../lib/countries';
+import { privacyUrlError } from '../../lib/countries';
+import { CountrySelect } from '../../components/CountrySelect';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
+import { TimezoneSelect } from '../../components/TimezoneSelect';
+import { suggestedTimezonesForCountry } from '../../lib/timezones';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { RequiredMark } from '../../components/RequiredMark';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -44,7 +47,7 @@ function formatLastUsed(iso: string): string {
 /* ─── Business profile: name, type, address, contact info, signature name ───
    Shown as a tappable summary row (like the Analytics link below it) rather
    than an always-open form - tapping it opens an edit modal. */
-function ProfileSection({ clientId, onSaved }: { clientId: string; onSaved?: () => void }) {
+function ProfileSection({ clientId, onSaved, onError }: { clientId: string; onSaved?: () => void; onError?: (message: string) => void }) {
   const { profile, loading, updateProfile } = useClientProfile(clientId);
   const [editing, setEditing] = useState(false);
 
@@ -79,7 +82,7 @@ function ProfileSection({ clientId, onSaved }: { clientId: string; onSaved?: () 
 
       <AnimatePresence>
         {editing && (
-          <ProfileEditModal profile={profile} updateProfile={updateProfile} onClose={() => setEditing(false)} onSaved={onSaved} />
+          <ProfileEditModal profile={profile} updateProfile={updateProfile} onClose={() => setEditing(false)} onSaved={onSaved} onError={onError} />
         )}
       </AnimatePresence>
     </>
@@ -87,12 +90,13 @@ function ProfileSection({ clientId, onSaved }: { clientId: string; onSaved?: () 
 }
 
 function ProfileEditModal({
-  profile, updateProfile, onClose, onSaved,
+  profile, updateProfile, onClose, onSaved, onError,
 }: {
   profile: ClientProfile;
   updateProfile: (input: UpdateClientProfileInput) => Promise<{ error: string | null }>;
   onClose: () => void;
   onSaved?: () => void;
+  onError?: (message: string) => void;
 }) {
   // Lazy initializer, not an effect - `profile` is already loaded by the time
   // this component mounts (ProfileSection gates on it), so the form's local
@@ -108,10 +112,10 @@ function ProfileEditModal({
     notification_channel: profile.notification_channel ?? 'whatsapp',
     country: profile.country ?? '',
     privacy_url: profile.privacy_url ?? '',
+    send_timezone: profile.send_timezone,
   }));
   const [initialForm] = useState(() => JSON.stringify(form));
   const requestClose = () => { if (confirmDiscard(JSON.stringify(form) !== initialForm)) onClose(); };
-  const countryOptions = countryOptionsFor(profile.country);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -135,7 +139,7 @@ function ProfileEditModal({
       contact_phone: form.contact_phone.trim() ? normalizePhone(form.contact_phone) : '',
     });
     setBusy(false);
-    if (error) setErr(error); else { onSaved?.(); onClose(); }
+    if (error) { setErr(error); onError?.(error); } else { onSaved?.(); onClose(); }
   }
 
   return (
@@ -216,14 +220,32 @@ function ProfileEditModal({
 
           <div className="mb-4">
             <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Country</label>
-            <Select value={form.country} onValueChange={(v) => set('country', v)}>
-              <SelectTrigger className="h-10 rounded-lg text-[13px]" style={inputStyle} aria-label="Country"><SelectValue placeholder="Select a country" /></SelectTrigger>
-              <SelectContent className="text-[13px]" style={{ background: 'var(--surface)', color: 'var(--ink)' }}>
-                {countryOptions.map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <CountrySelect
+              value={form.country}
+              onValueChange={(v) => set('country', v)}
+              triggerClassName="h-10 rounded-lg text-[13px]"
+              triggerStyle={inputStyle}
+              contentClassName="text-[13px]"
+              contentStyle={{ background: 'var(--surface)', color: 'var(--ink)' }}
+            />
             <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>
               Where your business is based. New campaigns default to this country.
+            </p>
+          </div>
+
+          <div className="mb-4">
+            <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Send timezone</label>
+            <TimezoneSelect
+              value={form.send_timezone}
+              onValueChange={(v) => set('send_timezone', v)}
+              suggested={suggestedTimezonesForCountry(profile.country)}
+              triggerClassName="h-10 rounded-lg text-[13px]"
+              triggerStyle={inputStyle}
+              contentClassName="text-[13px]"
+              contentStyle={{ background: 'var(--surface)', color: 'var(--ink)' }}
+            />
+            <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>
+              Emails are sent Monday to Friday, 9:00 to 17:00 in this timezone.
             </p>
           </div>
 
@@ -480,7 +502,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
         Business profile
       </div>
       <div className="mb-6 overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
-        <ProfileSection clientId={clientId} onSaved={() => toast('Profile saved.')} />
+        <ProfileSection clientId={clientId} onSaved={() => toast('Profile saved.')} onError={(m) => toast(m, 'error')} />
 
         <div className="border-t" style={{ borderColor: 'var(--line)' }} />
 
