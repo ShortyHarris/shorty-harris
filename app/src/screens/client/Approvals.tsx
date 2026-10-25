@@ -65,12 +65,15 @@ const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif
 const READ_ONLY_MSG = 'You\'re viewing read-only. Turn on "Edit as admin" in the banner to approve or reject.';
 
 export function Approvals({
-  clientId, client = supabase, readOnly = false, basePath = '/app',
-}: { clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string }) {
+  clientId, client = supabase, readOnly = false, basePath = '/app', isAdmin = false,
+}: { clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string; isAdmin?: boolean }) {
+  // Drafts held by policy (generic/freemail recipients) are hidden from clients;
+  // admins can reveal them. Not tied to readOnly: admin edit mode is still admin.
+  const [showHeld, setShowHeld] = useState(false);
   const {
     items, stats, approvedDrafts, loading, isFetching, dataUpdatedAt, error,
     approve: approveRaw, saveEdits, reject: rejectRaw, bulkReject: bulkRejectRaw, reload,
-  } = useClientApprovals(clientId, client);
+  } = useClientApprovals(clientId, client, isAdmin && showHeld);
   const [tab, setTab] = useState<ApprovalTab>('pending');
   const { connection: gmailConnection } = useGmailConnection(clientId);
   const { rows: campaigns } = useClientCampaignList(clientId, client);
@@ -359,6 +362,12 @@ export function Approvals({
         </div>
       )}
 
+      {isAdmin && tab === 'blocked' && (
+        <label className="flex w-fit cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-[#62655c]">
+          <input type="checkbox" checked={showHeld} onChange={(e) => setShowHeld(e.target.checked)} className="accent-[#3c7a5b]" />
+          Held by policy
+        </label>
+      )}
       {tab === 'blocked' && blockedCount > 0 && (
         <p className="m-0 text-[12.5px] text-[#62655c]">
           These drafts are approved but won't send until the reason shown is cleared. You can reject any you don't want to keep.

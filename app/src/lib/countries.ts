@@ -5,6 +5,8 @@
 // ('XX', the ISO 3166 user-assigned "unknown" code) - never null, so a
 // required select always has a real value to save.
 
+import { getAllCountries } from 'countries-and-timezones';
+
 export interface CountryOption {
   code: string;
   name: string;
@@ -76,6 +78,41 @@ export function countryOptionsFor(current: string | null | undefined): CountryOp
   const norm = normalizeCode(current);
   if (!norm || COUNTRY_OPTIONS.some((c) => c.code === norm)) return [...COUNTRY_OPTIONS];
   return [...COUNTRY_OPTIONS, { code: norm, name: norm }];
+}
+
+// ─── Full list for a client's own country ────────────────────────────────────
+// COUNTRY_OPTIONS above is deliberately short: it drives the EU compliance
+// rule and the campaign "Target country" select. A client's own country can be
+// anywhere, so its picker uses every country (ISO codes from
+// countries-and-timezones, names from Intl.DisplayNames). Campaigns map a
+// country outside COUNTRY_OPTIONS to Other (see defaultCampaignCountry).
+
+let allCountriesCache: CountryOption[] | null = null;
+
+function regionName(code: string, fallback: string): string {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+// Every country alphabetically, with Other last.
+export function allCountryOptions(): CountryOption[] {
+  if (allCountriesCache) return allCountriesCache;
+  const list = Object.values(getAllCountries())
+    .map((c) => ({ code: c.id, name: regionName(c.id, c.name) }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'en'));
+  allCountriesCache = [...list, { code: OTHER_COUNTRY_CODE, name: 'Other' }];
+  return allCountriesCache;
+}
+
+// Display name for any country code ('JP' -> 'Japan', 'XX' -> 'Other'); the
+// code itself if unknown.
+export function anyCountryName(code: string | null | undefined): string {
+  const norm = normalizeCode(code);
+  if (!norm) return '';
+  return allCountryOptions().find((c) => c.code === norm)?.name ?? norm;
 }
 
 // Pre-selected "Target country" for a new campaign: the client's own country

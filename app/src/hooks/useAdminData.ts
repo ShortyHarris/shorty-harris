@@ -481,6 +481,8 @@ export interface ClientListRow {
   auto_approve_campaigns: boolean;
   allow_generic_mailboxes: boolean;
   is_internal: boolean;
+  country: string | null;
+  send_timezone: string;
   has_profile: boolean;
   activated_at: string | null;
   credits_remaining: number;
@@ -489,7 +491,7 @@ export interface ClientListRow {
 async function fetchClients(): Promise<ClientListRow[]> {
   const { data, error } = await supabase
     .from('clients')
-    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, notification_channel, status, created_at, monthly_prospect_limit, max_campaigns, auto_approve_campaigns, allow_generic_mailboxes, is_internal')
+    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, notification_channel, status, created_at, monthly_prospect_limit, max_campaigns, auto_approve_campaigns, allow_generic_mailboxes, is_internal, country, send_timezone')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -589,6 +591,8 @@ export interface NewClientInput {
   contact_email: string;
   contact_phone: string;
   notification_channel: 'whatsapp' | 'sms';
+  country?: string;
+  send_timezone?: string;
   starting_credits: number;
   status?: 'draft' | 'active';
   // Pre-fills the auto-created default campaign's prospect-discovery fields -
@@ -609,6 +613,9 @@ export async function createClient(input: NewClientInput) {
       contact_email: input.contact_email || null,
       contact_phone: input.contact_phone || null,
       notification_channel: input.notification_channel,
+      country: input.country || null,
+      // Omitted -> the column default ('America/Chicago') applies.
+      ...(input.send_timezone ? { send_timezone: input.send_timezone } : {}),
       status: input.status ?? 'active',
     })
     .select('id')
@@ -679,6 +686,8 @@ export interface UpdateClientInput {
   contact_phone: string;
   contact_name: string;
   notification_channel: 'whatsapp' | 'sms';
+  country: string;
+  send_timezone: string;
   status: 'draft' | 'active' | 'paused' | 'churned';
   monthly_prospect_limit: number;
   max_campaigns: number;
@@ -696,6 +705,8 @@ export async function updateClient(id: string, input: UpdateClientInput) {
     contact_phone: input.contact_phone,
     contact_name: input.contact_name || null,
     notification_channel: input.notification_channel,
+    country: input.country || null,
+    send_timezone: input.send_timezone,
     status: input.status,
     monthly_prospect_limit: input.monthly_prospect_limit,
     max_campaigns: input.max_campaigns,
