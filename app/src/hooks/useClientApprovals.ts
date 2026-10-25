@@ -6,6 +6,8 @@ import { queryClient } from '../lib/queryClient';
 import { useAuth } from '../auth/AuthProvider';
 import type { ClientMessageItem } from '../types';
 import { fetchAllRows } from '../lib/fetchAllRows';
+import { runInChunks, type ChunkedResult } from '../lib/chunkedBulk';
+import { TERMINAL_PIPELINE_STATUSES } from '../lib/pipelineStatus';
 import { campaignPendingProspectsPrefix } from './useClientCampaigns';
 
 // Returned when an update matched no pending row (already approved or
@@ -27,7 +29,6 @@ function invalidateApprovalQueries(clientId: string) {
 
 // Prospects still in play that have at least one drafted email waiting on
 // approval. Same exclusions as the approve_sequences RPC.
-const TERMINAL_PIPELINE_STATUSES = '(replied,hot_lead,won,lost,called,bounced)';
 
 async function fetchAwaitingProspects(clientId: string, client: SupabaseClient): Promise<number> {
   const { count, error } = await client
@@ -132,7 +133,7 @@ interface ClientApprovalStats {
 // tiebreak keeps page boundaries stable. Callers compare the list length with
 // stats.pending (an exact count) to tell whether it is the whole queue.
 async function fetchPendingMessages(clientId: string, client: SupabaseClient): Promise<ClientMessageItem[]> {
-  const rows = await fetchAllRows<Record<string, unknown>>((from, to) =>
+  const { rows } = await fetchAllRows<Record<string, unknown>>((from, to) =>
     client
       .from('messages')
       .select(MESSAGE_SELECT)
@@ -274,37 +275,36 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
 
   // Bulk writes only ever touch drafts that are still pending and unsent, and
   // report how many rows actually changed (0 can mean RLS or another tab won).
-  const bulkApprove = useCallback(async (ids: string[]): Promise<{ affected: number; error: string | null }> => {
-    if (ids.length === 0) return { affected: 0, error: null };
+  // Both are batched (every id goes in the URL) and best-effort: a failed batch
+  // doesn't stop the rest, and the result carries the honest partial count.
+  const bulkApprove = useCallback(async (ids: string[]): Promise<ChunkedResult> => {
+    if (ids.length === 0) return { affected: 0, total: 0, failedBatches: 0, error: null };
     await removeFromCache(ids);
-    const { data, error } = await supabase
+    const now = new Date().toISOString();
+    const res = await runInChunks(ids, (chunk) => supabase
       .from('messages')
-      .update({
-        approval_status: 'approved',
-        approved_at: new Date().toISOString(),
-        approved_by: profile?.id ?? null,
-        updated_at: new Date().toISOString(),
-      })
-      .in('id', ids)
+      .update({ approval_status: 'approved', approved_at: now, approved_by: profile?.id ?? null, updated_at: now })
+      .in('id', chunk)
       .eq('approval_status', 'pending')
       .eq('send_status', 'not_sent')
-      .select('id');
+      .select('id'));
+    // Always refetch: after a partial failure the unprocessed rows must reappear.
     invalidateApprovalQueries(clientId);
-    return { affected: data?.length ?? 0, error: error?.message ?? null };
+    return res;
   }, [clientId, profile?.id, removeFromCache]);
 
-  const bulkReject = useCallback(async (ids: string[]): Promise<{ affected: number; error: string | null }> => {
-    if (ids.length === 0) return { affected: 0, error: null };
+  const bulkReject = useCallback(async (ids: string[]): Promise<ChunkedResult> => {
+    if (ids.length === 0) return { affected: 0, total: 0, failedBatches: 0, error: null };
     await removeFromCache(ids);
-    const { data, error } = await supabase
+    const res = await runInChunks(ids, (chunk) => supabase
       .from('messages')
       .update({ approval_status: 'rejected', updated_at: new Date().toISOString() })
-      .in('id', ids)
+      .in('id', chunk)
       .eq('approval_status', 'pending')
       .eq('send_status', 'not_sent')
-      .select('id');
+      .select('id'));
     invalidateApprovalQueries(clientId);
-    return { affected: data?.length ?? 0, error: error?.message ?? null };
+    return res;
   }, [clientId, removeFromCache]);
 
   return {

@@ -7,18 +7,27 @@ export const MAX_LOADED_ROWS = 5000;
 
 type PageResult<T> = { data: T[] | null; error: { message: string } | null };
 
+export interface FetchAllResult<T> {
+  rows: T[];
+  /** Hit the ceiling with a full last page - there may be more rows than loaded. */
+  truncated: boolean;
+}
+
 export async function fetchAllRows<T>(
   page: (from: number, to: number) => PromiseLike<PageResult<T>>,
   max: number = MAX_LOADED_ROWS,
-): Promise<T[]> {
+): Promise<FetchAllResult<T>> {
   const rows: T[] = [];
+  let lastPageFull = false;
   while (rows.length < max) {
     const from = rows.length;
-    const { data, error } = await page(from, Math.min(from + PAGE, max) - 1);
+    const size = Math.min(PAGE, max - from);
+    const { data, error } = await page(from, from + size - 1);
     if (error) throw new Error(error.message);
     const batch = data ?? [];
     rows.push(...batch);
-    if (batch.length < PAGE) break;
+    lastPageFull = batch.length === size;
+    if (!lastPageFull) break;
   }
-  return rows;
+  return { rows, truncated: rows.length >= max && lastPageFull };
 }

@@ -17,6 +17,7 @@ import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { previewSequenceApproval, approveSequences, type ApprovalPreview } from '../../hooks/useSequenceActions';
 import { blockInfo, type BlockTone } from '../../lib/blockReasons';
+import { partialFailureMessage } from '../../lib/chunkedBulk';
 import type { ClientMessageItem } from '../../types';
 
 type ApprovalTab = 'pending' | 'approved' | 'blocked';
@@ -104,17 +105,24 @@ export function Approvals({
     if (!rejectIds) return;
     setRejecting(true);
     const n = rejectIds.length;
-    let err: string | null;
+    let err: string | null = null;
     let done = n;
+    let failed = false;
     if (n === 1) {
       ({ error: err } = await rejectRaw(rejectIds[0]));
     } else {
       const res = await bulkRejectRaw(rejectIds);
-      err = res.error;
       done = res.affected;
+      failed = res.failedBatches > 0;
+      if (failed) err = partialFailureMessage(res, 'rejected', 'reject');
     }
     setRejecting(false);
     setRejectIds(null);
+    if (failed) {
+      // Partial progress is real: the rows that did go through are gone from the list.
+      toast(err as string, 'error');
+      return;
+    }
     if (err) { toast(`Couldn't reject: ${err}`, 'error'); return; }
     setSelected((prev) => {
       const next = new Set(prev);
