@@ -1,7 +1,8 @@
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
-import { clientApprovalsKey, clientApprovalsStatsKey, clientAwaitingProspectsKey } from './useClientApprovals';
+import { clientApprovalsKey, clientApprovalsStatsKey, clientAwaitingProspectsKey, clientApprovedKey } from './useClientApprovals';
 import { dashboardKey } from './useClientDashboard';
+import { campaignPendingProspectsPrefix } from './useClientCampaigns';
 
 // Every sequence write goes through a Supabase RPC on the real (non-impersonation)
 // client - never a direct write to `messages`. Each RPC returns { ok, error? }
@@ -34,6 +35,8 @@ export function refreshSequenceData(clientId: string | null) {
     queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
+    queryClient.invalidateQueries({ queryKey: clientApprovedKey(clientId) });
+    queryClient.invalidateQueries({ queryKey: campaignPendingProspectsPrefix });
     queryClient.invalidateQueries({ queryKey: dashboardKey(clientId) });
   }
 }

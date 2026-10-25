@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
 import { useAuth } from '../auth/AuthProvider';
 import type { QueueItem } from '../types';
+import { fetchAllRows } from '../lib/fetchAllRows';
 
 export const AQ_KEYS = {
   items: ['approval-queue', 'items'] as const,
@@ -17,7 +18,8 @@ interface Stats {
 }
 
 async function fetchQueueItems(): Promise<QueueItem[]> {
-  const { data, error } = await supabase
+  // Paged: one select is silently capped at 1000 rows by PostgREST.
+  const data = await fetchAllRows<Record<string, unknown>>((from, to) => supabase
     .from('messages_with_sender')
     .select(
       `
@@ -35,9 +37,9 @@ async function fetchQueueItems(): Promise<QueueItem[]> {
     `
     )
     .eq('approval_status', 'pending')
-    .order('created_at', { ascending: true });
-
-  if (error) throw new Error(error.message);
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+    .range(from, to));
 
   const prospectIds = Array.from(
     new Set((data ?? []).map((row: Record<string, unknown>) => row.prospect_id as string))
@@ -140,6 +142,7 @@ export function useApprovalQueue() {
   // more than once at a time (e.g. the sidebar badge + the page itself).
 
   const approve = useCallback(async (id: string, editedBody?: string, editedSubject?: string): Promise<{ error: string | null }> => {
+    await queryClient.cancelQueries({ queryKey: AQ_KEYS.items });
     queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) =>
       prev.filter((i) => i.id !== id)
     );
@@ -177,6 +180,7 @@ export function useApprovalQueue() {
   // The pending guard skips anything another admin already handled.
   const bulkApprove = useCallback(async (ids: string[]): Promise<{ approved: number; error: string | null }> => {
     if (ids.length === 0) return { approved: 0, error: null };
+    await queryClient.cancelQueries({ queryKey: AQ_KEYS.items });
     queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) =>
       prev.filter((i) => !ids.includes(i.id))
     );
@@ -187,12 +191,10 @@ export function useApprovalQueue() {
       .update({ approval_status: 'approved', approved_at: now, approved_by: profile?.id ?? null, updated_at: now })
       .in('id', ids)
       .eq('approval_status', 'pending')
+      .eq('send_status', 'not_sent')
       .select('id');
 
-    if (error) {
-      queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
-    }
-
+    queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
     queryClient.invalidateQueries({ queryKey: AQ_KEYS.stats });
     return { approved: data?.length ?? 0, error: error?.message ?? null };
   }, [profile?.id]);
@@ -217,24 +219,28 @@ export function useApprovalQueue() {
   }, []);
 
   const reject = useCallback(async (id: string): Promise<{ error: string | null }> => {
+    // Cancel in-flight fetches so a stale response can't restore the row.
+    await queryClient.cancelQueries({ queryKey: AQ_KEYS.items });
     queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) =>
       prev.filter((i) => i.id !== id)
     );
 
-    const { error } = await supabase
+    // Only a still-pending, unsent draft can be rejected from the queue.
+    const { data, error } = await supabase
       .from('messages')
       .update({
         approval_status: 'rejected',
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('approval_status', 'pending')
+      .eq('send_status', 'not_sent')
+      .select('id');
 
-    if (error) {
-      queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
-    }
-
+    const missed = !error && (data?.length ?? 0) === 0;
+    queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
     queryClient.invalidateQueries({ queryKey: AQ_KEYS.stats });
-    return { error: error?.message ?? null };
+    return { error: error?.message ?? (missed ? 'this draft was already handled - the list has been refreshed' : null) };
   }, []);
 
   return {

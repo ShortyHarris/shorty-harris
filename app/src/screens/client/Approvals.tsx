@@ -16,7 +16,10 @@ import { RefreshButton } from '../../components/RefreshButton';
 import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { previewSequenceApproval, approveSequences, type ApprovalPreview } from '../../hooks/useSequenceActions';
+import { blockInfo, type BlockTone } from '../../lib/blockReasons';
 import type { ClientMessageItem } from '../../types';
+
+type ApprovalTab = 'pending' | 'approved' | 'blocked';
 import { Clock, CheckCircle2, Send, Ban, ClipboardCheck } from 'lucide-react';
 
 const GMAIL_REQUIRED_TITLE = "Connect your Gmail in Settings before approving - that's what actually sends this.";
@@ -64,9 +67,10 @@ export function Approvals({
   clientId, client = supabase, readOnly = false, basePath = '/app',
 }: { clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string }) {
   const {
-    items, stats, loading, isFetching, dataUpdatedAt, error,
+    items, stats, approvedDrafts, loading, isFetching, dataUpdatedAt, error,
     approve: approveRaw, saveEdits, reject: rejectRaw, bulkReject: bulkRejectRaw, reload,
   } = useClientApprovals(clientId, client);
+  const [tab, setTab] = useState<ApprovalTab>('pending');
   const { connection: gmailConnection } = useGmailConnection(clientId);
   const { rows: campaigns } = useClientCampaignList(clientId, client);
   const { toasts, toast, dismiss } = useToast();
@@ -84,17 +88,32 @@ export function Approvals({
     else toast(body !== undefined || subject !== undefined ? 'Edits saved and email approved.' : 'Email approved.');
   }
 
+  // A single row can be rejected from any tab (incl. approved-but-blocked).
   function askReject(ids: string[]) {
     if (readOnly) { toast(READ_ONLY_MSG, 'warning'); return; }
     if (ids.length > 0) setRejectIds(ids);
   }
 
+  // Bulk reject only ever covers drafts that are loaded and still pending.
+  function askBulkReject() {
+    const loaded = new Set(items.map((i) => i.id));
+    askReject(Array.from(selected).filter((id) => loaded.has(id)));
+  }
+
   async function confirmReject() {
     if (!rejectIds) return;
     setRejecting(true);
-    const { error: err } = rejectIds.length === 1 ? await rejectRaw(rejectIds[0]) : await bulkRejectRaw(rejectIds);
-    setRejecting(false);
     const n = rejectIds.length;
+    let err: string | null;
+    let done = n;
+    if (n === 1) {
+      ({ error: err } = await rejectRaw(rejectIds[0]));
+    } else {
+      const res = await bulkRejectRaw(rejectIds);
+      err = res.error;
+      done = res.affected;
+    }
+    setRejecting(false);
     setRejectIds(null);
     if (err) { toast(`Couldn't reject: ${err}`, 'error'); return; }
     setSelected((prev) => {
@@ -102,7 +121,9 @@ export function Approvals({
       rejectIds.forEach((id) => next.delete(id));
       return next;
     });
-    toast(n === 1 ? 'Draft rejected.' : `${n} drafts rejected.`);
+    if (n === 1) toast('Draft rejected.');
+    else if (done === n) toast(`${n} drafts rejected.`);
+    else toast(`${done} of ${n} drafts rejected - the rest were already handled.`, 'warning');
   }
 
   async function handleSaveDraft(id: string, body?: string, subject?: string) {
@@ -116,7 +137,7 @@ export function Approvals({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [approvalPlan, setApprovalPlan] = useState<{ prospectIds: string[]; preview: ApprovalPreview } | null>(null);
+  const [approvalPlan, setApprovalPlan] = useState<{ prospectIds: string[]; preview: ApprovalPreview; campaignsLabel: string } | null>(null);
   const [approving, setApproving] = useState(false);
 
   // Approving an email-channel message only matters if it can actually be
@@ -131,11 +152,43 @@ export function Approvals({
   const euCampaignIds = new Set(campaigns.filter((c) => isEuCountry(c.country)).map((c) => c.id));
   const hasEuDrafts = items.some((i) => i.campaign_id != null && euCampaignIds.has(i.campaign_id));
 
-  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
-  const safePage   = Math.min(page, totalPages);
-  const paged      = items.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const sendableDrafts = approvedDrafts?.sendable ?? [];
+  const blockedDrafts  = approvedDrafts?.blocked ?? [];
+  const sendableCount  = approvedDrafts?.counts.sendable ?? 0;
+  const blockedCount   = approvedDrafts?.counts.blocked ?? 0;
+  const visible = tab === 'pending' ? items : tab === 'approved' ? sendableDrafts : blockedDrafts;
+  const isPendingTab = tab === 'pending';
 
-  const allSelected = paged.length > 0 && paged.every((i) => selected.has(i.id));
+  // The pending list is paged up to a ceiling; stats.pending is the exact count.
+  // When they differ, "all" would mean rows that aren't loaded, so bulk-by-scope is off.
+  const totalPending = Math.max(stats.pending, items.length);
+  const pendingCapped = stats.pending > items.length;
+
+  const campaignName = (id: string | null | undefined) =>
+    (id ? campaigns.find((c) => c.id === id)?.name : null) ?? 'Unknown campaign';
+  // "Prague Restaurants (12), Berlin Cafes (3)" for the given loaded drafts.
+  function campaignBreakdown(drafts: { campaign_id?: string | null }[]): string {
+    const counts = new Map<string, number>();
+    drafts.forEach((d) => {
+      const name = campaignName(d.campaign_id);
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    });
+    const parts = Array.from(counts, ([name, n]) => (counts.size === 1 ? name : `${name} (${n})`));
+    return parts.join(', ');
+  }
+  const draftById = new Map([...items, ...sendableDrafts, ...blockedDrafts].map((d) => [d.id, d]));
+
+  function switchTab(next: ApprovalTab) {
+    setTab(next);
+    setPage(1);
+    setSelected(new Set());
+  }
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages);
+  const paged      = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const allSelected = !pendingCapped && paged.length > 0 && paged.every((i) => selected.has(i.id));
   const selectedBlockedByGmail = Array.from(selected).some((id) => {
     const item = items.find((i) => i.id === id);
     return item ? needsGmail(item) : false;
@@ -166,9 +219,12 @@ export function Approvals({
   // nothing selected it covers every prospect that has a draft waiting.
   async function handleBulkApprove() {
     if (readOnly) { toast(READ_ONLY_MSG, 'warning'); return; }
+    // "All" only when the whole queue is loaded; otherwise a selection is required.
+    if (selected.size === 0 && pendingCapped) return;
     const source = selected.size > 0 ? items.filter((i) => selected.has(i.id)) : items;
     const prospectIds = Array.from(new Set(source.map((i) => i.prospect_id)));
     if (prospectIds.length === 0) return;
+    const campaignsLabel = campaignBreakdown(source);
 
     setBulkBusy(true);
     const res = await previewSequenceApproval(clientId, prospectIds);
@@ -178,7 +234,7 @@ export function Approvals({
       toast('Nothing to approve - these prospects have replied or are no longer active.', 'warning');
       return;
     }
-    setApprovalPlan({ prospectIds, preview: res.data });
+    setApprovalPlan({ prospectIds, preview: res.data, campaignsLabel });
   }
 
   async function confirmBulkApprove() {
@@ -263,36 +319,98 @@ export function Approvals({
         </div>
       )}
 
+      {/* Approved summary - sendable and blocked are never lumped together */}
+      {approvedDrafts && (sendableCount > 0 || blockedCount > 0) && (
+        <p className="m-0 text-[13px] font-semibold text-[#20211c]" data-testid="approved-summary">
+          Approved: {sendableCount} sendable, {blockedCount} blocked
+        </p>
+      )}
+
+      {/* Tabs */}
+      {!loading && (
+        <div role="tablist" className="flex flex-wrap gap-1.5">
+          {([
+            ['pending', `Pending (${totalPending})`],
+            ['approved', `Approved (${sendableCount})`],
+            ['blocked', `Blocked (${blockedCount})`],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={tab === key}
+              onClick={() => switchTab(key)}
+              className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition-colors ${
+                tab === key
+                  ? key === 'blocked' ? 'border-[#a8533a] bg-[#a8533a] text-white' : 'border-[#3c7a5b] bg-[#3c7a5b] text-white'
+                  : 'border-[#ece8df] bg-white text-[#62655c] hover:bg-[#fbf9f5]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === 'blocked' && blockedCount > 0 && (
+        <p className="m-0 text-[12.5px] text-[#62655c]">
+          These drafts are approved but won't send until the reason shown is cleared. You can reject any you don't want to keep.
+        </p>
+      )}
+      {tab !== 'pending' && approvedDrafts && (tab === 'approved' ? sendableCount : blockedCount) > visible.length && (
+        <p className="m-0 text-[12px] text-[#9a9d92]">Showing the latest {visible.length} of {tab === 'approved' ? sendableCount : blockedCount}.</p>
+      )}
+
       {/* Table / Cards */}
       {loading ? (
         <SkeletonTable rows={PAGE_SIZE} cols={4} />
-      ) : items.length === 0 ? (
+      ) : visible.length === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-          <strong className="text-[15px] font-bold text-[#20211c]">Queue's clear.</strong>
-          <span className="text-[13px] text-[#62655c]">No drafts waiting for review. New ones appear here as we write them for your prospects.</span>
+          <strong className="text-[15px] font-bold text-[#20211c]">
+            {isPendingTab ? "Queue's clear." : tab === 'approved' ? 'Nothing approved and waiting.' : 'Nothing blocked.'}
+          </strong>
+          <span className="text-[13px] text-[#62655c]">
+            {isPendingTab
+              ? 'No drafts waiting for review. New ones appear here as we write them for your prospects.'
+              : tab === 'approved'
+                ? 'Approved drafts that are ready or scheduled to send show up here.'
+                : 'No approved drafts are being held back.'}
+          </span>
         </div>
       ) : (
         <>
           {/* Selection bar */}
           <div className="rounded-lg border border-[#ece8df] bg-white px-4 py-3">
           <div className="flex items-center justify-between gap-3">
-            <label className="flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-[#62655c]">
-              <input type="checkbox" checked={allSelected} onChange={toggleAll} className="accent-[#3c7a5b]" />
-              Select all
-            </label>
+            {isPendingTab ? (
+              <label
+                className={`flex items-center gap-2 text-[12.5px] font-semibold text-[#62655c] ${pendingCapped ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                title={pendingCapped ? `Only ${items.length} of ${totalPending} pending drafts are loaded, so select-all is off. Tick rows individually, or work through the queue to bring it under the limit.` : undefined}
+              >
+                <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={pendingCapped} className="accent-[#3c7a5b]" />
+                Select all
+              </label>
+            ) : <span />}
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {selected.size > 0 && <span className="text-[12.5px] text-[#9a9d92]">{selected.size} selected</span>}
+              {isPendingTab && (selected.size > 0 || pendingCapped) && (
+                <span className="text-[12.5px] text-[#9a9d92]">
+                  {pendingCapped ? `${selected.size} of ${totalPending} selected (${items.length} loaded)` : `${selected.size} selected`}
+                </span>
+              )}
+              {isPendingTab && (
               <button
                 onClick={handleBulkApprove}
-                disabled={bulkBusy || approving || (selected.size > 0 ? selectedBlockedByGmail : items.some(needsGmail))}
-                title={(selected.size > 0 ? selectedBlockedByGmail : items.some(needsGmail)) ? GMAIL_REQUIRED_TITLE : undefined}
+                disabled={bulkBusy || approving || (selected.size === 0 && pendingCapped) || (selected.size > 0 ? selectedBlockedByGmail : items.some(needsGmail))}
+                title={(selected.size > 0 ? selectedBlockedByGmail : items.some(needsGmail))
+                  ? GMAIL_REQUIRED_TITLE
+                  : (selected.size === 0 && pendingCapped) ? `Only ${items.length} of ${totalPending} drafts are loaded. Select rows to approve instead.` : undefined}
                 className="cursor-pointer rounded-md border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {bulkBusy ? 'Checking…' : selected.size > 0 ? 'Approve selected sequences' : 'Approve all pending'}
               </button>
-              {selected.size > 0 && (
+              )}
+              {isPendingTab && selected.size > 0 && (
                 <button
-                  onClick={() => askReject(Array.from(selected))}
+                  onClick={askBulkReject}
                   disabled={bulkBusy || rejecting}
                   className="cursor-pointer rounded-md border border-[#a8533a] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white disabled:opacity-50"
                 >
@@ -329,7 +447,7 @@ export function Approvals({
                 {paged.map((item) => (
                   <tr key={item.id}>
                     <td className="px-3">
-                      <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleOne(item.id)} className="accent-[#3c7a5b]" />
+                      {isPendingTab && <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleOne(item.id)} className="accent-[#3c7a5b]" />}
                     </td>
                     <td className="min-w-0">
                       <div className="truncate font-bold text-[#20211c]" title={item.prospect?.business_name ?? undefined}>
@@ -349,9 +467,11 @@ export function Approvals({
                       <div className="truncate" title={item.subject ?? undefined}>
                         {item.subject ?? <span className="italic text-[#c4bfb5]">No subject</span>}
                       </div>
+                      <BlockBadge reason={item.block_reason} className="mt-1" />
                     </td>
                     <td className="px-3">
                       <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        {isPendingTab && (<>
                         <button
                           onClick={() => doApprove(item.id)}
                           disabled={needsGmail(item)}
@@ -366,6 +486,7 @@ export function Approvals({
                         >
                           Edit
                         </button>
+                        </>)}
                         <button
                           onClick={() => askReject([item.id])}
                           className="cursor-pointer whitespace-nowrap rounded-md border border-[#a8533a] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white"
@@ -386,12 +507,14 @@ export function Approvals({
               <div key={item.id} className="rounded-xl border border-[#ece8df] bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-2 min-w-0">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(item.id)}
-                      onChange={() => toggleOne(item.id)}
-                      className="mt-1 accent-[#3c7a5b] shrink-0"
-                    />
+                    {isPendingTab && (
+                      <input
+                        type="checkbox"
+                        checked={selected.has(item.id)}
+                        onChange={() => toggleOne(item.id)}
+                        className="mt-1 accent-[#3c7a5b] shrink-0"
+                      />
+                    )}
                     <div className="min-w-0">
                       <div className="font-bold text-[#20211c] truncate">{item.prospect?.business_name ?? 'Unknown'}</div>
                       {item.prospect?.contact_name && (
@@ -407,7 +530,9 @@ export function Approvals({
                 {item.subject && (
                   <div className="mt-1.5 truncate text-[12px] text-[#9a9d92]">{item.subject}</div>
                 )}
+                <BlockBadge reason={item.block_reason} className="mt-1.5" />
                 <div className="mt-3 flex items-center gap-2 border-t border-[#f5f2ec] pt-3">
+                  {isPendingTab && (<>
                   <button
                     onClick={() => doApprove(item.id)}
                     disabled={needsGmail(item)}
@@ -422,6 +547,7 @@ export function Approvals({
                   >
                     Edit
                   </button>
+                  </>)}
                   <button
                     onClick={() => askReject([item.id])}
                     className="cursor-pointer flex-1 rounded-md border border-[#a8533a] bg-transparent px-3 py-2 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white"
@@ -481,7 +607,7 @@ export function Approvals({
         {rejectIds && (
           <ConfirmDialog
             key="reject-confirm"
-            title={rejectIds.length === 1 ? 'Reject this draft?' : `Reject ${rejectIds.length} drafts?`}
+            title={rejectIds.length === 1 ? 'Reject this draft?' : `Reject ${rejectIds.length} pending drafts?`}
             confirmLabel="Reject"
             cancelLabel="Keep"
             danger
@@ -489,6 +615,9 @@ export function Approvals({
             onConfirm={confirmReject}
             onCancel={() => setRejectIds(null)}
           >
+            <p className="m-0 mb-2 font-semibold text-[#20211c]">
+              {rejectIds.length} draft{rejectIds.length === 1 ? '' : 's'} in {campaignBreakdown(rejectIds.map((id) => draftById.get(id) ?? { campaign_id: null }))}
+            </p>
             {rejectIds.length === 1 ? 'It' : 'They'} won't be sent, and any follow-ups still planned for {rejectIds.length === 1 ? 'that prospect' : 'those prospects'} are cancelled too. This can't be undone.
           </ConfirmDialog>
         )}
@@ -504,6 +633,7 @@ export function Approvals({
             onConfirm={confirmBulkApprove}
             onCancel={() => setApprovalPlan(null)}
           >
+            <p className="m-0 mb-2 font-semibold text-[#20211c]">Campaign: {approvalPlan.campaignsLabel}</p>
             <ul className="m-0 mb-3 list-none p-0">
               {STEP_ORDER.filter((k) => (approvalPlan.preview.by_step[k] ?? 0) > 0).map((k) => (
                 <li key={k} className="flex justify-between border-b border-[#f5f2ec] py-1 last:border-0">
@@ -518,6 +648,29 @@ export function Approvals({
       </AnimatePresence>
 
       <ToastHost toasts={toasts} onDismiss={dismiss} />
+    </div>
+  );
+}
+
+const BLOCK_TONE_STYLE: Record<BlockTone, { bg: string; fg: string }> = {
+  blocked:   { bg: '#f6e8e2', fg: '#a8533a' },
+  paused:    { bg: '#f8efdb', fg: '#8a6417' },
+  scheduled: { bg: '#f5f2ec', fg: '#62655c' },
+};
+
+function BlockBadge({ reason, className = '' }: { reason: string | null | undefined; className?: string }) {
+  if (!reason) return null;
+  const info = blockInfo(reason);
+  const style = BLOCK_TONE_STYLE[info.tone];
+  return (
+    <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
+      <span
+        style={{ background: style.bg, color: style.fg }}
+        className="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[.04em]"
+      >
+        {info.badge}
+      </span>
+      {info.text !== info.badge && <span className="text-[11px] leading-snug" style={{ color: style.fg }}>{info.text}</span>}
     </div>
   );
 }

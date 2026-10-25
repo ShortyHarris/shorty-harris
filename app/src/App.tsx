@@ -122,7 +122,9 @@ function ClientZone() {
   const { profile, signOut } = useAuth();
   const clientId = profile!.client_id!;
   const { businessName, credits } = useClientHeader(clientId);
-  const { items: pendingApprovals } = useClientApprovals(clientId);
+  const { items: pendingItems, stats: approvalStats } = useClientApprovals(clientId);
+  // Exact count, not the loaded list, which is capped for very large queues.
+  const pendingApprovals = Math.max(approvalStats.pending, pendingItems.length);
   const { connection: gmailConnection } = useGmailConnection(clientId);
   const { leads } = useClientDashboard(clientId);
   const newHotLeads = leads.filter((l) => l.status === 'new').length;
@@ -167,7 +169,7 @@ function ClientZone() {
           businessName={businessName}
           credits={credits}
           displayName={profile!.full_name ?? 'Account'}
-          pendingApprovals={pendingApprovals.length}
+          pendingApprovals={pendingApprovals}
           newHotLeads={newHotLeads}
           gmailConnected={gmailConnection.connected}
           notifications={notifications}
