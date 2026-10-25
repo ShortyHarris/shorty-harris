@@ -8,7 +8,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import {
   useClientCampaignList, createClientCampaign, updateClientCampaign,
   getClientCampaignDeleteCounts, deleteClientCampaign, useClientCampaignProspects, useClientUsage,
-  useClientLaunchUsage, MONTHLY_LAUNCH_LIMIT,
+  useClientLaunchUsage, useCampaignPendingProspects, MONTHLY_LAUNCH_LIMIT,
 } from '../../hooks/useClientCampaigns';
 import type { ClientCampaignRow, ClientCampaignDeleteCounts } from '../../hooks/useClientCampaigns';
 import { queryClient } from '../../lib/queryClient';
@@ -869,7 +869,9 @@ function CampaignDetailModal({
   const contacted = prospects.filter((p) => p.pipeline_status === 'contacted').length;
   const replied   = prospects.filter((p) => p.pipeline_status === 'replied').length;
   const hotLeads  = prospects.filter((p) => p.pipeline_status === 'hot_lead').length;
-  const pendingApproval = prospects.filter((p) => p.pipeline_status === 'message_pending').length;
+  // Prospects with a draft awaiting review (distinct, this campaign only). Not
+  // pipeline_status 'message_pending', which means "email not written yet".
+  const pendingApproval = useCampaignPendingProspects(campaign.id, client);
 
   function startEdit() {
     setErr(null);
@@ -1093,7 +1095,7 @@ function CampaignDetailModal({
               className="flex items-center gap-3 rounded-xl border border-[#d8cdf0] bg-[#f0ecf8] px-4 py-3.5 no-underline transition-colors hover:bg-[#e9e2f5]"
             >
               <span className="flex-1 text-[13px] leading-snug text-[#6b4fa0]">
-                <strong className="font-bold">{pendingApproval} message{pendingApproval !== 1 ? 's' : ''} ready</strong> for your review.
+                <strong className="font-bold">{pendingApproval} prospect{pendingApproval !== 1 ? 's' : ''} with messages ready</strong> for your review.
               </span>
               <ChevronRight size={16} className="shrink-0 text-[#6b4fa0]" />
             </Link>

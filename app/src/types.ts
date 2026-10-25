@@ -101,6 +101,8 @@ export interface ClientMessageItem {
   message_type: MessageType;
   approval_status: ApprovalStatus;
   created_at: string;
+  /** From message_block_reasons; only set on approved drafts that aren't simply sendable. */
+  block_reason?: string | null;
   prospect: {
     id: string;
     business_name: string;

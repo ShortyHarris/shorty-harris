@@ -1,6 +1,11 @@
 // Shared plain-language labels for prospects.pipeline_status. The raw value
 // ("message_pending") reads like an error when it's actually a normal queue
 // state, so every screen that shows a status must go through this map.
+// PostgREST `in` list of statuses where a prospect's sequence is over, so a
+// waiting draft no longer counts as "awaiting review". Same exclusions as the
+// approve_sequences RPC.
+export const TERMINAL_PIPELINE_STATUSES = '(replied,hot_lead,won,lost,called,bounced)';
+
 export const PIPELINE_STATUS_LABEL: Record<string, string> = {
   new: 'Not contacted yet',
   message_pending: 'Email not written yet',

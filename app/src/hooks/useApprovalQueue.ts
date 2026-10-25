@@ -4,20 +4,37 @@ import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
 import { useAuth } from '../auth/AuthProvider';
 import type { QueueItem } from '../types';
+import { fetchAllRows } from '../lib/fetchAllRows';
+import { runInChunks, type ChunkedResult } from '../lib/chunkedBulk';
 
 export const AQ_KEYS = {
   items: ['approval-queue', 'items'] as const,
   stats: ['approval-queue', 'stats'] as const,
 };
 
+// The cached list plus whether it hit the load ceiling (more pending than loaded).
+interface QueueData {
+  items: QueueItem[];
+  truncated: boolean;
+}
+
+const EMPTY_QUEUE: QueueData = { items: [], truncated: false };
+
+function updateQueueItems(fn: (prev: QueueItem[]) => QueueItem[]) {
+  queryClient.setQueryData<QueueData>(AQ_KEYS.items, (prev = EMPTY_QUEUE) => ({ ...prev, items: fn(prev.items) }));
+}
+
 interface Stats {
   approvedToday: number;
   sentToday: number;
   rejected: number;
+  /** Exact pending count, from the same view as the list. Only used past the load ceiling. */
+  pendingExact: number;
 }
 
-async function fetchQueueItems(): Promise<QueueItem[]> {
-  const { data, error } = await supabase
+async function fetchQueueItems(): Promise<QueueData> {
+  // Paged: one select is silently capped at 1000 rows by PostgREST.
+  const { rows: data, truncated } = await fetchAllRows<Record<string, unknown>>((from, to) => supabase
     .from('messages_with_sender')
     .select(
       `
@@ -35,9 +52,9 @@ async function fetchQueueItems(): Promise<QueueItem[]> {
     `
     )
     .eq('approval_status', 'pending')
-    .order('created_at', { ascending: true });
-
-  if (error) throw new Error(error.message);
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+    .range(from, to));
 
   const prospectIds = Array.from(
     new Set((data ?? []).map((row: Record<string, unknown>) => row.prospect_id as string))
@@ -60,7 +77,7 @@ async function fetchQueueItems(): Promise<QueueItem[]> {
     });
   }
 
-  return (data ?? []).map((row: Record<string, unknown>) => ({
+  const items = (data ?? []).map((row: Record<string, unknown>) => ({
     ...row,
     prospect: Array.isArray(row.prospect)
       ? row.prospect[0] ?? null
@@ -71,6 +88,7 @@ async function fetchQueueItems(): Promise<QueueItem[]> {
     originalOpenedAt: originalOpens[row.prospect_id as string]?.opened_at ?? null,
     originalOpenCount: originalOpens[row.prospect_id as string]?.open_count ?? 0,
   })) as QueueItem[];
+  return { items, truncated };
 }
 
 async function fetchQueueStats(): Promise<Stats> {
@@ -78,7 +96,7 @@ async function fetchQueueStats(): Promise<Stats> {
   startOfDay.setHours(0, 0, 0, 0);
   const iso = startOfDay.toISOString();
 
-  const [approvedToday, sentToday, rejected] = await Promise.all([
+  const [approvedToday, sentToday, rejected, pendingExact] = await Promise.all([
     supabase
       .from('messages')
       .select('id', { count: 'exact', head: true })
@@ -95,19 +113,25 @@ async function fetchQueueStats(): Promise<Stats> {
       .from('messages')
       .select('id', { count: 'exact', head: true })
       .eq('approval_status', 'rejected'),
+
+    supabase
+      .from('messages_with_sender')
+      .select('id', { count: 'exact', head: true })
+      .eq('approval_status', 'pending'),
   ]);
 
   return {
     approvedToday: approvedToday.count ?? 0,
     sentToday: sentToday.count ?? 0,
     rejected: rejected.count ?? 0,
+    pendingExact: pendingExact.count ?? 0,
   };
 }
 
 export function useApprovalQueue() {
   const { profile } = useAuth();
   const {
-    data: items = [],
+    data: queue = EMPTY_QUEUE,
     isLoading: loading,
     isFetching: itemsFetching,
     dataUpdatedAt,
@@ -120,7 +144,7 @@ export function useApprovalQueue() {
   });
 
   const {
-    data: otherStats = { approvedToday: 0, sentToday: 0, rejected: 0 },
+    data: otherStats = { approvedToday: 0, sentToday: 0, rejected: 0, pendingExact: 0 },
     isFetching: statsFetching,
     refetch: refetchStats,
   } = useQuery({
@@ -129,10 +153,14 @@ export function useApprovalQueue() {
     staleTime: 60 * 1000,
   });
 
+  const { items, truncated } = queue;
+  const { pendingExact, ...countStats } = otherStats;
+
   // `pending` is derived from `items` (not a separate count query) so the
   // number shown on the stat tile and the list rendered below it can never
-  // drift apart - they're reading the exact same cached data.
-  const stats = { pending: items.length, ...otherStats };
+  // drift apart - they're reading the exact same cached data. Only when the
+  // list was cut off at the load ceiling is the exact count used instead.
+  const stats = { pending: truncated ? Math.max(pendingExact, items.length) : items.length, ...countStats };
 
   // Realtime invalidation for the `messages` table is handled once, centrally,
   // by useRealtimeSync() in AdminLayout - not here. A second per-hook channel
@@ -140,9 +168,8 @@ export function useApprovalQueue() {
   // more than once at a time (e.g. the sidebar badge + the page itself).
 
   const approve = useCallback(async (id: string, editedBody?: string, editedSubject?: string): Promise<{ error: string | null }> => {
-    queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) =>
-      prev.filter((i) => i.id !== id)
-    );
+    await queryClient.cancelQueries({ queryKey: AQ_KEYS.items });
+    updateQueueItems((prev) => prev.filter((i) => i.id !== id));
 
     const patch: Record<string, unknown> = {
       approval_status: 'approved',
@@ -160,41 +187,43 @@ export function useApprovalQueue() {
       patch.subject = editedSubject;
     }
 
-    const { error } = await supabase
+    // Only a still-pending, unsent draft can be approved - never revive a rejected one.
+    const { data, error } = await supabase
       .from('messages')
       .update(patch)
-      .eq('id', id);
+      .eq('id', id)
+      .eq('approval_status', 'pending')
+      .eq('send_status', 'not_sent')
+      .select('id');
 
-    if (error) {
-      queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
-    }
-
+    const missed = !error && (data?.length ?? 0) === 0;
+    queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
     queryClient.invalidateQueries({ queryKey: AQ_KEYS.stats });
-    return { error: error?.message ?? null };
+    return { error: error?.message ?? (missed ? 'this draft was already handled - the list has been refreshed' : null) };
   }, [profile?.id]);
 
   // Approves a set of drafts in one update (used for "approve all for this client").
   // The pending guard skips anything another admin already handled.
-  const bulkApprove = useCallback(async (ids: string[]): Promise<{ approved: number; error: string | null }> => {
-    if (ids.length === 0) return { approved: 0, error: null };
-    queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) =>
-      prev.filter((i) => !ids.includes(i.id))
-    );
+  // Sent in batches (every id goes in the URL); a failed batch doesn't stop the
+  // rest, and the result carries the honest partial count. Always refetches so
+  // rows from failed batches reappear.
+  const bulkApprove = useCallback(async (ids: string[]): Promise<ChunkedResult> => {
+    if (ids.length === 0) return { affected: 0, total: 0, failedBatches: 0, error: null };
+    await queryClient.cancelQueries({ queryKey: AQ_KEYS.items });
+    updateQueueItems((prev) => prev.filter((i) => !ids.includes(i.id)));
 
     const now = new Date().toISOString();
-    const { data, error } = await supabase
+    const res = await runInChunks(ids, (chunk) => supabase
       .from('messages')
       .update({ approval_status: 'approved', approved_at: now, approved_by: profile?.id ?? null, updated_at: now })
-      .in('id', ids)
+      .in('id', chunk)
       .eq('approval_status', 'pending')
-      .select('id');
+      .eq('send_status', 'not_sent')
+      .select('id'));
 
-    if (error) {
-      queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
-    }
-
+    queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
     queryClient.invalidateQueries({ queryKey: AQ_KEYS.stats });
-    return { approved: data?.length ?? 0, error: error?.message ?? null };
+    return res;
   }, [profile?.id]);
 
   // Same edit patch as approve(), minus the approval fields - the draft stays pending.
@@ -209,37 +238,39 @@ export function useApprovalQueue() {
       .eq('id', id);
 
     if (!error) {
-      queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) =>
-        prev.map((i) => (i.id === id ? { ...i, ...patch } as QueueItem : i))
-      );
+      updateQueueItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } as QueueItem : i)));
     }
     return { error: error?.message ?? null };
   }, []);
 
   const reject = useCallback(async (id: string): Promise<{ error: string | null }> => {
-    queryClient.setQueryData<QueueItem[]>(AQ_KEYS.items, (prev = []) =>
-      prev.filter((i) => i.id !== id)
-    );
+    // Cancel in-flight fetches so a stale response can't restore the row.
+    await queryClient.cancelQueries({ queryKey: AQ_KEYS.items });
+    updateQueueItems((prev) => prev.filter((i) => i.id !== id));
 
-    const { error } = await supabase
+    // Only a still-pending, unsent draft can be rejected from the queue.
+    const { data, error } = await supabase
       .from('messages')
       .update({
         approval_status: 'rejected',
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('approval_status', 'pending')
+      .eq('send_status', 'not_sent')
+      .select('id');
 
-    if (error) {
-      queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
-    }
-
+    const missed = !error && (data?.length ?? 0) === 0;
+    queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
     queryClient.invalidateQueries({ queryKey: AQ_KEYS.stats });
-    return { error: error?.message ?? null };
+    return { error: error?.message ?? (missed ? 'this draft was already handled - the list has been refreshed' : null) };
   }, []);
 
   return {
     items,
     stats,
+    /** True when more drafts are pending than were loaded; bulk actions must be disabled. */
+    truncated,
     loading,
     isFetching: itemsFetching || statsFetching,
     dataUpdatedAt,

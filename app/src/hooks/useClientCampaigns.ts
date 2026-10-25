@@ -1,10 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { TERMINAL_PIPELINE_STATUSES } from '../lib/pipelineStatus';
 import { buildAreaColumns, type TargetArea } from '../lib/targetAreas';
 
 export const myCampaignsKey = (clientId: string) => ['my-campaigns', clientId] as const;
 const myCampaignProspectsKey = (campaignId: string) => ['my-campaign-prospects', campaignId] as const;
+// Prefix is exported so approve/reject can invalidate every campaign's count at once.
+export const campaignPendingProspectsPrefix = ['campaign-pending-prospects'] as const;
+const campaignPendingProspectsKey = (campaignId: string) => [...campaignPendingProspectsPrefix, campaignId] as const;
 
 export interface ClientCampaignRow {
   id: string;
@@ -189,6 +193,33 @@ export function useClientCampaignProspects(campaignId: string | null, client: Su
   });
 
   return { rows, loading };
+}
+
+// Distinct prospects in this campaign with at least one draft awaiting review.
+// Same rules as the Approvals page's awaiting count (fetchAwaitingProspects):
+// prospects whose sequence is over are excluded and the draft must be unsent.
+// Counts parent (prospect) rows of an inner-joined embed, so a prospect with
+// several pending drafts counts once. Deliberately ignores
+// prospects.pipeline_status: 'message_pending' means "email not written yet"
+// and never clears once the draft exists.
+export function useCampaignPendingProspects(campaignId: string | null, client: SupabaseClient = supabase) {
+  const { data: count = 0 } = useQuery({
+    queryKey: campaignPendingProspectsKey(campaignId ?? ''),
+    queryFn: async () => {
+      const { count, error } = await client
+        .from('prospects')
+        .select('id, messages!inner(id)', { count: 'exact', head: true })
+        .eq('campaign_id', campaignId as string)
+        .not('pipeline_status', 'in', TERMINAL_PIPELINE_STATUSES)
+        .eq('messages.approval_status', 'pending')
+        .eq('messages.send_status', 'not_sent');
+      if (error) throw new Error(error.message);
+      return count ?? 0;
+    },
+    enabled: !!campaignId,
+    staleTime: 30 * 1000,
+  });
+  return count;
 }
 
 export interface ClientUsage {

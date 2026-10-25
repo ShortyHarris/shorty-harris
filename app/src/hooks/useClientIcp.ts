@@ -191,11 +191,52 @@ export async function saveClientIcp(
   return { error: null };
 }
 
-export async function buildClientIcp(clientId: string): Promise<{ error: string | null }> {
-  const { error } = await supabase.rpc('build_client_icp', { p_client_id: clientId });
-  if (error) return { error: error.message };
+export interface RebuildIcpResponse {
+  ok: boolean;
+  step?: 'lookup' | 'website' | 'profile';
+  reason?: string;
+  detail?: string;
+  limited_data?: boolean;
+}
+
+const REBUILD_GENERIC_ERROR = "Couldn't rebuild your targeting profile - please try again.";
+
+// Fallbacks for when the function gives a reason but no detail. Any other
+// reason (incl. website_read_failed_*) gets the generic message instead.
+const REBUILD_REASON_COPY: Record<string, string> = {
+  no_website_url: 'Add a website URL to this client first',
+  website_read_timeout: 'Reading the website took too long, try again in a minute',
+  not_permitted: "You don't have access to this client",
+};
+
+function rebuildErrorMessage(body: Partial<RebuildIcpResponse> | null | undefined): string {
+  if (body?.detail) return body.detail;
+  return (body?.reason && REBUILD_REASON_COPY[body.reason]) || REBUILD_GENERIC_ERROR;
+}
+
+// The function can take up to ~60s. Success is only ever ok === true; a
+// non-2xx surfaces as an error whose context is the Response with the JSON body.
+export async function buildClientIcp(
+  clientId: string,
+): Promise<{ ok: boolean; error: string | null; limitedData: boolean }> {
+  const { data, error } = await supabase.functions.invoke('rebuild-client-targeting', {
+    body: { client_id: clientId },
+  });
+
+  if (error) {
+    let body: Partial<RebuildIcpResponse> | null = null;
+    try {
+      const ctx = (error as { context?: unknown }).context;
+      if (ctx instanceof Response) body = await ctx.json();
+    } catch { /* relay/fetch errors and non-JSON bodies fall through to the generic message */ }
+    return { ok: false, error: rebuildErrorMessage(body), limitedData: false };
+  }
+
+  const result = data as RebuildIcpResponse | null;
+  if (result?.ok !== true) return { ok: false, error: rebuildErrorMessage(result), limitedData: false };
+
   queryClient.invalidateQueries({ queryKey: clientIcpKey(clientId) });
-  return { error: null };
+  return { ok: true, error: null, limitedData: result.limited_data === true };
 }
 
 // ─── Targeting performance ───────────────────────────────────────────────

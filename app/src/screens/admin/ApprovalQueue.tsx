@@ -11,10 +11,12 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { partialFailureMessage } from '../../lib/chunkedBulk';
 import type { QueueItem } from '../../types';
 import { Clock, CheckCircle2, Send, Ban, Eye, AlertTriangle, RefreshCw } from 'lucide-react';
 
-const GMAIL_TOOLTIP = "This client needs to connect their Gmail from Settings before messages can be sent";
+const TOO_MANY_MSG = 'Too many to act on at once - narrow by client.';
+const GMAIL_TOOLTIP ="This client needs to connect their Gmail from Settings before messages can be sent";
 
 function senderBlocked(item: QueueItem): boolean {
   return !item.sender_email || item.sender_status !== 'active';
@@ -53,7 +55,7 @@ function formatPhone(raw: string): string {
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
 export function ApprovalQueue() {
-  const { items: allItems, stats, loading, isFetching, dataUpdatedAt, error, approve, bulkApprove, saveEdits, reject, reload } = useApprovalQueue();
+  const { items: allItems, stats, loading, isFetching, dataUpdatedAt, error, approve, bulkApprove, saveEdits, reject, reload, truncated } = useApprovalQueue();
   const { toasts, toast, dismiss } = useToast();
   async function doApprove(id: string, body?: string, subject?: string) {
     const { error: err } = await approve(id, body, subject);
@@ -95,12 +97,13 @@ export function ApprovalQueue() {
   const approvable = items.filter((i) => !senderBlocked(i));
 
   async function doBulkApprove() {
+    if (truncated) { toast(TOO_MANY_MSG, 'warning'); setConfirmBulk(false); return; }
     setBulkBusy(true);
-    const { approved, error: err } = await bulkApprove(approvable.map((i) => i.id));
+    const res = await bulkApprove(approvable.map((i) => i.id));
     setBulkBusy(false);
     setConfirmBulk(false);
-    if (err) { toast(`Couldn't approve the emails: ${err}`, 'error'); return; }
-    toast(`${approved} email${approved === 1 ? '' : 's'} approved for ${activeClient?.name ?? 'this client'}.`);
+    if (res.failedBatches > 0) { toast(partialFailureMessage(res, 'approved', 'approve the emails'), 'error'); return; }
+    toast(`${res.affected} email${res.affected === 1 ? '' : 's'} approved for ${activeClient?.name ?? 'this client'}.`);
   }
 
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
@@ -193,6 +196,12 @@ export function ApprovalQueue() {
         </div>
       )}
 
+      {truncated && (
+        <div className="rounded-xl border border-(--ad-amber)/30 bg-(--ad-amber-tint) px-4 py-3 text-[13px] text-(--ad-amber)">
+          {TOO_MANY_MSG} Only the oldest {allItems.length} of {stats.pending} pending drafts are loaded.
+        </div>
+      )}
+
       {/* Client filter + per-client bulk approve */}
       {!loading && clientOptions.length > 0 && (
         <div className="flex flex-wrap items-center gap-3">
@@ -208,8 +217,8 @@ export function ApprovalQueue() {
           {activeClient && (
             <button
               onClick={() => setConfirmBulk(true)}
-              disabled={approvable.length === 0}
-              title={approvable.length === 0 ? GMAIL_TOOLTIP : undefined}
+              disabled={approvable.length === 0 || truncated}
+              title={truncated ? TOO_MANY_MSG : approvable.length === 0 ? GMAIL_TOOLTIP : undefined}
               className="cursor-pointer rounded-md border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
             >
               Approve all {approvable.length} for {activeClient.name}
