@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Search, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  useProspects, useClientsList, useClientCampaigns,
+  useProspects, useProspectCategories, useProspectDetail, useClientsList, useClientCampaigns,
   updateProspect, getProspectDeleteCounts, deleteProspect,
 } from '../../hooks/useAdminData';
+import { clampPage, rangeLabel, totalPages } from '../../lib/prospectQuery';
+import { extraFields, safeWebsiteHref } from '../../lib/prospectDetail';
 import type { ProspectListRow, UpdateProspectInput, ProspectDeleteCounts } from '../../hooks/useAdminData';
 import { SkeletonTable } from '../../components/Skeleton';
 import { MobileFab } from '../../components/MobileFab';
@@ -56,44 +58,43 @@ const STATUS_PILL: Record<string, { bg: string; text: string; border?: string }>
   message_pending:    { bg: 'var(--ad-purple-tint)', text: 'var(--ad-purple)', border: '1px solid rgba(107,79,160,0.2)' },
 };
 
-const PAGE_SIZE = 15;
+const SEARCH_DEBOUNCE_MS = 300;
 
 const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
 const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
 const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50';
 
 export function Prospects() {
-  const { rows, loading, isFetching, dataUpdatedAt, error, reload, updateStatus } = useProspects();
-  const { toasts, toast, dismiss } = useToast();
-  const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh prospects.');
-  const [q, setQ]           = useState('');
+  const [qInput, setQInput] = useState('');
+  const [q, setQ]           = useState('');   // debounced copy of qInput, what the query uses
   const [status, setStatus] = useState('all');
   const [cat, setCat]       = useState('all');
   const [page, setPage]     = useState(1);
+  const { rows: paged, total, loading, isFetching, isPlaceholderData, dataUpdatedAt, error, reload, updateStatus } =
+    useProspects({ q: q.trim(), status, category: cat, page });
+  const categories = useProspectCategories();
+  const { toasts, toast, dismiss } = useToast();
+  const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh prospects.');
   const [showAdd, setShowAdd] = useState(false);
+  const [viewProspect, setViewProspect]   = useState<ProspectListRow | null>(null);
   const [editProspect, setEditProspect]   = useState<ProspectListRow | null>(null);
   const [deleteTarget, setDeleteTarget]   = useState<ProspectListRow | null>(null);
 
-  const categories = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.category).filter(Boolean))) as string[],
-    [rows],
-  );
+  useEffect(() => {
+    if (qInput === q) return;
+    const t = setTimeout(() => { setQ(qInput); setPage(1); }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [qInput, q]);
 
-  const filtered = rows.filter((r) => {
-    if (status !== 'all' && r.pipeline_status !== status) return false;
-    if (cat !== 'all' && r.category !== cat) return false;
-    if (q) {
-      const hay = `${r.business_name} ${r.email ?? ''} ${r.contact_name ?? ''}`.toLowerCase();
-      if (!hay.includes(q.toLowerCase())) return false;
-    }
-    return true;
-  });
+  const pages    = totalPages(total);
+  const safePage = clampPage(page, total);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage   = Math.min(page, totalPages);
-  const paged      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  // A delete (or a filter change landing elsewhere) can leave the current page past the end.
+  useEffect(() => {
+    if (!isPlaceholderData && !loading && page !== safePage) setPage(safePage);
+  }, [isPlaceholderData, loading, page, safePage]);
 
-  function updateQ(v: string)         { setQ(v);      setPage(1); }
+  function updateQ(v: string)         { setQInput(v); }
   function updateFilterStatus(v: string) { setStatus(v); setPage(1); }
   function updateCat(v: string)       { setCat(v);    setPage(1); }
 
@@ -106,7 +107,7 @@ export function Prospects() {
       <header className="page-header flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)"> <img src="https://cdn-icons-png.flaticon.com/128/143/143438.png" alt="Prospects" className="w-10 h-10" />Prospects</h1>
-          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">{rows.length} total across all clients</p>
+          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">{total.toLocaleString()} {q.trim() || status !== 'all' || cat !== 'all' ? 'matching' : 'total across all clients'}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton content={HELP} />
@@ -120,7 +121,7 @@ export function Prospects() {
         <div className="relative flex min-w-[220px] flex-1 items-center">
           <Search className="absolute left-3 h-4 w-4 text-(--ad-ink-faint) pointer-events-none" />
           <input
-            value={q}
+            value={qInput}
             onChange={(e) => updateQ(e.target.value)}
             placeholder="Search name, email, contact…"
             style={FONT}
@@ -152,8 +153,12 @@ export function Prospects() {
           <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
             <SelectItem value="all">All categories</SelectItem>
             {categories.map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
+              <SelectItem key={c.category} value={c.category}>{c.category} ({c.n.toLocaleString()})</SelectItem>
             ))}
+            {/* Keep a selected category visible even if the RPC list hasn't loaded or dropped it. */}
+            {cat !== 'all' && !categories.some((c) => c.category === cat) && (
+              <SelectItem value={cat}>{cat}</SelectItem>
+            )}
           </SelectContent>
         </Select>
       </div>
@@ -166,28 +171,27 @@ export function Prospects() {
 
       {/* Table / Cards */}
       {loading ? (
-        <SkeletonTable rows={PAGE_SIZE} cols={5} />
-      ) : filtered.length === 0 ? (
+        <SkeletonTable rows={10} cols={5} />
+      ) : total === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
           <strong className="text-[15px] font-bold text-(--ad-ink)">No matches.</strong>
           <span className="text-[13px] text-(--ad-ink-soft)">Try adjusting your filters or search query.</span>
         </div>
       ) : (
-        <>
+        <div className={`flex flex-col gap-6 transition-opacity ${isPlaceholderData ? 'opacity-60' : ''}`}>
           {/* Desktop table */}
           <div className="atbl hidden md:block">
             <table className="table-fixed">
               <colgroup>
-                <col className="w-[24%]" />
-                <col className="w-[24%]" />
+                <col className="w-[28%]" />
+                <col className="w-[22%]" />
+                <col className="w-[22%]" />
                 <col className="w-[16%]" />
-                <col className="w-[16%]" />
-                <col className="w-[14%]" />
-                <col className="w-[6%]" />
+                <col className="w-[12%]" />
               </colgroup>
               <thead>
                 <tr>
-                  {['Business', 'Contact', 'Category', 'Location', 'Status', ''].map((h) => (
+                  {['Business', 'Category', 'Location', 'Status', ''].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -225,14 +229,15 @@ export function Prospects() {
                   return (
                     <tr key={r.id}>
                       <td className="min-w-0">
-                        <div className="truncate font-bold text-(--ad-ink)" title={r.business_name}>{r.business_name}</div>
-                      </td>
-                      <td className="min-w-0">
-                        <div className="truncate text-(--ad-ink)" title={r.contact_name ?? undefined}>{r.contact_name ?? '-'}</div>
-                        {r.email && (
-                          <div className="mt-0.5 truncate font-mono text-[11px] text-(--ad-ink-faint)" title={r.email}>
-                            {r.email}
-                          </div>
+                        <button
+                          onClick={() => setViewProspect(r)}
+                          title="View details"
+                          className="block w-full cursor-pointer whitespace-normal wrap-break-word border-0 bg-transparent p-0 text-left font-bold text-(--ad-ink) hover:text-(--ad-green) hover:underline"
+                        >
+                          {r.business_name}
+                        </button>
+                        {r.contact_name && (
+                          <div className="mt-0.5 wrap-break-word text-[11px] text-(--ad-ink-faint)">{r.contact_name}</div>
                         )}
                       </td>
                       <td className="min-w-0 text-(--ad-ink-soft)">
@@ -247,7 +252,17 @@ export function Prospects() {
                         </span>
                       </td>
                       <td className="px-3 text-right">
-                        <RowMenu items={[...statusMenuItems, ...copyEmailItem, ...editDeleteItems]} />
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setViewProspect(r)}
+                            aria-label={`View details for ${r.business_name}`}
+                            title="View details"
+                            className="cursor-pointer rounded-md border-0 bg-transparent p-1 text-(--ad-ink-faint) transition-colors hover:bg-(--ad-surface-2) hover:text-(--ad-ink)"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                          <RowMenu items={[{ type: 'action' as const, label: 'View details', onClick: () => setViewProspect(r) }, ...statusMenuItems, ...copyEmailItem, ...editDeleteItems]} />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -263,7 +278,13 @@ export function Prospects() {
               return (
                 <div key={r.id} className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 truncate font-bold text-(--ad-ink)" title={r.business_name}>{r.business_name}</div>
+                    <button
+                      onClick={() => setViewProspect(r)}
+                      className="min-w-0 cursor-pointer whitespace-normal wrap-break-word border-0 bg-transparent p-0 text-left font-bold text-(--ad-ink)"
+                      title="View details"
+                    >
+                      {r.business_name}
+                    </button>
                     <span
                       style={{
                         background: pill.bg,
@@ -306,6 +327,12 @@ export function Prospects() {
                   </div>
                   <div className="mt-3 border-t border-(--ad-fill) pt-3 flex gap-2">
                     <button
+                      onClick={() => setViewProspect(r)}
+                      className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
+                    >
+                      Details
+                    </button>
+                    <button
                       onClick={() => setEditProspect(r)}
                       className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
                     >
@@ -324,28 +351,28 @@ export function Prospects() {
           </div>
 
           {/* Shared pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3 text-[12.5px] text-(--ad-ink-faint)">
-              <span>Page {safePage} of {totalPages}</span>
+          <div className="flex items-center justify-between rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3 text-[12.5px] text-(--ad-ink-faint)">
+            <span>{rangeLabel(safePage, total)}{pages > 1 && ` · Page ${safePage} of ${pages}`}</span>
+            {pages > 1 && (
               <div className="flex gap-2">
                 <button
                   onClick={() => setPage(safePage - 1)}
-                  disabled={safePage <= 1}
+                  disabled={safePage <= 1 || isPlaceholderData}
                   className={pagBtnCls}
                 >
                   Previous
                 </button>
                 <button
                   onClick={() => setPage(safePage + 1)}
-                  disabled={safePage >= totalPages}
+                  disabled={safePage >= pages || isPlaceholderData}
                   className={pagBtnCls}
                 >
                   Next
                 </button>
               </div>
-            </div>
-          )}
-        </>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Mobile FAB */}
@@ -357,6 +384,14 @@ export function Prospects() {
             key="new-prospect-modal"
             onClose={() => setShowAdd(false)}
             onCreated={() => { setShowAdd(false); toast('Prospect added.'); reload(); }}
+          />
+        )}
+        {viewProspect && (
+          <ProspectDetailModal
+            key={`view-${viewProspect.id}`}
+            prospect={viewProspect}
+            onClose={() => setViewProspect(null)}
+            onEdit={() => { setEditProspect(viewProspect); setViewProspect(null); }}
           />
         )}
         {editProspect && (
@@ -379,6 +414,127 @@ export function Prospects() {
 
       <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
+  );
+}
+
+/* ── Prospect detail modal ─────────────────────────────────────────── */
+function one(v: unknown): Record<string, unknown> | null {
+  const x = Array.isArray(v) ? v[0] : v;
+  return x && typeof x === 'object' ? (x as Record<string, unknown>) : null;
+}
+
+function fmtDate(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleString();
+}
+
+function ProspectDetailModal({
+  prospect, onClose, onEdit,
+}: { prospect: ProspectListRow; onClose: () => void; onEdit: () => void }) {
+  const { data: full, isLoading, error } = useProspectDetail(prospect.id);
+  // The list row renders instantly; the full row fills in the rest.
+  const row: Record<string, unknown> = { ...prospect, ...(full ?? {}) };
+  const str = (k: string) => (typeof row[k] === 'string' && (row[k] as string).trim() ? (row[k] as string) : null);
+  const pill = STATUS_PILL[prospect.pipeline_status] ?? STATUS_PILL.new;
+  const clientName = (one(row.client)?.business_name as string | undefined) ?? null;
+  const campaignName = (one(row.campaign)?.name as string | undefined) ?? null;
+  const href = safeWebsiteHref(str('website'));
+  const extras = extraFields(row);
+
+  const lbl = 'mb-1 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const val = 'm-0 wrap-break-word text-[13px] text-(--ad-ink)';
+  const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <div className="min-w-0">
+      <div className={lbl}>{label}</div>
+      <div className={val}>{children ?? '-'}</div>
+    </div>
+  );
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      {...useOverlayClose(onClose)}
+    >
+      <motion.div
+        style={FONT}
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-(--ad-line) px-5 py-4">
+          <div className="min-w-0">
+            <h2 className="m-0 wrap-break-word text-[18px] font-bold text-(--ad-ink)">{prospect.business_name}</h2>
+            <span
+              className="atbl-pill mt-2 inline-flex"
+              style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
+            >
+              {prospect.pipeline_status.replace(/_/g, ' ')}
+            </span>
+          </div>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Contact name">{str('contact_name')}</Field>
+            <Field label="Email">
+              {str('email') && (
+                <span className="flex items-center gap-2">
+                  <span className="min-w-0 break-all font-mono text-[12px]">{str('email')}</span>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(str('email')!)}
+                    className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-[11px] font-semibold text-(--ad-green) hover:underline"
+                  >
+                    Copy
+                  </button>
+                </span>
+              )}
+            </Field>
+            <Field label="Phone">{str('phone')}</Field>
+            <Field label="Website">
+              {str('website') && (href
+                ? <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-(--ad-green) hover:underline">{str('website')}</a>
+                : <span className="break-all">{str('website')}</span>)}
+            </Field>
+            <Field label="Category">{str('category')}</Field>
+            <Field label="Location">{str('location')}</Field>
+            <Field label="Client">{clientName}</Field>
+            <Field label="Campaign">{campaignName}</Field>
+            <Field label="Added">{fmtDate(row.created_at)}</Field>
+            <Field label="Updated">{fmtDate(row.updated_at)}</Field>
+          </div>
+
+          {isLoading && <div className="text-[12px] text-(--ad-ink-faint)">Loading all details…</div>}
+          {error && (
+            <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">
+              Couldn't load the full record: {(error as Error).message}
+            </div>
+          )}
+
+          {extras.length > 0 && (
+            <div className="border-t border-(--ad-line) pt-4">
+              <div className="mb-3 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">More details</div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {extras.map((x) => <Field key={x.label} label={x.label}>{x.value}</Field>)}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
+          <button onClick={onClose} className={ghostCls}>Close</button>
+          <button onClick={onEdit} className={primaryCls}>Edit prospect</button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

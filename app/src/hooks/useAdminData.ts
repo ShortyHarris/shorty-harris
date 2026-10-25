@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
+import { applyProspectFilters, mapCategoryRows, pageRange } from '../lib/prospectQuery';
 import { buildAreaColumns, type TargetArea } from '../lib/targetAreas';
 
 // ─── Query keys ──────────────────────────────────────────────────────────────
@@ -28,30 +29,77 @@ export interface ProspectListRow {
   client: { business_name: string } | null;
 }
 
-async function fetchProspects(): Promise<ProspectListRow[]> {
-  const { data, error } = await supabase
+export interface ProspectsParams {
+  q: string;
+  status: string;
+  category: string;
+  page: number;
+}
+
+interface ProspectsPage { rows: ProspectListRow[]; total: number }
+
+async function fetchProspectsPage(p: ProspectsParams): Promise<ProspectsPage> {
+  const { from, to } = pageRange(p.page);
+  const query = supabase
     .from('prospects')
     .select(`id, business_name, contact_name, email, phone, category, location, pipeline_status,
-             client:clients ( business_name )`)
-    .order('created_at', { ascending: false });
+             client:clients ( business_name )`, { count: 'exact' });
+  const { data, error, count } = await applyProspectFilters(query, p)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .range(from, to);
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r: Record<string, unknown>) => ({
+  const rows = (data ?? []).map((r: Record<string, unknown>) => ({
     ...r,
     client: Array.isArray(r.client) ? r.client[0] ?? null : r.client ?? null,
   })) as ProspectListRow[];
+  return { rows, total: count ?? rows.length };
 }
 
-export function useProspects() {
-  const { data: rows = [], isLoading: loading, isFetching, dataUpdatedAt, error, refetch } = useQuery({
-    queryKey: QK.prospects,
-    queryFn: fetchProspects,
+/** Distinct categories with counts, from the admin-only admin_prospect_categories() RPC. */
+export function useProspectCategories() {
+  const { data = [] } = useQuery({
+    queryKey: [...QK.prospects, 'categories'] as const,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_prospect_categories');
+      if (error) throw new Error(error.message);
+      return mapCategoryRows(data);
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  return data;
+}
+
+/** Full prospect row (every column) plus client and campaign names, for the detail modal. */
+export function useProspectDetail(id: string) {
+  return useQuery({
+    queryKey: [...QK.prospects, 'detail', id] as const,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('prospects')
+        .select('*, client:clients ( business_name ), campaign:campaigns ( name )')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return (data ?? null) as Record<string, unknown> | null;
+    },
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useProspects(params: ProspectsParams) {
+  const { data, isLoading: loading, isFetching, isPlaceholderData, dataUpdatedAt, error, refetch } = useQuery({
+    // Prefixed with QK.prospects so realtime's invalidateQueries hits every page.
+    queryKey: [...QK.prospects, 'list', params] as const,
+    queryFn: () => fetchProspectsPage(params),
+    placeholderData: keepPreviousData,
     staleTime: Infinity, // realtime drives updates
   });
 
   const updateStatus = useCallback(async (id: string, status: string) => {
-    // Optimistic update
-    queryClient.setQueryData<ProspectListRow[]>(QK.prospects, (prev = []) =>
-      prev.map((r) => (r.id === id ? { ...r, pipeline_status: status } : r)),
+    // Optimistic update across every cached page
+    queryClient.setQueriesData<ProspectsPage>({ queryKey: [...QK.prospects, 'list'] }, (prev) =>
+      prev && { ...prev, rows: prev.rows.map((r) => (r.id === id ? { ...r, pipeline_status: status } : r)) },
     );
     const { error } = await supabase
       .from('prospects')
@@ -64,9 +112,11 @@ export function useProspects() {
   }, []);
 
   return {
-    rows,
+    rows: data?.rows ?? [],
+    total: data?.total ?? 0,
     loading,
     isFetching,
+    isPlaceholderData,
     dataUpdatedAt,
     error: (error as Error)?.message ?? null,
     reload: async () => {
