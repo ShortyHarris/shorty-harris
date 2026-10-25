@@ -155,12 +155,3 @@ export function defaultTimezoneForCountry(code: string | null | undefined): stri
   const canon = preferred ? canonicalTimezone(preferred) : undefined;
   return canon && suggested.includes(canon) ? canon : suggested[0];
 }
-
-// Case-insensitive match on the label and the full IANA name, so both
-// "prag" and "europe/pr" find Prague. '' matches everything.
-export function matchesTimezoneQuery(timeZone: string, query: string): boolean {
-  const q = query.trim().toLowerCase().replace(/_/g, ' ');
-  if (!q) return true;
-  const haystack = `${timezoneLabel(timeZone)} ${timeZone.replace(/_/g, ' ')}`.toLowerCase();
-  return haystack.includes(q);
-}

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_TIMEZONE, allTimezones, canonicalTimezone, defaultTimezoneForCountry, isKnownTimezone,
-  isSameTimezone, matchesTimezoneQuery, suggestedTimezonesForCountry, timezoneLabel, utcOffsetLabel,
+  isSameTimezone, suggestedTimezonesForCountry, timezoneLabel, utcOffsetLabel,
 } from './timezones';
 
 describe('allTimezones', () => {
@@ -95,20 +95,5 @@ describe('labels', () => {
   it('labels as City (offset)', () => {
     expect(timezoneLabel('Europe/Prague', new Date('2026-07-15T12:00:00Z'))).toBe('Prague (UTC+02:00)');
     expect(timezoneLabel('America/Argentina/Buenos_Aires', new Date('2026-07-15T12:00:00Z'))).toBe('Buenos Aires (UTC-03:00)');
-  });
-});
-
-describe('matchesTimezoneQuery', () => {
-  it('filters by city fragment, case-insensitively', () => {
-    expect(matchesTimezoneQuery('Europe/Prague', 'Prag')).toBe(true);
-    expect(matchesTimezoneQuery('Europe/Prague', 'pRaG')).toBe(true);
-    expect(matchesTimezoneQuery('Europe/Berlin', 'Prag')).toBe(false);
-  });
-  it('matches the IANA path and underscored names', () => {
-    expect(matchesTimezoneQuery('America/New_York', 'america/new')).toBe(true);
-    expect(matchesTimezoneQuery('America/New_York', 'new york')).toBe(true);
-  });
-  it('matches everything for an empty query', () => {
-    expect(matchesTimezoneQuery('Asia/Tokyo', '  ')).toBe(true);
   });
 });

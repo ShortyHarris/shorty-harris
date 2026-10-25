@@ -19,7 +19,7 @@ import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import { isValidEmail, isValidPhone, normalizePhone } from '../../lib/validation';
 import { RequiredMark } from '../../components/RequiredMark';
 import { TimezoneSelect } from '../../components/TimezoneSelect';
-import { COUNTRY_OPTIONS, countryOptionsFor } from '../../lib/countries';
+import { CountrySelect } from '../../components/CountrySelect';
 import {
   defaultTimezoneForCountry, DEFAULT_TIMEZONE, suggestedTimezonesForCountry, timezoneLabel,
 } from '../../lib/timezones';
@@ -493,11 +493,10 @@ const SELECT_TRIGGER_CLS = 'h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-
 const SELECT_CONTENT_CLS = 'bg-(--ad-surface) text-[13px] text-(--ad-ink)';
 
 function CountryTimezoneFields({
-  country, timezone, countryOptions, onCountryChange, onTimezoneChange,
+  country, timezone, onCountryChange, onTimezoneChange,
 }: {
   country: string;
   timezone: string;
-  countryOptions: readonly { code: string; name: string }[];
   onCountryChange: (code: string) => void;
   onTimezoneChange: (timeZone: string) => void;
 }) {
@@ -505,12 +504,14 @@ function CountryTimezoneFields({
     <>
       <div>
         <label className={fieldLbl}>Country</label>
-        <Select value={country} onValueChange={onCountryChange}>
-          <SelectTrigger style={FONT} className={SELECT_TRIGGER_CLS} aria-label="Country"><SelectValue placeholder="Select a country" /></SelectTrigger>
-          <SelectContent style={FONT} className={SELECT_CONTENT_CLS}>
-            {countryOptions.map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <CountrySelect
+          value={country}
+          onValueChange={onCountryChange}
+          triggerStyle={FONT}
+          triggerClassName={SELECT_TRIGGER_CLS}
+          contentStyle={FONT}
+          contentClassName={SELECT_CONTENT_CLS}
+        />
         <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Where the business is based.</p>
       </div>
       <div>
@@ -814,7 +815,6 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
         <CountryTimezoneFields
           country={country}
           timezone={sendTimezone}
-          countryOptions={COUNTRY_OPTIONS}
           onCountryChange={(code) => {
             setCountry(code);
             if (!timezoneTouched) setSendTimezone(defaultTimezoneForCountry(code));
@@ -1022,7 +1022,6 @@ function EditClientModal({
         <CountryTimezoneFields
           country={country}
           timezone={sendTimezone}
-          countryOptions={countryOptionsFor(client.country)}
           onCountryChange={setCountry}
           onTimezoneChange={setSendTimezone}
         />

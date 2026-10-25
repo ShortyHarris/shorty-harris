@@ -14,7 +14,8 @@ import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { useAuth } from '../../auth/AuthProvider';
 import { useTour } from '../../tour/TourProvider';
 import { isValidEmail, isValidPhone, normalizePhone } from '../../lib/validation';
-import { countryOptionsFor, privacyUrlError } from '../../lib/countries';
+import { privacyUrlError } from '../../lib/countries';
+import { CountrySelect } from '../../components/CountrySelect';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
@@ -115,7 +116,6 @@ function ProfileEditModal({
   }));
   const [initialForm] = useState(() => JSON.stringify(form));
   const requestClose = () => { if (confirmDiscard(JSON.stringify(form) !== initialForm)) onClose(); };
-  const countryOptions = countryOptionsFor(profile.country);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -220,12 +220,14 @@ function ProfileEditModal({
 
           <div className="mb-4">
             <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Country</label>
-            <Select value={form.country} onValueChange={(v) => set('country', v)}>
-              <SelectTrigger className="h-10 rounded-lg text-[13px]" style={inputStyle} aria-label="Country"><SelectValue placeholder="Select a country" /></SelectTrigger>
-              <SelectContent className="text-[13px]" style={{ background: 'var(--surface)', color: 'var(--ink)' }}>
-                {countryOptions.map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <CountrySelect
+              value={form.country}
+              onValueChange={(v) => set('country', v)}
+              triggerClassName="h-10 rounded-lg text-[13px]"
+              triggerStyle={inputStyle}
+              contentClassName="text-[13px]"
+              contentStyle={{ background: 'var(--surface)', color: 'var(--ink)' }}
+            />
             <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>
               Where your business is based. New campaigns default to this country.
             </p>

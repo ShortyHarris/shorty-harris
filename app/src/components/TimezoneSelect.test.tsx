@@ -18,7 +18,7 @@ describe('TimezoneSelect', () => {
     open();
     expect(screen.getAllByRole('option').length).toBeGreaterThan(300);
 
-    fireEvent.change(screen.getByLabelText('Search timezones'), { target: { value: 'Prag' } });
+    fireEvent.change(screen.getByLabelText('Search send timezone'), { target: { value: 'Prag' } });
     const options = screen.getAllByRole('option');
     expect(options).toHaveLength(1);
     expect(options[0].textContent).toContain('Prague');
@@ -56,16 +56,25 @@ describe('TimezoneSelect', () => {
     const onChange = vi.fn();
     render(<TimezoneSelect value="America/Chicago" onValueChange={onChange} />);
     open();
-    const search = screen.getByLabelText('Search timezones');
+    const search = screen.getByLabelText('Search send timezone');
     fireEvent.change(search, { target: { value: 'nairobi' } });
     fireEvent.keyDown(search, { key: 'Enter' });
     expect(onChange).toHaveBeenCalledWith('Africa/Nairobi');
   });
 
+  it('matches the IANA path as well as the city', () => {
+    render(<TimezoneSelect value="America/Chicago" onValueChange={() => {}} />);
+    open();
+    fireEvent.change(screen.getByLabelText('Search send timezone'), { target: { value: 'america/new_y' } });
+    const options = screen.getAllByRole('option');
+    expect(options).toHaveLength(1);
+    expect(options[0].textContent).toContain('New York');
+  });
+
   it('says so when nothing matches', () => {
     render(<TimezoneSelect value="America/Chicago" onValueChange={() => {}} />);
     open();
-    fireEvent.change(screen.getByLabelText('Search timezones'), { target: { value: 'zzzzqq' } });
+    fireEvent.change(screen.getByLabelText('Search send timezone'), { target: { value: 'zzzzqq' } });
     expect(screen.getByText('No matching timezone.')).toBeTruthy();
   });
 });
