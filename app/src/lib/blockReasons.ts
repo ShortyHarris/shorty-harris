@@ -66,6 +66,13 @@ export function blockInfo(reason: string): BlockInfo {
   return BLOCK_INFO[reason as BlockReason] ?? FALLBACK;
 }
 
+/** Held by policy (EU/Czech recipient rules): hidden from the client's Blocked list and counts. */
+export const POLICY_HELD_REASONS: readonly BlockReason[] = ['generic_mailbox', 'freemail_address'];
+
+export function isPolicyHeld(reason: string | null | undefined): boolean {
+  return !!reason && (POLICY_HELD_REASONS as readonly string[]).includes(reason);
+}
+
 /** Scheduled is a normal waiting state, not a block. */
 export function isBlocking(reason: string | null | undefined): boolean {
   return !!reason && blockInfo(reason).tone !== 'scheduled';

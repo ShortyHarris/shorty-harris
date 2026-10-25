@@ -9,6 +9,7 @@ import { fetchAllRows } from '../lib/fetchAllRows';
 import { runInChunks, type ChunkedResult } from '../lib/chunkedBulk';
 import { TERMINAL_PIPELINE_STATUSES } from '../lib/pipelineStatus';
 import { campaignPendingProspectsPrefix } from './useClientCampaigns';
+import { POLICY_HELD_REASONS } from '../lib/blockReasons';
 
 // Returned when an update matched no pending row (already approved or
 // rejected elsewhere, or not visible to this user).
@@ -17,7 +18,9 @@ const ALREADY_HANDLED = 'this draft was already handled - the list has been refr
 export const clientApprovalsKey =(clientId: string) => ['client-approvals', clientId] as const;
 export const clientApprovalsStatsKey = (clientId: string) => ['client-approvals-stats', clientId] as const;
 export const clientAwaitingProspectsKey = (clientId: string) => ['client-awaiting-prospects', clientId] as const;
-export const clientApprovedKey = (clientId: string) => ['client-approved-drafts', clientId] as const;
+// includeHeld is a trailing element, so invalidating [key, clientId] matches both variants.
+export const clientApprovedKey = (clientId: string, includeHeld = false) =>
+  includeHeld ? (['client-approved-drafts', clientId, true] as const) : (['client-approved-drafts', clientId] as const);
 
 function invalidateApprovalQueries(clientId: string) {
   queryClient.invalidateQueries({ queryKey: campaignPendingProspectsPrefix });
@@ -68,21 +71,31 @@ function normalizeRows(data: unknown): ClientMessageItem[] {
   })) as ClientMessageItem[];
 }
 
-async function fetchApprovedDrafts(clientId: string, client: SupabaseClient): Promise<ApprovedDrafts> {
-  const [totalRes, blockedRes, recentRes] = await Promise.all([
+// Drafts held by policy (generic/freemail recipients) are left out of the blocked
+// list and count and out of the sendable list. Admins opt in with includeHeld.
+async function fetchApprovedDrafts(clientId: string, client: SupabaseClient, includeHeld = false): Promise<ApprovedDrafts> {
+  const heldReasons = [...POLICY_HELD_REASONS] as string[];
+  const blockedQuery = client.from('message_block_reasons').select('message_id, reason', { count: 'exact' })
+    .eq('client_id', clientId).neq('reason', 'waiting_followup_timing');
+  const [totalRes, blockedRes, recentRes, heldCountRes] = await Promise.all([
     client.from('messages').select('id', { count: 'exact', head: true })
       .eq('client_id', clientId).eq('approval_status', 'approved').eq('send_status', 'not_sent'),
-    client.from('message_block_reasons').select('message_id, reason', { count: 'exact' })
-      .eq('client_id', clientId).neq('reason', 'waiting_followup_timing')
+    (includeHeld ? blockedQuery : blockedQuery.not('reason', 'in', `(${heldReasons.join(',')})`))
       .limit(APPROVED_LIST_LIMIT),
     client.from('messages').select(MESSAGE_SELECT)
       .eq('client_id', clientId).eq('approval_status', 'approved').eq('send_status', 'not_sent')
       .order('approved_at', { ascending: false })
       .limit(APPROVED_LIST_LIMIT),
+    // Hidden held drafts are in neither list, so they come out of the sendable total too.
+    includeHeld
+      ? Promise.resolve({ count: 0, error: null })
+      : client.from('message_block_reasons').select('message_id', { count: 'exact', head: true })
+          .eq('client_id', clientId).in('reason', heldReasons),
   ]);
   if (totalRes.error) throw new Error(totalRes.error.message);
   if (blockedRes.error) throw new Error(blockedRes.error.message);
   if (recentRes.error) throw new Error(recentRes.error.message);
+  if (heldCountRes.error) throw new Error(heldCountRes.error.message);
 
   const reasonById = new Map<string, string>(
     (blockedRes.data ?? []).map((r: { message_id: string; reason: string }) => [r.message_id, r.reason]),
@@ -107,18 +120,30 @@ async function fetchApprovedDrafts(clientId: string, client: SupabaseClient): Pr
   if (schedErr) throw new Error(schedErr.message);
   const scheduledIds = new Set((scheduledRows ?? []).map((r: { message_id: string }) => r.message_id));
 
+  // Hidden held drafts in the recent window must not fall through into "sendable".
+  let heldIds = new Set<string>();
+  if (!includeHeld && recent.length > 0) {
+    const { data: heldRows, error: heldErr } = await client
+      .from('message_block_reasons').select('message_id')
+      .in('reason', heldReasons)
+      .in('message_id', recent.map((m) => m.id));
+    if (heldErr) throw new Error(heldErr.message);
+    heldIds = new Set((heldRows ?? []).map((r: { message_id: string }) => r.message_id));
+  }
+
   const blocked = [...recent, ...extraBlocked]
     .filter((m) => reasonById.has(m.id))
     .map((m) => ({ ...m, block_reason: reasonById.get(m.id)! }));
   const sendable = recent
-    .filter((m) => !reasonById.has(m.id))
+    .filter((m) => !reasonById.has(m.id) && !heldIds.has(m.id))
     .map((m) => ({ ...m, block_reason: scheduledIds.has(m.id) ? 'waiting_followup_timing' : null }));
 
   const blockedCount = blockedRes.count ?? blocked.length;
+  const heldCount = heldCountRes.count ?? 0;
   return {
     sendable,
     blocked,
-    counts: { blocked: blockedCount, sendable: Math.max(0, (totalRes.count ?? 0) - blockedCount) },
+    counts: { blocked: blockedCount, sendable: Math.max(0, (totalRes.count ?? 0) - blockedCount - heldCount) },
   };
 }
 
@@ -170,7 +195,7 @@ async function fetchClientStats(clientId: string, client: SupabaseClient): Promi
   };
 }
 
-export function useClientApprovals(clientId: string, client: SupabaseClient = supabase) {
+export function useClientApprovals(clientId: string, client: SupabaseClient = supabase, includeHeld = false) {
   const { profile } = useAuth();
 
   const isPreview = clientId === '__preview__';
@@ -208,8 +233,8 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
   });
 
   const { data: approvedDrafts = null, isFetching: approvedFetching, refetch: refetchApproved } = useQuery({
-    queryKey: clientApprovedKey(clientId),
-    queryFn: () => fetchApprovedDrafts(clientId, client),
+    queryKey: clientApprovedKey(clientId, includeHeld),
+    queryFn: () => fetchApprovedDrafts(clientId, client, includeHeld),
     enabled: !!clientId && !isPreview,
     staleTime: 30 * 1000,
   });
