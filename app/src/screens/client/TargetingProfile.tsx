@@ -83,12 +83,21 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
   }
 
   async function handleRebuild() {
+    if (rebuilding) return;
     setRebuilding(true); setErr(null);
-    const { error } = await buildClientIcp(clientId);
-    setRebuilding(false);
-    if (error) { setErr(error); return; }
+    const { ok, error, limitedData } = await buildClientIcp(clientId);
+    if (!ok) {
+      setRebuilding(false);
+      setErr(error);
+      toast(error ?? "Couldn't rebuild your targeting profile - please try again.", 'error');
+      return;
+    }
     await reload();
-    toast('Rebuilt from your website - your own edits were left alone.');
+    setRebuilding(false);
+    toast(
+      'Rebuilt from your website - your own edits were left alone.'
+        + (limitedData ? ' We could only read limited information from the website.' : ''),
+    );
   }
 
   return (
@@ -123,6 +132,11 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
             <p className="m-0 mt-1 text-[12.5px]" style={{ color: 'var(--ink-soft)' }}>
               Re-reads your website and refreshes everything below - except any field you've already edited yourself.
             </p>
+            {rebuilding && (
+              <p className="m-0 mt-1 text-[12.5px] font-semibold" style={{ color: 'var(--leaf)' }} role="status">
+                Reading your website - this can take up to a minute. Please keep this page open.
+              </p>
+            )}
           </div>
           <button
             onClick={handleRebuild}
@@ -131,7 +145,7 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
             style={{ background: 'var(--leaf)' }}
           >
             <RefreshCw size={14} className={rebuilding ? 'animate-spin' : ''} />
-            {rebuilding ? 'Rebuilding…' : 'Rebuild'}
+            {rebuilding ? 'Rebuilding… up to a minute' : 'Rebuild'}
           </button>
         </div>
       )}
