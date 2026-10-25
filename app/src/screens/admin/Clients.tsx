@@ -20,7 +20,9 @@ import { isValidEmail, isValidPhone, normalizePhone } from '../../lib/validation
 import { RequiredMark } from '../../components/RequiredMark';
 import { TimezoneSelect } from '../../components/TimezoneSelect';
 import { COUNTRY_OPTIONS, countryOptionsFor } from '../../lib/countries';
-import { defaultTimezoneForCountry, DEFAULT_TIMEZONE, timezoneLabel } from '../../lib/timezones';
+import {
+  defaultTimezoneForCountry, DEFAULT_TIMEZONE, suggestedTimezonesForCountry, timezoneLabel,
+} from '../../lib/timezones';
 
 const HELP: HelpContent = {
   title: 'Clients',
@@ -516,6 +518,7 @@ function CountryTimezoneFields({
         <TimezoneSelect
           value={timezone}
           onValueChange={onTimezoneChange}
+          suggested={suggestedTimezonesForCountry(country)}
           triggerStyle={FONT}
           triggerClassName={SELECT_TRIGGER_CLS}
           contentStyle={FONT}

@@ -19,6 +19,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
 import { TimezoneSelect } from '../../components/TimezoneSelect';
+import { suggestedTimezonesForCountry } from '../../lib/timezones';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { RequiredMark } from '../../components/RequiredMark';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -235,6 +236,7 @@ function ProfileEditModal({
             <TimezoneSelect
               value={form.send_timezone}
               onValueChange={(v) => set('send_timezone', v)}
+              suggested={suggestedTimezonesForCountry(profile.country)}
               triggerClassName="h-10 rounded-lg text-[13px]"
               triggerStyle={inputStyle}
               contentClassName="text-[13px]"
