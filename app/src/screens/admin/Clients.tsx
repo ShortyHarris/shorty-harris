@@ -18,6 +18,9 @@ import { RefreshButton } from '../../components/RefreshButton';
 import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import { isValidEmail, isValidPhone, normalizePhone } from '../../lib/validation';
 import { RequiredMark } from '../../components/RequiredMark';
+import { TimezoneSelect } from '../../components/TimezoneSelect';
+import { COUNTRY_OPTIONS, countryOptionsFor } from '../../lib/countries';
+import { defaultTimezoneForCountry, DEFAULT_TIMEZONE, timezoneLabel } from '../../lib/timezones';
 
 const HELP: HelpContent = {
   title: 'Clients',
@@ -160,6 +163,9 @@ export function Clients() {
                     <tr key={c.id} onClick={() => setEditClient(c)} className="group cursor-pointer">
                       <td className="min-w-0">
                         <div className="truncate font-bold text-(--ad-ink) group-hover:underline" title={c.business_name}>{c.business_name}</div>
+                        <span className="mt-0.5 inline-block max-w-full truncate rounded-full bg-(--ad-fill) px-2 py-0.5 text-[10px] font-semibold text-(--ad-ink-faint)" title={`Send timezone: ${c.send_timezone}`}>
+                          {timezoneLabel(c.send_timezone)}
+                        </span>
                       </td>
                       <td className="min-w-0 text-(--ad-ink-soft)">
                         <div className="truncate" title={c.contact_name ?? undefined}>{c.contact_name ?? '-'}</div>
@@ -251,6 +257,9 @@ export function Clients() {
                       {[c.business_type, c.location].filter(Boolean).join(' · ')}
                     </p>
                   )}
+                  <p className="mt-1 text-[11px] text-(--ad-ink-faint)" title={`Send timezone: ${c.send_timezone}`}>
+                    {timezoneLabel(c.send_timezone)}
+                  </p>
                   <div className="mt-2 flex flex-col gap-0.5">
                     {c.contact_email && <span className="font-mono text-[11px] text-(--ad-ink-faint)">{c.contact_email}</span>}
                     {c.contact_phone && <span className="font-mono text-[11px] text-(--ad-ink-ghost)">{c.contact_phone}</span>}
@@ -477,6 +486,47 @@ const ENRICH_ERROR_MESSAGES: Record<string, string> = {
 // back genuinely empty (AI searched but found nothing) vs never asked about.
 type EnrichableField = 'businessName' | 'businessType' | 'location' | 'contactEmail' | 'contactPhone';
 
+/* ── Country + send timezone fields (shared by New / Edit) ─────────── */
+const SELECT_TRIGGER_CLS = 'h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)';
+const SELECT_CONTENT_CLS = 'bg-(--ad-surface) text-[13px] text-(--ad-ink)';
+
+function CountryTimezoneFields({
+  country, timezone, countryOptions, onCountryChange, onTimezoneChange,
+}: {
+  country: string;
+  timezone: string;
+  countryOptions: readonly { code: string; name: string }[];
+  onCountryChange: (code: string) => void;
+  onTimezoneChange: (timeZone: string) => void;
+}) {
+  return (
+    <>
+      <div>
+        <label className={fieldLbl}>Country</label>
+        <Select value={country} onValueChange={onCountryChange}>
+          <SelectTrigger style={FONT} className={SELECT_TRIGGER_CLS} aria-label="Country"><SelectValue placeholder="Select a country" /></SelectTrigger>
+          <SelectContent style={FONT} className={SELECT_CONTENT_CLS}>
+            {countryOptions.map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Where the business is based.</p>
+      </div>
+      <div>
+        <label className={fieldLbl}>Send timezone</label>
+        <TimezoneSelect
+          value={timezone}
+          onValueChange={onTimezoneChange}
+          triggerStyle={FONT}
+          triggerClassName={SELECT_TRIGGER_CLS}
+          contentStyle={FONT}
+          contentClassName={SELECT_CONTENT_CLS}
+        />
+        <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Emails are sent Monday to Friday, 9:00 to 17:00 in this timezone.</p>
+      </div>
+    </>
+  );
+}
+
 /* ── New Client Modal ──────────────────────────────────────────────── */
 function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [businessName, setBusinessName]       = useState('');
@@ -486,6 +536,10 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
   const [contactEmail, setContactEmail]       = useState('');
   const [contactPhone, setContactPhone]       = useState('');
   const [notifChannel, setNotifChannel]       = useState<NewClientInput['notification_channel']>('whatsapp');
+  const [country, setCountry]                 = useState('');
+  const [sendTimezone, setSendTimezone]       = useState(DEFAULT_TIMEZONE);
+  // Once the admin picks a timezone themselves, changing the country stops re-defaulting it.
+  const [timezoneTouched, setTimezoneTouched] = useState(false);
   const [startingCredits, setStartingCredits] = useState(0);
   const [saveAsDraft, setSaveAsDraft]         = useState(false);
   const [busy, setBusy]                       = useState(false);
@@ -599,6 +653,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
       business_name: businessName.trim(), business_type: businessType.trim(),
       location: location.trim(), website_url: websiteUrl.trim(), contact_email: contactEmail.trim(),
       contact_phone: contactPhone.trim() ? normalizePhone(contactPhone) : '', notification_channel: notifChannel,
+      country, send_timezone: sendTimezone,
       starting_credits: startingCredits,
       status: saveAsDraft ? 'draft' : 'active',
       // Pre-fill the auto-created default campaign from whatever we know:
@@ -753,6 +808,16 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
             </SelectContent>
           </Select>
         </div>
+        <CountryTimezoneFields
+          country={country}
+          timezone={sendTimezone}
+          countryOptions={COUNTRY_OPTIONS}
+          onCountryChange={(code) => {
+            setCountry(code);
+            if (!timezoneTouched) setSendTimezone(defaultTimezoneForCountry(code));
+          }}
+          onTimezoneChange={(tz) => { setSendTimezone(tz); setTimezoneTouched(true); }}
+        />
         <div className="border-t border-(--ad-fill) pt-3">
           <label className={fieldLbl}>Starting credits</label>
           <input type="number" min={0} value={startingCredits}
@@ -797,6 +862,8 @@ function EditClientModal({
   const [status, setStatus] = useState<UpdateClientInput['status']>(
     (client.status as UpdateClientInput['status']) ?? 'active',
   );
+  const [country, setCountry]           = useState(client.country ?? '');
+  const [sendTimezone, setSendTimezone] = useState(client.send_timezone);
   const [monthlyProspectLimit, setMonthlyProspectLimit] = useState(client.monthly_prospect_limit);
   const [maxCampaigns, setMaxCampaigns] = useState(client.max_campaigns);
   const [autoApprove, setAutoApprove] = useState(client.auto_approve_campaigns);
@@ -822,6 +889,7 @@ function EditClientModal({
       location: location.trim(), website_url: websiteUrl.trim(), contact_email: contactEmail.trim(),
       contact_phone: normalizePhone(contactPhone), contact_name: contactName.trim(),
       notification_channel: notifChannel, status,
+      country, send_timezone: sendTimezone,
       monthly_prospect_limit: monthlyProspectLimit, max_campaigns: maxCampaigns,
       auto_approve_campaigns: autoApprove,
       allow_generic_mailboxes: allowGeneric,
@@ -948,6 +1016,13 @@ function EditClientModal({
             </Select>
           </div>
         </div>
+        <CountryTimezoneFields
+          country={country}
+          timezone={sendTimezone}
+          countryOptions={countryOptionsFor(client.country)}
+          onCountryChange={setCountry}
+          onTimezoneChange={setSendTimezone}
+        />
         {err && <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>}
       </div>
       <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
