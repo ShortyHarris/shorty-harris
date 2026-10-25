@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { TERMINAL_PIPELINE_STATUSES } from '../lib/pipelineStatus';
 import { buildAreaColumns, type TargetArea } from '../lib/targetAreas';
 
 export const myCampaignsKey = (clientId: string) => ['my-campaigns', clientId] as const;
@@ -195,6 +196,8 @@ export function useClientCampaignProspects(campaignId: string | null, client: Su
 }
 
 // Distinct prospects in this campaign with at least one draft awaiting review.
+// Same rules as the Approvals page's awaiting count (fetchAwaitingProspects):
+// prospects whose sequence is over are excluded and the draft must be unsent.
 // Counts parent (prospect) rows of an inner-joined embed, so a prospect with
 // several pending drafts counts once. Deliberately ignores
 // prospects.pipeline_status: 'message_pending' means "email not written yet"
@@ -207,7 +210,9 @@ export function useCampaignPendingProspects(campaignId: string | null, client: S
         .from('prospects')
         .select('id, messages!inner(id)', { count: 'exact', head: true })
         .eq('campaign_id', campaignId as string)
-        .eq('messages.approval_status', 'pending');
+        .not('pipeline_status', 'in', TERMINAL_PIPELINE_STATUSES)
+        .eq('messages.approval_status', 'pending')
+        .eq('messages.send_status', 'not_sent');
       if (error) throw new Error(error.message);
       return count ?? 0;
     },
