@@ -429,6 +429,8 @@ export interface ClientListRow {
   monthly_prospect_limit: number;
   max_campaigns: number;
   auto_approve_campaigns: boolean;
+  allow_generic_mailboxes: boolean;
+  is_internal: boolean;
   has_profile: boolean;
   activated_at: string | null;
   credits_remaining: number;
@@ -437,7 +439,7 @@ export interface ClientListRow {
 async function fetchClients(): Promise<ClientListRow[]> {
   const { data, error } = await supabase
     .from('clients')
-    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, notification_channel, status, created_at, monthly_prospect_limit, max_campaigns, auto_approve_campaigns')
+    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, notification_channel, status, created_at, monthly_prospect_limit, max_campaigns, auto_approve_campaigns, allow_generic_mailboxes, is_internal')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -631,6 +633,7 @@ export interface UpdateClientInput {
   monthly_prospect_limit: number;
   max_campaigns: number;
   auto_approve_campaigns: boolean;
+  allow_generic_mailboxes: boolean;
 }
 
 export async function updateClient(id: string, input: UpdateClientInput) {
@@ -647,6 +650,7 @@ export async function updateClient(id: string, input: UpdateClientInput) {
     monthly_prospect_limit: input.monthly_prospect_limit,
     max_campaigns: input.max_campaigns,
     auto_approve_campaigns: input.auto_approve_campaigns,
+    allow_generic_mailboxes: input.allow_generic_mailboxes,
     updated_at: new Date().toISOString(),
   }).eq('id', id);
 }

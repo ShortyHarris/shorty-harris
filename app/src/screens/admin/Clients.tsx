@@ -90,9 +90,9 @@ export function Clients() {
       } else {
         toast(`${c.business_name} already has an active account.`, 'warning');
       }
-      // The edge function persists activated_at once it discovers a genuinely
-      // active account - reload so future page loads skip the round trip and
-      // show the disabled state up front instead of only finding out on click.
+      // A DB trigger stamps profiles.activated_at on first sign-in, so this
+      // reload just refreshes the row to show the disabled state up front
+      // instead of only finding out on click.
       if (alreadyActive) reload();
     } else {
       setInvitePhase((p) => ({ ...p, [c.id]: 'sent' }));
@@ -200,8 +200,10 @@ export function Clients() {
                             type: 'action',
                             label: phase === 'sent' || c.has_profile ? 'Resend invite' : 'Send invite',
                             onClick: () => handleInvite(c),
-                            disabled: !c.contact_email || phase === 'sending' || phase === 'active' || !!c.activated_at,
-                            title: (phase === 'active' || c.activated_at)
+                            disabled: c.is_internal || !c.contact_email || phase === 'sending' || phase === 'active' || !!c.activated_at,
+                            title: c.is_internal
+                              ? 'Internal client - no invite needed.'
+                              : (phase === 'active' || c.activated_at)
                               ? "This client can already sign in - resending won't do anything. Have them log in directly, or use “Forgot password” on the login screen if they've lost access."
                               : undefined,
                           },
@@ -368,6 +370,9 @@ function InviteCell({
 }) {
   const pillCls = 'atbl-pill w-[120px] justify-center';
 
+  if (client.is_internal) {
+    return <span className={pillCls} style={{ background: 'var(--ad-fill)', color: 'var(--ad-ink-faint)' }}>Internal</span>;
+  }
   if (!client.contact_email) {
     return <span className={pillCls} style={{ background: 'var(--ad-fill)', color: 'var(--ad-ink-ghost)' }}>No email</span>;
   }
@@ -389,7 +394,7 @@ function InviteCell({
         className={pillCls}
         style={{ background: 'var(--ad-fill)', color: 'var(--ad-ink-faint)' }}
       >
-        Account active
+        Activated
       </span>
     );
   }
@@ -795,6 +800,7 @@ function EditClientModal({
   const [monthlyProspectLimit, setMonthlyProspectLimit] = useState(client.monthly_prospect_limit);
   const [maxCampaigns, setMaxCampaigns] = useState(client.max_campaigns);
   const [autoApprove, setAutoApprove] = useState(client.auto_approve_campaigns);
+  const [allowGeneric, setAllowGeneric] = useState(client.allow_generic_mailboxes ?? false);
   const [usage, setUsage] = useState<ClientUsage | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState<string | null>(null);
@@ -818,6 +824,7 @@ function EditClientModal({
       notification_channel: notifChannel, status,
       monthly_prospect_limit: monthlyProspectLimit, max_campaigns: maxCampaigns,
       auto_approve_campaigns: autoApprove,
+      allow_generic_mailboxes: allowGeneric,
     });
     setBusy(false);
     if (error) setErr(error.message); else onSaved();
@@ -903,6 +910,18 @@ function EditClientModal({
           <span>
             <span className="block font-semibold text-(--ad-ink)">Auto-approve this client's campaigns</span>
             <span className="block text-[11px] text-(--ad-ink-faint)">Skips the "Awaiting approval" step - campaigns they create go active immediately, no admin review.</span>
+          </span>
+        </label>
+        <label className="flex cursor-pointer items-start gap-2 text-[13px] text-(--ad-ink-soft)">
+          <input
+            type="checkbox"
+            checked={allowGeneric}
+            onChange={(e) => setAllowGeneric(e.target.checked)}
+            className="mt-0.5 accent-(--ad-green)"
+          />
+          <span>
+            <span className="block font-semibold text-(--ad-ink)">Allow shared mailboxes (info@, office@) for EU/Czech campaigns</span>
+            <span className="block text-[11px] text-(--ad-clay)">Off by default. Emailing shared addresses in the EU/Czech Republic carries GDPR/PECR risk - only enable with the client's sign-off.</span>
           </span>
         </label>
         <div className="grid grid-cols-2 gap-3">
