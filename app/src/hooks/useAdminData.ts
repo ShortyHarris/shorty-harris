@@ -70,6 +70,23 @@ export function useProspectCategories() {
   return data;
 }
 
+/** Full prospect row (every column) plus client and campaign names, for the detail modal. */
+export function useProspectDetail(id: string) {
+  return useQuery({
+    queryKey: [...QK.prospects, 'detail', id] as const,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('prospects')
+        .select('*, client:clients ( business_name ), campaign:campaigns ( name )')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return (data ?? null) as Record<string, unknown> | null;
+    },
+    staleTime: 30 * 1000,
+  });
+}
+
 export function useProspects(params: ProspectsParams) {
   const { data, isLoading: loading, isFetching, isPlaceholderData, dataUpdatedAt, error, refetch } = useQuery({
     // Prefixed with QK.prospects so realtime's invalidateQueries hits every page.

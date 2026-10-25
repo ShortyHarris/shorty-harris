@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  useProspects, useProspectCategories, useClientsList, useClientCampaigns,
+  useProspects, useProspectCategories, useProspectDetail, useClientsList, useClientCampaigns,
   updateProspect, getProspectDeleteCounts, deleteProspect,
 } from '../../hooks/useAdminData';
 import { clampPage, rangeLabel, totalPages } from '../../lib/prospectQuery';
+import { extraFields, safeWebsiteHref } from '../../lib/prospectDetail';
 import type { ProspectListRow, UpdateProspectInput, ProspectDeleteCounts } from '../../hooks/useAdminData';
 import { SkeletonTable } from '../../components/Skeleton';
 import { MobileFab } from '../../components/MobileFab';
@@ -75,6 +76,7 @@ export function Prospects() {
   const { toasts, toast, dismiss } = useToast();
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh prospects.');
   const [showAdd, setShowAdd] = useState(false);
+  const [viewProspect, setViewProspect]   = useState<ProspectListRow | null>(null);
   const [editProspect, setEditProspect]   = useState<ProspectListRow | null>(null);
   const [deleteTarget, setDeleteTarget]   = useState<ProspectListRow | null>(null);
 
@@ -181,16 +183,15 @@ export function Prospects() {
           <div className="atbl hidden md:block">
             <table className="table-fixed">
               <colgroup>
-                <col className="w-[24%]" />
-                <col className="w-[24%]" />
+                <col className="w-[28%]" />
+                <col className="w-[22%]" />
+                <col className="w-[22%]" />
                 <col className="w-[16%]" />
-                <col className="w-[16%]" />
-                <col className="w-[14%]" />
-                <col className="w-[6%]" />
+                <col className="w-[12%]" />
               </colgroup>
               <thead>
                 <tr>
-                  {['Business', 'Contact', 'Category', 'Location', 'Status', ''].map((h) => (
+                  {['Business', 'Category', 'Location', 'Status', ''].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -228,14 +229,15 @@ export function Prospects() {
                   return (
                     <tr key={r.id}>
                       <td className="min-w-0">
-                        <div className="truncate font-bold text-(--ad-ink)" title={r.business_name}>{r.business_name}</div>
-                      </td>
-                      <td className="min-w-0">
-                        <div className="truncate text-(--ad-ink)" title={r.contact_name ?? undefined}>{r.contact_name ?? '-'}</div>
-                        {r.email && (
-                          <div className="mt-0.5 truncate font-mono text-[11px] text-(--ad-ink-faint)" title={r.email}>
-                            {r.email}
-                          </div>
+                        <button
+                          onClick={() => setViewProspect(r)}
+                          title="View details"
+                          className="block w-full cursor-pointer whitespace-normal wrap-break-word border-0 bg-transparent p-0 text-left font-bold text-(--ad-ink) hover:text-(--ad-green) hover:underline"
+                        >
+                          {r.business_name}
+                        </button>
+                        {r.contact_name && (
+                          <div className="mt-0.5 wrap-break-word text-[11px] text-(--ad-ink-faint)">{r.contact_name}</div>
                         )}
                       </td>
                       <td className="min-w-0 text-(--ad-ink-soft)">
@@ -250,7 +252,17 @@ export function Prospects() {
                         </span>
                       </td>
                       <td className="px-3 text-right">
-                        <RowMenu items={[...statusMenuItems, ...copyEmailItem, ...editDeleteItems]} />
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setViewProspect(r)}
+                            aria-label={`View details for ${r.business_name}`}
+                            title="View details"
+                            className="cursor-pointer rounded-md border-0 bg-transparent p-1 text-(--ad-ink-faint) transition-colors hover:bg-(--ad-surface-2) hover:text-(--ad-ink)"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                          <RowMenu items={[{ type: 'action' as const, label: 'View details', onClick: () => setViewProspect(r) }, ...statusMenuItems, ...copyEmailItem, ...editDeleteItems]} />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -266,7 +278,13 @@ export function Prospects() {
               return (
                 <div key={r.id} className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 truncate font-bold text-(--ad-ink)" title={r.business_name}>{r.business_name}</div>
+                    <button
+                      onClick={() => setViewProspect(r)}
+                      className="min-w-0 cursor-pointer whitespace-normal wrap-break-word border-0 bg-transparent p-0 text-left font-bold text-(--ad-ink)"
+                      title="View details"
+                    >
+                      {r.business_name}
+                    </button>
                     <span
                       style={{
                         background: pill.bg,
@@ -308,6 +326,12 @@ export function Prospects() {
                     )}
                   </div>
                   <div className="mt-3 border-t border-(--ad-fill) pt-3 flex gap-2">
+                    <button
+                      onClick={() => setViewProspect(r)}
+                      className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
+                    >
+                      Details
+                    </button>
                     <button
                       onClick={() => setEditProspect(r)}
                       className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
@@ -362,6 +386,14 @@ export function Prospects() {
             onCreated={() => { setShowAdd(false); toast('Prospect added.'); reload(); }}
           />
         )}
+        {viewProspect && (
+          <ProspectDetailModal
+            key={`view-${viewProspect.id}`}
+            prospect={viewProspect}
+            onClose={() => setViewProspect(null)}
+            onEdit={() => { setEditProspect(viewProspect); setViewProspect(null); }}
+          />
+        )}
         {editProspect && (
           <EditProspectModal
             key={`edit-${editProspect.id}`}
@@ -382,6 +414,127 @@ export function Prospects() {
 
       <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
+  );
+}
+
+/* ── Prospect detail modal ─────────────────────────────────────────── */
+function one(v: unknown): Record<string, unknown> | null {
+  const x = Array.isArray(v) ? v[0] : v;
+  return x && typeof x === 'object' ? (x as Record<string, unknown>) : null;
+}
+
+function fmtDate(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleString();
+}
+
+function ProspectDetailModal({
+  prospect, onClose, onEdit,
+}: { prospect: ProspectListRow; onClose: () => void; onEdit: () => void }) {
+  const { data: full, isLoading, error } = useProspectDetail(prospect.id);
+  // The list row renders instantly; the full row fills in the rest.
+  const row: Record<string, unknown> = { ...prospect, ...(full ?? {}) };
+  const str = (k: string) => (typeof row[k] === 'string' && (row[k] as string).trim() ? (row[k] as string) : null);
+  const pill = STATUS_PILL[prospect.pipeline_status] ?? STATUS_PILL.new;
+  const clientName = (one(row.client)?.business_name as string | undefined) ?? null;
+  const campaignName = (one(row.campaign)?.name as string | undefined) ?? null;
+  const href = safeWebsiteHref(str('website'));
+  const extras = extraFields(row);
+
+  const lbl = 'mb-1 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const val = 'm-0 wrap-break-word text-[13px] text-(--ad-ink)';
+  const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <div className="min-w-0">
+      <div className={lbl}>{label}</div>
+      <div className={val}>{children ?? '-'}</div>
+    </div>
+  );
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      {...useOverlayClose(onClose)}
+    >
+      <motion.div
+        style={FONT}
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-(--ad-line) px-5 py-4">
+          <div className="min-w-0">
+            <h2 className="m-0 wrap-break-word text-[18px] font-bold text-(--ad-ink)">{prospect.business_name}</h2>
+            <span
+              className="atbl-pill mt-2 inline-flex"
+              style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
+            >
+              {prospect.pipeline_status.replace(/_/g, ' ')}
+            </span>
+          </div>
+          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Contact name">{str('contact_name')}</Field>
+            <Field label="Email">
+              {str('email') && (
+                <span className="flex items-center gap-2">
+                  <span className="min-w-0 break-all font-mono text-[12px]">{str('email')}</span>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(str('email')!)}
+                    className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-[11px] font-semibold text-(--ad-green) hover:underline"
+                  >
+                    Copy
+                  </button>
+                </span>
+              )}
+            </Field>
+            <Field label="Phone">{str('phone')}</Field>
+            <Field label="Website">
+              {str('website') && (href
+                ? <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-(--ad-green) hover:underline">{str('website')}</a>
+                : <span className="break-all">{str('website')}</span>)}
+            </Field>
+            <Field label="Category">{str('category')}</Field>
+            <Field label="Location">{str('location')}</Field>
+            <Field label="Client">{clientName}</Field>
+            <Field label="Campaign">{campaignName}</Field>
+            <Field label="Added">{fmtDate(row.created_at)}</Field>
+            <Field label="Updated">{fmtDate(row.updated_at)}</Field>
+          </div>
+
+          {isLoading && <div className="text-[12px] text-(--ad-ink-faint)">Loading all details…</div>}
+          {error && (
+            <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">
+              Couldn't load the full record: {(error as Error).message}
+            </div>
+          )}
+
+          {extras.length > 0 && (
+            <div className="border-t border-(--ad-line) pt-4">
+              <div className="mb-3 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">More details</div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {extras.map((x) => <Field key={x.label} label={x.label}>{x.value}</Field>)}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
+          <button onClick={onClose} className={ghostCls}>Close</button>
+          <button onClick={onEdit} className={primaryCls}>Edit prospect</button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
