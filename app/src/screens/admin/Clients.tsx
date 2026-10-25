@@ -23,6 +23,7 @@ import { CountrySelect } from '../../components/CountrySelect';
 import {
   defaultTimezoneForCountry, DEFAULT_TIMEZONE, suggestedTimezonesForCountry, timezoneLabel,
 } from '../../lib/timezones';
+import { capSearchTerms, getActiveCampaignLimits } from '../../lib/campaignLimits';
 
 const HELP: HelpContent = {
   title: 'Clients',
@@ -644,6 +645,10 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
     setEnriching(false);
   }
 
+  // The enrichment can return more services than a campaign may have search
+  // terms. Cap them here and show what was left out rather than slicing silently.
+  const termPlan = capSearchTerms(enrichResult?.services ?? [], getActiveCampaignLimits().maxSearchTerms);
+
   async function submit() {
     if (!businessName.trim()) { setErr('Business name is required.'); return; }
     if (!saveAsDraft) {
@@ -664,7 +669,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
       // the enrichment's services become search terms (no editable field of
       // their own to fall back on), and the location uses whatever ended up
       // in the Location field - enriched or hand-typed/corrected, either way.
-      search_queries: enrichResult?.services ?? [],
+      search_queries: termPlan.kept,
       target_locations: location.trim() ? [location.trim()] : [],
     });
     setBusy(false);
@@ -731,6 +736,13 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
               {enrichResult.summary && <p className="m-0 text-(--ad-green)">{enrichResult.summary}</p>}
               {!!enrichResult.services?.length && (
                 <p className="m-0"><strong className="font-bold">Services:</strong> {enrichResult.services.join(', ')}</p>
+              )}
+              {termPlan.dropped.length > 0 && (
+                <p className="m-0 text-(--ad-amber)">
+                  A campaign can have up to {getActiveCampaignLimits().maxSearchTerms} search terms, so the first campaign
+                  will start with <strong className="font-bold">{termPlan.kept.join(', ')}</strong>.
+                  Left out: {termPlan.dropped.join(', ')}. You can swap them in when you edit the campaign.
+                </p>
               )}
               {!!enrichResult.target_customer_profiles?.length && (
                 <p className="m-0">

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { TERMINAL_PIPELINE_STATUSES } from '../lib/pipelineStatus';
 import { buildAreaColumns, type TargetArea } from '../lib/targetAreas';
+import { campaignLimitsError } from '../lib/campaignLimits';
 
 export const myCampaignsKey = (clientId: string) => ['my-campaigns', clientId] as const;
 const myCampaignProspectsKey = (campaignId: string) => ['my-campaign-prospects', campaignId] as const;
@@ -85,7 +86,14 @@ export interface NewClientCampaignInput {
 
 export async function createClientCampaign(
   input: NewClientCampaignInput,
-): Promise<{ autoApproved: boolean; error: Error | null }> {
+): Promise<{ autoApproved: boolean; error: { message: string } | null }> {
+  const limitError = campaignLimitsError({
+    searchQueries: input.search_queries,
+    locationCount: input.target_areas.length,
+    maxResults: input.max_results,
+  });
+  if (limitError) return { autoApproved: false, error: { message: limitError } };
+
   // Most clients' campaigns land in 'pending_review' and wait for an admin to
   // review and activate them (see needsReview in useAdminData.ts). A client
   // flagged auto_approve_campaigns skips that - but the campaign still has to
@@ -131,6 +139,13 @@ export interface UpdateClientCampaignInput {
 }
 
 export async function updateClientCampaign(campaignId: string, input: UpdateClientCampaignInput) {
+  const limitError = campaignLimitsError({
+    searchQueries: input.search_queries,
+    locationCount: input.target_areas.length,
+    maxResults: input.max_results,
+  });
+  if (limitError) return { error: { message: limitError } };
+
   const { error } = await supabase
     .from('campaigns')
     .update({
