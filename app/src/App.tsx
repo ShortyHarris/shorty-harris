@@ -27,6 +27,8 @@ import { Home } from './screens/Home';
 import { Blog } from './screens/Blog';
 import { BlogPost } from './screens/BlogPost';
 import { Privacy } from './screens/Privacy';
+import { Pricing } from './screens/Pricing';
+import { GmailDataUse } from './screens/GmailDataUse';
 import { Terms } from './screens/Terms';
 import { Cookies } from './screens/Cookies';
 import { Unsubscribe } from './screens/Unsubscribe';
@@ -402,6 +404,8 @@ function AppRoutes() {
 
       <Route path="/blog" element={<Blog />} />
       <Route path="/blog/:slug" element={<BlogPost />} />
+      <Route path="/pricing" element={<Pricing />} />
+      <Route path="/gmail-data-use" element={<GmailDataUse />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/cookies" element={<Cookies />} />
