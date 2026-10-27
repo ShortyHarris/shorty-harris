@@ -25,6 +25,7 @@ import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { RequiredMark } from '../../components/RequiredMark';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { confirmDiscard } from '../../lib/confirmDiscard';
+import { btn } from '../../lib/clientButtons';
 
 const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em]';
 const inputCls = 'w-full rounded-lg border px-3.5 py-2.5 text-[13px] outline-none transition-colors';
@@ -275,8 +276,7 @@ function ProfileEditModal({
           <button
             onClick={submit}
             disabled={busy}
-            className="cursor-pointer rounded-lg border-0 px-4 py-2 text-[13px] font-bold text-white transition-colors disabled:opacity-50"
-            style={{ background: 'var(--leaf)' }}
+            className={btn('primary', 'lg')}
           >
             {busy ? 'Saving…' : 'Save changes'}
           </button>
@@ -592,8 +592,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
             )}
             <a
               href={connectUrl}
-              className="inline-block cursor-pointer rounded-lg border-0 px-4 py-2 text-[13px] font-bold text-white transition-colors"
-              style={{ background: 'var(--leaf)' }}
+              className={btn('primary', 'lg')}
             >
               Reconnect Gmail
             </a>
@@ -609,8 +608,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
             </p>
             <a
               href={connectUrl}
-              className="inline-flex items-center gap-2 cursor-pointer rounded-lg border-0 px-4 py-2 text-[13px] font-bold text-white no-underline transition-colors"
-              style={{ background: 'var(--leaf)' }}
+              className={btn('primary', 'lg')}
             >
               <Mail size={15} /> Connect Gmail
             </a>

@@ -21,6 +21,7 @@ import { RowMenu } from '../../components/RowMenu';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { LocationAreaInput } from '../../components/LocationAreaInput';
 import { TargetAreaChips } from '../../components/TargetAreaChips';
+import { campaignStatusLabel } from '../../lib/campaignStatus';
 import { SuggestForMe } from '../client/Campaigns';
 import { TagInput } from '../../components/TagInput';
 import { LimitCounter, LimitMessages } from '../../components/LimitCounter';
@@ -549,7 +550,7 @@ export function Campaigns() {
                       </td>
                       <td>
                         <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
-                          {CAMP_STATUS_LABEL[c.status] ?? c.status}
+                          {campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}
                         </span>
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
@@ -634,7 +635,7 @@ export function Campaigns() {
                     </div>
                     <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
                       className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
-                      {CAMP_STATUS_LABEL[c.status] ?? c.status}
+                      {campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}
                     </span>
                   </div>
                   <p className="mt-1.5 text-[12px] text-(--ad-ink-soft)">

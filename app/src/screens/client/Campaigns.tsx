@@ -1,3 +1,4 @@
+import { btn } from '../../lib/clientButtons';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,6 +20,7 @@ import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { TagInput } from '../../components/TagInput';
 import { LocationAreaInput } from '../../components/LocationAreaInput';
 import { TargetAreaChips } from '../../components/TargetAreaChips';
+import { campaignStatusLabel } from '../../lib/campaignStatus';
 import { areaDisplayLabel, areasToLocationLabels, joinedLocationsError, locationsToAreas, type TargetArea } from '../../lib/targetAreas';
 import { useToast, ToastHost } from '../../components/Toast';
 import { RefreshButton } from '../../components/RefreshButton';
@@ -63,6 +65,12 @@ const CAMP_PILL: Record<string, { bg: string; text: string; border?: string }> =
   completed:      { bg: '#e7f0f7', text: '#2f6690' },
 };
 
+function lastScrapedLabel(iso: string | null): string {
+  return iso
+    ? `Last scraped ${new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    : 'Never scraped';
+}
+
 const CAMP_STATUS_LABEL: Record<string, string> = {
   pending_review: 'In review',
   draft: 'Draft',
@@ -81,8 +89,8 @@ const LANGUAGE_OPTIONS = [
   'Dutch', 'Polish', 'Slovak', 'Arabic', 'Chinese', 'Swahili', 'Bemba', 'Nyanja',
 ];
 
-const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]';
-const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50';
+const ghostCls   = btn('secondary', 'lg');
+const primaryCls = btn('primary', 'lg');
 
 export function Campaigns({
   clientId, client = supabase, readOnly = false, canDelete = true, basePath = '/app',
@@ -94,7 +102,10 @@ export function Campaigns({
   const { toasts, toast, dismiss } = useToast();
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh campaigns.');
   const [showNew, setShowNew] = useState(false);
-  const [openCampaign, setOpenCampaign] = useState<ClientCampaignRow | null>(null);
+  const [openCampaign, setOpenCampaignRaw] = useState<ClientCampaignRow | null>(null);
+  // The table's Edit button opens the same window already in edit mode.
+  const [openInEdit, setOpenInEdit] = useState(false);
+  const setOpenCampaign = (c: ClientCampaignRow | null, edit = false) => { setOpenInEdit(edit); setOpenCampaignRaw(c); };
 
   // Existing campaigns over the limit (e.g. the limit was lowered after they
   // were created) are never touched here - this only gates creating new ones.
@@ -136,7 +147,7 @@ export function Campaigns({
               onClick={() => setShowNew(true)}
               disabled={newCampaignDisabled}
               title={newCampaignTitle}
-              className={`${primaryCls} hidden md:inline-flex`}
+              className={`${primaryCls} max-md:hidden`}
               data-tour="new-campaign-btn"
             >
               + New campaign
@@ -202,45 +213,62 @@ export function Campaigns({
           <div className="atbl hidden md:block">
             <table className="table-fixed">
               <colgroup>
-                <col className="w-[30%]" />
-                <col className="w-[14%]" />
+                <col className="w-[44%]" />
+                <col className="w-[18%]" />
                 <col className="w-[16%]" />
-                <col className="w-[14%]" />
-                <col className="w-[20%]" />
-                <col className="w-[6%]" />
+                <col className="w-[22%]" />
               </colgroup>
               <thead>
                 <tr>
-                  {['Campaign', 'Status', 'Language', 'Prospects', 'Created', ''].map((h) => (
-                    <th key={h}>{h}</th>
+                  {['Campaign', 'Prospects', 'Status', ''].map((h, i) => (
+                    <th key={i}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((c) => {
                   const pill = CAMP_PILL[c.status] ?? CAMP_PILL.draft;
+                  const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
+                  const isDraft = c.status === 'draft' || c.status === 'pending_review';
                   return (
-                    <tr key={c.id} onClick={() => setOpenCampaign(c)} className="cursor-pointer">
+                    <tr key={c.id} onClick={() => setOpenCampaign(c)} className="group cursor-pointer">
                       <td className="min-w-0">
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <span className="truncate font-bold text-[#20211c]" title={c.name}>{c.name}</span>
-                          {isEuCountry(c.country) && <EuBadge />}
+                        <div className="line-clamp-2 font-bold leading-snug text-[#20211c] group-hover:underline" title={c.name}>{c.name}</div>
+                        {isEuCountry(c.country) && <div className="mt-1"><EuBadge /></div>}
+                        {needsSetup && (
+                          <span className="atbl-pill mt-1" style={{ background: '#f8efdb', color: '#b9831f' }}>⚠ Needs setup</span>
+                        )}
+                        <div className="mt-1 text-[11px] text-[#9a9d92]">
+                          {c.scrape_status === 'running'
+                            ? <span className="font-semibold text-[#b9831f]">Finding prospects…</span>
+                            : lastScrapedLabel(c.last_scraped_at)} · {c.language}
                         </div>
+                        {c.target_areas && (
+                          <TargetAreaChips areas={c.target_areas} radiusOnly className="mt-1.5 flex flex-wrap gap-1" chipClassName="px-2 py-0.5 text-[11px]" />
+                        )}
                       </td>
                       <td>
-                        <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
-                          {CAMP_STATUS_LABEL[c.status] ?? c.status}
+                        <span className="atbl-pill" style={{ background: '#f5f2ec', color: '#62655c' }}>
+                          {c.prospectCount} prospect{c.prospectCount === 1 ? '' : 's'}
                         </span>
                       </td>
-                      <td className="min-w-0 text-[#62655c]">
-                        <div className="truncate" title={c.language}>{c.language}</div>
+                      <td>
+                        <span className="atbl-pill whitespace-nowrap" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
+                          {campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}
+                        </span>
                       </td>
-                      <td className="text-[#62655c]">{c.prospectCount}</td>
-                      <td className="text-[12px] text-[#9a9d92] whitespace-nowrap">
-                        {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </td>
-                      <td className="px-3 text-right">
-                        <ChevronRight size={15} className="text-[#c4bfb5]" />
+                      <td className="px-3">
+                        <div className="flex items-center justify-end gap-2">
+                          {isDraft && !readOnly && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setOpenCampaign(c, true); }}
+                              className={btn('secondary', 'sm')}
+                            >
+                              Edit
+                            </button>
+                          )}
+                          <ChevronRight size={15} className="text-[#c4bfb5]" />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -260,17 +288,26 @@ export function Campaigns({
                   className="cursor-pointer rounded-xl border border-[#ece8df] bg-white p-4 text-left"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <span className="min-w-0 truncate font-bold text-[#20211c] text-[14px]" title={c.name}>{c.name}</span>
-                      {isEuCountry(c.country) && <EuBadge />}
+                    <span className="min-w-0">
+                      <span className="line-clamp-2 block text-[14px] font-bold leading-snug text-[#20211c]" title={c.name}>{c.name}</span>
+                      {isEuCountry(c.country) && <span className="mt-1 block"><EuBadge /></span>}
                     </span>
                     <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-                      className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
-                      {CAMP_STATUS_LABEL[c.status] ?? c.status}
+                      className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[.04em]">
+                      {campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}
                     </span>
                   </div>
-                  <p className="mt-1.5 text-[12px] text-[#62655c]">{c.language}</p>
-                  <p className="mt-0.5 text-[12px] text-[#9a9d92]">{c.prospectCount} prospects</p>
+                  {(c.search_queries.length === 0 || c.target_locations.length === 0) && (
+                    <span className="atbl-pill mt-1.5" style={{ background: '#f8efdb', color: '#b9831f' }}>⚠ Needs setup</span>
+                  )}
+                  <p className="mt-1.5 text-[12px] text-[#62655c]">
+                    {c.prospectCount} prospect{c.prospectCount === 1 ? '' : 's'} · {c.language}
+                  </p>
+                  <p className="mt-0.5 text-[11.5px] text-[#9a9d92]">
+                    {c.scrape_status === 'running'
+                      ? <span className="font-semibold text-[#b9831f]">Finding prospects…</span>
+                      : lastScrapedLabel(c.last_scraped_at)}
+                  </p>
                 </button>
               );
             })}
@@ -315,6 +352,7 @@ export function Campaigns({
           <CampaignDetailModal
             key={`detail-${openCampaign.id}`}
             campaign={openCampaign}
+            startInEdit={openInEdit && !readOnly}
             clientId={clientId}
             client={client}
             readOnly={readOnly}
@@ -672,7 +710,7 @@ export function SuggestForMe({
       <button
         type="button"
         onClick={load}
-        className="inline-flex items-center gap-1.5 cursor-pointer rounded-lg border border-[#ece8df] bg-transparent px-3 py-1.5 text-[12px] font-semibold text-[#3c7a5b] transition-colors hover:border-[#3c7a5b]/40 hover:bg-[#edf4ef]"
+        className={btn('secondary', 'md')}
       >
         <Sparkles size={13} /> Suggest for me
       </button>
@@ -843,14 +881,14 @@ function ReviewRow({ label, value, tags }: { label: string; value?: string; tags
 
 /* ── Campaign Detail Modal ─────────────────────────────────────────── */
 function CampaignDetailModal({
-  campaign, clientId, onClose, onUpdated, onDeleted, client = supabase, readOnly = false, canDelete = true, basePath = '/app', hold = null,
+  campaign, startInEdit = false, clientId, onClose, onUpdated, onDeleted, client = supabase, readOnly = false, canDelete = true, basePath = '/app', hold = null,
 }: {
-  campaign: ClientCampaignRow; clientId: string; onClose: () => void; onUpdated: () => void; onDeleted: () => void;
+  campaign: ClientCampaignRow; startInEdit?: boolean; clientId: string; onClose: () => void; onUpdated: () => void; onDeleted: () => void;
   client?: SupabaseClient; readOnly?: boolean; canDelete?: boolean; basePath?: string; hold?: { country: string; reason: string } | null;
 }) {
   const { rows: prospects, loading } = useClientCampaignProspects(campaign.id, client);
 
-  const [editing, setEditing]       = useState(false);
+  const [editing, setEditing]       = useState(startInEdit);
   const [deleting, setDeleting]     = useState(false);
   const [name, setName]             = useState(campaign.name);
   const [description, setDescription] = useState(campaign.description ?? '');
@@ -866,7 +904,10 @@ function CampaignDetailModal({
   // Snapshot of the form when editing started; the `campaign` prop goes stale
   // after a save, so it can't be the baseline for a second edit.
   const formSnapshot = JSON.stringify([name, description, queries, areas, maxResults, language]);
-  const [editBaseline, setEditBaseline] = useState<string | null>(null);
+  // Opened straight into the editor: the baseline is the untouched campaign, same as the initial form state.
+  const [editBaseline, setEditBaseline] = useState<string | null>(() => startInEdit
+    ? JSON.stringify([campaign.name, campaign.description ?? '', campaign.search_queries, campaign.target_areas ?? locationsToAreas(campaign.target_locations), campaign.max_results, campaign.language])
+    : null);
   const dirty = editing && editBaseline !== null && formSnapshot !== editBaseline;
   const requestClose = () => { if (confirmDiscard(dirty)) onClose(); };
 
@@ -962,7 +1003,7 @@ function CampaignDetailModal({
             <div className="mt-1.5 flex items-center gap-1.5">
               <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
                 className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
-                {CAMP_STATUS_LABEL[campaign.status] ?? campaign.status}
+                {campaignStatusLabel(campaign.status, campaign.prospectCount, CAMP_STATUS_LABEL)}
               </span>
               {isEuCountry(campaign.country) && <EuBadge />}
             </div>

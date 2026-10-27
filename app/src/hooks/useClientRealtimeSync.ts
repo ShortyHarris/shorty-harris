@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
-import { clientApprovalsKey, clientApprovalsStatsKey, clientAwaitingProspectsKey, clientApprovedKey } from './useClientApprovals';
+import { approvalsScheduleKey } from './useApprovalsSchedule';
+import { clientApprovalsKey, clientPendingCountKey, clientApprovalsStatsKey, clientAwaitingProspectsKey, clientApprovedKey } from './useClientApprovals';
 import { dashboardKey } from './useClientDashboard';
 import { campaignPendingProspectsPrefix } from './useClientCampaigns';
 import { clientHeaderKey } from './useClientHeader';
@@ -32,6 +33,8 @@ export function useClientRealtimeSync(clientId: string) {
         () => {
           queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
           queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
+          queryClient.invalidateQueries({ queryKey: clientPendingCountKey(clientId) });
+          queryClient.invalidateQueries({ queryKey: approvalsScheduleKey(clientId) });
           queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
           queryClient.invalidateQueries({ queryKey: clientApprovedKey(clientId) });
           queryClient.invalidateQueries({ queryKey: campaignPendingProspectsPrefix });

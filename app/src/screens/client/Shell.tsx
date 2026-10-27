@@ -7,6 +7,8 @@ import { useOverlayClose } from '../../hooks/useOverlayClose';
 import '../../styles/admin-tables.css';
 import './Shell.css';
 
+type SideNavItem = { to: string; label: string; icon: React.ElementType; end?: boolean; badge?: number };
+
 export function Shell({
   businessName,
   credits,
@@ -44,6 +46,38 @@ export function Shell({
   const location = useLocation();
   const showGmailBanner = !gmailConnected && location.pathname !== `${basePath}/settings`;
 
+  // View-as-client passes "-" (no balance to show); a dash chip with an "Add credits" link is noise.
+  const hasCredits = /^\d/.test(String(credits));
+
+  // Grouped like the admin sidebar: what needs attention, the outreach itself, then account.
+  const navGroups: { label: string; items: SideNavItem[] }[] = [
+    {
+      label: 'Daily',
+      items: [
+        { to: basePath, end: true, label: 'Hot Leads', icon: Inbox, badge: newHotLeads },
+        { to: `${basePath}/approvals`, label: 'Approvals', icon: ClipboardCheck, badge: pendingApprovals },
+      ],
+    },
+    {
+      label: 'Outreach',
+      items: [
+        { to: `${basePath}/campaigns`, label: 'Campaigns', icon: Megaphone },
+        { to: `${basePath}/targeting`, label: 'Targeting', icon: Target },
+        { to: `${basePath}/prospects`, label: 'Prospects', icon: Users },
+        { to: `${basePath}/results`, label: 'Results', icon: Filter },
+        { to: `${basePath}/analytics`, label: 'Analytics', icon: BarChart3 },
+      ],
+    },
+    {
+      label: 'Account',
+      items: [
+        { to: `${basePath}/billing`, label: 'Billing', icon: CreditCard },
+        ...(hideSettings ? [] : [{ to: `${basePath}/settings`, label: 'Settings', icon: Settings }]),
+        { to: '/docs', label: 'Help & Docs', icon: BookOpen },
+      ],
+    },
+  ];
+
   return (
     <div className="cpage">
 
@@ -80,62 +114,34 @@ export function Shell({
            live in the top bar above ═══ */}
       <aside className="cside">
         <div className="cside-scroll">
-        <p className="cside-section-label" style={{ marginTop: 4 }}>Menu</p>
-        <nav className="cside-nav">
-          <NavLink to={basePath} end className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <Inbox size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Hot Leads
-            {newHotLeads > 0 && <span className="cside-nav-badge">{newHotLeads > 99 ? '99+' : newHotLeads}</span>}
-          </NavLink>
-          <NavLink to={`${basePath}/results`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <Filter size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Results
-          </NavLink>
-          <NavLink to={`${basePath}/campaigns`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <Megaphone size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Campaigns
-          </NavLink>
-          <NavLink to={`${basePath}/prospects`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <Users size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Prospects
-          </NavLink>
-          <NavLink to={`${basePath}/approvals`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <ClipboardCheck size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Approvals
-            {pendingApprovals > 0 && <span className="cside-nav-badge">{pendingApprovals > 99 ? '99+' : pendingApprovals}</span>}
-          </NavLink>
-          <NavLink to={`${basePath}/analytics`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <BarChart3 size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Analytics
-          </NavLink>
-          <NavLink to={`${basePath}/targeting`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <Target size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Targeting
-          </NavLink>
-          <NavLink to={`${basePath}/billing`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <CreditCard size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Billing
-          </NavLink>
-          {!hideSettings && (
-            <NavLink to={`${basePath}/settings`} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-              <Settings size={16} strokeWidth={1.9} className="cside-link-icon" />
-              Settings
-            </NavLink>
-          )}
-          <NavLink to="/docs" className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
-            <BookOpen size={16} strokeWidth={1.9} className="cside-link-icon" />
-            Help &amp; Docs
-          </NavLink>
-        </nav>
+        {navGroups.map((group, gi) => (
+          <div key={group.label}>
+            <p className="cside-section-label" style={{ marginTop: gi === 0 ? 4 : 18 }}>{group.label}</p>
+            <nav className="cside-nav">
+              {group.items.map((n) => {
+                const Icon = n.icon;
+                return (
+                  <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `cside-link${isActive ? ' is-active' : ''}`}>
+                    <Icon size={16} strokeWidth={1.9} className="cside-link-icon" />
+                    {n.label}
+                    {!!n.badge && n.badge > 0 && <span className="cside-nav-badge">{n.badge > 99 ? '99+' : n.badge}</span>}
+                  </NavLink>
+                );
+              })}
+            </nav>
+          </div>
+        ))}
         </div>
 
-        <div className="cside-bottom">
-          <Link to={`${basePath}/billing`} className="cside-credits">
-            <span className="cside-credits-num">{credits}</span>
-            <span className="cside-credits-label">credits remaining</span>
-            <span className="cside-credits-cta">Add credits </span>
-          </Link>
-        </div>
+        {hasCredits && (
+          <div className="cside-bottom">
+            <Link to={`${basePath}/billing`} className="cside-credits">
+              <span className="cside-credits-num">{credits}</span>
+              <span className="cside-credits-label">credits remaining</span>
+              <span className="cside-credits-cta">Add credits</span>
+            </Link>
+          </div>
+        )}
       </aside>
 
       {/* ═══ MOBILE TOPBAR ═══ */}
@@ -162,10 +168,12 @@ export function Shell({
           onMarkAllAsRead={onMarkAllAsRead}
           basePath={basePath}
         />
-        <Link to={`${basePath}/billing`} className="ctopbar-credits">
-          <span className="ctopbar-credits-num">{credits}</span>
-          <span className="ctopbar-credits-label"> cr</span>
-        </Link>
+        {hasCredits && (
+          <Link to={`${basePath}/billing`} className="ctopbar-credits">
+            <span className="ctopbar-credits-num">{credits}</span>
+            <span className="ctopbar-credits-label"> cr</span>
+          </Link>
+        )}
       </header>
 
       {/* ═══ CONTENT ═══ */}
