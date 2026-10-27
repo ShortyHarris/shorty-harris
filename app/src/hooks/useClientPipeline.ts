@@ -29,6 +29,9 @@ export interface PipelineRow {
   hot_lead_id: string | null;
   hot_lead_status: string | null;
   suppressed: boolean;
+  // Present once client_pipeline returns them; shown as a row pill when true.
+  followups_stopped?: boolean;
+  sequence_paused?: boolean;
 }
 
 export interface ClientPipelineResult {
@@ -135,6 +138,7 @@ export interface ProspectSequence {
   prospect: { prospect_id: string; business_name: string; email: string | null; pipeline_status: string };
   sequence_status?: SequenceStatus | null;
   stopped_because: StoppedBecause;
+  followups_stopped?: boolean;
   replies: SequenceReply[];
   steps: SequenceStep[];
 }

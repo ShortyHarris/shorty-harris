@@ -6,6 +6,7 @@ import {
 } from '../../hooks/useClientResultInsights';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { Filter, AlertTriangle, Info, ArrowRight } from 'lucide-react';
+import { btn } from '../../lib/clientButtons';
 
 const HELP: HelpContent = {
   title: 'Results',
@@ -194,16 +195,14 @@ function InsightCard({ insight, basePath }: { insight: ResultInsight; basePath: 
             isMailto ? (
               <a
                 href={href}
-                className="mt-3 inline-flex cursor-pointer items-center gap-1 rounded-lg border-0 px-3.5 py-1.5 text-[12.5px] font-bold text-white no-underline"
-                style={{ background: 'var(--leaf)' }}
+                className={`${btn(insight.severity === 'critical' ? 'alert' : 'primary', 'md')} mt-3`}
               >
                 {ACTION_LABEL[insight.action]}
               </a>
             ) : (
               <Link
                 to={href}
-                className="mt-3 inline-flex cursor-pointer items-center gap-1 rounded-lg border-0 px-3.5 py-1.5 text-[12.5px] font-bold text-white no-underline"
-                style={{ background: 'var(--leaf)' }}
+                className={`${btn(insight.severity === 'critical' ? 'alert' : 'primary', 'md')} mt-3`}
               >
                 {ACTION_LABEL[insight.action]}
               </Link>

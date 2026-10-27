@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { useClientBlacklist } from '../../hooks/useBlacklistedDomains';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
+import { btn } from '../../lib/clientButtons';
 
 const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em]';
 const inputCls = 'w-full rounded-lg border px-3.5 py-2.5 text-[13px] outline-none transition-colors';
@@ -110,8 +111,7 @@ export function BlockedDomainsModal({
               <button
                 onClick={submit}
                 disabled={busy}
-                className="cursor-pointer shrink-0 rounded-lg border-0 px-4 py-2.5 text-[13px] font-bold text-white transition-colors disabled:opacity-50"
-                style={{ background: 'var(--leaf)' }}
+                className={`${btn('primary', 'lg')} shrink-0`}
               >
                 {busy ? 'Adding…' : 'Add'}
               </button>

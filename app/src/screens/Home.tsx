@@ -116,10 +116,10 @@ function VideoFrame() {
 
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded-[28px] bg-cream-deep shadow-[0_30px_80px_-30px_rgba(0,0,0,0.25)]">
-      {/* #t=0.1 makes the browser paint the first frame as the cover */}
       <video
         ref={ref}
-        src={`${VIDEO_SRC}#t=0.1`}
+        src={VIDEO_SRC}
+        poster="/images/video-poster.png"
         className="absolute inset-0 h-full w-full object-cover"
         controls={playing}
         preload="metadata"
