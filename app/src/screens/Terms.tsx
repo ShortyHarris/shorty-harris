@@ -1,4 +1,5 @@
 import { LegalPage, type LegalSection } from '../components/LegalPage';
+import { PUBLIC_PAGES } from "../lib/publicPages";
 
 const SECTIONS: LegalSection[] = [
   {
@@ -89,9 +90,9 @@ const SECTIONS: LegalSection[] = [
 export function Terms() {
   return (
     <LegalPage
-      title="Terms of Service"
-      description="The terms that govern your use of Shorty Harris, including outreach sent via connected Gmail accounts."
-      path="/terms"
+      title={PUBLIC_PAGES.terms.title}
+      description={PUBLIC_PAGES.terms.description}
+      path={PUBLIC_PAGES.terms.path}
       lastUpdated="July 15, 2026"
       intro="These Terms of Service govern your access to and use of Shorty Harris. Please read them carefully."
       sections={SECTIONS}

@@ -1,4 +1,5 @@
 import { LegalPage, type LegalSection } from '../components/LegalPage';
+import { PUBLIC_PAGES } from "../lib/publicPages";
 
 const SECTIONS: LegalSection[] = [
   {
@@ -71,9 +72,9 @@ const SECTIONS: LegalSection[] = [
 export function Cookies() {
   return (
     <LegalPage
-      title="Cookie Policy"
-      description="How Shorty Harris uses cookies and similar tracking technologies, and how to control your preferences."
-      path="/cookies"
+      title={PUBLIC_PAGES.cookies.title}
+      description={PUBLIC_PAGES.cookies.description}
+      path={PUBLIC_PAGES.cookies.path}
       lastUpdated="August 31, 2026"
       intro="This policy describes the cookies and tracking technologies used on shortyharris.com and in the Shorty Harris dashboard, and how you can manage your preferences."
       sections={SECTIONS}

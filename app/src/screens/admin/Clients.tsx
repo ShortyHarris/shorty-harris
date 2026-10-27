@@ -87,7 +87,7 @@ export function Clients() {
     if (!c.contact_email) return;
     setInvitePhase((p) => ({ ...p, [c.id]: 'sending' }));
     setInviteErrors((e) => { const n = { ...e }; delete n[c.id]; return n; });
-    const { error: err, alreadyActive } = await sendClientInvite(c.id, c.contact_email, c.business_name);
+    const { error: err, alreadyActive, resent } = await sendClientInvite(c.id, c.contact_email, c.business_name);
     if (err) {
       setInvitePhase((p) => ({ ...p, [c.id]: alreadyActive ? 'active' : 'error' }));
       if (!alreadyActive) {
@@ -102,7 +102,10 @@ export function Clients() {
       if (alreadyActive) reload();
     } else {
       setInvitePhase((p) => ({ ...p, [c.id]: 'sent' }));
-      toast(`Invite sent to ${c.contact_email}.`);
+      // A resend for someone who never signed in goes out as a password-setup (reset) email, not the original invite.
+      toast(resent
+        ? `Password-setup link sent to ${c.contact_email}. (Resends use the password-reset email, not the original invite.)`
+        : `Invite sent to ${c.contact_email}.`);
     }
   }
 
@@ -207,7 +210,7 @@ export function Clients() {
                           { type: 'action', label: 'Add credits', onClick: () => setCreditsTarget(c) },
                           {
                             type: 'action',
-                            label: phase === 'sent' || c.has_profile ? 'Resend invite' : 'Send invite',
+                            label: (phase === 'active' || c.activated_at) ? 'Activated' : phase === 'sent' || c.has_profile ? 'Resend invite' : 'Send invite',
                             onClick: () => handleInvite(c),
                             disabled: c.is_internal || !c.contact_email || phase === 'sending' || phase === 'active' || !!c.activated_at,
                             title: c.is_internal

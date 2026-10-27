@@ -1,6 +1,8 @@
 // Maps PostKing blog articles onto this app's `blog_posts` CMS rows.
 // Used by `app/scripts/sync-postking-blog.ts` — not imported by the UI.
 
+import { expandInternalLinks } from './blogLinks';
+
 export const SHORTY_HARRIS_POSTKING_BRAND_ID = 'cmvgju3fk1bg9g07zorefgwgu';
 
 export const FORBIDDEN_POSTKING_BRAND_IDS = [
@@ -223,7 +225,7 @@ export function toUpsertRow(
 ): UpsertRow {
   const status = mapPostkingStatus(article.status);
   const slug = (article.slug || '').trim() || slugify(article.title);
-  const body = absolutizeHtml(article.content ?? '', apiBase);
+  const body = expandInternalLinks(absolutizeHtml(article.content ?? '', apiBase));
   const excerpt = article.excerpt?.trim() || article.metaDescription?.trim() || null;
   const seoTitle = article.seoTitle?.trim() || null;
   const metaDescription = article.metaDescription?.trim() || excerpt;

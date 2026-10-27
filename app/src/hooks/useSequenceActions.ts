@@ -3,6 +3,8 @@ import { queryClient } from '../lib/queryClient';
 import { clientApprovalsKey, clientApprovalsStatsKey, clientAwaitingProspectsKey, clientApprovedKey } from './useClientApprovals';
 import { dashboardKey } from './useClientDashboard';
 import { campaignPendingProspectsPrefix } from './useClientCampaigns';
+import { approvalsScheduleKey } from './useApprovalsSchedule';
+import { saveDraftEdits } from '../lib/draftEdits';
 
 // Every sequence write goes through a Supabase RPC on the real (non-impersonation)
 // client - never a direct write to `messages`. Each RPC returns { ok, error? }
@@ -36,6 +38,8 @@ export function refreshSequenceData(clientId: string | null) {
     queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
     queryClient.invalidateQueries({ queryKey: clientApprovedKey(clientId) });
+    queryClient.invalidateQueries({ queryKey: approvalsScheduleKey(clientId) });
+    queryClient.invalidateQueries({ queryKey: ['client-approvals-pending-count', clientId] });
     queryClient.invalidateQueries({ queryKey: campaignPendingProspectsPrefix });
     queryClient.invalidateQueries({ queryKey: dashboardKey(clientId) });
   }
@@ -72,6 +76,13 @@ export async function setSequencePaused(clientId: string | null, prospectId: str
   return res;
 }
 
+// Stops every remaining follow-up for a prospect (nothing already sent is touched).
+export async function stopFollowups(clientId: string | null, prospectId: string) {
+  const res = await callRpc<Record<string, unknown>>('stop_followups', { p_prospect_id: prospectId });
+  if (!res.error) refreshSequenceData(clientId);
+  return res;
+}
+
 export async function cancelUnsentSequence(clientId: string | null, prospectId: string) {
   const res = await callRpc<{ emails_cancelled: number }>('cancel_unsent_sequence', {
     p_prospect_id: prospectId,
@@ -92,15 +103,13 @@ export async function resolveUncertainReply(
 
 // Editing subject/body of an unsent email. There is no RPC for this yet, so it
 // is the one direct `messages` write; it touches only subject/body, so the
-// message keeps its approval_status.
+// message keeps its approval_status. Guarded to unsent drafts (a step the UI
+// offers to edit may be approved but not yet sent) and errors on zero rows.
 export async function saveStepEdit(
   clientId: string | null, messageId: string, patch: { subject?: string; body?: string },
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase
-    .from('messages')
-    .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq('id', messageId);
-  if (error) return { error: error.message };
+  const { error } = await saveDraftEdits(supabase, messageId, patch, ['pending', 'edited', 'approved']);
+  if (error) return { error };
   refreshSequenceData(clientId);
   return { error: null };
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import { marked } from 'marked';
 import { ArrowLeft } from 'lucide-react';
 import { PublicNav } from '../components/PublicNav';
@@ -8,6 +8,8 @@ import { useSeo } from '../hooks/useSeo';
 import { useBlogPost, fetchLinkedPosts } from '../hooks/useBlogPosts';
 import type { BlogCategory, LinkedPost } from '../hooks/useBlogPosts';
 import { responsiveImage } from '../lib/supabaseImage';
+import { expandInternalLinks, hasInternalLink } from '../lib/blogLinks';
+import { canonicalUrl } from '../lib/site';
 
 const CATEGORY_LABEL: Record<BlogCategory, string> = {
   family_business: 'Family Business',
@@ -48,6 +50,22 @@ export function BlogPost() {
     type: 'article',
   });
 
+  // Bare-slug redirects (vercel.json) can land here for non-posts: keep those
+  // out of the index.
+  useEffect(() => {
+    if (loading || post) return;
+    const meta = document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex, nofollow';
+    document.head.appendChild(meta);
+    return () => meta.remove();
+  }, [loading, post]);
+
+  // Old links like /blog/internal_link:some-slug: send to the real post.
+  if (hasInternalLink(slug)) {
+    return <Navigate to={expandInternalLinks(`/blog/${slug}`)} replace />;
+  }
+
   if (loading) {
     return (
       <div style={FONT} className="min-h-screen flex flex-col bg-cream">
@@ -87,7 +105,7 @@ export function BlogPost() {
     datePublished: post.published_at ?? undefined,
     author: { '@type': 'Person', name: post.author || 'Shorty Harris' },
     description: post.meta_description || post.excerpt || undefined,
-    mainEntityOfPage: { '@type': 'WebPage', '@id': `${window.location.origin}/blog/${post.slug}` },
+    mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalUrl(`/blog/${post.slug}`) },
   };
 
   return (
@@ -158,7 +176,7 @@ export function BlogPost() {
         `}</style>
         <div
           className="blog-post-body"
-          dangerouslySetInnerHTML={{ __html: marked.parse(post.body_md || '') as string }}
+          dangerouslySetInnerHTML={{ __html: marked.parse(expandInternalLinks(post.body_md || '')) as string }}
         />
 
         {/* Turn a finished read into a next step */}

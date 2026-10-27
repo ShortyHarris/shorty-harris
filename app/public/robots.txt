@@ -15,4 +15,4 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
-Sitemap: https://shortyharris.com/sitemap.xml
+Sitemap: https://www.shortyharris.com/sitemap.xml

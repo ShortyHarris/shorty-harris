@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { canonicalUrl } from '../lib/site';
 
 // Client-side per-page SEO: document.title, meta description, canonical link,
 // and Open Graph / Twitter Card tags. This runs after React renders, so it
@@ -9,7 +10,7 @@ import { useEffect } from 'react';
 interface SeoOptions {
   title: string;
   description?: string;
-  /** Path only, e.g. "/blog/my-post" - origin is read from window.location. */
+  /** Path only, e.g. "/blog/my-post" - the origin comes from lib/site.ts. */
   path?: string;
   image?: string;
   type?: 'website' | 'article';
@@ -50,8 +51,13 @@ export function useSeo({ title, description, path, image, type = 'website' }: Se
       upsertMeta('name', 'twitter:description', description);
     }
 
+    // A noindex left behind by another screen must not outlive it on an
+    // indexable page.
+    const robots = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    if (robots && /noindex/i.test(robots.content)) robots.remove();
+
     if (path) {
-      const url = `${window.location.origin}${path}`;
+      const url = canonicalUrl(path);
       upsertLink('canonical', url);
       upsertMeta('property', 'og:url', url);
     }

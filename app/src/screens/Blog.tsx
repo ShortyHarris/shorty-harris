@@ -4,6 +4,7 @@ import { Calendar, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PublicNav } from '../components/PublicNav';
 import { PublicFooter } from '../components/PublicFooter';
 import { useSeo } from '../hooks/useSeo';
+import { PUBLIC_PAGES } from '../lib/publicPages';
 import {
   BLOG_PAGE_SIZE,
   prefetchPublicBlogPage,
@@ -82,8 +83,9 @@ export function Blog() {
 
   useSeo({
     title: page > 1 ? `Blog - Page ${page}` : 'Blog',
-    description: 'Practical advice for growing your small or family business - outreach strategy, local business development, and growth tips.',
-    path: `/blog${searchFor(page, activeCategory)}`,
+    description: PUBLIC_PAGES.blog.description,
+    // Canonical never carries ?page= / ?category= (see canonicalUrl).
+    path: PUBLIC_PAGES.blog.path,
   });
 
   const { posts, total, totalPages, loading, error } = usePublicBlogPage(page, activeCategory);

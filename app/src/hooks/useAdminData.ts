@@ -498,6 +498,22 @@ export interface ClientListRow {
   credits_remaining: number;
 }
 
+/**
+ * One entry per client that has at least one profile. A client with several
+ * profiles counts as activated if ANY of them has activated_at (the latest one).
+ */
+export function activationByClient(
+  profiles: { client_id: string; activated_at: string | null }[],
+): Map<string, string | null> {
+  const out = new Map<string, string | null>();
+  for (const p of profiles) {
+    const prev = out.get(p.client_id) ?? null;
+    const best = p.activated_at && (!prev || p.activated_at > prev) ? p.activated_at : prev;
+    out.set(p.client_id, best);
+  }
+  return out;
+}
+
 async function fetchClients(): Promise<ClientListRow[]> {
   const { data, error } = await supabase
     .from('clients')
@@ -516,13 +532,13 @@ async function fetchClients(): Promise<ClientListRow[]> {
     (billingData ?? []).map((b: { client_id: string; credits_remaining: number }) => [b.client_id, b.credits_remaining]),
   );
 
-  const { data: profileData } = await supabase
+  const { data: profileData, error: profileErr } = await supabase
     .from('profiles')
     .select('client_id, activated_at')
     .in('client_id', base.map((c) => c.id));
-  const profileByClient = new Map(
-    (profileData ?? []).map((p: { client_id: string; activated_at: string | null }) => [p.client_id, p.activated_at]),
-  );
+  // A silent failure here would make every client look un-activated ("Resend invite").
+  if (profileErr) throw new Error(`Couldn't load login accounts: ${profileErr.message}`);
+  const profileByClient = activationByClient(profileData ?? []);
 
   return base.map((c) => ({
     ...c,
@@ -674,7 +690,7 @@ export async function sendClientInvite(
   clientId: string,
   email: string,
   fullName: string | null,
-): Promise<{ error: string | null; alreadyActive?: boolean }> {
+): Promise<{ error: string | null; alreadyActive?: boolean; resent?: boolean }> {
   const { data, error } = await supabase.functions.invoke('invite-client', {
     body: {
       email,
@@ -683,10 +699,19 @@ export async function sendClientInvite(
       redirect_to: `${window.location.origin}/auth/set-password`,
     },
   });
-  if (error) return { error: error.message };
-  if (data?.error === 'user_already_active') return { error: data.message, alreadyActive: true };
-  if (data?.error) return { error: data.message ?? data.error };
-  return { error: null };
+  let body = data as { error?: string; message?: string; resent?: boolean } | null;
+  if (error) {
+    // Non-2xx (e.g. 409 user_already_active): the JSON body is on error.context.
+    body = null;
+    try {
+      const ctx = (error as { context?: unknown }).context;
+      if (ctx instanceof Response) body = await ctx.json();
+    } catch { /* non-JSON body: fall through to the generic message */ }
+    if (!body) return { error: error.message };
+  }
+  if (body?.error === 'user_already_active') return { error: 'Already active', alreadyActive: true };
+  if (body?.error) return { error: body.message ?? body.error };
+  return { error: null, resent: body?.resent === true };
 }
 
 export async function updateClientLoginEmail(

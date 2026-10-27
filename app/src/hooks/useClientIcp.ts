@@ -171,7 +171,7 @@ export function useClientIcp(clientId: string, client: SupabaseClient = supabase
     icp,
     loading,
     error: (error as Error)?.message ?? null,
-    reload: async () => { await refetch(); },
+    reload: async (): Promise<ClientIcpRow | null> => (await refetch()).data ?? null,
   };
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
@@ -9,8 +9,11 @@ import './Login.css';
 const MIN_PW = 8;
 
 export function SetPassword() {
-  const { session, loading } = useAuth();
+  const { session, loading, profile } = useAuth();
   const navigate = useNavigate();
+  // The profile may finish loading while the success message is showing.
+  const roleRef = useRef(profile?.role);
+  roleRef.current = profile?.role;
 
   const [password, setPassword]   = useState('');
   const [confirm, setConfirm]     = useState('');
@@ -45,7 +48,7 @@ export function SetPassword() {
     setBusy(false);
     if (error) { setErr(error.message); return; }
     setDone(true);
-    setTimeout(() => navigate('/app', { replace: true }), 1400);
+    setTimeout(() => navigate(roleRef.current === 'admin' ? '/admin/approvals' : '/app', { replace: true }), 1400);
   }
 
   if (authRedirectError) {
