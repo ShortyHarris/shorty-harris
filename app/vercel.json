@@ -1,9 +1,80 @@
 {
   "redirects": [
     {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "shortyharris.com"
+        }
+      ],
+      "destination": "https://www.shortyharris.com/:path*",
+      "statusCode": 301
+    },
+    {
+      "source": "/home",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/blog/internal_link\\::slug",
+      "destination": "/blog/:slug",
+      "statusCode": 301
+    },
+    {
       "source": "/blog/simple-weekly-cash-flow-habits-small-business",
       "destination": "/blog/small-business-cash-flow-weekly-habits",
-      "permanent": true
+      "statusCode": 301
+    },
+    {
+      "source": "/:slug((?!pricing$|blog$|login$|signup$|app$|admin$|privacy$|terms$|cookies$|gmail-data-use$|home$|forgot-password$|auth$|unsubscribe$|assets$|images$|videos$)(?=[^/]*-)[a-z0-9-]+)",
+      "destination": "/blog/:slug",
+      "statusCode": 301
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/blog/:slug",
+      "destination": "/blog/:slug/index.html"
+    },
+    {
+      "source": "/blog",
+      "destination": "/blog/index.html"
+    },
+    {
+      "source": "/pricing",
+      "destination": "/pricing/index.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy/index.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/terms/index.html"
+    },
+    {
+      "source": "/cookies",
+      "destination": "/cookies/index.html"
+    },
+    {
+      "source": "/gmail-data-use",
+      "destination": "/gmail-data-use/index.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     }
   ]
 }

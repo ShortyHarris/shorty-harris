@@ -1,4 +1,5 @@
 import { LegalPage, type LegalSection } from '../components/LegalPage';
+import { PUBLIC_PAGES } from "../lib/publicPages";
 
 const SECTIONS: LegalSection[] = [
   {
@@ -108,9 +109,9 @@ const SECTIONS: LegalSection[] = [
 export function Privacy() {
   return (
     <LegalPage
-      title="Privacy Policy"
-      description="How Shorty Harris collects, uses, and protects your information, including data accessed via Google APIs."
-      path="/privacy"
+      title={PUBLIC_PAGES.privacy.title}
+      description={PUBLIC_PAGES.privacy.description}
+      path={PUBLIC_PAGES.privacy.path}
       lastUpdated="July 15, 2026"
       intro="This policy describes how Shorty Harris collects, uses, and shares information when you visit our website or use our dashboard."
       sections={SECTIONS}

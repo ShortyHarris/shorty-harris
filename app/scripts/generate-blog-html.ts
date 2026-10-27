@@ -28,6 +28,9 @@ import { marked } from 'marked';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { expandInternalLinks, hasInternalLink } from '../src/lib/blogLinks.ts';
+import { PUBLIC_PAGES } from '../src/lib/publicPages.ts';
+import { canonicalUrl, SITE_URL } from '../src/lib/site.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.resolve(__dirname, '..');
@@ -39,10 +42,9 @@ const TEMPLATE_PATH = path.join(DIST_DIR, 'index.html');
 // Override via env vars if this ever needs to point elsewhere.
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? 'https://lxoeotyibsalbxgbjfxo.supabase.co';
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY ?? 'sb_publishable_CdK80AB1j_99hPPZGGS_jA_XYsNzrUs';
-// Canonical/OG URLs always point at the production domain by default, even
-// on preview deploys — you don't want a Vercel preview URL getting indexed
-// as the canonical source. Override per-environment via SITE_URL if needed.
-const SITE_URL = (process.env.SITE_URL ?? 'https://shortyharris.com').replace(/\/$/, '');
+// Canonical/OG URLs always point at the single production host (www, see
+// src/lib/site.ts), even on preview deploys — you don't want a Vercel
+// preview URL getting indexed as the canonical source.
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -100,6 +102,8 @@ function initials(name: string): string {
 // a handful of entries.
 const REDIRECTED_SLUGS = new Set(['simple-weekly-cash-flow-habits-small-business']);
 
+const RESERVED_TOP_LEVEL = new Set(['pricing', 'blog', 'login', 'signup', 'app', 'admin', 'privacy', 'terms', 'cookies', 'gmail-data-use', 'home', 'forgot-password', 'auth', 'unsubscribe']);
+
 async function fetchPosts(slugFilter?: string): Promise<BlogPostRow[]> {
   let q = supabase
     .from('blog_posts')
@@ -109,7 +113,14 @@ async function fetchPosts(slugFilter?: string): Promise<BlogPostRow[]> {
   if (slugFilter) q = q.eq('slug', slugFilter);
   const { data, error } = await q;
   if (error) throw new Error(`Failed to fetch blog posts: ${error.message}`);
-  return ((data ?? []) as BlogPostRow[]).filter((p) => !REDIRECTED_SLUGS.has(p.slug));
+  // A slug containing "internal_link" is a junk row from an unexpanded
+  // PostKing link; it must never get a page or a sitemap entry.
+  const rows = (data ?? []) as BlogPostRow[];
+  // The bare-slug redirect in vercel.json skips these top-level routes, so a post
+  // using one would be unreachable via its bare URL; fail loudly.
+  const clash = rows.find((p) => RESERVED_TOP_LEVEL.has(p.slug));
+  if (clash) throw new Error(`Published slug "${clash.slug}" collides with a top-level route`);
+  return rows.filter((p) => !REDIRECTED_SLUGS.has(p.slug) && !hasInternalLink(p.slug));
 }
 
 // Matches a <meta ...> tag by one of its attributes regardless of attribute
@@ -135,7 +146,7 @@ function extractMetaContent(html: string, attrMatch: string): string {
 function buildHtml(template: string, post: BlogPostRow): string {
   const displayTitle = post.seo_title?.trim() || post.title;
   const fullTitle = displayTitle.endsWith('Shorty Harris') ? displayTitle : `${displayTitle} — Shorty Harris`;
-  const url = `${SITE_URL}/blog/${post.slug}`;
+  const url = canonicalUrl(`/blog/${post.slug}`);
   const image = post.cover_image_url?.trim() || '';
   const categoryLabel = CATEGORY_LABEL[post.category] ?? post.category;
   const author = post.author?.trim() || 'Shorty Harris';
@@ -165,10 +176,9 @@ function buildHtml(template: string, post: BlogPostRow): string {
     html = replaceMetaTag(html, 'name="twitter:card"', `<meta name="twitter:card" content="summary_large_image" />`);
   }
 
-  const extraTags: string[] = [
-    `<link rel="canonical" href="${escapeHtml(url)}" />`,
-    `<meta property="og:url" content="${escapeHtml(url)}" />`,
-  ];
+  html = setCanonical(html, url);
+
+  const extraTags: string[] = [];
   if (image) {
     extraTags.push(`<meta property="og:image" content="${escapeHtml(image)}" />`);
     extraTags.push(`<meta name="twitter:image" content="${escapeHtml(image)}" />`);
@@ -193,7 +203,8 @@ function buildHtml(template: string, post: BlogPostRow): string {
   // Real content for crawlers that never run JS. Class names intentionally
   // mirror src/screens/BlogPost.tsx so the already-loading Tailwind bundle
   // styles this correctly for the brief moment before React takes over.
-  const bodyHtml = marked.parse(post.body_md || '', { async: false }) as string;
+  const bodyHtml = marked.parse(expandInternalLinks(post.body_md || ''), { async: false }) as string;
+  if (hasInternalLink(bodyHtml)) throw new Error('rendered body still contains "internal_link"');
   const excerptHtml = post.excerpt
     ? `<p class="mt-5 text-[17px] sm:text-[19px] leading-relaxed text-[#54574e]">${escapeHtml(post.excerpt)}</p>`
     : '';
@@ -223,7 +234,30 @@ function buildHtml(template: string, post: BlogPostRow): string {
   return html;
 }
 
-const STATIC_ROUTES = ['/', '/blog', '/pricing', '/privacy', '/terms', '/cookies', '/gmail-data-use'];
+const STATIC_ROUTES = ['/', ...Object.values(PUBLIC_PAGES).map((p) => p.path)];
+
+// Replaces the homepage canonical + og:url baked into index.html.
+function setCanonical(html: string, url: string): string {
+  const u = escapeHtml(url);
+  html = html.replace(/<link[^>]*rel="canonical"[^>]*>/, () => `<link rel="canonical" href="${u}" />`);
+  return replaceMetaTag(html, 'property="og:url"', `<meta property="og:url" content="${u}" />`);
+}
+
+// Static shells for the non-blog public routes (/pricing, legal pages, /blog)
+// so each has its own title/description/canonical instead of the homepage
+// shell. React still takes over #root on load, same as the post pages.
+function buildStaticPageHtml(template: string, page: { path: string; title: string; description: string }): string {
+  const fullTitle = page.title.endsWith('Shorty Harris') ? page.title : `${page.title} - Shorty Harris`;
+  const t = escapeHtml(fullTitle);
+  const d = escapeHtml(page.description);
+  let html = template.replace(/<title>[^<]*<\/title>/, () => `<title>${t}</title>`);
+  html = replaceMetaTag(html, 'name="description"', `<meta name="description" content="${d}" />`);
+  html = replaceMetaTag(html, 'property="og:title"', `<meta property="og:title" content="${t}" />`);
+  html = replaceMetaTag(html, 'property="og:description"', `<meta property="og:description" content="${d}" />`);
+  html = replaceMetaTag(html, 'name="twitter:title"', `<meta name="twitter:title" content="${t}" />`);
+  html = replaceMetaTag(html, 'name="twitter:description"', `<meta name="twitter:description" content="${d}" />`);
+  return setCanonical(html, canonicalUrl(page.path));
+}
 
 // The sitemap always reflects every published post, regardless of whether
 // this run was scoped to a single --slug for HTML generation — a partial
@@ -250,6 +284,13 @@ async function main() {
 
   const slugArg = process.argv.find((a) => a.startsWith('--slug='));
   const slugFilter = slugArg ? slugArg.slice('--slug='.length) : undefined;
+
+  for (const page of Object.values(PUBLIC_PAGES)) {
+    const outDir = path.join(DIST_DIR, page.path);
+    mkdirSync(outDir, { recursive: true });
+    writeFileSync(path.join(outDir, 'index.html'), buildStaticPageHtml(template, page), 'utf-8');
+    console.log(`✓ dist${page.path}/index.html`);
+  }
 
   const posts = await fetchPosts(slugFilter);
 

@@ -6,6 +6,7 @@ import { PublicNav } from "@/components/PublicNav";
 import { PublicFooter } from "@/components/PublicFooter";
 import { useSeo } from "@/hooks/useSeo";
 import { PACKS } from "@/lib/pricing";
+import { PUBLIC_PAGES } from "@/lib/publicPages";
 
 const FONT: React.CSSProperties = {
   fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
@@ -51,11 +52,7 @@ const FAQS: { q: string; a: string }[] = [
 ];
 
 export function Pricing() {
-  useSeo({
-    title: "Pricing - Shorty Harris",
-    description: "No subscription and no setup fee. You buy credits and only use one when a business replies with real interest and becomes a hot lead.",
-    path: "/pricing",
-  });
+  useSeo(PUBLIC_PAGES.pricing);
 
   return (
     <div className="min-h-screen flex flex-col bg-cream text-[#1a1c17] antialiased" style={FONT}>

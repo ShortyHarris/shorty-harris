@@ -7,8 +7,8 @@
   list in that script if a new top-level page needs to be added, not this file.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://shortyharris.com/</loc></url>
-  <url><loc>https://shortyharris.com/blog</loc></url>
-  <url><loc>https://shortyharris.com/privacy</loc></url>
-  <url><loc>https://shortyharris.com/terms</loc></url>
+  <url><loc>https://www.shortyharris.com/</loc></url>
+  <url><loc>https://www.shortyharris.com/blog</loc></url>
+  <url><loc>https://www.shortyharris.com/privacy</loc></url>
+  <url><loc>https://www.shortyharris.com/terms</loc></url>
 </urlset>

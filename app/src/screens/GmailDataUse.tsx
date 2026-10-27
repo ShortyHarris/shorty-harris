@@ -1,4 +1,5 @@
 import { LegalPage, type LegalSection } from '../components/LegalPage';
+import { PUBLIC_PAGES } from "../lib/publicPages";
 
 // Plain-language disclosure of why Shorty Harris requests Gmail access.
 // Mirrors section 3 of the Privacy Policy - keep the two in step. A short
@@ -49,9 +50,9 @@ const SECTIONS: LegalSection[] = [
 export function GmailDataUse() {
   return (
     <LegalPage
-      title="How we use your Gmail"
-      description="Why Shorty Harris asks for Gmail access, what we do with it, and how to disconnect it at any time."
-      path="/gmail-data-use"
+      title={PUBLIC_PAGES.gmailDataUse.title}
+      description={PUBLIC_PAGES.gmailDataUse.description}
+      path={PUBLIC_PAGES.gmailDataUse.path}
       lastUpdated="October 25, 2026"
       intro="Plain-language answers about the optional Gmail connection."
       sections={SECTIONS}
