@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import type { QueueItem } from '../types';
 import { fetchAllRows } from '../lib/fetchAllRows';
 import { runInChunks, type ChunkedResult } from '../lib/chunkedBulk';
+import { saveDraftEdits } from '../lib/draftEdits';
 
 export const AQ_KEYS = {
   items: ['approval-queue', 'items'] as const,
@@ -41,13 +42,13 @@ async function fetchQueueItems(): Promise<QueueData> {
       id, prospect_id, campaign_id, client_id,
       channel, subject, body, message_type,
       approval_status, approved_at, send_status,
-      created_at, sender_email, sender_status,
+      created_at, pending_since, angle, observation, observation_source_url, sender_email, sender_status,
       prospect:prospects (
         id, business_name, contact_name, email,
         phone, category, location, pipeline_status
       ),
       client:clients (
-        id, business_name, business_type
+        id, business_name, business_type, send_timezone
       )
     `
     )
@@ -228,19 +229,12 @@ export function useApprovalQueue() {
 
   // Same edit patch as approve(), minus the approval fields - the draft stays pending.
   const saveEdits = useCallback(async (id: string, editedBody?: string, editedSubject?: string): Promise<{ error: string | null }> => {
-    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-    if (editedBody !== undefined) patch.body = editedBody;
-    if (editedSubject !== undefined) patch.subject = editedSubject;
-
-    const { error } = await supabase
-      .from('messages')
-      .update(patch)
-      .eq('id', id);
-
+    // Errors when no row was updated instead of reporting a silent "saved".
+    const { error, patch } = await saveDraftEdits(supabase, id, { body: editedBody, subject: editedSubject });
     if (!error) {
       updateQueueItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } as QueueItem : i)));
     }
-    return { error: error?.message ?? null };
+    return { error };
   }, []);
 
   const reject = useCallback(async (id: string): Promise<{ error: string | null }> => {

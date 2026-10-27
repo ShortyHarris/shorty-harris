@@ -15,6 +15,12 @@ export interface MessageRow {
   message_type: MessageType;
   approval_status: ApprovalStatus;
   approved_at: string | null;
+  /** When the draft last entered the pending queue (messages_with_sender exposes it). */
+  pending_since?: string | null;
+  /** Personalization behind the draft; all null on most rows. */
+  angle?: string | null;
+  observation?: string | null;
+  observation_source_url?: string | null;
   send_status: SendStatus;
   opened_at: string | null;
   open_count: number;
@@ -38,6 +44,7 @@ export interface ClientRow {
   id: string;
   business_name: string;
   business_type: string | null;
+  send_timezone?: string | null;
 }
 
 export interface QueueItem extends MessageRow {
@@ -101,6 +108,12 @@ export interface ClientMessageItem {
   message_type: MessageType;
   approval_status: ApprovalStatus;
   created_at: string;
+  /** When the draft last entered the pending queue (reset on resubmit). */
+  pending_since?: string | null;
+  /** Personalization behind the draft; all null on most rows. */
+  angle?: string | null;
+  observation?: string | null;
+  observation_source_url?: string | null;
   /** From message_block_reasons; only set on approved drafts that aren't simply sendable. */
   block_reason?: string | null;
   prospect: {

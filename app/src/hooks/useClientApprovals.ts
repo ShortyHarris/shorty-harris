@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -10,6 +10,10 @@ import { runInChunks, type ChunkedResult } from '../lib/chunkedBulk';
 import { TERMINAL_PIPELINE_STATUSES } from '../lib/pipelineStatus';
 import { campaignPendingProspectsPrefix } from './useClientCampaigns';
 import { POLICY_HELD_REASONS } from '../lib/blockReasons';
+import { saveDraftEdits } from '../lib/draftEdits';
+import { startOfDayInTz, browserTimeZone, heldRows, excludeHeldDrafts, adjustApprovalStats } from '../lib/approvalsView';
+import { approvalsScheduleKey, useApprovalsSchedule } from './useApprovalsSchedule';
+import { useClientProfile } from './useClientProfile';
 
 // Returned when an update matched no pending row (already approved or
 // rejected elsewhere, or not visible to this user).
@@ -17,6 +21,7 @@ const ALREADY_HANDLED = 'this draft was already handled - the list has been refr
 
 export const clientApprovalsKey =(clientId: string) => ['client-approvals', clientId] as const;
 export const clientApprovalsStatsKey = (clientId: string) => ['client-approvals-stats', clientId] as const;
+export const clientPendingCountKey = (clientId: string) => ['client-approvals-pending-count', clientId] as const;
 export const clientAwaitingProspectsKey = (clientId: string) => ['client-awaiting-prospects', clientId] as const;
 // includeHeld is a trailing element, so invalidating [key, clientId] matches both variants.
 export const clientApprovedKey = (clientId: string, includeHeld = false) =>
@@ -26,8 +31,45 @@ function invalidateApprovalQueries(clientId: string) {
   queryClient.invalidateQueries({ queryKey: campaignPendingProspectsPrefix });
   queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
   queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
+  queryClient.invalidateQueries({ queryKey: clientPendingCountKey(clientId) });
+  queryClient.invalidateQueries({ queryKey: approvalsScheduleKey(clientId) });
+  queryClient.invalidateQueries({ queryKey: ['client-approvals-held-approved-today', clientId] });
   queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
   queryClient.invalidateQueries({ queryKey: clientApprovedKey(clientId) });
+}
+
+// How many of these messages were approved since `iso` (ids go in the URL, so in batches).
+async function countApprovedSince(client: SupabaseClient, ids: string[], iso: string): Promise<number> {
+  let total = 0;
+  for (let i = 0; i < ids.length; i += 150) {
+    const { count, error } = await client.from('messages').select('id', { count: 'exact', head: true })
+      .in('id', ids.slice(i, i + 150)).eq('approval_status', 'approved').gte('approved_at', iso);
+    if (error) throw new Error(error.message);
+    total += count ?? 0;
+  }
+  return total;
+}
+
+// Head count only - what the sidebar badge needs, without loading any drafts.
+// Drafts held by send rules are not the client's to act on, so they are left out.
+export function usePendingApprovalCount(clientId: string): number {
+  const { schedule, scheduleReady } = useApprovalsSchedule(clientId);
+  const heldPending = heldRows(schedule).filter((r) => r.approval_status === 'pending').length;
+  const { data = 0 } = useQuery({
+    queryKey: clientPendingCountKey(clientId),
+    queryFn: async () => {
+      const { count, error } = await supabase.from('messages').select('id', { count: 'exact', head: true })
+        .eq('client_id', clientId).eq('approval_status', 'pending');
+      if (error) throw new Error(error.message);
+      return count ?? 0;
+    },
+    enabled: !!clientId && clientId !== '__preview__',
+    staleTime: 30 * 1000,
+  });
+  // Until the schedule is known the held rows can't be told apart, so show nothing
+  // rather than a count that includes drafts the client must not see.
+  if (!scheduleReady && clientId !== '__preview__') return 0;
+  return Math.max(0, data - heldPending);
 }
 
 // Prospects still in play that have at least one drafted email waiting on
@@ -60,7 +102,7 @@ export interface ApprovedDrafts {
 
 const MESSAGE_SELECT = `
   id, prospect_id, campaign_id, channel, subject, body, message_type,
-  approval_status, created_at,
+  approval_status, created_at, pending_since, angle, observation, observation_source_url,
   prospect:prospects ( id, business_name, contact_name, email, phone, category, location )
 `;
 
@@ -171,10 +213,9 @@ async function fetchPendingMessages(clientId: string, client: SupabaseClient): P
   return normalizeRows(rows);
 }
 
-async function fetchClientStats(clientId: string, client: SupabaseClient): Promise<ClientApprovalStats> {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const iso = startOfDay.toISOString();
+// "Today" starts at midnight in the business's send_timezone, not the browser's.
+async function fetchClientStats(clientId: string, client: SupabaseClient, timeZone: string): Promise<ClientApprovalStats> {
+  const iso = startOfDayInTz(timeZone).toISOString();
 
   const [pending, approvedToday, sentToday, rejected] = await Promise.all([
     client.from('messages').select('id', { count: 'exact', head: true })
@@ -195,14 +236,19 @@ async function fetchClientStats(clientId: string, client: SupabaseClient): Promi
   };
 }
 
-export function useClientApprovals(clientId: string, client: SupabaseClient = supabase, includeHeld = false) {
+const EMPTY_STATS: ClientApprovalStats = { pending: 0, approvedToday: 0, sentToday: 0, rejected: 0 };
+
+// hideSendRuleHeld: leave drafts held by send rules out of the lists, tabs and tiles (client view).
+export function useClientApprovals(clientId: string, client: SupabaseClient = supabase, includeHeld = false, hideSendRuleHeld = false) {
   const { profile } = useAuth();
+  const { profile: clientProfile } = useClientProfile(clientId);
+  const timeZone = clientProfile?.send_timezone ?? browserTimeZone();
 
   const isPreview = clientId === '__preview__';
 
   const {
-    data: items = [],
-    isLoading: loading,
+    data: rawItems = [],
+    isLoading: itemsLoading,
     isFetching: itemsFetching,
     dataUpdatedAt,
     error,
@@ -215,12 +261,12 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
   });
 
   const {
-    data: stats = { pending: 0, approvedToday: 0, sentToday: 0, rejected: 0 },
+    data: rawStats = { pending: 0, approvedToday: 0, sentToday: 0, rejected: 0 },
     isFetching: statsFetching,
     refetch: refetchStats,
   } = useQuery({
-    queryKey: clientApprovalsStatsKey(clientId),
-    queryFn: () => fetchClientStats(clientId, client),
+    queryKey: [...clientApprovalsStatsKey(clientId), timeZone],
+    queryFn: () => fetchClientStats(clientId, client, timeZone),
     enabled: !!clientId && !isPreview,
     staleTime: 60 * 1000,
   });
@@ -232,12 +278,39 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     staleTime: 30 * 1000,
   });
 
-  const { data: approvedDrafts = null, isFetching: approvedFetching, refetch: refetchApproved } = useQuery({
+  const { data: rawApproved = null, isFetching: approvedFetching, refetch: refetchApproved } = useQuery({
     queryKey: clientApprovedKey(clientId, includeHeld),
     queryFn: () => fetchApprovedDrafts(clientId, client, includeHeld),
     enabled: !!clientId && !isPreview,
     staleTime: 30 * 1000,
   });
+
+  // Drafts held by send rules (from approvals_schedule), hidden from the client's view.
+  const { schedule, scheduleReady } = useApprovalsSchedule(clientId, client);
+  // Fail closed: when held rows must be hidden but the schedule is not loaded (or its fetch
+  // failed), show nothing instead of the unfiltered lists.
+  const gated = hideSendRuleHeld && !isPreview && !scheduleReady;
+  const loading = itemsLoading || gated;
+  const held = useMemo(() => (hideSendRuleHeld ? heldRows(schedule) : []), [schedule, hideSendRuleHeld]);
+  const heldIds = useMemo(() => new Set(held.map((r) => r.message_id)), [held]);
+  const heldApprovedIds = useMemo(
+    () => held.filter((r) => r.approval_status === 'approved').map((r) => r.message_id), [held]);
+
+  const { data: heldApprovedToday = 0 } = useQuery({
+    queryKey: ['client-approvals-held-approved-today', clientId, timeZone, heldApprovedIds.join(',')],
+    queryFn: () => countApprovedSince(client, heldApprovedIds, startOfDayInTz(timeZone).toISOString()),
+    enabled: heldApprovedIds.length > 0 && !isPreview,
+    staleTime: 60 * 1000,
+  });
+
+  const items = useMemo(
+    () => (gated ? [] : heldIds.size ? rawItems.filter((i) => !heldIds.has(i.id)) : rawItems), [rawItems, heldIds, gated]);
+  const stats = useMemo(
+    () => (gated ? EMPTY_STATS : adjustApprovalStats(rawStats, held, heldApprovedToday)),
+    [rawStats, held, heldApprovedToday, gated]);
+  const approvedDrafts = useMemo(
+    () => (gated ? null : rawApproved && held.length ? excludeHeldDrafts(rawApproved, held) : rawApproved),
+    [rawApproved, held, gated]);
 
   // Cancel in-flight list fetches first: one that started before the update
   // lands would otherwise write the old rows (incl. a just-rejected draft)
@@ -269,18 +342,15 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
   }, [clientId, profile?.id, removeFromCache]);
 
   // Same edit patch as approve(), minus the approval fields - the draft stays pending.
+  // Errors when no row was updated (blocked by RLS or no longer pending), instead of a silent "saved".
   const saveEdits = useCallback(async (id: string, editedBody?: string, editedSubject?: string): Promise<{ error: string | null }> => {
-    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-    if (editedBody !== undefined) patch.body = editedBody;
-    if (editedSubject !== undefined) patch.subject = editedSubject;
-
-    const { error } = await supabase.from('messages').update(patch).eq('id', id);
+    const { error, patch } = await saveDraftEdits(supabase, id, { body: editedBody, subject: editedSubject });
     if (!error) {
       queryClient.setQueryData<ClientMessageItem[]>(clientApprovalsKey(clientId), (prev = []) =>
         prev.map((i) => (i.id === id ? { ...i, ...patch } as ClientMessageItem : i))
       );
     }
-    return { error: error?.message ?? null };
+    return { error };
   }, [clientId]);
 
   const reject = useCallback(async (id: string): Promise<{ error: string | null }> => {
@@ -337,6 +407,7 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     stats,
     awaitingProspects,
     approvedDrafts,
+    timeZone,
     loading,
     isFetching: itemsFetching || statsFetching || approvedFetching,
     dataUpdatedAt,
@@ -350,6 +421,8 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
 
     reload: async () => {
       const [itemsRes, statsRes, approvedRes] = await Promise.all([refetchItems(), refetchStats(), refetchApproved()]);
+      queryClient.invalidateQueries({ queryKey: approvalsScheduleKey(clientId) });
+      queryClient.invalidateQueries({ queryKey: clientPendingCountKey(clientId) });
       queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
       if (itemsRes.error) throw itemsRes.error;
       if (statsRes.error) throw statsRes.error;

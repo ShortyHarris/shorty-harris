@@ -10,7 +10,7 @@ import { supabase } from './lib/supabase';
 import { useClientHeader, clientHeaderKey } from './hooks/useClientHeader';
 import { useClientDashboard, dashboardKey } from './hooks/useClientDashboard';
 import { billingKey } from './hooks/useBilling';
-import { useClientApprovals } from './hooks/useClientApprovals';
+import { usePendingApprovalCount } from './hooks/useClientApprovals';
 import { useGmailConnection } from './hooks/useGmailConnection';
 import { useClientNotifications } from './hooks/useClientNotifications';
 import { useClientRealtimeSync } from './hooks/useClientRealtimeSync';
@@ -124,9 +124,8 @@ function ClientZone() {
   const { profile, signOut } = useAuth();
   const clientId = profile!.client_id!;
   const { businessName, credits } = useClientHeader(clientId);
-  const { items: pendingItems, stats: approvalStats } = useClientApprovals(clientId);
-  // Exact count, not the loaded list, which is capped for very large queues.
-  const pendingApprovals = Math.max(approvalStats.pending, pendingItems.length);
+  // Head count only - the badge must not load the whole queue on every page.
+  const pendingApprovals = usePendingApprovalCount(clientId);
   const { connection: gmailConnection } = useGmailConnection(clientId);
   const { leads } = useClientDashboard(clientId);
   const newHotLeads = leads.filter((l) => l.status === 'new').length;
@@ -227,6 +226,8 @@ function ImpersonateZone() {
   // this client's pages, and resets on exit (the zone unmounts).
   const [editMode, setEditMode] = useState(false);
   const [confirmEdit, setConfirmEdit] = useState(false);
+  // The client's real balance, so the sidebar and header match what they see.
+  const { credits } = useClientHeader(clientId ?? '', session?.client ?? supabase);
 
   useEffect(() => {
     if (!clientId) return;
@@ -286,7 +287,7 @@ function ImpersonateZone() {
       />
       <Shell
         businessName={session.businessName}
-        credits="-"
+        credits={credits}
         displayName={session.businessName}
         hideSettings
         signOutLabel="Exit impersonation"

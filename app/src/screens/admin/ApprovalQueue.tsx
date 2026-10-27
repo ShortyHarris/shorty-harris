@@ -13,6 +13,13 @@ import {
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { partialFailureMessage } from '../../lib/chunkedBulk';
 import type { QueueItem } from '../../types';
+import { approvalTypeLabel, APPROVAL_STEP_ORDER, APPROVAL_EXPLAINER } from '../../lib/approvalLabels';
+import {
+  applyApprovalView, DEFAULT_APPROVAL_SORT, APPROVAL_SORT_OPTIONS, browserTimeZone, formatPendingSince, pendingSinceOf,
+  type ApprovalSort, type ApprovalTypeFilter, type ScheduleMap,
+} from '../../lib/approvalsView';
+import { useApprovalsSchedule } from '../../hooks/useApprovalsSchedule';
+import { ScheduledCell, PendingCell, WaitingCell, HeldBadge, AnglePill, ObservationDetails } from '../../components/ApprovalCells';
 import { Clock, CheckCircle2, Send, Ban, Eye, AlertTriangle, RefreshCw } from 'lucide-react';
 
 const TOO_MANY_MSG = 'Too many to act on at once - narrow by client.';
@@ -27,6 +34,7 @@ const HELP: HelpContent = {
   body: [
     { type: 'p', text: "Every email the AI drafts lands here before it goes anywhere. Nothing sends until you approve it." },
     { type: 'p', text: "Read the draft, edit the copy if you want to tweak it, then Approve or Reject." },
+    { type: 'p', text: APPROVAL_EXPLAINER },
     { type: 'ul', items: [
       "Approve - sends the message exactly as written",
       "Edit then approve - change the copy first, then send",
@@ -35,12 +43,32 @@ const HELP: HelpContent = {
   ],
 };
 
-const TYPE_LABEL: Record<string, string> = {
-  initial: 'First touch',
-  follow_up_d3: 'Follow-up D3',
-  follow_up_d7: 'Follow-up D7',
-  follow_up_d14: 'Follow-up D14',
-};
+const TYPE_FILTER_OPTIONS: { value: ApprovalTypeFilter; label: string }[] = [
+  { value: 'all', label: 'All types' },
+  ...APPROVAL_STEP_ORDER.map((t) => ({ value: t as ApprovalTypeFilter, label: approvalTypeLabel(t) })),
+];
+
+function FilterSelect({ label, ariaLabel, value, onChange, options, className = '' }: {
+  label: string; ariaLabel: string; value: string; onChange: (v: string) => void;
+  options: { value: string; label: string }[]; className?: string;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger
+        style={FONT}
+        aria-label={ariaLabel}
+        className={`h-10 min-w-0 max-w-full basis-0 shrink max-md:basis-full gap-2 rounded-lg border-(--ad-line) bg-(--ad-surface-2) px-3 text-[13px] font-semibold text-(--ad-ink) focus:border-(--ad-green) focus:ring-0 focus:ring-offset-0 ${className}`}
+      >
+        <span className="w-14 shrink-0 text-left text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">{label}</span>
+        <span className="min-w-0 flex-1 truncate text-left"><SelectValue /></span>
+      </SelectTrigger>
+      <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
+        {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+}
+const tzOf = (item: QueueItem) => item.client?.send_timezone || browserTimeZone();
 
 const PAGE_SIZE = 10;
 const ALL_CLIENTS = 'all';
@@ -76,6 +104,8 @@ export function ApprovalQueue() {
   const [editItem, setEditItem] = useState<QueueItem | null>(null);
   const [page, setPage] = useState(1);
   const [clientFilter, setClientFilter] = useState<string>(ALL_CLIENTS);
+  const [sort, setSort] = useState<ApprovalSort>(DEFAULT_APPROVAL_SORT);
+  const [typeFilter, setTypeFilter] = useState<ApprovalTypeFilter>('all');
   const [confirmBulk, setConfirmBulk] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
   const queueRef = useRef<HTMLDivElement | null>(null);
@@ -92,9 +122,16 @@ export function ApprovalQueue() {
 
   // Fall back to everything once the filtered client's queue empties out.
   const activeFilter = clientOptions.some((c) => c.id === clientFilter) ? clientFilter : ALL_CLIENTS;
-  const items = activeFilter === ALL_CLIENTS ? allItems : allItems.filter((i) => i.client_id === activeFilter);
+  const clientItems = activeFilter === ALL_CLIENTS ? allItems : allItems.filter((i) => i.client_id === activeFilter);
+  // approvals_schedule is per client, so send estimates show once one client is picked.
+  const { schedule } = useApprovalsSchedule(activeFilter === ALL_CLIENTS ? null : activeFilter);
+  const items = applyApprovalView(clientItems, { sort, type: typeFilter, schedule });
+  const now = new Date();
+  const editIdx = editItem ? items.findIndex((i) => i.id === editItem.id) : -1;
   const activeClient = clientOptions.find((c) => c.id === activeFilter) ?? null;
+  // Respects the Type filter: only what is listed gets approved.
   const approvable = items.filter((i) => !senderBlocked(i));
+  const filtersActive = activeFilter !== ALL_CLIENTS || typeFilter !== 'all' || sort !== DEFAULT_APPROVAL_SORT;
 
   async function doBulkApprove() {
     if (truncated) { toast(TOO_MANY_MSG, 'warning'); setConfirmBulk(false); return; }
@@ -166,9 +203,9 @@ export function ApprovalQueue() {
         <StatTile
           icon={CheckCircle2}
           iconColor="var(--ad-green)"
-          label="Approved Today"
+          label="Approved today"
           value={stats.approvedToday}
-          sub="emails approved"
+          sub="since midnight, your browser time"
           subColor="var(--ad-ink-faint)"
         />
         <StatTile
@@ -183,7 +220,7 @@ export function ApprovalQueue() {
         <StatTile
           icon={Ban}
           iconColor="var(--ad-clay)"
-          label="Rejected"
+          label="Rejected (all time)"
           value={stats.rejected}
           sub="drafts discarded"
           subColor="var(--ad-ink-faint)"
@@ -204,26 +241,54 @@ export function ApprovalQueue() {
 
       {/* Client filter + per-client bulk approve */}
       {!loading && clientOptions.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3">
-          <Select value={activeFilter} onValueChange={(v) => { setClientFilter(v); setPage(1); }}>
-            <SelectTrigger style={FONT} aria-label="Filter by client" className="h-10 w-70 max-w-full rounded-lg border-(--ad-line) bg-(--ad-surface) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)"><SelectValue /></SelectTrigger>
-            <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
-              <SelectItem value={ALL_CLIENTS}>All clients ({allItems.length})</SelectItem>
-              {clientOptions.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name} ({c.count})</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {activeClient && (
+        <div className="flex flex-wrap items-center gap-2.5 md:flex-nowrap rounded-xl border border-(--ad-line) bg-(--ad-surface) p-2.5">
+          <FilterSelect
+            label="Client"
+            className="grow-3"
+            ariaLabel="Filter by client"
+            value={activeFilter}
+            onChange={(v) => { setClientFilter(v); setPage(1); }}
+            options={[
+              { value: ALL_CLIENTS, label: `All (${allItems.length})` },
+              ...clientOptions.map((c) => ({ value: c.id, label: `${c.name} (${c.count})` })),
+            ]}
+          />
+          <FilterSelect
+            label="Type"
+            className="grow-2"
+            ariaLabel="Filter by email type"
+            value={typeFilter}
+            onChange={(v) => { setTypeFilter(v as ApprovalTypeFilter); setPage(1); }}
+            options={TYPE_FILTER_OPTIONS.map((o) => ({ value: o.value, label: o.value === 'all' ? 'All' : o.label }))}
+          />
+          <FilterSelect
+            label="Sort"
+            className="grow-4"
+            ariaLabel="Sort drafts"
+            value={sort}
+            onChange={(v) => { setSort(v as ApprovalSort); setPage(1); }}
+            options={APPROVAL_SORT_OPTIONS}
+          />
+          {filtersActive && (
             <button
-              onClick={() => setConfirmBulk(true)}
-              disabled={approvable.length === 0 || truncated}
-              title={truncated ? TOO_MANY_MSG : approvable.length === 0 ? GMAIL_TOOLTIP : undefined}
-              className="cursor-pointer rounded-md border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => { setClientFilter(ALL_CLIENTS); setTypeFilter('all'); setSort(DEFAULT_APPROVAL_SORT); setPage(1); }}
+              className="cursor-pointer rounded-md border-0 bg-transparent px-2 py-1.5 text-[12.5px] font-semibold text-(--ad-ink-faint) underline-offset-2 transition-colors hover:text-(--ad-ink) hover:underline"
             >
-              Approve all {approvable.length} for {activeClient.name}
+              Reset
             </button>
           )}
+          <div className="ml-auto flex shrink-0 items-center gap-3">
+            {activeClient && (
+              <button
+                onClick={() => setConfirmBulk(true)}
+                disabled={approvable.length === 0 || truncated}
+                title={truncated ? TOO_MANY_MSG : approvable.length === 0 ? GMAIL_TOOLTIP : undefined}
+                className="cursor-pointer whitespace-nowrap rounded-lg border-0 bg-(--ad-green) px-4 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Approve all {approvable.length} for {activeClient.name}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -232,8 +297,8 @@ export function ApprovalQueue() {
         <SkeletonTable rows={PAGE_SIZE} cols={5} />
       ) : items.length === 0 ? (
         <div ref={queueRef} className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
-          <strong className="text-[15px] font-bold text-(--ad-ink)">Queue's clear.</strong>
-          <span className="text-[13px] text-(--ad-ink-soft)">No drafts waiting for review. New ones appear here as the AI writes them.</span>
+          <strong className="text-[15px] font-bold text-(--ad-ink)">{clientItems.length > 0 ? 'No drafts match this filter.' : "Queue's clear."}</strong>
+          <span className="text-[13px] text-(--ad-ink-soft)">{clientItems.length > 0 ? 'Choose "All types" to see everything.' : 'No drafts waiting for review. New ones appear here as the AI writes them.'}</span>
         </div>
       ) : (
         <div ref={queueRef} className="flex flex-col gap-6">
@@ -241,47 +306,57 @@ export function ApprovalQueue() {
           <div className="atbl hidden md:block">
             <table className="table-fixed">
               <colgroup>
-                <col className="w-[24%]" />
+                <col className="w-[22%]" />
+                <col className="w-[34%]" />
                 <col className="w-[16%]" />
-                <col className="w-[16%]" />
-                <col className="w-[28%]" />
-                <col className="w-[16%]" />
+                <col className="w-[10%]" />
+                <col className="w-[18%]" />
               </colgroup>
               <thead>
                 <tr>
-                  {(['Prospect', 'Client', 'Type', 'Subject', ''] as const).map((h) => (
-                    <th key={h}>{h}</th>
+                  {['Prospect', 'Subject', activeFilter === ALL_CLIENTS ? 'Client' : 'Scheduled send', 'Waiting', ''].map((h, i) => (
+                    <th key={i}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {paged.map((item) => (
-                  <tr key={item.id}>
+                  <tr key={item.id} onClick={() => setEditItem(item)} className="cursor-pointer">
                     <td className="min-w-0">
-                      <div className="truncate font-bold text-(--ad-ink)" title={item.prospect?.business_name ?? undefined}>
+                      <div className="line-clamp-2 font-bold text-(--ad-ink)" title={item.prospect?.business_name ?? undefined}>
                         {item.prospect?.business_name ?? 'Unknown'}
                       </div>
-                      {item.prospect?.contact_name && (
-                        <div className="mt-0.5 truncate text-[11px] text-(--ad-ink-faint)">{item.prospect.contact_name}</div>
+                      {(item.prospect?.contact_name || item.prospect?.location) && (
+                        <div className="mt-0.5 truncate text-[11px] text-(--ad-ink-faint)">
+                          {[item.prospect?.contact_name, item.prospect?.location].filter(Boolean).join(' · ')}
+                        </div>
                       )}
-                      <ProspectMeta item={item} className="mt-0.5" />
                     </td>
                     <td className="min-w-0 text-(--ad-ink-soft)">
-                      <div className="truncate" title={item.client?.business_name ?? undefined}>{item.client?.business_name ?? '-'}</div>
-                      <SenderLine item={item} className="mt-0.5" />
-                    </td>
-                    <td>
-                      <span className="atbl-pill" style={{ background: 'var(--ad-green-tint)', color: 'var(--ad-green)' }}>
-                        {TYPE_LABEL[item.message_type] ?? item.message_type}
-                      </span>
-                    </td>
-                    <td className="min-w-0 text-(--ad-ink-soft)">
-                      <div className="truncate" title={item.subject ?? undefined}>
+                      <div className="line-clamp-2" title={item.subject ?? undefined}>
                         {item.subject ?? <span className="italic text-(--ad-ink-ghost)">No subject</span>}
                       </div>
-                      <OpenBadge item={item} />
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        {item.message_type !== 'initial' && (
+                          <span className="atbl-pill" style={{ background: 'var(--ad-green-tint)', color: 'var(--ad-green)' }}>
+                            {approvalTypeLabel(item.message_type)}
+                          </span>
+                        )}
+                        <AnglePill angle={item.angle} />
+                        <OpenBadge item={item} />
+                        {senderBlocked(item) && <SenderLine item={item} />}
+                      </div>
+                      <HeldBadge row={schedule.get(item.id)} className="mt-1" />
                     </td>
-                    <td className="px-3">
+                    <td className="min-w-0 text-(--ad-ink-soft)">
+                      {activeFilter === ALL_CLIENTS
+                        ? <div className="truncate" title={item.client?.business_name ?? undefined}>{item.client?.business_name ?? '-'}</div>
+                        : <ScheduledCell schedule={schedule} id={item.id} tz={tzOf(item)} now={now} />}
+                    </td>
+                    <td className="whitespace-nowrap text-[12px] text-(--ad-ink-soft)">
+                      <WaitingCell item={item} schedule={schedule} tz={tzOf(item)} now={now} />
+                    </td>
+                    <td className="px-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => doApprove(item.id)}
@@ -315,8 +390,11 @@ export function ApprovalQueue() {
                     )}
                     <ProspectMeta item={item} className="mt-0.5" />
                   </div>
-                  <span className="flex-shrink-0 inline-flex items-center whitespace-nowrap rounded-full bg-(--ad-green-tint) px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em] text-(--ad-green)">
-                    {TYPE_LABEL[item.message_type] ?? item.message_type}
+                  <span className="flex flex-shrink-0 flex-col items-end gap-1">
+                    <span className="inline-flex items-center whitespace-nowrap rounded-full bg-(--ad-green-tint) px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em] text-(--ad-green)">
+                      {approvalTypeLabel(item.message_type)}
+                    </span>
+                    <AnglePill angle={item.angle} />
                   </span>
                 </div>
                 {item.client?.business_name && (
@@ -327,6 +405,13 @@ export function ApprovalQueue() {
                   <div className="mt-1 truncate text-[12px] text-(--ad-ink-faint)">{item.subject}</div>
                 )}
                 <OpenBadge item={item} className="mt-1" />
+                <HeldBadge row={schedule.get(item.id)} className="mt-1" />
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[11.5px] text-(--ad-ink-soft)">
+                  <div><div className="text-[10px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Scheduled</div>
+                    {activeFilter === ALL_CLIENTS ? '-' : <ScheduledCell schedule={schedule} id={item.id} tz={tzOf(item)} now={now} />}</div>
+                  <div><div className="text-[10px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Pending since</div>
+                    <PendingCell item={item} schedule={schedule} tz={tzOf(item)} now={now} /></div>
+                </div>
                 <div className="mt-3 flex items-center gap-2 border-t border-(--ad-fill) pt-3">
                   <button
                     onClick={() => doApprove(item.id)}
@@ -373,8 +458,11 @@ export function ApprovalQueue() {
       <AnimatePresence>
         {editItem && (
           <EditModal
-            key="edit-modal"
+            key={`edit-modal-${editItem.id}`}
             item={editItem}
+            schedule={schedule}
+            position={editIdx >= 0 ? { index: editIdx, total: items.length } : null}
+            onNav={(dir) => { const n = items[editIdx + dir]; if (n) setEditItem(n); }}
             onClose={() => setEditItem(null)}
             onSave={doSave}
             onApprove={(id, body, subject) => { doApprove(id, body, subject); setEditItem(null); }}
@@ -508,13 +596,28 @@ function StatTile({
   );
 }
 
+function Detail({ label, value, children }: { label: string; value?: string | null; children?: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">{label}</dt>
+      <dd className="m-0 mt-0.5 break-words text-(--ad-ink)">{children ?? (value || '-')}</dd>
+    </div>
+  );
+}
+
 function EditModal({
   item,
+  schedule,
+  position,
+  onNav,
   onClose,
   onSave,
   onApprove,
 }: {
   item: QueueItem;
+  schedule: ScheduleMap;
+  position: { index: number; total: number } | null;
+  onNav: (dir: -1 | 1) => void;
   onClose: () => void;
   onSave: (id: string, body?: string, subject?: string) => Promise<void>;
   onApprove: (id: string, body?: string, subject?: string) => void;
@@ -553,11 +656,11 @@ function EditModal({
         {/* Header */}
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-(--ad-line) px-5 py-4">
           <div>
-            <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Edit draft</h2>
+            <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Review draft</h2>
             <p className="m-0 mt-0.5 text-[12px] text-(--ad-ink-soft)">
               {item.prospect?.business_name ?? 'Unknown'}
               <span className="mx-1.5 text-(--ad-ink-ghost)">·</span>
-              {TYPE_LABEL[item.message_type] ?? item.message_type}
+              {approvalTypeLabel(item.message_type)}
             </p>
           </div>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) transition-colors hover:text-(--ad-ink)">×</button>
@@ -586,11 +689,17 @@ function EditModal({
               className="w-full resize-y rounded-xl border border-(--ad-green) bg-(--ad-surface) px-4 py-3 text-[13px] leading-relaxed text-(--ad-ink) outline-none"
             />
           </div>
-          <div className="rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[12px] text-(--ad-ink-soft)">
-            For <strong className="font-bold text-(--ad-ink)">{item.client?.business_name ?? 'unknown client'}</strong>
-            {item.prospect?.category && <><span className="mx-1.5 text-(--ad-ink-ghost)">·</span>{item.prospect.category}</>}
-            {item.prospect?.location && <><span className="mx-1.5 text-(--ad-ink-ghost)">·</span>{item.prospect.location}</>}
-          </div>
+          <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-3 text-[12px] text-(--ad-ink-soft)">
+            <Detail label="Client" value={item.client?.business_name} />
+            <Detail label="Sending from" value={item.sender_email} />
+            <Detail label="Prospect" value={[item.prospect?.category, item.prospect?.location].filter(Boolean).join(' · ')} />
+            <Detail label="Phone" value={item.prospect?.phone ? formatPhone(item.prospect.phone) : null} />
+            <Detail label="Scheduled send">
+              <ScheduledCell schedule={schedule} id={item.id} tz={tzOf(item)} now={new Date()} />
+            </Detail>
+            <Detail label="Waiting since" value={formatPendingSince(pendingSinceOf(item, schedule), tzOf(item))} />
+            <ObservationDetails observation={item.observation} sourceUrl={item.observation_source_url} Detail={Detail} />
+          </dl>
           {senderBlocked(item) && (
             <div className="flex items-center gap-1.5 rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-3.5 py-2.5 text-[12px] font-semibold text-(--ad-clay)">
               <AlertTriangle size={13} strokeWidth={2.2} className="shrink-0" />
@@ -600,16 +709,38 @@ function EditModal({
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
+        <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex items-center justify-end gap-2.5">
+          {position && position.total > 1 && (
+            <div className="mr-auto flex items-center gap-1.5 text-[12px] text-(--ad-ink-faint)">
+              <button
+                onClick={() => onNav(-1)}
+                disabled={dirty || position.index <= 0}
+                title={dirty ? 'Save or discard your edits first' : 'Previous draft'}
+                className="cursor-pointer rounded-md border border-(--ad-line) bg-transparent px-2.5 py-1.5 text-[13px] text-(--ad-ink-soft) hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-40"
+              >‹</button>
+              <span className="tabular-nums">{position.index + 1} / {position.total}</span>
+              <button
+                onClick={() => onNav(1)}
+                disabled={dirty || position.index >= position.total - 1}
+                title={dirty ? 'Save or discard your edits first' : 'Next draft'}
+                className="cursor-pointer rounded-md border border-(--ad-line) bg-transparent px-2.5 py-1.5 text-[13px] text-(--ad-ink-soft) hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-40"
+              >›</button>
+            </div>
+          )}
           <button onClick={onClose} className="cursor-pointer rounded-md border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:bg-(--ad-surface-2)">
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={!dirty || saving}
-            className="cursor-pointer rounded-md border border-(--ad-green) bg-transparent px-4 py-2 text-[13px] font-bold text-(--ad-green) transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-50"
+            title={dirty ? undefined : 'Change the subject or message to save a draft'}
+            className={`cursor-pointer rounded-md border px-4 py-2 text-[13px] font-bold transition-colors disabled:cursor-not-allowed ${
+              dirty
+                ? 'border-(--ad-green) bg-(--ad-green-tint) text-(--ad-green) shadow-sm hover:bg-(--ad-surface-2)'
+                : 'border-(--ad-line) bg-transparent text-(--ad-ink-faint)'
+            }`}
           >
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? 'Saving…' : 'Save draft'}
           </button>
           <button
             onClick={() => onApprove(item.id, bodyDirty ? draft : undefined, subjectDirty ? subjectDraft : undefined)}

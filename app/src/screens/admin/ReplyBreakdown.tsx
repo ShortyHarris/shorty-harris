@@ -25,6 +25,8 @@ const GROUP_TITLE: Record<ReplyGroup, string> = {
   ...HUMAN_INTENT_LABEL,
   automated: 'Automated replies',
   bounced: 'Bounced',
+  uncertain: 'Uncertain',
+  other: 'Other',
 };
 
 // Renders two grid cells (the summary card and, below it, the reply list), so
@@ -183,6 +185,20 @@ export function ReplyBreakdown({ replies }: { replies: ReplyRecord[] }) {
             percent={pct(summary.bounced, summary.total)}
             active={selected === 'bounced'}
             onClick={() => toggle('bounced')}
+          />
+          <StatTile
+            label="Uncertain"
+            count={summary.uncertain}
+            percent={pct(summary.uncertain, summary.total)}
+            active={selected === 'uncertain'}
+            onClick={() => toggle('uncertain')}
+          />
+          <StatTile
+            label="Other"
+            count={summary.other}
+            percent={pct(summary.other, summary.total)}
+            active={selected === 'other'}
+            onClick={() => toggle('other')}
           />
         </div>
       </div>

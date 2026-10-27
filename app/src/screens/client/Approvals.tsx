@@ -1,3 +1,4 @@
+import { btn } from '../../lib/clientButtons';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,6 +20,17 @@ import { previewSequenceApproval, approveSequences, type ApprovalPreview } from 
 import { blockInfo, type BlockTone } from '../../lib/blockReasons';
 import { partialFailureMessage } from '../../lib/chunkedBulk';
 import type { ClientMessageItem } from '../../types';
+import { approvalTypeLabel, APPROVAL_STEP_ORDER, APPROVAL_EXPLAINER } from '../../lib/approvalLabels';
+import {
+  applyApprovalView, DEFAULT_APPROVAL_SORT, APPROVAL_SORT_OPTIONS,
+  type ApprovalSort, type ApprovalTypeFilter,
+} from '../../lib/approvalsView';
+import { ScheduledCell, PendingCell, WaitingCell, HeldBadge, AnglePill, ObservationDetails } from '../../components/ApprovalCells';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '../../components/ui/select';
+import { formatPendingSince, pendingSinceOf, type ScheduleMap } from '../../lib/approvalsView';
+import { useApprovalsSchedule } from '../../hooks/useApprovalsSchedule';
 
 type ApprovalTab = 'pending' | 'approved' | 'blocked';
 import { Clock, CheckCircle2, Send, Ban, ClipboardCheck } from 'lucide-react';
@@ -38,18 +50,12 @@ const HELP: HelpContent = {
   ],
 };
 
-const TYPE_LABEL: Record<string, string> = {
-  initial: 'First touch',
-  follow_up_d3: 'Follow-up D3',
-  follow_up_d7: 'Follow-up D7',
-  follow_up_d14: 'Follow-up D14',
-};
-
 const PAGE_SIZE = 10;
 
-const STEP_ORDER = ['initial', 'follow_up_d3', 'follow_up_d7', 'follow_up_d14'];
-const APPROVAL_EXPLAINER =
-  'Approving schedules every email. Follow-ups send 3, 5 and 7 business days after the previous email, and only if the prospect has not replied or unsubscribed.';
+const TYPE_FILTER_OPTIONS: { value: ApprovalTypeFilter; label: string }[] = [
+  { value: 'all', label: 'All types' },
+  ...APPROVAL_STEP_ORDER.map((t) => ({ value: t as ApprovalTypeFilter, label: approvalTypeLabel(t) })),
+];
 const EU_RECIPIENT_NOTE =
   'Emails to generic addresses (info@) and free-mail addresses (gmail, yahoo) are skipped automatically.';
 
@@ -62,6 +68,36 @@ function formatPhone(raw: string): string {
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
+function FilterSelect({ label, ariaLabel, value, onChange, options, className = '' }: {
+  label: string; ariaLabel: string; value: string; onChange: (v: string) => void;
+  options: { value: string; label: string }[]; className?: string;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger
+        style={FONT}
+        aria-label={ariaLabel}
+        className={`h-10 min-w-0 max-w-full basis-0 shrink max-md:basis-full gap-2 rounded-lg border-[#ece8df] bg-[#fbf9f5] px-3 text-[13px] font-semibold text-[#20211c] focus:border-[#3c7a5b] focus:ring-0 focus:ring-offset-0 ${className}`}
+      >
+        <span className="w-14 shrink-0 text-left text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">{label}</span>
+        <span className="min-w-0 flex-1 truncate text-left"><SelectValue /></span>
+      </SelectTrigger>
+      <SelectContent style={FONT} className="bg-white text-[13px] text-[#20211c]">
+        {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function Detail({ label, value, children }: { label: string; value?: string | null; children?: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">{label}</dt>
+      <dd className="m-0 mt-0.5 wrap-break-word text-[#20211c]">{children ?? (value || '-')}</dd>
+    </div>
+  );
+}
+
 const READ_ONLY_MSG = 'You\'re viewing read-only. Turn on "Edit as admin" in the banner to approve or reject.';
 
 export function Approvals({
@@ -71,10 +107,13 @@ export function Approvals({
   // admins can reveal them. Not tied to readOnly: admin edit mode is still admin.
   const [showHeld, setShowHeld] = useState(false);
   const {
-    items, stats, approvedDrafts, loading, isFetching, dataUpdatedAt, error,
+    items, stats, approvedDrafts, timeZone, loading, isFetching, dataUpdatedAt, error,
     approve: approveRaw, saveEdits, reject: rejectRaw, bulkReject: bulkRejectRaw, reload,
-  } = useClientApprovals(clientId, client, isAdmin && showHeld);
+  } = useClientApprovals(clientId, client, isAdmin && showHeld, !isAdmin);
   const [tab, setTab] = useState<ApprovalTab>('pending');
+  const [sort, setSort] = useState<ApprovalSort>(DEFAULT_APPROVAL_SORT);
+  const [typeFilter, setTypeFilter] = useState<ApprovalTypeFilter>('all');
+  const { schedule } = useApprovalsSchedule(clientId, client);
   const { connection: gmailConnection } = useGmailConnection(clientId);
   const { rows: campaigns } = useClientCampaignList(clientId, client);
   const { toasts, toast, dismiss } = useToast();
@@ -167,7 +206,10 @@ export function Approvals({
   const blockedDrafts  = approvedDrafts?.blocked ?? [];
   const sendableCount  = approvedDrafts?.counts.sendable ?? 0;
   const blockedCount   = approvedDrafts?.counts.blocked ?? 0;
-  const visible = tab === 'pending' ? items : tab === 'approved' ? sendableDrafts : blockedDrafts;
+  const baseList = tab === 'pending' ? items : tab === 'approved' ? sendableDrafts : blockedDrafts;
+  // Filter, then sort the whole loaded list before it is cut into pages.
+  const visible = applyApprovalView(baseList, { sort, type: typeFilter, schedule });
+  const now = new Date();
   const isPendingTab = tab === 'pending';
 
   // The pending list is paged up to a ceiling; stats.pending is the exact count.
@@ -194,6 +236,9 @@ export function Approvals({
     setPage(1);
     setSelected(new Set());
   }
+
+  function changeSort(next: ApprovalSort) { setSort(next); setPage(1); }
+  function changeTypeFilter(next: ApprovalTypeFilter) { setTypeFilter(next); setPage(1); }
 
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -260,7 +305,7 @@ export function Approvals({
     toast(`${e} email${e === 1 ? '' : 's'} approved across ${p} prospect${p === 1 ? '' : 's'}`);
   }
 
-  const pagBtnCls = 'cursor-pointer rounded-md border border-[#ddd8cb] bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-[#20211c] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-40';
+  const pagBtnCls = btn('secondary', 'md');
 
   return (
     <div style={FONT} className="flex flex-col gap-6 content">
@@ -282,7 +327,7 @@ export function Approvals({
             onRefresh={handleRefresh}
             isFetching={isFetching}
             dataUpdatedAt={dataUpdatedAt}
-            className="cursor-pointer whitespace-nowrap rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:border-[#ddd8cb] hover:bg-[#fbf9f5]"
+            className={btn('secondary', 'lg')}
           />
         </div>
       </header>
@@ -300,9 +345,9 @@ export function Approvals({
         <StatTile
           icon={CheckCircle2}
           iconColor="#3c7a5b"
-          label="Approved Today"
+          label="Approved today"
           value={stats.approvedToday}
-          sub="emails approved"
+          sub="includes any already sent"
           subColor="#9a9d92"
         />
         <StatTile
@@ -317,7 +362,7 @@ export function Approvals({
         <StatTile
           icon={Ban}
           iconColor="#a8533a"
-          label="Rejected"
+          label="Rejected (all time)"
           value={stats.rejected}
           sub="drafts discarded"
           subColor="#9a9d92"
@@ -373,20 +418,50 @@ export function Approvals({
           These drafts are approved but won't send until the reason shown is cleared. You can reject any you don't want to keep.
         </p>
       )}
-      {tab !== 'pending' && approvedDrafts && (tab === 'approved' ? sendableCount : blockedCount) > visible.length && (
-        <p className="m-0 text-[12px] text-[#9a9d92]">Showing the latest {visible.length} of {tab === 'approved' ? sendableCount : blockedCount}.</p>
+      {tab !== 'pending' && approvedDrafts && (tab === 'approved' ? sendableCount : blockedCount) > baseList.length && (
+        <p className="m-0 text-[12px] text-[#9a9d92]">Showing the latest {baseList.length} of {tab === 'approved' ? sendableCount : blockedCount}.</p>
+      )}
+
+      {/* Sort + type filter */}
+      {!loading && baseList.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2.5 md:flex-nowrap rounded-xl border border-[#ece8df] bg-white p-2.5">
+          <FilterSelect
+            label="Type"
+            className="grow-2"
+            ariaLabel="Filter by email type"
+            value={typeFilter}
+            onChange={(v) => changeTypeFilter(v as ApprovalTypeFilter)}
+            options={TYPE_FILTER_OPTIONS.map((o) => ({ value: o.value, label: o.value === 'all' ? 'All' : o.label }))}
+          />
+          <FilterSelect
+            label="Sort"
+            className="grow-3"
+            ariaLabel="Sort drafts"
+            value={sort}
+            onChange={(v) => changeSort(v as ApprovalSort)}
+            options={APPROVAL_SORT_OPTIONS}
+          />
+          {(typeFilter !== 'all' || sort !== DEFAULT_APPROVAL_SORT) && (
+            <button
+              onClick={() => { changeTypeFilter('all'); changeSort(DEFAULT_APPROVAL_SORT); }}
+              className="cursor-pointer rounded-md border-0 bg-transparent px-2 py-1.5 text-[12.5px] font-semibold text-[#9a9d92] underline-offset-2 transition-colors hover:text-[#20211c] hover:underline"
+            >
+              Reset
+            </button>
+          )}
+        </div>
       )}
 
       {/* Table / Cards */}
       {loading ? (
-        <SkeletonTable rows={PAGE_SIZE} cols={4} />
+        <SkeletonTable rows={PAGE_SIZE} cols={5} />
       ) : visible.length === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
           <strong className="text-[15px] font-bold text-[#20211c]">
-            {isPendingTab ? "Queue's clear." : tab === 'approved' ? 'Nothing approved and waiting.' : 'Nothing blocked.'}
+            {baseList.length > 0 ? 'No drafts match this filter.' : isPendingTab ? "Queue's clear." : tab === 'approved' ? 'Nothing approved and waiting.' : 'Nothing blocked.'}
           </strong>
           <span className="text-[13px] text-[#62655c]">
-            {isPendingTab
+            {baseList.length > 0 ? 'Choose "All types" to see everything on this tab.' : isPendingTab
               ? 'No drafts waiting for review. New ones appear here as we write them for your prospects.'
               : tab === 'approved'
                 ? 'Approved drafts that are ready or scheduled to send show up here.'
@@ -420,7 +495,7 @@ export function Approvals({
                 title={(selected.size > 0 ? selectedBlockedByGmail : items.some(needsGmail))
                   ? GMAIL_REQUIRED_TITLE
                   : (selected.size === 0 && pendingCapped) ? `Only ${items.length} of ${totalPending} drafts are loaded. Select rows to approve instead.` : undefined}
-                className="cursor-pointer rounded-md border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:opacity-50 disabled:cursor-not-allowed"
+                className={btn('primary', 'md')}
               >
                 {bulkBusy ? 'Checking…' : selected.size > 0 ? 'Approve selected sequences' : 'Approve all pending'}
               </button>
@@ -429,7 +504,7 @@ export function Approvals({
                 <button
                   onClick={askBulkReject}
                   disabled={bulkBusy || rejecting}
-                  className="cursor-pointer rounded-md border border-[#a8533a] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white disabled:opacity-50"
+                  className={btn('danger', 'md')}
                 >
                   Reject selected
                 </button>
@@ -447,66 +522,80 @@ export function Approvals({
             <table className="table-fixed">
               <colgroup>
                 <col className="w-9" />
-                <col className="w-[34%]" />
-                <col className="w-[16%]" />
-                <col className="w-[22%]" />
-                <col className="w-[28%]" />
+                <col className="w-[19%]" />
+                <col className="w-[25%]" />
+                <col className="w-[17%]" />
+                <col className="w-[8%]" />
+                <col className="w-[27%]" />
               </colgroup>
               <thead>
                 <tr>
                   <th className="w-9" />
-                  {(['Prospect', 'Type', 'Subject', ''] as const).map((h) => (
-                    <th key={h}>{h}</th>
+                  {['Prospect', 'Subject', 'Scheduled send', 'Waiting', ''].map((h, i) => (
+                    <th key={i}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {paged.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-3">
+                  <tr
+                    key={item.id}
+                    onClick={isPendingTab ? () => setEditItem(item) : undefined}
+                    className={isPendingTab ? 'cursor-pointer' : undefined}
+                  >
+                    <td className="px-3" onClick={(e) => e.stopPropagation()}>
                       {isPendingTab && <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleOne(item.id)} className="accent-[#3c7a5b]" />}
                     </td>
                     <td className="min-w-0">
-                      <div className="truncate font-bold text-[#20211c]" title={item.prospect?.business_name ?? undefined}>
+                      <div className="line-clamp-2 font-bold text-[#20211c]" title={item.prospect?.business_name ?? undefined}>
                         {item.prospect?.business_name ?? 'Unknown'}
                       </div>
-                      {item.prospect?.contact_name && (
-                        <div className="mt-0.5 truncate text-[11px] text-[#9a9d92]">{item.prospect.contact_name}</div>
+                      {(item.prospect?.contact_name || item.prospect?.location) && (
+                        <div className="mt-0.5 truncate text-[11px] text-[#9a9d92]">
+                          {[item.prospect?.contact_name, item.prospect?.location].filter(Boolean).join(' · ')}
+                        </div>
                       )}
-                      <ProspectMeta item={item} className="mt-0.5" />
-                    </td>
-                    <td>
-                      <span className="atbl-pill" style={{ background: '#edf4ef', color: '#3c7a5b' }}>
-                        {TYPE_LABEL[item.message_type] ?? item.message_type}
-                      </span>
                     </td>
                     <td className="min-w-0 text-[#62655c]">
-                      <div className="truncate" title={item.subject ?? undefined}>
+                      <div className="line-clamp-2" title={item.subject ?? undefined}>
                         {item.subject ?? <span className="italic text-[#c4bfb5]">No subject</span>}
                       </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        {item.message_type !== 'initial' && (
+                          <span className="atbl-pill" style={{ background: '#edf4ef', color: '#3c7a5b' }}>
+                            {approvalTypeLabel(item.message_type)}
+                          </span>
+                        )}
+                        <AnglePill angle={item.angle} />
+                      </div>
                       <BlockBadge reason={item.block_reason} className="mt-1" />
+                      {isAdmin && <HeldBadge row={schedule.get(item.id)} settingsPath={readOnly ? null : `${basePath}/settings`} className="mt-1" />}
                     </td>
-                    <td className="px-3">
-                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    <td className="whitespace-nowrap"><ScheduledCell schedule={schedule} id={item.id} tz={timeZone} now={now} /></td>
+                    <td className="whitespace-nowrap text-[12px] text-[#62655c]">
+                      <WaitingCell item={item} schedule={schedule} tz={timeZone} now={now} staleClassName="font-bold text-[#d4870f]" />
+                    </td>
+                    <td className="px-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-nowrap items-center justify-end gap-1.5">
                         {isPendingTab && (<>
                         <button
                           onClick={() => doApprove(item.id)}
                           disabled={needsGmail(item)}
                           title={needsGmail(item) ? GMAIL_REQUIRED_TITLE : undefined}
-                          className="cursor-pointer whitespace-nowrap rounded-md border-0 bg-[#3c7a5b] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
+                          className={btn('primary', 'md')}
                         >
                           Approve
                         </button>
                         <button
                           onClick={() => setEditItem(item)}
-                          className="cursor-pointer whitespace-nowrap rounded-md border border-[#ece8df] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                          className={btn('secondary', 'md')}
                         >
                           Edit
                         </button>
                         </>)}
                         <button
                           onClick={() => askReject([item.id])}
-                          className="cursor-pointer whitespace-nowrap rounded-md border border-[#a8533a] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white"
+                          className={btn('danger', 'md')}
                         >
                           Reject
                         </button>
@@ -540,34 +629,42 @@ export function Approvals({
                       <ProspectMeta item={item} className="mt-0.5" />
                     </div>
                   </div>
-                  <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full bg-[#edf4ef] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em] text-[#3c7a5b]">
-                    {TYPE_LABEL[item.message_type] ?? item.message_type}
+                  <span className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="inline-flex items-center whitespace-nowrap rounded-full bg-[#edf4ef] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em] text-[#3c7a5b]">
+                      {approvalTypeLabel(item.message_type)}
+                    </span>
+                    <AnglePill angle={item.angle} />
                   </span>
                 </div>
                 {item.subject && (
                   <div className="mt-1.5 truncate text-[12px] text-[#9a9d92]">{item.subject}</div>
                 )}
                 <BlockBadge reason={item.block_reason} className="mt-1.5" />
+                {isAdmin && <HeldBadge row={schedule.get(item.id)} settingsPath={readOnly ? null : `${basePath}/settings`} className="mt-1.5" />}
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[11.5px]">
+                  <div><div className="text-[10px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">Scheduled</div><ScheduledCell schedule={schedule} id={item.id} tz={timeZone} now={now} /></div>
+                  <div><div className="text-[10px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">Pending since</div><PendingCell item={item} schedule={schedule} tz={timeZone} now={now} /></div>
+                </div>
                 <div className="mt-3 flex items-center gap-2 border-t border-[#f5f2ec] pt-3">
                   {isPendingTab && (<>
                   <button
                     onClick={() => doApprove(item.id)}
                     disabled={needsGmail(item)}
                     title={needsGmail(item) ? GMAIL_REQUIRED_TITLE : undefined}
-                    className="cursor-pointer flex-1 rounded-md border-0 bg-[#3c7a5b] px-3 py-2 text-[12px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
+                    className={`${btn('primary', 'md')} flex-1`}
                   >
                     Approve
                   </button>
                   <button
                     onClick={() => setEditItem(item)}
-                    className="cursor-pointer flex-1 rounded-md border border-[#ece8df] bg-white px-3 py-2 text-[12px] font-semibold text-[#62655c] transition-colors hover:border-[#3c7a5b] hover:text-[#3c7a5b]"
+                    className={`${btn('secondary', 'md')} flex-1`}
                   >
                     Edit
                   </button>
                   </>)}
                   <button
                     onClick={() => askReject([item.id])}
-                    className="cursor-pointer flex-1 rounded-md border border-[#a8533a] bg-transparent px-3 py-2 text-[12px] font-bold text-[#a8533a] transition-colors hover:bg-[#a8533a] hover:text-white"
+                    className={`${btn('danger', 'md')} flex-1`}
                   >
                     Reject
                   </button>
@@ -606,6 +703,8 @@ export function Approvals({
           <EditModal
             key="edit-modal"
             item={editItem}
+            schedule={schedule}
+            timeZone={timeZone}
             blockedByGmail={needsGmail(editItem)}
             settingsPath={readOnly ? null : `${basePath}/settings`}
             onClose={() => setEditItem(null)}
@@ -652,9 +751,9 @@ export function Approvals({
           >
             <p className="m-0 mb-2 font-semibold text-[#20211c]">Campaign: {approvalPlan.campaignsLabel}</p>
             <ul className="m-0 mb-3 list-none p-0">
-              {STEP_ORDER.filter((k) => (approvalPlan.preview.by_step[k] ?? 0) > 0).map((k) => (
+              {APPROVAL_STEP_ORDER.filter((k) => (approvalPlan.preview.by_step[k] ?? 0) > 0).map((k) => (
                 <li key={k} className="flex justify-between border-b border-[#f5f2ec] py-1 last:border-0">
-                  <span>{TYPE_LABEL[k] ?? k}</span>
+                  <span>{approvalTypeLabel(k)}</span>
                   <span className="font-bold text-[#20211c]">{approvalPlan.preview.by_step[k]}</span>
                 </li>
               ))}
@@ -762,6 +861,8 @@ function StatTile({
 
 function EditModal({
   item,
+  schedule,
+  timeZone,
   blockedByGmail,
   settingsPath,
   onClose,
@@ -769,6 +870,8 @@ function EditModal({
   onApprove,
 }: {
   item: ClientMessageItem;
+  schedule: ScheduleMap;
+  timeZone: string;
   blockedByGmail: boolean;
   /** null in view-as-client, which has no Settings page to link to. */
   settingsPath: string | null;
@@ -811,11 +914,11 @@ function EditModal({
         {/* Header */}
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#ece8df] px-5 py-4">
           <div>
-            <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Edit draft</h2>
+            <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Review draft</h2>
             <p className="m-0 mt-0.5 text-[12px] text-[#62655c]">
               {item.prospect?.business_name ?? 'Unknown'}
               <span className="mx-1.5 text-[#c4bfb5]">·</span>
-              {TYPE_LABEL[item.message_type] ?? item.message_type}
+              {approvalTypeLabel(item.message_type)}
             </p>
           </div>
           <button onClick={requestClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] transition-colors hover:text-[#20211c]">×</button>
@@ -844,10 +947,15 @@ function EditModal({
               className="w-full resize-y rounded-xl border border-[#3c7a5b] bg-white px-4 py-3 text-[13px] leading-relaxed text-[#20211c] outline-none"
             />
           </div>
-          <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[12px] text-[#62655c]">
-            {item.prospect?.category && <>{item.prospect.category}</>}
-            {item.prospect?.location && <><span className="mx-1.5 text-[#c4bfb5]">·</span>{item.prospect.location}</>}
-          </div>
+          <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-3 text-[12px] text-[#62655c]">
+            <Detail label="Prospect" value={[item.prospect?.category, item.prospect?.location].filter(Boolean).join(' · ')} />
+            <Detail label="Phone" value={item.prospect?.phone ? formatPhone(item.prospect.phone) : null} />
+            <Detail label="Scheduled send">
+              <ScheduledCell schedule={schedule} id={item.id} tz={timeZone} now={new Date()} />
+            </Detail>
+            <Detail label="Waiting since" value={formatPendingSince(pendingSinceOf(item, schedule), timeZone)} />
+            <ObservationDetails observation={item.observation} sourceUrl={item.observation_source_url} Detail={Detail} />
+          </dl>
           {blockedByGmail && (
             <div className="rounded-xl border border-[#e8d5a8] bg-[#f8efdb] px-3.5 py-2.5 text-[12px] text-[#8a6417]">
               {settingsPath
@@ -859,21 +967,26 @@ function EditModal({
 
         {/* Footer */}
         <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
-          <button onClick={onClose} className="cursor-pointer rounded-xl border border-[#ece8df] bg-transparent px-4 py-2 text-[13px] font-semibold text-[#62655c] transition-colors hover:bg-[#fbf9f5]">
+          <button onClick={onClose} className={btn('secondary', 'lg')}>
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={!dirty || saving}
-            className="cursor-pointer rounded-xl border border-[#3c7a5b] bg-transparent px-4 py-2 text-[13px] font-bold text-[#3c7a5b] transition-colors hover:bg-[#fbf9f5] disabled:cursor-not-allowed disabled:opacity-50"
+            title={dirty ? undefined : 'Change the subject or message to save a draft'}
+            className={`cursor-pointer rounded-xl border px-4 py-2 text-[13px] font-bold transition-colors disabled:cursor-not-allowed ${
+              dirty
+                ? 'border-[#3c7a5b] bg-[#edf4ef] text-[#2d5e46] shadow-sm hover:bg-[#e0ede4]'
+                : 'border-[#ddd8cb] bg-transparent text-[#9a9d92]'
+            }`}
           >
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? 'Saving…' : 'Save draft'}
           </button>
           <button
             onClick={() => onApprove(item.id, bodyDirty ? draft : undefined, subjectDirty ? subjectDraft : undefined)}
             disabled={blockedByGmail || saving}
             title={blockedByGmail ? GMAIL_REQUIRED_TITLE : undefined}
-            className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#2d5e46] disabled:cursor-not-allowed disabled:opacity-50"
+            className={btn('primary', 'lg')}
           >
             {dirty ? 'Save & approve' : 'Approve'}
           </button>

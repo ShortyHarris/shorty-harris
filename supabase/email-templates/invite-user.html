@@ -3,6 +3,11 @@
   Paste this whole file into the template body field in the dashboard.
   Suggested subject line: You're invited to Shorty Harris
 
+  BEFORE PASTING, replace the two bracketed placeholders:
+    [EXPIRY]         - how long the link lasts (Authentication → Settings →
+                       "Email OTP expiration"; e.g. "24 hours")
+    [SUPPORT_EMAIL]  - the address clients can write to for help
+
   Uses Supabase's template variables:
     {{ .ConfirmationURL }} — the invite accept link (goes to /auth/set-password
                               per redirectTo, handled by invite-client edge fn)
@@ -48,7 +53,7 @@
                 You've been invited
               </h1>
               <p style="margin:10px 0 0; font-size:14px; line-height:1.6; color:#62655c;">
-                An admin has set up your Shorty Harris account for <strong style="color:#1a1c17;">{{ .Email }}</strong>. Set a password to get in and see your leads, messages, and results in one place.
+                The Shorty Harris team has set up your Shorty Harris account for <strong style="color:#1a1c17;">{{ .Email }}</strong>. Set a password to get in and see your leads, messages, and results in one place.
               </p>
             </td>
           </tr>
@@ -82,7 +87,7 @@
           <tr>
             <td style="padding:20px 40px 0;">
               <p style="margin:0; font-size:12px; line-height:1.6; color:#9a9d92;">
-                This link expires after a while and can only be used once. If it's stopped working, ask the admin who invited you to resend it.
+                This link expires in [EXPIRY] and can only be used once. If it has stopped working, reply to the Shorty Harris team or write to <a href="mailto:[SUPPORT_EMAIL]" style="color:#3c7a5b;">[SUPPORT_EMAIL]</a> and we'll send a new one.
               </p>
             </td>
           </tr>
@@ -91,7 +96,7 @@
           <tr>
             <td style="padding:32px 40px 32px;">
               <p style="margin:0; font-size:11px; color:#c4c0b7;">
-                © 2026 Shorty Harris. If you weren't expecting this, you can ignore this email.
+                Sent by the Shorty Harris team. If you weren't expecting this, you can ignore this email.
               </p>
             </td>
           </tr>

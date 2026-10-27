@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { BOUNCED_INTENT, isNonReplyIntent } from '../lib/replyIntents';
 
 export interface CampaignAnalytics {
   campaign_id: string;
@@ -135,9 +136,9 @@ async function fetchClientAnalytics(clientId: string, client: SupabaseClient): P
     const campaignId = prospect?.campaign_id;
     if (!campaignId) return;
     const b = bucketFor(campaignId);
-    if (r.intent === 'bounced') {
+    if (r.intent === BOUNCED_INTENT) {
       b.bounced += 1;
-    } else if (r.intent !== 'auto_reply') {
+    } else if (!isNonReplyIntent(r.intent)) {
       b.repliedProspects.add(r.prospect_id);
     }
   });
@@ -206,7 +207,7 @@ async function fetchClientAnalytics(clientId: string, client: SupabaseClient): P
     }
   });
   replies.forEach((r) => {
-    if (!r.classified_at || r.intent === 'bounced' || r.intent === 'auto_reply') return;
+    if (!r.classified_at || isNonReplyIntent(r.intent)) return;
     const wk = weekStartISO(r.classified_at);
     if (wk >= earliestWeek && trendMap.has(wk)) trendMap.get(wk)!.replied += 1;
   });

@@ -9,6 +9,8 @@ import {
 import { TagInput } from '../../components/TagInput';
 import { useToast, ToastHost } from '../../components/Toast';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
+import { summarizeRebuild, type RebuildSummary } from '../../lib/rebuildSummary';
+import { btn } from '../../lib/clientButtons';
 
 const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em]';
 const inputCls = 'w-full rounded-lg border px-3.5 py-2.5 text-[13px] outline-none transition-colors';
@@ -53,6 +55,9 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
   const [savingField, setSavingField] = useState<string | null>(null);
   const [rebuilding, setRebuilding] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [rebuildSummary, setRebuildSummary] = useState<RebuildSummary | null>(null);
+
+  const fieldLabel = (key: string) => ARRAY_FIELDS.find((f) => f.key === key)?.label ?? key;
 
   function valuesFor(key: FieldDef['key']): string[] {
     return draft[key] ?? icp[key] ?? [];
@@ -84,7 +89,8 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
 
   async function handleRebuild() {
     if (rebuilding) return;
-    setRebuilding(true); setErr(null);
+    setRebuilding(true); setErr(null); setRebuildSummary(null);
+    const before = icp;
     const { ok, error, limitedData } = await buildClientIcp(clientId);
     if (!ok) {
       setRebuilding(false);
@@ -92,10 +98,13 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
       toast(error ?? "Couldn't rebuild your targeting profile - please try again.", 'error');
       return;
     }
-    await reload();
+    const after = await reload();
     setRebuilding(false);
+    const summary = after ? summarizeRebuild(before, after, ARRAY_FIELDS.map((f) => f.key)) : null;
+    setRebuildSummary(summary);
     toast(
-      'Rebuilt from your website - your own edits were left alone.'
+      'Rebuilt from your website.'
+        + (summary ? ` Filled: ${summary.filled.length}. Skipped (your edits): ${summary.skippedEdited.length}.` : '')
         + (limitedData ? ' We could only read limited information from the website.' : ''),
     );
   }
@@ -132,6 +141,17 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
             <p className="m-0 mt-1 text-[12.5px]" style={{ color: 'var(--ink-soft)' }}>
               Re-reads your website and refreshes everything below - except any field you've already edited yourself.
             </p>
+            {rebuildSummary && !rebuilding && (
+              <div className="mt-2 text-[12.5px]" style={{ color: 'var(--ink-soft)' }} role="status">
+                <div><strong>Filled:</strong> {rebuildSummary.filled.length ? rebuildSummary.filled.map(fieldLabel).join(', ') : 'nothing new'}</div>
+                {rebuildSummary.skippedEdited.length > 0 && (
+                  <div><strong>Skipped because you edited them:</strong> {rebuildSummary.skippedEdited.map(fieldLabel).join(', ')}</div>
+                )}
+                {rebuildSummary.stillEmpty.length > 0 && (
+                  <div><strong>Still empty:</strong> {rebuildSummary.stillEmpty.map(fieldLabel).join(', ')}</div>
+                )}
+              </div>
+            )}
             {rebuilding && (
               <p className="m-0 mt-1 text-[12.5px] font-semibold" style={{ color: 'var(--leaf)' }} role="status">
                 Reading your website - this can take up to a minute. Please keep this page open.
@@ -141,8 +161,7 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
           <button
             onClick={handleRebuild}
             disabled={rebuilding}
-            className="cursor-pointer inline-flex shrink-0 items-center gap-2 rounded-lg border-0 px-4 py-2 text-[13px] font-bold text-white transition-colors disabled:opacity-50"
-            style={{ background: 'var(--leaf)' }}
+            className={`${btn('primary', 'lg')} shrink-0`}
           >
             <RefreshCw size={14} className={rebuilding ? 'animate-spin' : ''} />
             {rebuilding ? 'Rebuilding… up to a minute' : 'Rebuild'}
@@ -165,7 +184,7 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
                 <div className="p-5">
                   <div className="mb-1.5 flex items-center justify-between gap-2">
                     <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>{f.label}</label>
-                    {edited && (
+                    {edited && valuesFor(f.key).length > 0 && (
                       <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)' }}>
                         your edit - won't be overwritten
                       </span>
@@ -187,6 +206,9 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
                       onChange={(v) => commitArray(f.key, v)}
                       splitOn={f.splitOn}
                     />
+                  )}
+                  {edited && valuesFor(f.key).length === 0 && (
+                    <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>Empty, and Rebuild skips this field because it was edited earlier. Add a value to fill it.</p>
                   )}
                   {valuesFor(f.key).length === 0 && f.emptyHint && (
                     <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>{f.emptyHint}</p>
