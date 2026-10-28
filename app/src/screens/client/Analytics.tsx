@@ -19,7 +19,7 @@ const HELP: HelpContent = {
 
 const TOOLTIP_STYLE = {
   borderRadius: 10,
-  border: '1px solid #ece8df',
+  border: '1px solid #e8e3f7',
   fontSize: 13,
   fontFamily: "'Plus Jakarta Sans', sans-serif",
 };
@@ -64,14 +64,14 @@ export function Analytics({ clientId, client = supabase }: { clientId: string; c
             <h2 className="an-section-title">Weekly activity</h2>
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={trend} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ece8df" />
-                <XAxis dataKey="weekLabel" tick={{ fontSize: 11, fill: '#9a9d92', fontFamily: "'Plus Jakarta Sans', sans-serif" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#9a9d92', fontFamily: "'Plus Jakarta Sans', sans-serif" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e8e3f7" />
+                <XAxis dataKey="weekLabel" tick={{ fontSize: 11, fill: '#605978', fontFamily: "'Plus Jakarta Sans', sans-serif" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#605978', fontFamily: "'Plus Jakarta Sans', sans-serif" }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} />
                 <Legend wrapperStyle={{ fontSize: 12, fontFamily: "'Plus Jakarta Sans', sans-serif" }} />
-                <Line type="monotone" dataKey="sent" name="Sent" stroke="#9a9d92" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="opened" name="Opened" stroke="#b9831f" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="replied" name="Replied" stroke="#3c7a5b" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="sent" name="Sent" stroke="#605978" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+                <Line type="monotone" dataKey="opened" name="Opened" stroke="#0e0822" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="replied" name="Replied" stroke="#7412ef" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

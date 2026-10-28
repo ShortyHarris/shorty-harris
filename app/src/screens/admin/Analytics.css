@@ -14,7 +14,7 @@
   .metric[data-tone="blue"] { border-left-color: var(--brand); }
   .metric[data-tone="green"] { border-left-color: var(--approve); }
   .metric-value {
-    @apply text-[28px] font-[720] leading-none tabular-nums;
+    @apply text-[28px] font-semibold leading-none tabular-nums;
   }
   .metric-label {
     @apply mt-1;
@@ -30,13 +30,13 @@
     background: var(--paper-raised);
     border-color: var(--line);
     padding: 20px;
-    box-shadow: var(--shadow);
+    box-shadow: none;
   }
   .chart-card.full {
     @apply mb-4;
   }
   .chart-card h3 {
-    @apply text-[14.5px] font-[650] m-0 mb-3.5;
+    @apply text-[14.5px] font-semibold m-0 mb-3.5;
   }
 
   .ab-variants {
@@ -57,13 +57,13 @@
     color: var(--ink-soft);
   }
   .ab-lead {
-    @apply text-[10.5px] font-[650] rounded-full;
+    @apply text-[10.5px] font-semibold rounded-full;
     background: var(--approve);
     color: #fff;
     padding: 2px 7px;
   }
   .ab-rate {
-    @apply text-[26px] font-[720] mt-1 tabular-nums;
+    @apply text-[26px] font-semibold mt-1 tabular-nums;
   }
   .ab-detail {
     @apply text-xs;

@@ -11,93 +11,93 @@
 
 :root {
   /* text */
-  --ad-ink:          #20211c;
-  --ad-black:        #0a0a0a;
-  --ad-ink-2:        #3f4038;
-  --ad-ink-soft:     #62655c;
-  --ad-ink-faint:    #9a9d92;
-  --ad-ink-ghost:    #c4bfb5;
+  --ad-ink:          #0e0822;
+  --ad-black:        #0e0822;
+  --ad-ink-2:        #2a2147;
+  --ad-ink-soft:     #605978;
+  --ad-ink-faint:    #605978;
+  --ad-ink-ghost:    #8f8aa8;
 
   /* surfaces + lines */
-  --ad-page:         #f5f5f5;
-  --ad-page-sunken:  #efeded;
+  --ad-page:         #f9f6ff;
+  --ad-page-sunken:  #f1e9ff;
   --ad-surface:      #ffffff;
-  --ad-surface-2:    #fbf9f5;
-  --ad-fill:         #f5f2ec;
-  --ad-line:         #ece8df;
-  --ad-line-strong:  #ddd8cb;
+  --ad-surface-2:    #f9f6ff;
+  --ad-fill:         #f1e9ff;
+  --ad-line:         #e8e3f7;
+  --ad-line-strong:  #8f8aa8;
 
-  /* brand green */
-  --ad-green:        #3c7a5b;
-  --ad-green-hover:  #2d5e46;
-  --ad-green-tint:   #edf4ef;
-  --ad-green-line:   #b4d5c0;
+  /* brand purple (the token names are historical) */
+  --ad-green:        #7412ef;
+  --ad-green-hover:  #5b0fc2;
+  --ad-green-tint:   #f1e9ff;
+  --ad-green-line:   #e8dafd;
 
-  /* clay (danger / destructive) */
-  --ad-clay:         #a8533a;
-  --ad-clay-hover:   #8a3f2b;
-  --ad-clay-tint:    #f6e8e2;
-  --ad-clay-line:    #e0b8ae;
-  --ad-red:          #ba1a1a;
+  /* ink (danger: solid ink, never red) */
+  --ad-clay:         #0e0822;
+  --ad-clay-hover:   #2a2147;
+  --ad-clay-tint:    #f9f6ff;
+  --ad-clay-line:    #e8e3f7;
+  --ad-red:          #0e0822;
 
-  /* amber (warning / scheduled / pending) */
-  --ad-amber:        #b9831f;
-  --ad-orange:       #d4870f;
-  --ad-amber-ink:    #8a6417;
-  --ad-amber-tint:   #f8efdb;
-  --ad-amber-wash:   #fdf8ee;
-  --ad-amber-line:   #e8d5a8;
+  /* warning / scheduled / pending: purple tint, status carried by word + icon */
+  --ad-amber:        #7412ef;
+  --ad-orange:       #7412ef;
+  --ad-amber-ink:    #5b0fc2;
+  --ad-amber-tint:   #f1e9ff;
+  --ad-amber-wash:   #f9f6ff;
+  --ad-amber-line:   #e8dafd;
 
   /* accents */
-  --ad-purple:       #6b4fa0;
-  --ad-purple-tint:  #f0ecf8;
-  --ad-blue:         #2f6690;
-  --ad-blue-tint:    #e7f0f7;
+  --ad-purple:       #7412ef;
+  --ad-purple-tint:  #f1e9ff;
+  --ad-blue:         #605978;
+  --ad-blue-tint:    #f9f6ff;
 }
 
 html[data-admin-theme="dark"] {
   color-scheme: dark;
 
-  --ad-ink:          #ecebe6;
-  --ad-black:        #f4f3ef;
-  --ad-ink-2:        #cfcec7;
-  --ad-ink-soft:     #a9aaa2;
-  --ad-ink-faint:    #82847b;
-  --ad-ink-ghost:    #595b53;
+  --ad-ink:          #f4f1ff;
+  --ad-black:        #ffffff;
+  --ad-ink-2:        #dcd5f2;
+  --ad-ink-soft:     #b0a8cc;
+  --ad-ink-faint:    #8f89ad;
+  --ad-ink-ghost:    #5e5680;
 
-  --ad-page:         #121310;
-  --ad-page-sunken:  #0e0f0d;
-  --ad-surface:      #1a1b18;
-  --ad-surface-2:    #20211e;
-  --ad-fill:         #272824;
-  --ad-line:         #2e302b;
-  --ad-line-strong:  #3e403a;
+  --ad-page:         #0e0822;
+  --ad-page-sunken:  #090518;
+  --ad-surface:      #17102e;
+  --ad-surface-2:    #1d1538;
+  --ad-fill:         #241a45;
+  --ad-line:         #2c2250;
+  --ad-line-strong:  #463a73;
 
-  --ad-green:        #3f9469;
-  --ad-green-hover:  #357f59;
-  --ad-green-tint:   #1d2b23;
-  --ad-green-line:   #2f4c3c;
+  --ad-green:        #a875ff;
+  --ad-green-hover:  #bd96ff;
+  --ad-green-tint:   #261845;
+  --ad-green-line:   #3b2a6b;
 
-  --ad-clay:         #d0704f;
-  --ad-clay-hover:   #b85e40;
-  --ad-clay-tint:    #3a2621;
-  --ad-clay-line:    #5c362b;
-  --ad-red:          #e0524a;
+  --ad-clay:         #f4f1ff;
+  --ad-clay-hover:   #ffffff;
+  --ad-clay-tint:    #241a45;
+  --ad-clay-line:    #463a73;
+  --ad-red:          #f4f1ff;
 
-  --ad-amber:        #e2b456;
-  --ad-orange:       #c47d12;
-  --ad-amber-ink:    #e9c47c;
-  --ad-amber-tint:   #33291a;
-  --ad-amber-wash:   #2a2318;
-  --ad-amber-line:   #5a4721;
+  --ad-amber:        #a875ff;
+  --ad-orange:       #a875ff;
+  --ad-amber-ink:    #c4a3ff;
+  --ad-amber-tint:   #261845;
+  --ad-amber-wash:   #1d1538;
+  --ad-amber-line:   #3b2a6b;
 
-  --ad-purple:       #8f74c9;
-  --ad-purple-tint:  #2a2438;
-  --ad-blue:         #6ea4cf;
-  --ad-blue-tint:    #1c2a36;
+  --ad-purple:       #a875ff;
+  --ad-purple-tint:  #261845;
+  --ad-blue:         #b0a8cc;
+  --ad-blue-tint:    #1d1538;
 
   /* page background behind the admin shell */
-  background: #121310;
+  background: #0e0822;
 }
 
 /* Inverted buttons: near-black background + white text in light mode

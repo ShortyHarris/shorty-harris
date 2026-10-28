@@ -32,26 +32,26 @@ export function NotFound() {
   }, []);
 
   return (
-    <div style={FONT} className="min-h-screen flex flex-col bg-cream text-[#0a0a0a]">
+    <div style={FONT} className="min-h-screen flex flex-col bg-paper text-[#0e0822]">
       <PublicNav />
       <main className="max-w-[680px] mx-auto px-6 py-24 text-center">
-        <span className="text-[12.5px] font-bold uppercase tracking-[.1em] text-[#3c7a5b]">404</span>
+        <span className="text-[12.5px] font-semibold uppercase tracking-[.1em] text-[#7412ef]">404</span>
         <h1 className="mt-4 mb-0 text-[30px] sm:text-[38px] font-extrabold leading-[1.15] tracking-tight">
           Page not found
         </h1>
-        <p className="mt-4 text-[15.5px] leading-relaxed text-[#525252]">
+        <p className="mt-4 text-[15.5px] leading-relaxed text-[#605978]">
           The page you're looking for doesn't exist or may have moved.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link
             to="/"
-            className="inline-flex items-center justify-center h-11 px-6 rounded-full bg-[#0a0a0a] text-white text-[14.5px] font-semibold no-underline hover:bg-[#3c7a5b] transition-colors"
+            className="inline-flex items-center justify-center h-11 px-6 rounded-full bg-[#0e0822] text-white text-[14.5px] font-semibold no-underline hover:bg-[#7412ef] transition-colors"
           >
             Back to home
           </Link>
           <Link
             to="/blog"
-            className="inline-flex items-center justify-center h-11 px-6 rounded-full border border-[#d4d4d4] bg-white text-[#0a0a0a] text-[14.5px] font-semibold no-underline hover:bg-[#f5f5f5] transition-colors"
+            className="inline-flex items-center justify-center h-11 px-6 rounded-full border border-[#d4d4d4] bg-white text-[#0e0822] text-[14.5px] font-semibold no-underline hover:bg-[#f5f5f5] transition-colors"
           >
             Read the blog
           </Link>
@@ -65,13 +65,13 @@ export function NotFound() {
             <a
               key={c.title}
               href={c.to}
-              className="group rounded-2xl border border-[#e5e5e5] bg-white p-5 no-underline transition-colors hover:border-[#b4d5c0]"
+              className="group rounded-2xl border border-[#e8e3f7] bg-white p-5 no-underline transition-colors hover:border-[#e8dafd]"
             >
-              <div className="flex items-center gap-1.5 text-[15px] font-bold text-[#0a0a0a]">
+              <div className="flex items-center gap-1.5 text-[15px] font-semibold text-[#0e0822]">
                 {c.title}
-                <ArrowRight size={16} strokeWidth={2.4} className="text-[#3c7a5b] transition-transform duration-200 group-hover:translate-x-0.5" />
+                <ArrowRight size={16} strokeWidth={2.4} className="text-[#7412ef] transition-transform duration-200 group-hover:translate-x-0.5" />
               </div>
-              <div className="mt-1 text-[13.5px] leading-[1.5] text-[#737373]">{c.body}</div>
+              <div className="mt-1 text-[13.5px] leading-[1.5] text-[#605978]">{c.body}</div>
             </a>
           ))}
         </div>

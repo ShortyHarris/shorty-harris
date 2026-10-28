@@ -59,7 +59,7 @@ function FilterSelect({ label, ariaLabel, value, onChange, options, className = 
         aria-label={ariaLabel}
         className={`h-10 min-w-0 max-w-full basis-0 shrink max-md:basis-full gap-2 rounded-lg border-(--ad-line) bg-(--ad-surface-2) px-3 text-[13px] font-semibold text-(--ad-ink) focus:border-(--ad-green) focus:ring-0 focus:ring-offset-0 ${className}`}
       >
-        <span className="w-14 shrink-0 text-left text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">{label}</span>
+        <span className="w-14 shrink-0 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">{label}</span>
         <span className="min-w-0 flex-1 truncate text-left"><SelectValue /></span>
       </SelectTrigger>
       <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
@@ -283,7 +283,7 @@ export function ApprovalQueue() {
                 onClick={() => setConfirmBulk(true)}
                 disabled={approvable.length === 0 || truncated}
                 title={truncated ? TOO_MANY_MSG : approvable.length === 0 ? GMAIL_TOOLTIP : undefined}
-                className="cursor-pointer whitespace-nowrap rounded-lg border-0 bg-(--ad-green) px-4 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
+                className="cursor-pointer whitespace-nowrap rounded-lg border-0 bg-(--ad-green) px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Approve all {approvable.length} for {activeClient.name}
               </button>
@@ -297,7 +297,7 @@ export function ApprovalQueue() {
         <SkeletonTable rows={PAGE_SIZE} cols={5} />
       ) : items.length === 0 ? (
         <div ref={queueRef} className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
-          <strong className="text-[15px] font-bold text-(--ad-ink)">{clientItems.length > 0 ? 'No drafts match this filter.' : "Queue's clear."}</strong>
+          <strong className="text-[15px] font-semibold text-(--ad-ink)">{clientItems.length > 0 ? 'No drafts match this filter.' : "Queue's clear."}</strong>
           <span className="text-[13px] text-(--ad-ink-soft)">{clientItems.length > 0 ? 'Choose "All types" to see everything.' : 'No drafts waiting for review. New ones appear here as the AI writes them.'}</span>
         </div>
       ) : (
@@ -323,7 +323,7 @@ export function ApprovalQueue() {
                 {paged.map((item) => (
                   <tr key={item.id} onClick={() => setEditItem(item)} className="cursor-pointer">
                     <td className="min-w-0">
-                      <div className="line-clamp-2 font-bold text-(--ad-ink)" title={item.prospect?.business_name ?? undefined}>
+                      <div className="line-clamp-2 font-semibold text-(--ad-ink)" title={item.prospect?.business_name ?? undefined}>
                         {item.prospect?.business_name ?? 'Unknown'}
                       </div>
                       {(item.prospect?.contact_name || item.prospect?.location) && (
@@ -362,7 +362,7 @@ export function ApprovalQueue() {
                           onClick={() => doApprove(item.id)}
                           disabled={senderBlocked(item)}
                           title={senderBlocked(item) ? GMAIL_TOOLTIP : undefined}
-                          className="cursor-pointer rounded-md border-0 bg-(--ad-green) px-3.5 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
+                          className="cursor-pointer rounded-md border-0 bg-(--ad-green) px-3.5 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Approve
                         </button>
@@ -384,14 +384,14 @@ export function ApprovalQueue() {
               <div key={item.id} className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="font-bold text-(--ad-ink) truncate">{item.prospect?.business_name ?? 'Unknown'}</div>
+                    <div className="font-semibold text-(--ad-ink) truncate">{item.prospect?.business_name ?? 'Unknown'}</div>
                     {item.prospect?.contact_name && (
                       <div className="mt-0.5 text-[11px] text-(--ad-ink-faint)">{item.prospect.contact_name}</div>
                     )}
                     <ProspectMeta item={item} className="mt-0.5" />
                   </div>
                   <span className="flex flex-shrink-0 flex-col items-end gap-1">
-                    <span className="inline-flex items-center whitespace-nowrap rounded-full bg-(--ad-green-tint) px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em] text-(--ad-green)">
+                    <span className="inline-flex items-center whitespace-nowrap rounded-full bg-(--ad-green-tint) px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.04em] text-(--ad-green)">
                       {approvalTypeLabel(item.message_type)}
                     </span>
                     <AnglePill angle={item.angle} />
@@ -407,9 +407,9 @@ export function ApprovalQueue() {
                 <OpenBadge item={item} className="mt-1" />
                 <HeldBadge row={schedule.get(item.id)} className="mt-1" />
                 <div className="mt-2 grid grid-cols-2 gap-2 text-[11.5px] text-(--ad-ink-soft)">
-                  <div><div className="text-[10px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Scheduled</div>
+                  <div><div className="text-[10px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">Scheduled</div>
                     {activeFilter === ALL_CLIENTS ? '-' : <ScheduledCell schedule={schedule} id={item.id} tz={tzOf(item)} now={now} />}</div>
-                  <div><div className="text-[10px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Pending since</div>
+                  <div><div className="text-[10px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">Pending since</div>
                     <PendingCell item={item} schedule={schedule} tz={tzOf(item)} now={now} /></div>
                 </div>
                 <div className="mt-3 flex items-center gap-2 border-t border-(--ad-fill) pt-3">
@@ -417,7 +417,7 @@ export function ApprovalQueue() {
                     onClick={() => doApprove(item.id)}
                     disabled={senderBlocked(item)}
                     title={senderBlocked(item) ? GMAIL_TOOLTIP : undefined}
-                    className="cursor-pointer flex-1 rounded-md border-0 bg-(--ad-green) px-3 py-2 text-[12px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
+                    className="cursor-pointer flex-1 rounded-md border-0 bg-(--ad-green) px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Approve
                   </button>
@@ -564,14 +564,14 @@ function StatTile({
     <div
       onClick={onClick}
       style={{ background: bg, borderColor: bdr, boxShadow: '0 1px 2px rgba(32,33,28,.04)' }}
-      className={`flex flex-col rounded-lg border px-5 py-[18px] gap-0 transition-shadow hover:shadow-md ${onClick ? 'cursor-pointer' : ''}`}
+      className={`flex flex-col rounded-lg border px-5 py-[18px] gap-0 ${onClick ? 'cursor-pointer' : ''}`}
     >
       {/* Icon + label row */}
       <div className="flex items-center gap-[5px] mb-[10px]">
         <Icon size={13} strokeWidth={2} style={{ color: icnC, flexShrink: 0 }} />
         <span
           style={{ color: lblC }}
-          className="text-[11px] font-bold uppercase tracking-[.08em] leading-none"
+          className="text-[11px] font-semibold uppercase tracking-[.08em] leading-none"
         >
           {label}
         </span>
@@ -599,7 +599,7 @@ function StatTile({
 function Detail({ label, value, children }: { label: string; value?: string | null; children?: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">{label}</dt>
+      <dt className="text-[10px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">{label}</dt>
       <dd className="m-0 mt-0.5 break-words text-(--ad-ink)">{children ?? (value || '-')}</dd>
     </div>
   );
@@ -646,7 +646,7 @@ function EditModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[600px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[600px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -656,7 +656,7 @@ function EditModal({
         {/* Header */}
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-(--ad-line) px-5 py-4">
           <div>
-            <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Review draft</h2>
+            <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Review draft</h2>
             <p className="m-0 mt-0.5 text-[12px] text-(--ad-ink-soft)">
               {item.prospect?.business_name ?? 'Unknown'}
               <span className="mx-1.5 text-(--ad-ink-ghost)">·</span>
@@ -670,22 +670,22 @@ function EditModal({
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
           {item.subject !== null && (
             <div>
-              <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Subject</div>
+              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">Subject</div>
               <input
                 value={subjectDraft}
                 onChange={(e) => setSubjectDraft(e.target.value)}
-                style={{ ...FONT, boxShadow: '0 0 0 3px rgba(60,122,91,0.12)' }}
-                className="w-full rounded-xl border border-(--ad-green) bg-(--ad-surface) px-3.5 py-2.5 text-[13px] font-bold text-(--ad-ink) outline-none"
+                style={FONT}
+                className="w-full rounded-xl border border-(--ad-green) bg-(--ad-surface) px-3.5 py-2.5 text-[13px] font-semibold text-(--ad-ink) outline-none"
               />
             </div>
           )}
           <div>
-            <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Message body</div>
+            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">Message body</div>
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               rows={Math.max(6, draft.split('\n').length + 1)}
-              style={{ ...FONT, boxShadow: '0 0 0 3px rgba(60,122,91,0.12)' }}
+              style={FONT}
               className="w-full resize-y rounded-xl border border-(--ad-green) bg-(--ad-surface) px-4 py-3 text-[13px] leading-relaxed text-(--ad-ink) outline-none"
             />
           </div>
@@ -734,9 +734,9 @@ function EditModal({
             onClick={handleSave}
             disabled={!dirty || saving}
             title={dirty ? undefined : 'Change the subject or message to save a draft'}
-            className={`cursor-pointer rounded-md border px-4 py-2 text-[13px] font-bold transition-colors disabled:cursor-not-allowed ${
+            className={`cursor-pointer rounded-md border px-4 py-2 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed ${
               dirty
-                ? 'border-(--ad-green) bg-(--ad-green-tint) text-(--ad-green) shadow-sm hover:bg-(--ad-surface-2)'
+                ? 'border-(--ad-green) bg-(--ad-green-tint) text-(--ad-green) hover:bg-(--ad-surface-2)'
                 : 'border-(--ad-line) bg-transparent text-(--ad-ink-faint)'
             }`}
           >
@@ -746,7 +746,7 @@ function EditModal({
             onClick={() => onApprove(item.id, bodyDirty ? draft : undefined, subjectDirty ? subjectDraft : undefined)}
             disabled={senderBlocked(item) || saving}
             title={senderBlocked(item) ? GMAIL_TOOLTIP : undefined}
-            className="cursor-pointer rounded-md border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
+            className="cursor-pointer rounded-md border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:cursor-not-allowed disabled:opacity-50"
           >
             {dirty ? 'Save & approve' : 'Approve'}
           </button>

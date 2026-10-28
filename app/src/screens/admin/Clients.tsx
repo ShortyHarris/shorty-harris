@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Check, X } from 'lucide-react';
+import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -48,19 +50,19 @@ const CHANNEL_PILL: Record<string, { bg: string; text: string }> = {
   sms:      { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
 };
 
-const STATUS_PILL: Record<string, { bg: string; text: string }> = {
-  draft:   { bg: 'var(--ad-fill)', text: 'var(--ad-ink-soft)' },
-  active:  { bg: 'var(--ad-green-tint)', text: 'var(--ad-green)' },
-  paused:  { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
-  churned: { bg: 'var(--ad-fill)', text: 'var(--ad-ink-faint)' },
+const STATUS_PILL: Record<string, StatusPillStyle> = {
+  draft:   { ...PILL.ahead,   icon: 'circle' },
+  active:  { ...PILL.waiting, icon: 'check' },
+  paused:  { ...PILL.ahead,   icon: 'clock' },
+  churned: { ...PILL.closed,  icon: 'minus' },
 };
 
 const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
-const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
-const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50';
+const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
+const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50';
 const PAGE_SIZE  = 15;
 
-const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
 const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
 type InvitePhase = 'idle' | 'sending' | 'sent' | 'active' | 'error';
@@ -136,7 +138,7 @@ export function Clients() {
         <SkeletonTable rows={PAGE_SIZE} cols={7} />
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
-          <strong className="text-[15px] font-bold text-(--ad-ink)">No clients yet.</strong>
+          <strong className="text-[15px] font-semibold text-(--ad-ink)">No clients yet.</strong>
           <span className="text-[13px] text-(--ad-ink-soft)">Create the first client to get started.</span>
           <button onClick={() => setShowNew(true)} className={`${primaryCls} mt-2`}>+ New client</button>
         </div>
@@ -168,7 +170,7 @@ export function Clients() {
                   return (
                     <tr key={c.id} onClick={() => setEditClient(c)} className="group cursor-pointer">
                       <td className="min-w-0">
-                        <div className="truncate font-bold text-(--ad-ink) group-hover:underline" title={c.business_name}>{c.business_name}</div>
+                        <div className="truncate font-semibold text-(--ad-ink) group-hover:underline" title={c.business_name}>{c.business_name}</div>
                         <span className="mt-0.5 inline-block max-w-full truncate rounded-full bg-(--ad-fill) px-2 py-0.5 text-[10px] font-semibold text-(--ad-ink-faint)" title={`Send timezone: ${c.send_timezone}`}>
                           {timezoneLabel(c.send_timezone)}
                         </span>
@@ -180,13 +182,13 @@ export function Clients() {
                         {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </td>
                       <td>
-                        <span className="atbl-pill" style={{ background: spill.bg, color: spill.text }}>
+                        <StatusPill pill={spill}>
                           {c.status}
-                        </span>
+                        </StatusPill>
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-(--ad-ink)">{c.credits_remaining}</span>
+                          <span className="font-semibold text-(--ad-ink)">{c.credits_remaining}</span>
                           <button
                             onClick={() => setCreditsTarget(c)}
                             className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-2 py-1 text-[11px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
@@ -246,14 +248,14 @@ export function Clients() {
               return (
                 <div key={c.id} className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="min-w-0 truncate font-bold text-[14px] text-(--ad-ink)" title={c.business_name}>{c.business_name}</span>
+                    <span className="min-w-0 truncate font-semibold text-[14px] text-(--ad-ink)" title={c.business_name}>{c.business_name}</span>
                     <div className="flex shrink-0 items-center gap-1.5">
                       <span style={{ background: spill.bg, color: spill.text }}
-                        className="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[.04em]">
+                        className="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.04em]">
                         {c.status}
                       </span>
                       <span style={{ background: pill.bg, color: pill.text }}
-                        className="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[.04em]">
+                        className="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.04em]">
                         {ch}
                       </span>
                     </div>
@@ -400,7 +402,7 @@ function InviteCell({
     );
   }
   if (phase === 'sent') {
-    return <span className={pillCls} style={{ background: 'var(--ad-green-tint)', color: 'var(--ad-green)' }}>✓ Invite sent</span>;
+    return <span className={pillCls} style={{ background: 'var(--ad-green-tint)', color: 'var(--ad-green)' }}><Check size={12} strokeWidth={2} aria-hidden /> Invite sent</span>;
   }
   if (phase === 'active' || client.activated_at) {
     return (
@@ -417,7 +419,7 @@ function InviteCell({
     <div className="flex flex-col gap-1">
       <button
         onClick={onInvite}
-        className={`${pillCls} cursor-pointer border-0 font-bold transition-opacity hover:opacity-75`}
+        className={`${pillCls} cursor-pointer border-0 font-semibold transition-opacity hover:opacity-75`}
         style={client.has_profile
           ? { background: 'var(--ad-amber-tint)', color: 'var(--ad-amber)' }
           : { background: 'var(--ad-green-tint)', color: 'var(--ad-green)' }}
@@ -441,7 +443,7 @@ function ModalShell({ children }: { onClose: () => void; children: React.ReactNo
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
@@ -682,7 +684,7 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
   return (
     <ModalShell onClose={onClose}>
       <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">New client</h2>
+        <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">New client</h2>
         <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
@@ -738,18 +740,18 @@ function NewClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
             <div className="mt-2 rounded-xl border border-(--ad-green)/20 bg-(--ad-green-tint) px-3.5 py-3 text-[12px] text-(--ad-ink) flex flex-col gap-1.5">
               {enrichResult.summary && <p className="m-0 text-(--ad-green)">{enrichResult.summary}</p>}
               {!!enrichResult.services?.length && (
-                <p className="m-0"><strong className="font-bold">Services:</strong> {enrichResult.services.join(', ')}</p>
+                <p className="m-0"><strong className="font-semibold">Services:</strong> {enrichResult.services.join(', ')}</p>
               )}
               {termPlan.dropped.length > 0 && (
                 <p className="m-0 text-(--ad-amber)">
                   A campaign can have up to {getActiveCampaignLimits().maxSearchTerms} search terms, so the first campaign
-                  will start with <strong className="font-bold">{termPlan.kept.join(', ')}</strong>.
+                  will start with <strong className="font-semibold">{termPlan.kept.join(', ')}</strong>.
                   Left out: {termPlan.dropped.join(', ')}. You can swap them in when you edit the campaign.
                 </p>
               )}
               {!!enrichResult.target_customer_profiles?.length && (
                 <p className="m-0">
-                  <strong className="font-bold">Target customers:</strong>{' '}
+                  <strong className="font-semibold">Target customers:</strong>{' '}
                   {enrichResult.target_customer_profiles.map((p, i) => (
                     <span key={p.segment ?? i} title={p.reasoning}>
                       {i > 0 && ', '}{p.segment}{p.priority ? ` (${p.priority})` : ''}
@@ -919,7 +921,7 @@ function EditClientModal({
   return (
     <ModalShell onClose={onClose}>
       <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Edit client</h2>
+        <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Edit client</h2>
         <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
@@ -1098,7 +1100,7 @@ function AddCreditsModal({
   return (
     <ModalShell onClose={onClose}>
       <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Credits - {client.business_name}</h2>
+        <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Credits - {client.business_name}</h2>
         <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
@@ -1151,7 +1153,7 @@ function AddCreditsModal({
                         <td className="py-1.5 pr-2 whitespace-nowrap text-(--ad-ink-soft)">
                           {new Date(t.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                         </td>
-                        <td className={`py-1.5 pr-2 font-bold ${t.amount < 0 ? 'text-(--ad-clay)' : 'text-(--ad-green)'}`}>
+                        <td className={`py-1.5 pr-2 font-semibold ${t.amount < 0 ? 'text-(--ad-clay)' : 'text-(--ad-green)'}`}>
                           {t.amount > 0 ? `+${t.amount}` : t.amount}
                         </td>
                         <td className="py-1.5 pr-2 text-(--ad-ink-soft)">{t.type}</td>
@@ -1205,12 +1207,12 @@ function DeleteClientModal({
   return (
     <ModalShell onClose={onClose}>
       <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Delete client</h2>
+        <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Delete client</h2>
         <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
         <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-4">
-          <p className="m-0 text-[14px] font-bold text-(--ad-clay)">
+          <p className="m-0 text-[14px] font-semibold text-(--ad-clay)">
             Permanently delete "{client.business_name}"?
           </p>
           <p className="m-0 mt-1.5 text-[13px] text-(--ad-clay)/80">
@@ -1219,7 +1221,7 @@ function DeleteClientModal({
         </div>
 
         <div>
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">This will permanently delete:</p>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">This will permanently delete:</p>
           {!counts ? (
             <div className="flex items-center gap-2 text-[13px] text-(--ad-ink-faint)">
               <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-(--ad-line-strong) border-t-(--ad-clay)" />
@@ -1231,7 +1233,7 @@ function DeleteClientModal({
             <ul className="m-0 list-none p-0 flex flex-col gap-1">
               {blastItems.map((item) => (
                 <li key={String(item)} className="flex items-center gap-2 text-[13px] text-(--ad-ink-soft)">
-                  <span className="text-(--ad-clay)">✕</span>
+                  <X size={12} strokeWidth={2} className="shrink-0 text-(--ad-ink)" aria-hidden />
                   {item}
                 </li>
               ))}
@@ -1280,12 +1282,12 @@ function ChangeLoginEmailModal({
   return (
     <ModalShell onClose={onClose}>
       <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Change login email</h2>
+        <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Change login email</h2>
         <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
         <p className="m-0 text-[13px] text-(--ad-ink-soft)">
-          This changes the email <strong className="font-bold">{client.business_name}</strong> uses to sign in to their dashboard. It's applied immediately - no confirmation email is sent to the new address.
+          This changes the email <strong className="font-semibold">{client.business_name}</strong> uses to sign in to their dashboard. It's applied immediately - no confirmation email is sent to the new address.
         </p>
         <div>
           <label className={fieldLbl}>New login email<RequiredMark /></label>

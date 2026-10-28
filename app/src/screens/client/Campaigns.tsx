@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ChevronRight, TriangleAlert, Pencil, Trash2, Megaphone } from 'lucide-react';
+import { ChevronRight, TriangleAlert, Pencil, Trash2, Megaphone, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import {
@@ -32,6 +32,7 @@ import {
 import { validateCampaignLimits } from '../../lib/campaignLimits';
 import { LimitCounter, LimitMessages } from '../../components/LimitCounter';
 import { PIPELINE_STATUS_LABEL, PIPELINE_STATUS_PILL } from '../../lib/pipelineStatus';
+import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
 import { Sparkles } from 'lucide-react';
 import { useClientProfile } from '../../hooks/useClientProfile';
 import { useCountrySendHolds } from '../../hooks/useCountrySendHolds';
@@ -57,12 +58,12 @@ const HELP: HelpContent = {
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
-const CAMP_PILL: Record<string, { bg: string; text: string; border?: string }> = {
-  pending_review: { bg: '#f0ecf8', text: '#6b4fa0' },
-  draft:          { bg: '#f5f2ec', text: '#62655c', border: '1px solid #ece8df' },
-  active:         { bg: '#edf4ef', text: '#3c7a5b' },
-  paused:         { bg: '#f8efdb', text: '#b9831f' },
-  completed:      { bg: '#e7f0f7', text: '#2f6690' },
+const CAMP_PILL: Record<string, StatusPillStyle> = {
+  pending_review: { ...PILL.waiting, icon: 'clock' },
+  draft:          { ...PILL.closed,  icon: 'minus' },
+  active:         { ...PILL.sent,    icon: 'send' },
+  paused:         { ...PILL.ahead,   icon: 'clock' },
+  completed:      { ...PILL.closed,  icon: 'check' },
 };
 
 function lastScrapedLabel(iso: string | null): string {
@@ -128,16 +129,16 @@ export function Campaigns({
     <div style={FONT} className="flex flex-col gap-6 content">
       <header className="page-header flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
-          <h1 className="m-0 text-[26px] flex items-center gap-2 font-extrabold tracking-tight text-[#20211c]">
-            <Megaphone size={24} strokeWidth={2} className="text-[#3c7a5b]" aria-hidden />
+          <h1 className="m-0 text-[26px] flex items-center gap-2 font-extrabold tracking-tight text-[#0e0822]">
+            <Megaphone size={24} strokeWidth={2} className="text-[#7412ef]" aria-hidden />
             Campaigns
           </h1>
-          <p className="m-0 mt-1 text-[13px] text-[#62655c]">{rows.length} campaign{rows.length !== 1 ? 's' : ''}
+          <p className="m-0 mt-1 text-[13px] text-[#605978]">{rows.length} campaign{rows.length !== 1 ? 's' : ''}
             <span className="md:hidden" title={launchLimitTitle}> · {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used</span>
           </p>
         </div>
         <div className="flex items-center gap-2 md:gap-2.5 shrink-0">
-          <span className="hidden md:inline text-[12px] font-semibold text-[#62655c]" title={launchLimitTitle}>
+          <span className="hidden md:inline text-[12px] font-semibold text-[#605978]" title={launchLimitTitle}>
             {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used
           </span>
           <HelpButton content={HELP} />
@@ -157,23 +158,23 @@ export function Campaigns({
       </header>
 
       {atLaunchLimit && (
-        <div className="flex items-start gap-3 rounded-xl border border-[#e8d5a8] bg-[#f8efdb] px-4 py-3.5">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f0dfb8]">
-            <TriangleAlert size={15} strokeWidth={2.2} className="text-[#8a6417]" />
+        <div className="flex items-start gap-3 rounded-xl border border-[#e8dafd] bg-[#f1e9ff] px-4 py-3.5">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#e8dafd]">
+            <TriangleAlert size={15} strokeWidth={2.2} className="text-[#5b0fc2]" />
           </span>
-          <p className="m-0 pt-0.5 text-[13px] leading-snug text-[#8a6417]">
-            <strong className="font-bold">Launch limit reached</strong> - you've used {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches this month. Contact us to increase it before creating another campaign.
+          <p className="m-0 pt-0.5 text-[13px] leading-snug text-[#5b0fc2]">
+            <strong className="font-semibold">Launch limit reached</strong> - you've used {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches this month. Contact us to increase it before creating another campaign.
           </p>
         </div>
       )}
 
       {atLimit && (
-        <div className="flex items-start gap-3 rounded-xl border border-[#e8d5a8] bg-[#f8efdb] px-4 py-3.5">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f0dfb8]">
-            <TriangleAlert size={15} strokeWidth={2.2} className="text-[#8a6417]" />
+        <div className="flex items-start gap-3 rounded-xl border border-[#e8dafd] bg-[#f1e9ff] px-4 py-3.5">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#e8dafd]">
+            <TriangleAlert size={15} strokeWidth={2.2} className="text-[#5b0fc2]" />
           </span>
-          <p className="m-0 pt-0.5 text-[13px] leading-snug text-[#8a6417]">
-            <strong className="font-bold">Campaign limit reached</strong> - you've used {usage!.campaign_count} of {usage!.max_campaigns} slots. Contact us to increase it before creating another one.
+          <p className="m-0 pt-0.5 text-[13px] leading-snug text-[#5b0fc2]">
+            <strong className="font-semibold">Campaign limit reached</strong> - you've used {usage!.campaign_count} of {usage!.max_campaigns} slots. Contact us to increase it before creating another one.
           </p>
         </div>
       )}
@@ -187,15 +188,15 @@ export function Campaigns({
       ))}
 
       {error && (
-        <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">Couldn't load your campaigns: {error}</div>
+        <div className="rounded-xl border border-[#0e0822]/20 bg-[#f9f6ff] px-4 py-3 text-[13px] text-[#0e0822]">Couldn't load your campaigns: {error}</div>
       )}
 
       {loading ? (
         <SkeletonTable rows={6} cols={5} />
       ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-          <strong className="text-[15px] font-bold text-[#20211c]">No campaigns yet.</strong>
-          <span className="text-[13px] text-[#62655c]">Create your first campaign to tell us who to target.</span>
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[#e8e3f7] bg-white p-10 text-center">
+          <strong className="text-[15px] font-semibold text-[#0e0822]">No campaigns yet.</strong>
+          <span className="text-[13px] text-[#605978]">Create your first campaign to tell us who to target.</span>
           {!readOnly && (
             <button
               onClick={() => setShowNew(true)}
@@ -233,14 +234,14 @@ export function Campaigns({
                   return (
                     <tr key={c.id} onClick={() => setOpenCampaign(c)} className="group cursor-pointer">
                       <td className="min-w-0">
-                        <div className="line-clamp-2 font-bold leading-snug text-[#20211c] group-hover:underline" title={c.name}>{c.name}</div>
+                        <div className="line-clamp-2 font-semibold leading-snug text-[#0e0822] group-hover:underline" title={c.name}>{c.name}</div>
                         {isEuCountry(c.country) && <div className="mt-1"><EuBadge /></div>}
                         {needsSetup && (
-                          <span className="atbl-pill mt-1" style={{ background: '#f8efdb', color: '#b9831f' }}>⚠ Needs setup</span>
+                          <StatusPill pill={{ ...PILL.waiting, icon: 'alert' }} className="mt-1">Needs setup</StatusPill>
                         )}
-                        <div className="mt-1 text-[11px] text-[#9a9d92]">
+                        <div className="mt-1 text-[11px] text-[#605978]">
                           {c.scrape_status === 'running'
-                            ? <span className="font-semibold text-[#b9831f]">Finding prospects…</span>
+                            ? <span className="font-semibold text-[#7412ef]">Finding prospects…</span>
                             : lastScrapedLabel(c.last_scraped_at)} · {c.language}
                         </div>
                         {c.target_areas && (
@@ -248,14 +249,12 @@ export function Campaigns({
                         )}
                       </td>
                       <td>
-                        <span className="atbl-pill" style={{ background: '#f5f2ec', color: '#62655c' }}>
+                        <span className="atbl-pill" style={{ background: '#f9f6ff', color: '#605978' }}>
                           {c.prospectCount} prospect{c.prospectCount === 1 ? '' : 's'}
                         </span>
                       </td>
                       <td>
-                        <span className="atbl-pill whitespace-nowrap" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
-                          {campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}
-                        </span>
+                        <StatusPill pill={pill}>{campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}</StatusPill>
                       </td>
                       <td className="px-3">
                         <div className="flex items-center justify-end gap-2">
@@ -267,7 +266,7 @@ export function Campaigns({
                               Edit
                             </button>
                           )}
-                          <ChevronRight size={15} className="text-[#c4bfb5]" />
+                          <ChevronRight size={15} className="text-[#8f8aa8]" />
                         </div>
                       </td>
                     </tr>
@@ -285,27 +284,24 @@ export function Campaigns({
                 <button
                   key={c.id}
                   onClick={() => setOpenCampaign(c)}
-                  className="cursor-pointer rounded-xl border border-[#ece8df] bg-white p-4 text-left"
+                  className="cursor-pointer rounded-xl border border-[#e8e3f7] bg-white p-4 text-left"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className="min-w-0">
-                      <span className="line-clamp-2 block text-[14px] font-bold leading-snug text-[#20211c]" title={c.name}>{c.name}</span>
+                      <span className="line-clamp-2 block text-[14px] font-semibold leading-snug text-[#0e0822]" title={c.name}>{c.name}</span>
                       {isEuCountry(c.country) && <span className="mt-1 block"><EuBadge /></span>}
                     </span>
-                    <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-                      className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[.04em]">
-                      {campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}
-                    </span>
+                    <StatusPill pill={pill} className="shrink-0">{campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}</StatusPill>
                   </div>
                   {(c.search_queries.length === 0 || c.target_locations.length === 0) && (
-                    <span className="atbl-pill mt-1.5" style={{ background: '#f8efdb', color: '#b9831f' }}>⚠ Needs setup</span>
+                    <StatusPill pill={{ ...PILL.waiting, icon: 'alert' }} className="mt-1.5">Needs setup</StatusPill>
                   )}
-                  <p className="mt-1.5 text-[12px] text-[#62655c]">
+                  <p className="mt-1.5 text-[12px] text-[#605978]">
                     {c.prospectCount} prospect{c.prospectCount === 1 ? '' : 's'} · {c.language}
                   </p>
-                  <p className="mt-0.5 text-[11.5px] text-[#9a9d92]">
+                  <p className="mt-0.5 text-[11.5px] text-[#605978]">
                     {c.scrape_status === 'running'
-                      ? <span className="font-semibold text-[#b9831f]">Finding prospects…</span>
+                      ? <span className="font-semibold text-[#7412ef]">Finding prospects…</span>
                       : lastScrapedLabel(c.last_scraped_at)}
                   </p>
                 </button>
@@ -322,7 +318,7 @@ export function Campaigns({
           label="New campaign"
           disabled={newCampaignDisabled}
           title={newCampaignTitle}
-          colorClass="bg-[#3c7a5b] hover:bg-[#2d5e46]"
+          colorClass="bg-[#7412ef] hover:bg-[#5b0fc2]"
           offsetClass="bottom-[calc(84px+env(safe-area-inset-bottom,0px))]"
           data-tour="new-campaign-btn"
         />
@@ -484,8 +480,8 @@ function NewCampaignModal({
     if (error) setErr(error.message); else onCreated(autoApproved);
   }
 
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
-  const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-[#605978]';
+  const inputCls = 'w-full rounded-lg border border-[#e8e3f7] bg-[#f9f6ff] px-3.5 py-2.5 text-[13px] text-[#0e0822] outline-none placeholder:text-[#8f8aa8] transition-colors focus:border-[#7412ef] focus:bg-white';
 
   return (
     <motion.div
@@ -498,7 +494,7 @@ function NewCampaignModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:border md:border-[#e8e3f7]"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -506,21 +502,21 @@ function NewCampaignModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header + step indicator */}
-        <div className="shrink-0 border-b border-[#ece8df] px-5 py-4">
+        <div className="shrink-0 border-b border-[#e8e3f7] px-5 py-4">
           <div className="flex items-center justify-between">
-            <h2 className="m-0 text-[18px] font-bold text-[#20211c]">New campaign</h2>
-            <button onClick={requestClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+            <h2 className="m-0 text-[18px] font-semibold text-[#0e0822]">New campaign</h2>
+            <button onClick={requestClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#605978] hover:text-[#0e0822]">×</button>
           </div>
           <div className="mt-3 flex items-center gap-1.5">
             {STEP_LABELS.map((_, i) => (
               <div
                 key={i}
                 className="h-1 flex-1 rounded-full transition-colors"
-                style={{ background: i <= step ? '#3c7a5b' : '#ece8df' }}
+                style={{ background: i <= step ? '#7412ef' : '#e8e3f7' }}
               />
             ))}
           </div>
-          <p className="m-0 mt-2 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">
+          <p className="m-0 mt-2 text-[11px] font-semibold uppercase tracking-[.06em] text-[#605978]">
             Step {step + 1} of {STEP_LABELS.length} - {STEP_LABELS[step]}
           </p>
         </div>
@@ -543,7 +539,7 @@ function NewCampaignModal({
                   style={FONT}
                   className={`${inputCls} resize-y`}
                 />
-                <p className="mt-1 text-[11px] text-[#9a9d92]">Internal notes for our team - not shown to prospects. Helpful for context, e.g. "Focus on independent clinics, skip chains."</p>
+                <p className="mt-1 text-[11px] text-[#605978]">Internal notes for our team - not shown to prospects. Helpful for context, e.g. "Focus on independent clinics, skip chains."</p>
               </div>
             </>
           )}
@@ -597,7 +593,7 @@ function NewCampaignModal({
                   style={FONT}
                   className={inputCls}
                 />
-                <p className="mt-1 text-[11px] text-[#9a9d92]">Maximum number of businesses to find per search term per location (up to {limits.maxResults}).</p>
+                <p className="mt-1 text-[11px] text-[#605978]">Maximum number of businesses to find per search term per location (up to {limits.maxResults}).</p>
                 <LimitMessages errors={check.errors} fields={['max_results']} />
               </div>
               <div>
@@ -613,19 +609,19 @@ function NewCampaignModal({
                 <datalist id="client-new-campaign-languages">
                   {LANGUAGE_OPTIONS.map((l) => <option key={l} value={l} />)}
                 </datalist>
-                <p className="mt-1 text-[11px] text-[#9a9d92]">Messages and follow-ups will be written in this language.</p>
+                <p className="mt-1 text-[11px] text-[#605978]">Messages and follow-ups will be written in this language.</p>
               </div>
               <div>
                 <label className={fieldLbl}>Target country<RequiredMark /></label>
                 <Select value={country} onValueChange={setPickedCountry}>
-                  <SelectTrigger className="h-10 rounded-lg text-[13px] border-[#ece8df] bg-[#fbf9f5] text-[#20211c]" style={FONT} aria-label="Target country">
+                  <SelectTrigger className="h-10 rounded-lg text-[13px] border-[#e8e3f7] bg-[#f9f6ff] text-[#0e0822]" style={FONT} aria-label="Target country">
                     <SelectValue placeholder="Select a country" />
                   </SelectTrigger>
                   <SelectContent className="text-[13px]">
                     {COUNTRY_OPTIONS.map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <p className="mt-1 text-[11px] text-[#9a9d92]">The country your prospects are in. EU countries have extra outreach rules.</p>
+                <p className="mt-1 text-[11px] text-[#605978]">The country your prospects are in. EU countries have extra outreach rules.</p>
               </div>
             </>
           )}
@@ -639,20 +635,20 @@ function NewCampaignModal({
               <ReviewRow label="Max results" value={String(maxResults)} />
               <ReviewRow label="Outreach language" value={language} />
               <ReviewRow label="Target country" value={countryName(country)} />
-              <p className="m-0 text-[12px] text-[#9a9d92]">
+              <p className="m-0 text-[12px] text-[#605978]">
                 Double-check everything above, then create your campaign. You can't edit these details once it's running.
               </p>
             </div>
           )}
 
           {atLaunchLimit && step === STEP_LABELS.length - 1 && (
-            <div className="rounded-xl border border-[#e8d5a8] bg-[#f8efdb] px-4 py-3 text-[13px] text-[#8a6417]">{launchLimitTitle}</div>
+            <div className="rounded-xl border border-[#e8dafd] bg-[#f1e9ff] px-4 py-3 text-[13px] text-[#5b0fc2]">{launchLimitTitle}</div>
           )}
-          {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
+          {err && <div className="rounded-xl border border-[#0e0822]/20 bg-[#f9f6ff] px-4 py-3 text-[13px] text-[#0e0822]">{err}</div>}
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+        <div className="shrink-0 border-t border-[#e8e3f7] px-5 py-4 flex justify-end gap-2.5">
           {step === 0 ? (
             <button onClick={onClose} className={ghostCls}>Cancel</button>
           ) : (
@@ -689,7 +685,7 @@ export function SuggestForMe({
   targetingPath?: string;
 }) {
   const targetingLink = targetingPath
-    ? <Link to={targetingPath} className="font-semibold text-[#3c7a5b] underline">your targeting profile</Link>
+    ? <Link to={targetingPath} className="font-semibold text-[#7412ef] underline">your targeting profile</Link>
     : 'your targeting profile';
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -745,24 +741,24 @@ export function SuggestForMe({
   const websiteLocations = resultLocations.filter((l) => l.source === 'website');
 
   return (
-    <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-4 py-3.5 flex flex-col gap-3">
+    <div className="rounded-xl border border-[#e8e3f7] bg-[#f9f6ff] px-4 py-3.5 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#3c7a5b]"><Sparkles size={13} /> Suggestions</span>
-        <button type="button" onClick={() => setOpen(false)} aria-label="Hide suggestions" className="cursor-pointer border-0 bg-transparent text-[18px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#7412ef]"><Sparkles size={13} /> Suggestions</span>
+        <button type="button" onClick={() => setOpen(false)} aria-label="Hide suggestions" className="cursor-pointer border-0 bg-transparent text-[18px] leading-none text-[#605978] hover:text-[#0e0822]">×</button>
       </div>
 
-      {loading && <p className="m-0 text-[12.5px] text-[#9a9d92]">Looking up your targeting profile…</p>}
-      {err && <p className="m-0 text-[12.5px] text-[#a8533a]">Couldn't load suggestions: {err}</p>}
+      {loading && <p className="m-0 text-[12.5px] text-[#605978]">Looking up your targeting profile…</p>}
+      {err && <p className="m-0 text-[12.5px] text-[#0e0822]">Couldn't load suggestions: {err}</p>}
 
       {result && !result.has_icp && (
-        <p className="m-0 text-[12.5px] text-[#62655c]">
+        <p className="m-0 text-[12.5px] text-[#605978]">
           We don't have a targeting profile for you yet. Add your website in{' '}
           {targetingLink} and we'll read it.
         </p>
       )}
 
       {result && result.has_icp && resultTerms.length === 0 && resultLocations.length === 0 && (
-        <p className="m-0 text-[12.5px] text-[#62655c]">
+        <p className="m-0 text-[12.5px] text-[#605978]">
           We don't have enough to suggest yet. Add your website in{' '}
           {targetingLink} and we'll read it.
         </p>
@@ -771,7 +767,7 @@ export function SuggestForMe({
       {result && result.has_icp && (resultTerms.length > 0 || resultLocations.length > 0) && (
         <>
           {result.confidence === 'none' && (
-            <p className="m-0 text-[11.5px] text-[#9a9d92]">
+            <p className="m-0 text-[11.5px] text-[#605978]">
               These come from reading your website. Once your campaigns get replies, we'll start suggesting what actually works.
             </p>
           )}
@@ -817,7 +813,7 @@ export function SuggestForMe({
           )}
 
           {(atTermCap || atLocationCap || pairsWouldExceed(0, 0)) && limits && (
-            <p className="m-0 text-[11px] text-[#b9831f]">
+            <p className="m-0 text-[11px] text-[#7412ef]">
               {atTermCap && `You've reached the ${limits.max_search_terms}-term limit. `}
               {atLocationCap && `You've reached the ${limits.max_locations}-location limit. `}
               {!atTermCap && !atLocationCap && pairsWouldExceed(0, 0) && `Adding more would exceed the ${limits.max_term_location_pairs} term×location limit. `}
@@ -840,8 +836,8 @@ function SuggestGroup({
 }) {
   return (
     <div>
-      <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">{label}</div>
-      {caption && <p className="m-0 mb-1.5 text-[11.5px] text-[#62655c]">{caption}</p>}
+      <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[.06em] text-[#605978]">{label}</div>
+      {caption && <p className="m-0 mb-1.5 text-[11.5px] text-[#605978]">{caption}</p>}
       <div className="flex flex-wrap gap-1.5">
         {items.map((item) => (
           <button
@@ -850,10 +846,10 @@ function SuggestGroup({
             disabled={item.disabled}
             onClick={() => onPick(item.label)}
             title={item.sub}
-            className="cursor-pointer rounded-full border border-[#3c7a5b]/30 bg-white px-2.5 py-1 text-left text-[12px] font-semibold text-[#3c7a5b] transition-colors hover:bg-[#edf4ef] disabled:cursor-not-allowed disabled:opacity-40"
+            className="cursor-pointer rounded-full border border-[#7412ef]/30 bg-white px-2.5 py-1 text-left text-[12px] font-semibold text-[#7412ef] transition-colors hover:bg-[#f1e9ff] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {item.label}
-            {item.sub && <span className="ml-1.5 font-normal text-[#62655c]">· {item.sub}</span>}
+            {item.sub && <span className="ml-1.5 font-normal text-[#605978]">· {item.sub}</span>}
           </button>
         ))}
       </div>
@@ -865,15 +861,15 @@ function SuggestGroup({
 function ReviewRow({ label, value, tags }: { label: string; value?: string; tags?: string[] }) {
   return (
     <div>
-      <div className="mb-1 text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">{label}</div>
+      <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[.08em] text-[#605978]">{label}</div>
       {tags ? (
         <div className="flex flex-wrap gap-1.5">
           {tags.map((t) => (
-            <span key={t} className="rounded-full bg-[#fbf9f5] border border-[#ece8df] px-2.5 py-1 text-[12px] text-[#62655c]">{t}</span>
+            <span key={t} className="rounded-full bg-[#f9f6ff] border border-[#e8e3f7] px-2.5 py-1 text-[12px] text-[#605978]">{t}</span>
           ))}
         </div>
       ) : (
-        <p className="m-0 text-[13.5px] text-[#20211c]">{value}</p>
+        <p className="m-0 text-[13.5px] text-[#0e0822]">{value}</p>
       )}
     </div>
   );
@@ -974,8 +970,8 @@ function CampaignDetailModal({
     onUpdated();
   }
 
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]';
-  const inputCls = 'w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-2.5 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-[#605978]';
+  const inputCls = 'w-full rounded-lg border border-[#e8e3f7] bg-[#f9f6ff] px-3.5 py-2.5 text-[13px] text-[#0e0822] outline-none placeholder:text-[#8f8aa8] transition-colors focus:border-[#7412ef] focus:bg-white';
 
   return (
     <>
@@ -989,7 +985,7 @@ function CampaignDetailModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[600px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[600px] md:rounded-md md:border md:border-[#e8e3f7]"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -997,14 +993,11 @@ function CampaignDetailModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#ece8df] px-5 py-4">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#e8e3f7] px-5 py-4">
           <div className="min-w-0">
-            <h2 className="m-0 truncate text-[18px] font-bold text-[#20211c]">{name}</h2>
+            <h2 className="m-0 truncate text-[18px] font-semibold text-[#0e0822]">{name}</h2>
             <div className="mt-1.5 flex items-center gap-1.5">
-              <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-                className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
-                {campaignStatusLabel(campaign.status, campaign.prospectCount, CAMP_STATUS_LABEL)}
-              </span>
+              <StatusPill pill={pill}>{campaignStatusLabel(campaign.status, campaign.prospectCount, CAMP_STATUS_LABEL)}</StatusPill>
               {isEuCountry(campaign.country) && <EuBadge />}
             </div>
           </div>
@@ -1015,7 +1008,7 @@ function CampaignDetailModal({
                   onClick={startEdit}
                   aria-label="Edit campaign"
                   title="Edit campaign"
-                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-[#9a9d92] transition-colors hover:bg-[#f5f2ec] hover:text-[#3c7a5b]"
+                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-[#605978] transition-colors hover:bg-[#f9f6ff] hover:text-[#7412ef]"
                 >
                   <Pencil size={15} />
                 </button>
@@ -1024,14 +1017,14 @@ function CampaignDetailModal({
                     onClick={() => setDeleting(true)}
                     aria-label="Delete campaign"
                     title="Delete campaign"
-                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-[#9a9d92] transition-colors hover:bg-[#fdf0ec] hover:text-[#a8533a]"
+                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-[#605978] transition-colors hover:bg-[#f9f6ff] hover:text-[#0e0822]"
                   >
                     <Trash2 size={15} />
                   </button>
                 )}
               </>
             )}
-            <button onClick={requestClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+            <button onClick={requestClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#605978] hover:text-[#0e0822]">×</button>
           </div>
         </div>
 
@@ -1117,20 +1110,20 @@ function CampaignDetailModal({
             </datalist>
           </div>
 
-          {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
+          {err && <div className="rounded-xl border border-[#0e0822]/20 bg-[#f9f6ff] px-4 py-3 text-[13px] text-[#0e0822]">{err}</div>}
         </div>
         ) : (
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
           {hold && <CountryHoldBanner reason={hold.reason} />}
 
           {description && (
-            <p className="m-0 text-[13px] leading-relaxed text-[#62655c]">{description}</p>
+            <p className="m-0 text-[13px] leading-relaxed text-[#605978]">{description}</p>
           )}
 
           {!loading && campaign.prospectCount === 0 && (
-            <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-4 py-3.5">
-              <p className="m-0 text-[13px] font-bold text-[#20211c]">What happens next</p>
-              <p className="m-0 mt-1.5 text-[12.5px] leading-relaxed text-[#62655c]">
+            <div className="rounded-xl border border-[#e8e3f7] bg-[#f9f6ff] px-4 py-3.5">
+              <p className="m-0 text-[13px] font-semibold text-[#0e0822]">What happens next</p>
+              <p className="m-0 mt-1.5 text-[12.5px] leading-relaxed text-[#605978]">
                 We'll find matching businesses, write personalized outreach for each one, and
                 {' '}{campaign.status === 'active' ? "get them approved and sent" : "have them ready once your campaign is approved"}.
                 This can take a little while - check back here, or we'll flag it once there's something for you to review.
@@ -1141,64 +1134,64 @@ function CampaignDetailModal({
           {pendingApproval > 0 && (
             <Link
               to={`${basePath}/approvals`}
-              className="flex items-center gap-3 rounded-xl border border-[#d8cdf0] bg-[#f0ecf8] px-4 py-3.5 no-underline transition-colors hover:bg-[#e9e2f5]"
+              className="flex items-center gap-3 rounded-xl border border-[#e8dafd] bg-[#f1e9ff] px-4 py-3.5 no-underline transition-colors hover:bg-[#f1e9ff]"
             >
-              <span className="flex-1 text-[13px] leading-snug text-[#6b4fa0]">
-                <strong className="font-bold">{pendingApproval} prospect{pendingApproval !== 1 ? 's' : ''} with messages ready</strong> for your review.
+              <span className="flex-1 text-[13px] leading-snug text-[#7412ef]">
+                <strong className="font-semibold">{pendingApproval} prospect{pendingApproval !== 1 ? 's' : ''} with messages ready</strong> for your review.
               </span>
-              <ChevronRight size={16} className="shrink-0 text-[#6b4fa0]" />
+              <ChevronRight size={16} className="shrink-0 text-[#7412ef]" />
             </Link>
           )}
 
           <div>
-            <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Search terms</div>
+            <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[.08em] text-[#605978]">Search terms</div>
             <div className="flex flex-wrap gap-1.5">
               {queries.map((q) => (
-                <span key={q} className="rounded-full bg-[#fbf9f5] border border-[#ece8df] px-2.5 py-1 text-[12px] text-[#62655c]">{q}</span>
+                <span key={q} className="rounded-full bg-[#f9f6ff] border border-[#e8e3f7] px-2.5 py-1 text-[12px] text-[#605978]">{q}</span>
               ))}
             </div>
           </div>
 
           <div>
-            <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Target locations</div>
+            <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[.08em] text-[#605978]">Target locations</div>
             <TargetAreaChips areas={areas} />
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-[13px]">
-            <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-3">
-              <div className="text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Max results</div>
-              <div className="mt-0.5 font-bold text-[#20211c]">{maxResults}</div>
+            <div className="rounded-xl border border-[#e8e3f7] bg-[#f9f6ff] px-3.5 py-3">
+              <div className="text-[10.5px] font-semibold uppercase tracking-[.08em] text-[#605978]">Max results</div>
+              <div className="mt-0.5 font-semibold text-[#0e0822]">{maxResults}</div>
             </div>
-            <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-3">
-              <div className="text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Language</div>
-              <div className="mt-0.5 font-bold text-[#20211c]">{language}</div>
+            <div className="rounded-xl border border-[#e8e3f7] bg-[#f9f6ff] px-3.5 py-3">
+              <div className="text-[10.5px] font-semibold uppercase tracking-[.08em] text-[#605978]">Language</div>
+              <div className="mt-0.5 font-semibold text-[#0e0822]">{language}</div>
             </div>
             {campaign.country && (
-              <div className="rounded-xl border border-[#ece8df] bg-[#fbf9f5] px-3.5 py-3">
-                <div className="text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Target country</div>
-                <div className="mt-0.5 font-bold text-[#20211c]">{countryName(campaign.country)}</div>
+              <div className="rounded-xl border border-[#e8e3f7] bg-[#f9f6ff] px-3.5 py-3">
+                <div className="text-[10.5px] font-semibold uppercase tracking-[.08em] text-[#605978]">Target country</div>
+                <div className="mt-0.5 font-semibold text-[#0e0822]">{countryName(campaign.country)}</div>
               </div>
             )}
           </div>
 
-          <p className="m-0 text-[12.5px] leading-relaxed text-[#62655c]">
-            <span className="font-bold text-[#20211c]">Cadence:</span> follow-ups after 3, 5 and 7 business days (days 3, 7, 14), weekdays, 9am to 5pm Central.
+          <p className="m-0 text-[12.5px] leading-relaxed text-[#605978]">
+            <span className="font-semibold text-[#0e0822]">Cadence:</span> follow-ups after 3, 5 and 7 business days (days 3, 7, 14), weekdays, 9am to 5pm Central.
           </p>
 
           <div>
-            <div className="mb-2 text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Prospects - {campaign.prospectCount} total</div>
+            <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[.08em] text-[#605978]">Prospects - {campaign.prospectCount} total</div>
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-xl border border-[#ece8df] bg-white px-2 py-2.5">
-                <div className="text-[18px] font-extrabold text-[#20211c]">{contacted}</div>
-                <div className="mt-0.5 text-[10.5px] text-[#9a9d92]">Contacted</div>
+              <div className="rounded-xl border border-[#e8e3f7] bg-white px-2 py-2.5">
+                <div className="text-[18px] font-extrabold text-[#0e0822]">{contacted}</div>
+                <div className="mt-0.5 text-[10.5px] text-[#605978]">Contacted</div>
               </div>
-              <div className="rounded-xl border border-[#ece8df] bg-white px-2 py-2.5">
-                <div className="text-[18px] font-extrabold text-[#20211c]">{replied}</div>
-                <div className="mt-0.5 text-[10.5px] text-[#9a9d92]">Replied</div>
+              <div className="rounded-xl border border-[#e8e3f7] bg-white px-2 py-2.5">
+                <div className="text-[18px] font-extrabold text-[#0e0822]">{replied}</div>
+                <div className="mt-0.5 text-[10.5px] text-[#605978]">Replied</div>
               </div>
-              <div className="rounded-xl border border-[#ece8df] bg-white px-2 py-2.5">
-                <div className="text-[18px] font-extrabold text-[#3c7a5b]">{hotLeads}</div>
-                <div className="mt-0.5 text-[10.5px] text-[#9a9d92]">Hot leads</div>
+              <div className="rounded-xl border border-[#e8e3f7] bg-white px-2 py-2.5">
+                <div className="text-[18px] font-extrabold text-[#7412ef]">{hotLeads}</div>
+                <div className="mt-0.5 text-[10.5px] text-[#605978]">Hot leads</div>
               </div>
             </div>
           </div>
@@ -1207,25 +1200,22 @@ function CampaignDetailModal({
             <SkeletonTable rows={4} cols={2} />
           ) : prospects.length > 0 && (
             <div>
-              <div className="mb-2 text-[10.5px] font-bold uppercase tracking-[.08em] text-[#9a9d92]">Prospect list</div>
-              <div className="rounded-xl border border-[#ece8df] overflow-hidden">
-                <div className="divide-y divide-[#f5f2ec]">
+              <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[.08em] text-[#605978]">Prospect list</div>
+              <div className="rounded-xl border border-[#e8e3f7] overflow-hidden">
+                <div className="divide-y divide-[#f9f6ff]">
                   {prospects.map((p) => {
                     const spill = PROSPECT_STATUS_PILL[p.pipeline_status] ?? PROSPECT_STATUS_PILL.new;
                     return (
                       <div key={p.id} className="flex items-center justify-between gap-2 px-3.5 py-2.5">
                         <div className="min-w-0">
-                          <div className="truncate text-[13px] font-semibold text-[#20211c]" title={p.business_name}>{p.business_name}</div>
+                          <div className="truncate text-[13px] font-semibold text-[#0e0822]" title={p.business_name}>{p.business_name}</div>
                           {(p.category || p.location) && (
-                            <div className="truncate text-[11px] text-[#9a9d92]">
+                            <div className="truncate text-[11px] text-[#605978]">
                               {[p.category, p.location].filter(Boolean).join(' · ')}
                             </div>
                           )}
                         </div>
-                        <span style={{ background: spill.bg, color: spill.text, border: spill.border ?? 'none' }}
-                          className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[.04em]">
-                          {PROSPECT_STATUS_LABEL[p.pipeline_status] ?? p.pipeline_status}
-                        </span>
+                        <StatusPill pill={spill} className="shrink-0">{PROSPECT_STATUS_LABEL[p.pipeline_status] ?? p.pipeline_status}</StatusPill>
                       </div>
                     );
                   })}
@@ -1238,7 +1228,7 @@ function CampaignDetailModal({
 
         {/* Footer - only shown while editing; view mode has no footer actions */}
         {editing && (
-          <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+          <div className="shrink-0 border-t border-[#e8e3f7] px-5 py-4 flex justify-end gap-2.5">
             <button onClick={cancelEdit} className={ghostCls}>Cancel</button>
             <button onClick={saveEdit} disabled={busy || !check.valid} className={primaryCls}>
               {busy ? 'Saving…' : 'Save changes'}
@@ -1302,54 +1292,54 @@ function DeleteCampaignModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[460px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[460px] md:rounded-md md:border md:border-[#e8e3f7]"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-[#20211c]">Delete campaign</h2>
-          <button onClick={onClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#9a9d92] hover:text-[#20211c]">×</button>
+        <div className="flex shrink-0 items-center justify-between border-b border-[#e8e3f7] px-5 py-4">
+          <h2 className="m-0 text-[18px] font-semibold text-[#0e0822]">Delete campaign</h2>
+          <button onClick={onClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#605978] hover:text-[#0e0822]">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
-          <div className="rounded-xl border border-[#a8533a]/20 bg-[#fdf0ec] px-4 py-4">
-            <p className="m-0 text-[14px] font-bold text-[#a8533a]">
+          <div className="rounded-xl border border-[#0e0822]/20 bg-[#f9f6ff] px-4 py-4">
+            <p className="m-0 text-[14px] font-semibold text-[#0e0822]">
               Permanently delete "{campaign.name}"?
             </p>
-            <p className="m-0 mt-1.5 text-[13px] text-[#a8533a]/80">
+            <p className="m-0 mt-1.5 text-[13px] text-[#0e0822]/80">
               This cannot be undone. All prospects, messages, and replies tied to this campaign will be deleted.
             </p>
           </div>
           <div>
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-[#9a9d92]">This will permanently delete:</p>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.06em] text-[#605978]">This will permanently delete:</p>
             {!counts ? (
-              <div className="flex items-center gap-2 text-[13px] text-[#9a9d92]">
-                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#ddd8cb] border-t-[#a8533a]" />
+              <div className="flex items-center gap-2 text-[13px] text-[#605978]">
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#cfc9e8] border-t-[#0e0822]" />
                 Counting affected records…
               </div>
             ) : blastItems.length === 0 ? (
-              <p className="text-[13px] text-[#62655c]">No associated records - the campaign row only.</p>
+              <p className="text-[13px] text-[#605978]">No associated records - the campaign row only.</p>
             ) : (
               <ul className="m-0 list-none p-0 flex flex-col gap-1">
                 {blastItems.map((item) => (
-                  <li key={String(item)} className="flex items-center gap-2 text-[13px] text-[#62655c]">
-                    <span className="text-[#a8533a]">✕</span>
+                  <li key={String(item)} className="flex items-center gap-2 text-[13px] text-[#605978]">
+                    <X size={12} strokeWidth={2} className="shrink-0 text-[#0e0822]" aria-hidden />
                     {item}
                   </li>
                 ))}
               </ul>
             )}
           </div>
-          {err && <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{err}</div>}
+          {err && <div className="rounded-xl border border-[#0e0822]/20 bg-[#f9f6ff] px-4 py-3 text-[13px] text-[#0e0822]">{err}</div>}
         </div>
-        <div className="shrink-0 border-t border-[#ece8df] px-5 py-4 flex justify-end gap-2.5">
+        <div className="shrink-0 border-t border-[#e8e3f7] px-5 py-4 flex justify-end gap-2.5">
           <button onClick={onClose} className={ghostCls}>Cancel</button>
           <button
             onClick={confirm}
             disabled={busy || !counts}
-            className="cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#a8533a] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#8a3f2b] disabled:opacity-50"
+            className="cursor-pointer whitespace-nowrap rounded-xl border-0 bg-[#0e0822] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#8a3f2b] disabled:opacity-50"
           >
             {busy ? 'Deleting…' : 'Delete campaign'}
           </button>

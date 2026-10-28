@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Search, ChevronRight } from 'lucide-react';
+import { PIPELINE_STATUS_PILL } from '../../lib/pipelineStatus';
+import { StatusPill, type StatusPillStyle } from '../../components/StatusPill';
+import { Search, ChevronRight, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   useProspects, useProspectCategories, useProspectDetail, useClientsList, useClientCampaigns,
@@ -47,22 +49,13 @@ const STATUS_LABEL: Record<string, string> = {
   generation_failed: 'Gen. failed', message_pending: 'Msg. pending',
 };
 
-const STATUS_PILL: Record<string, { bg: string; text: string; border?: string }> = {
-  new:                { bg: 'var(--ad-green-tint)', text: 'var(--ad-green)' },
-  contacted:          { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
-  replied:            { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
-  hot_lead:           { bg: 'var(--ad-green)', text: '#fff' },
-  won:                { bg: 'var(--ad-green)', text: '#fff' },
-  lost:               { bg: 'transparent', text: 'var(--ad-ink-faint)', border: '1px solid var(--ad-line-strong)' },
-  generation_failed:  { bg: 'var(--ad-clay-tint)', text: 'var(--ad-clay)', border: '1px solid rgba(168,83,58,0.2)' },
-  message_pending:    { bg: 'var(--ad-purple-tint)', text: 'var(--ad-purple)', border: '1px solid rgba(107,79,160,0.2)' },
-};
+const STATUS_PILL: Record<string, StatusPillStyle> = PIPELINE_STATUS_PILL;
 
 const SEARCH_DEBOUNCE_MS = 300;
 
 const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
-const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
-const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50';
+const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
+const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50';
 
 export function Prospects() {
   const [qInput, setQInput] = useState('');
@@ -174,7 +167,7 @@ export function Prospects() {
         <SkeletonTable rows={10} cols={5} />
       ) : total === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
-          <strong className="text-[15px] font-bold text-(--ad-ink)">No matches.</strong>
+          <strong className="text-[15px] font-semibold text-(--ad-ink)">No matches.</strong>
           <span className="text-[13px] text-(--ad-ink-soft)">Try adjusting your filters or search query.</span>
         </div>
       ) : (
@@ -232,7 +225,7 @@ export function Prospects() {
                         <button
                           onClick={() => setViewProspect(r)}
                           title="View details"
-                          className="block w-full cursor-pointer whitespace-normal wrap-break-word border-0 bg-transparent p-0 text-left font-bold text-(--ad-ink) hover:text-(--ad-green) hover:underline"
+                          className="block w-full cursor-pointer whitespace-normal wrap-break-word border-0 bg-transparent p-0 text-left font-semibold text-(--ad-ink) hover:text-(--ad-green) hover:underline"
                         >
                           {r.business_name}
                         </button>
@@ -247,9 +240,9 @@ export function Prospects() {
                         <div className="truncate" title={r.location ?? undefined}>{r.location ?? '-'}</div>
                       </td>
                       <td className="pr-3">
-                        <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
+                        <StatusPill pill={pill}>
                           {r.pipeline_status.replace(/_/g, ' ')}
-                        </span>
+                        </StatusPill>
                       </td>
                       <td className="px-3 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -280,7 +273,7 @@ export function Prospects() {
                   <div className="flex items-start justify-between gap-3">
                     <button
                       onClick={() => setViewProspect(r)}
-                      className="min-w-0 cursor-pointer whitespace-normal wrap-break-word border-0 bg-transparent p-0 text-left font-bold text-(--ad-ink)"
+                      className="min-w-0 cursor-pointer whitespace-normal wrap-break-word border-0 bg-transparent p-0 text-left font-semibold text-(--ad-ink)"
                       title="View details"
                     >
                       {r.business_name}
@@ -291,7 +284,7 @@ export function Prospects() {
                         color: pill.text,
                         border: pill.border ?? 'none',
                       }}
-                      className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]"
+                      className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.04em]"
                     >
                       {r.pipeline_status.replace('_', ' ')}
                     </span>
@@ -442,7 +435,7 @@ function ProspectDetailModal({
   const href = safeWebsiteHref(str('website'));
   const extras = extraFields(row);
 
-  const lbl = 'mb-1 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const lbl = 'mb-1 text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
   const val = 'm-0 wrap-break-word text-[13px] text-(--ad-ink)';
   const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div className="min-w-0">
@@ -462,7 +455,7 @@ function ProspectDetailModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -471,7 +464,7 @@ function ProspectDetailModal({
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-(--ad-line) px-5 py-4">
           <div className="min-w-0">
-            <h2 className="m-0 wrap-break-word text-[18px] font-bold text-(--ad-ink)">{prospect.business_name}</h2>
+            <h2 className="m-0 wrap-break-word text-[18px] font-semibold text-(--ad-ink)">{prospect.business_name}</h2>
             <span
               className="atbl-pill mt-2 inline-flex"
               style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
@@ -521,7 +514,7 @@ function ProspectDetailModal({
 
           {extras.length > 0 && (
             <div className="border-t border-(--ad-line) pt-4">
-              <div className="mb-3 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">More details</div>
+              <div className="mb-3 text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">More details</div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {extras.map((x) => <Field key={x.label} label={x.label}>{x.value}</Field>)}
               </div>
@@ -596,7 +589,7 @@ function NewProspectModal({ onClose, onCreated }: { onClose: () => void; onCreat
     }
   }
 
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
   const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
   return (
@@ -610,7 +603,7 @@ function NewProspectModal({ onClose, onCreated }: { onClose: () => void; onCreat
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -619,7 +612,7 @@ function NewProspectModal({ onClose, onCreated }: { onClose: () => void; onCreat
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Add prospect</h2>
+          <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Add prospect</h2>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
 
@@ -723,7 +716,7 @@ function EditProspectModal({
   const [busy, setBusy]                 = useState(false);
   const [err, setErr]                   = useState<string | null>(null);
 
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
   const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
   async function submit() {
@@ -755,7 +748,7 @@ function EditProspectModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -764,7 +757,7 @@ function EditProspectModal({
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Edit prospect</h2>
+          <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Edit prospect</h2>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
 
@@ -857,7 +850,7 @@ function DeleteProspectModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -866,13 +859,13 @@ function DeleteProspectModal({
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Delete prospect</h2>
+          <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Delete prospect</h2>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
           <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-4">
-            <p className="m-0 text-[14px] font-bold text-(--ad-clay)">
+            <p className="m-0 text-[14px] font-semibold text-(--ad-clay)">
               Permanently delete "{prospect.business_name}"?
             </p>
             <p className="m-0 mt-1.5 text-[13px] text-(--ad-clay)/80">
@@ -881,7 +874,7 @@ function DeleteProspectModal({
           </div>
 
           <div>
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">This will permanently delete:</p>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">This will permanently delete:</p>
             {!counts ? (
               <div className="flex items-center gap-2 text-[13px] text-(--ad-ink-faint)">
                 <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-(--ad-line-strong) border-t-(--ad-clay)" />
@@ -893,7 +886,7 @@ function DeleteProspectModal({
               <ul className="m-0 list-none p-0 flex flex-col gap-1">
                 {blastItems.map((item) => (
                   <li key={String(item)} className="flex items-center gap-2 text-[13px] text-(--ad-ink-soft)">
-                    <span className="text-(--ad-clay)">✕</span>
+                    <X size={12} strokeWidth={2} className="shrink-0 text-(--ad-ink)" aria-hidden />
                     {item}
                   </li>
                 ))}

@@ -19,7 +19,7 @@ const VARIANT: Record<BtnVariant, string> = {
   danger: 'border border-(--clay) bg-transparent font-bold text-(--clay) hover:bg-(--clay) hover:text-white',
   // The action inside a red warning banner: solid in the banner's own colour
   // instead of green on red.
-  alert: 'border border-transparent bg-(--clay) font-bold text-white hover:bg-[#8a3f2b]',
+  alert: 'border border-transparent bg-(--clay) font-bold text-white hover:bg-[#2a2147]',
   // Low-emphasis text actions.
   quiet: 'border border-transparent bg-transparent text-(--ink-soft) hover:bg-(--bg) hover:text-(--ink)',
 };

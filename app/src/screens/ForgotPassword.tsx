@@ -41,10 +41,10 @@ export function ForgotPassword() {
 
           {sent ? (
             <div style={{
-              background: '#edf4ef',
+              background: '#f1e9ff',
               borderRadius: 10,
               padding: '14px 16px',
-              color: '#2d5e46',
+              color: '#0e0822',
               fontSize: 14,
               fontWeight: 600,
               lineHeight: 1.4,

@@ -88,6 +88,8 @@ export interface HotLead {
   // started storing reply_id. Fall back to latest_reply in that case.
   reply: HotLeadReply | null;
   latest_reply: HotLeadReply | null;
+  // How the reply was tied to our email; fetched separately from the RPC (see fetchDashboard).
+  reply_match?: import('./lib/replyMatch').ReplyMatch | null;
 }
 
 export interface ClientSummary {
@@ -96,6 +98,7 @@ export interface ClientSummary {
   messagesSent: number;
   replies: number;
   hotLeads: number;
+  send_timezone?: string | null;
 }
 
 export interface ClientMessageItem {

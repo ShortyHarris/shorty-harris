@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Check } from 'lucide-react';
 
 export type MenuItem =
   | { type: 'action'; label: string; onClick: () => void; destructive?: boolean; dot?: string; checked?: boolean; disabled?: boolean; title?: string }
@@ -76,7 +77,7 @@ export function RowMenu({ items }: { items: MenuItem[] }) {
             maxHeight: pos.maxHeight,
             zIndex: 9999,
           }}
-          className="w-48 overflow-y-auto overscroll-contain rounded-xl border border-(--ad-line) bg-(--ad-surface) py-1 shadow-[0_8px_28px_rgba(0,0,0,0.12)]"
+          className="w-48 overflow-y-auto overscroll-contain rounded-xl border border-(--ad-line) bg-(--ad-surface) py-1"
         >
           {items.map((item, i) => {
             if (item.type === 'separator') {
@@ -84,7 +85,7 @@ export function RowMenu({ items }: { items: MenuItem[] }) {
             }
             if (item.type === 'header') {
               return (
-                <div key={i} className="px-3 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-[.07em] text-(--ad-ink-ghost)">
+                <div key={i} className="px-3 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-[.07em] text-(--ad-ink-ghost)">
                   {item.label}
                 </div>
               );
@@ -107,7 +108,7 @@ export function RowMenu({ items }: { items: MenuItem[] }) {
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: item.dot }} />
                 )}
                 <span className="flex-1">{item.label}</span>
-                {item.checked && <span className="text-[11px] text-(--ad-green)">✓</span>}
+                {item.checked && <Check size={12} strokeWidth={2.5} className="text-(--ad-green)" aria-hidden />}
               </button>
             );
           })}

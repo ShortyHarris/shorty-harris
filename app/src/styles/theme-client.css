@@ -1,30 +1,32 @@
-/* Client "good news feed" palette - warm, calm, rewarding */
+/* Client palette, from the brand manual: white, one purple, ink. Status is
+   carried by words and icons, so amber and clay map onto purple and ink
+   rather than adding colours. */
 .theme-client {
-  --bg: #fbf9f5;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --ink: #20211c;
-  --ink-soft: #62655c;
-  --ink-faint: #9a9d92;
-  --line: #ece8df;
-  --line-strong: #ddd8cb;
+  --ink: #0e0822;
+  --ink-soft: #605978;
+  --ink-faint: #605978;
+  --line: #e8e3f7;
+  --line-strong: #8f8aa8;
 
-  --leaf: #3c7a5b;
-  --leaf-hover: #2d5e46;
-  --leaf-tint: #edf4ef;
-  --amber: #b9831f;
-  --amber-tint: #f8efdb;
-  --clay: #a8533a;
-  --clay-tint: #f6e8e2;
+  --leaf: #7412ef;
+  --leaf-hover: #5b0fc2;
+  --leaf-tint: #f1e9ff;
+  --amber: #7412ef;
+  --amber-tint: #f1e9ff;
+  --clay: #0e0822;
+  --clay-tint: #f9f6ff;
 
   --radius: 16px;
   --radius-sm: 10px;
-  --shadow: 0 1px 2px rgba(32, 33, 28, 0.04), 0 8px 28px rgba(32, 33, 28, 0.07);
+  --shadow: none;
 
   background: var(--bg);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-feature-settings: 'cv11', 'ss01', 'tnum';
+  font-feature-settings: "tnum";
 }
 
 .theme-client * { box-sizing: border-box; }
@@ -47,7 +49,7 @@
 .theme-client textarea,
 .theme-client select,
 .theme-client li {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .theme-client h1,

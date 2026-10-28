@@ -12,6 +12,14 @@ import { RefreshButton } from '../../components/RefreshButton';
 import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import { PACKS } from '../../lib/pricing';
 import { CreditCard } from 'lucide-react';
+import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
+
+const PAY_PILL: Record<string, StatusPillStyle> = {
+  succeeded: { ...PILL.waiting, icon: 'check' },
+  failed:    { ...PILL.problem, icon: 'alert' },
+  pending:   { ...PILL.ahead,   icon: 'clock' },
+  refunded:  { ...PILL.closed,  icon: 'minus' },
+};
 import './Billing.css';
 
 const HELP: HelpContent = {
@@ -134,7 +142,7 @@ export function Billing({
       <div className="lg:grid  lg:gap-6 lg:items-start">
 
           <div className="bill-section-head">
-             <h1 className='m-0 text-2xl font-bold flex items-center gap-2' style={{ color: 'var(--ink)', letterSpacing: '-0.01em' }}>
+             <h1 className='m-0 text-2xl font-semibold flex items-center gap-2' style={{ color: 'var(--ink)', letterSpacing: '-0.01em' }}>
                <CreditCard size={24} strokeWidth={2} style={{ color: 'var(--leaf)' }} aria-hidden />
                Billing & Activity
              </h1>
@@ -212,26 +220,26 @@ export function Billing({
             {[...Array(3)].map((_, i) => (
               <div key={i} className="payment-item rounded-lg">
                 <div className="flex flex-col gap-2">
-                  <div className="h-4 w-28 rounded animate-pulse bg-[#ddd8cb]" />
-                  <div className="h-3 w-20 rounded animate-pulse bg-[#ece8df]" />
+                  <div className="h-4 w-28 rounded animate-pulse bg-[#cfc9e8]" />
+                  <div className="h-3 w-20 rounded animate-pulse bg-[#e8e3f7]" />
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <div className="h-4 w-16 rounded animate-pulse bg-[#ddd8cb]" />
-                  <div className="h-5 w-14 rounded-full animate-pulse bg-[#ece8df]" />
+                  <div className="h-4 w-16 rounded animate-pulse bg-[#cfc9e8]" />
+                  <div className="h-5 w-14 rounded-full animate-pulse bg-[#e8e3f7]" />
                 </div>
               </div>
             ))}
           </div>
           {/* Desktop: skeleton table */}
-          <div className="hidden lg:block lg:bg-white lg:border lg:border-[#e8e3da] lg:rounded-[10px] lg:p-4 lg:shadow-[0_1px_2px_rgba(32,33,28,0.04)]" aria-hidden>
+          <div className="hidden lg:block lg:bg-white lg:border lg:border-[#e8e3f7] lg:rounded-[10px] lg:p-4" aria-hidden>
             <table className="w-full">
               <tbody>
                 {[...Array(4)].map((_, i) => (
                   <tr key={i} className="border-b border-[var(--line)]">
-                    <td className="py-3.5 px-2"><div className="h-4 w-10 rounded animate-pulse bg-[#ddd8cb]" /></td>
-                    <td className="py-3.5 px-2"><div className="h-3 w-24 rounded animate-pulse bg-[#ece8df]" /></td>
-                    <td className="py-3.5 px-2"><div className="h-4 w-16 rounded animate-pulse bg-[#ddd8cb]" /></td>
-                    <td className="py-3.5 px-2"><div className="h-5 w-14 rounded-full animate-pulse bg-[#ece8df]" /></td>
+                    <td className="py-3.5 px-2"><div className="h-4 w-10 rounded animate-pulse bg-[#cfc9e8]" /></td>
+                    <td className="py-3.5 px-2"><div className="h-3 w-24 rounded animate-pulse bg-[#e8e3f7]" /></td>
+                    <td className="py-3.5 px-2"><div className="h-4 w-16 rounded animate-pulse bg-[#cfc9e8]" /></td>
+                    <td className="py-3.5 px-2"><div className="h-5 w-14 rounded-full animate-pulse bg-[#e8e3f7]" /></td>
                   </tr>
                 ))}
               </tbody>
@@ -259,14 +267,14 @@ export function Billing({
                   <span className="payment-item-amount">
                     {money(p.amount_cents, p.currency)}
                   </span>
-                  <span className={`pay-pill ${p.status}`}>{p.status}</span>
+                  <StatusPill pill={PAY_PILL[p.status] ?? PAY_PILL.pending}>{p.status.charAt(0).toUpperCase() + p.status.slice(1)}</StatusPill>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Desktop: real table, full width, contained in one bordered card */}
-          <div className="hidden lg:block lg:bg-white lg:border lg:border-[#e8e3da] lg:rounded-[10px] lg:p-4 lg:shadow-[0_1px_2px_rgba(32,33,28,0.04)]">
+          <div className="hidden lg:block lg:bg-white lg:border lg:border-[#e8e3f7] lg:rounded-[10px] lg:p-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[13px] text-[var(--ink-faint)]">
                 {filteredPayments.length} payment{filteredPayments.length !== 1 ? 's' : ''}
@@ -320,7 +328,7 @@ export function Billing({
           </div>
 
           {/* Desktop: real table, full width, contained in one bordered card */}
-          <div className="hidden lg:block lg:bg-white lg:border lg:border-[#e8e3da] lg:rounded-[10px] lg:p-4 lg:shadow-[0_1px_2px_rgba(32,33,28,0.04)]">
+          <div className="hidden lg:block lg:bg-white lg:border lg:border-[#e8e3f7] lg:rounded-[10px] lg:p-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[13px] text-[var(--ink-faint)]">
                 {filteredLedger.length} entr{filteredLedger.length !== 1 ? 'ies' : 'y'}
@@ -361,21 +369,21 @@ function PaymentsTable({ payments }: { payments: PaymentRow[] }) {
     <table className="w-full text-left">
       <thead>
         <tr className="border-b border-[var(--line)]">
-          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0]">Credits</th>
-          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0]">Date</th>
-          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0]">Amount</th>
-          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0]">Status</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8]">Credits</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8]">Date</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8]">Amount</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8]">Status</th>
         </tr>
       </thead>
       <tbody>
         {payments.map((p) => (
-          <tr key={p.id} className="border-b border-[var(--line)] last:border-0 transition-colors hover:bg-[#faf9f7]">
+          <tr key={p.id} className="border-b border-[var(--line)] last:border-0 transition-colors hover:bg-[#f9f6ff]">
             <td className="py-3 px-2 font-semibold text-[14px] text-[var(--ink)]">
               {p.credits_purchased > 0 ? `+${p.credits_purchased}` : '-'}
             </td>
             <td className="py-3 px-2 text-[13.5px] text-[var(--ink-faint)]">{date(p.created_at)}</td>
             <td className="py-3 px-2 text-[14px] text-[var(--ink)] font-medium">{money(p.amount_cents, p.currency)}</td>
-            <td className="py-3 px-2"><span className={`pay-pill ${p.status}`}>{p.status}</span></td>
+            <td className="py-3 px-2"><StatusPill pill={PAY_PILL[p.status] ?? PAY_PILL.pending}>{p.status.charAt(0).toUpperCase() + p.status.slice(1)}</StatusPill></td>
           </tr>
         ))}
       </tbody>
@@ -389,14 +397,14 @@ function ActivityTable({ ledger }: { ledger: LedgerRow[] }) {
     <table className="w-full text-left">
       <thead>
         <tr className="border-b border-[var(--line)]">
-          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0]">Description</th>
-          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0]">Date</th>
-          <th className="py-2.5 px-2 text-[10.5px] font-bold uppercase tracking-[0.11em] text-[#a8aba0] text-right">Amount</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8]">Description</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8]">Date</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8] text-right">Amount</th>
         </tr>
       </thead>
       <tbody>
         {ledger.map((l) => (
-          <tr key={l.id} className="border-b border-[var(--line)] last:border-0 transition-colors hover:bg-[#faf9f7]">
+          <tr key={l.id} className="border-b border-[var(--line)] last:border-0 transition-colors hover:bg-[#f9f6ff]">
             <td className="py-3 px-2 text-[14px] text-[var(--ink)] capitalize">
               {l.description ?? l.type.replace(/_/g, ' ')}
             </td>

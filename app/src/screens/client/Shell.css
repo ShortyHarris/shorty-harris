@@ -44,7 +44,7 @@
   }
   .ctopbar-biz {
     font-size: 14.5px;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: -0.02em;
     color: var(--ink);
     flex: 1;
@@ -67,7 +67,7 @@
   .ctopbar-credits:hover { opacity: 0.82; }
   .ctopbar-credits-num {
     font-size: 15px;
-    font-weight: 750;
+    font-weight: 800;
     color: var(--leaf);
     line-height: 1;
     font-variant-numeric: tabular-nums;
@@ -254,10 +254,10 @@
     /* Section label */
     .cside-section-label {
       font-size: 9.5px;
-      font-weight: 700;
+      font-weight: 600;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: #c4bfb5;
+      color: #8f8aa8;
       padding: 0 10px 6px;
       margin: 0;
     }
@@ -276,20 +276,20 @@
       border-radius: 6px;
       font-size: 13.5px;
       font-weight: 500;
-      color: #62655c;
+      color: #605978;
       text-decoration: none;
       letter-spacing: -0.01em;
       transition: background 0.1s, color 0.1s;
     }
-    .cside-link:hover { background: #f5f2ec; color: #20211c; }
-    .cside-link:hover .cside-link-icon { color: #20211c; }
+    .cside-link:hover { background: #f9f6ff; color: #0e0822; }
+    .cside-link:hover .cside-link-icon { color: #0e0822; }
     .cside-link.is-active {
       background: var(--leaf-tint);
-      color: #2d5e46;
-      font-weight: 700;
+      color: #5b0fc2;
+      font-weight: 600;
     }
     .cside-link.is-active .cside-link-icon { color: var(--leaf); }
-    .cside-link-icon { color: #a8aba0; flex-shrink: 0; transition: color 0.1s; }
+    .cside-link-icon { color: #8f8aa8; flex-shrink: 0; transition: color 0.1s; }
     .cside-nav-badge {
       margin-left: auto;
       display: flex;
@@ -342,7 +342,7 @@
     }
     .cside-credits-cta {
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 600;
       color: var(--leaf);
       margin-top: 6px;
     }
@@ -363,7 +363,7 @@
     .cside-user-info { flex: 1; min-width: 0; }
     .cside-user-name {
       font-size: 12.5px;
-      font-weight: 700;
+      font-weight: 600;
       color: var(--ink);
       white-space: nowrap;
       overflow: hidden;
@@ -371,7 +371,7 @@
     }
     .cside-user-role {
       font-size: 9.5px;
-      color: #9a9d92;
+      color: #605978;
       letter-spacing: 0.06em;
       font-weight: 600;
       text-transform: uppercase;
@@ -381,15 +381,15 @@
       align-items: center;
       justify-content: center;
       background: none;
-      border: 1px solid #ece8df;
+      border: 1px solid #e8e3f7;
       cursor: pointer;
-      color: #9a9d92;
+      color: #605978;
       padding: 6px 7px;
       border-radius: 6px;
       flex-shrink: 0;
       transition: background 0.1s, color 0.1s, border-color 0.1s;
     }
-    .cside-signout:hover { background: #f6e8e2; color: #a8533a; border-color: #e0b8ae; }
+    .cside-signout:hover { background: #f9f6ff; color: #0e0822; border-color: #e8e3f7; }
   }
 
 
@@ -415,7 +415,7 @@
     border-radius: 10px;
     color: var(--ink-soft);
     font-size: 13px;
-    font-weight: 550;
+    font-weight: 500;
     padding: 8px 14px;
   }
 }

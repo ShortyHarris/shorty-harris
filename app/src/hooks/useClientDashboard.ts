@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
-import type { HotLead, ClientSummary, HotLeadStatus, CallOutcomeValue } from '../types';
+import { toReplyMatch, type ReplyMatch } from '../lib/replyMatch';
+import type { HotLead,ClientSummary, HotLeadStatus, CallOutcomeValue } from '../types';
 
 function mockLeads(): HotLead[] {
   const statuses: HotLeadStatus[] = ['new', 'new', 'viewed', 'contacted', 'contacted', 'won', 'won', 'lost', 'new', 'contacted'];
@@ -37,7 +38,7 @@ interface DashboardData {
 
 async function fetchDashboard(clientId: string, client: SupabaseClient): Promise<DashboardData> {
   const [clientRes, billingRes, sentRes, repliesRes, leadsRes] = await Promise.all([
-    client.from('clients').select('business_name').eq('id', clientId).single(),
+    client.from('clients').select('business_name, send_timezone').eq('id', clientId).single(),
     client.from('billing_profiles').select('credits_remaining').eq('client_id', clientId).single(),
     client.from('messages').select('id', { count: 'exact', head: true }).eq('client_id', clientId).eq('send_status', 'sent'),
     client.from('replies').select('id', { count: 'exact', head: true }).eq('client_id', clientId),
@@ -48,7 +49,21 @@ async function fetchDashboard(clientId: string, client: SupabaseClient): Promise
   const leadsResult = leadsRes.data as { ok: boolean; error?: string; leads?: HotLead[] } | null;
   if (leadsResult && leadsResult.ok === false) throw new Error(leadsResult.error ?? 'not_permitted');
 
-  const leads = leadsResult?.leads ?? [];
+  const rpcLeads = leadsResult?.leads ?? [];
+
+  // The RPC does not return how each reply was matched, so read it separately.
+  // Best effort: a failure here must never hide the leads themselves.
+  const matchByLead = new Map<string, ReplyMatch | null>();
+  if (rpcLeads.length > 0) {
+    const { data: matchRows } = await client
+      .from('hot_leads')
+      .select('id, reply:replies ( match_method, message:messages ( subject, sent_at ) )')
+      .eq('client_id', clientId);
+    (matchRows ?? []).forEach((row: Record<string, unknown>) => {
+      matchByLead.set(row.id as string, toReplyMatch(row.reply));
+    });
+  }
+  const leads = rpcLeads.map((l) => ({ ...l, reply_match: matchByLead.get(l.hot_lead_id) ?? null }));
 
   return {
     summary: {
@@ -57,6 +72,7 @@ async function fetchDashboard(clientId: string, client: SupabaseClient): Promise
       messagesSent:      sentRes.count ?? 0,
       replies:           repliesRes.count ?? 0,
       hotLeads:          leads.length,
+      send_timezone:     clientRes.data?.send_timezone ?? null,
     },
     leads,
   };

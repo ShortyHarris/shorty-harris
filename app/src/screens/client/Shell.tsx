@@ -150,14 +150,14 @@ export function Shell({
         <Link
           to={`${basePath}/analytics`}
           aria-label="Analytics"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#62655c] transition-colors hover:bg-[#f5f2ec]"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#605978] transition-colors hover:bg-[#f9f6ff]"
         >
           <BarChart3 size={17} strokeWidth={1.8} />
         </Link>
         <Link
           to="/docs"
           aria-label="Help & Docs"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#62655c] transition-colors hover:bg-[#f5f2ec]"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#605978] transition-colors hover:bg-[#f9f6ff]"
         >
           <BookOpen size={17} strokeWidth={1.8} />
         </Link>
@@ -181,12 +181,12 @@ export function Shell({
         {showGmailBanner && (
           <Link
             to={`${basePath}/settings`}
-            className="flex items-center bg-yellow-400 border border-gray-200 shadow-sm gap-2.5 no-underline px-4 py-3 md:mx-7 md:mt-6 md:rounded-md"
+            className="flex items-center bg-[#f1e9ff] text-[#0e0822] border border-[#e8dafd] gap-2.5 no-underline px-4 py-3 md:mx-7 md:mt-6 md:rounded-md"
            
           >
             <Mail size={17} strokeWidth={2} className="shrink-0" aria-hidden />
             <span className="flex-1 text-[13px] leading-snug">
-              <strong className="font-bold">Connect your Gmail</strong> to start sending outreach - approvals are disabled until it's set up.
+              <strong className="font-semibold">Connect your Gmail</strong> to start sending outreach - approvals are disabled until it's set up.
             </span>
             <ChevronRight size={16} style={{ color: 'var(--amber)', flexShrink: 0 }} />
           </Link>
@@ -284,12 +284,12 @@ function NotificationBell({
       <button
         onClick={() => setOpen(true)}
         aria-label="Notifications"
-        className="relative flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-[#62655c] transition-colors hover:bg-[#f5f2ec]"
+        className="relative flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-[#605978] transition-colors hover:bg-[#f9f6ff]"
       >
         <Bell size={17} strokeWidth={1.8} />
         {unreadCount > 0 && (
           <span
-            className="absolute right-0.5 top-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full px-1 text-[9.5px] font-bold leading-none text-white"
+            className="absolute right-0.5 top-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full px-1 text-[9.5px] font-semibold leading-none text-white"
             style={{ background: 'var(--amber)' }}
           >
             {unreadCount > 99 ? '99+' : unreadCount}
@@ -341,46 +341,46 @@ function NotificationPanel({
         role="dialog"
         aria-modal="true"
         aria-label="Notifications"
-        className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[420px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[420px] md:rounded-md md:border md:border-[#e8e3f7]"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-[#ece8df] px-5 py-4">
-          <span className="text-[15px] font-bold text-[#20211c]">Notifications</span>
+        <div className="flex shrink-0 items-center justify-between border-b border-[#e8e3f7] px-5 py-4">
+          <span className="text-[15px] font-semibold text-[#0e0822]">Notifications</span>
           <div className="flex items-center gap-3">
             {unreadCount > 0 && (
               <button
                 onClick={() => onMarkAllAsRead?.()}
-                className="cursor-pointer border-0 bg-transparent text-[12px] font-semibold text-[#3c7a5b] hover:underline"
+                className="cursor-pointer border-0 bg-transparent text-[12px] font-semibold text-[#7412ef] hover:underline"
               >
                 Mark all as read
               </button>
             )}
-            <button onClick={onClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[22px] leading-none text-[#9a9d92] transition-colors hover:text-[#20211c]">×</button>
+            <button onClick={onClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[22px] leading-none text-[#605978] transition-colors hover:text-[#0e0822]">×</button>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           {notifications.length === 0 ? (
-            <div className="px-5 py-14 text-center text-[13px] text-[#9a9d92]">Nothing yet.</div>
+            <div className="px-5 py-14 text-center text-[13px] text-[#605978]">Nothing yet.</div>
           ) : (
             notifications.map((n) => (
               <button
                 key={n.id}
                 onClick={() => onSelect(n)}
-                className="flex w-full cursor-pointer items-start gap-2.5 border-b border-[#f5f2ec] px-5 py-3.5 text-left transition-colors last:border-0 hover:bg-[#fbf9f5]"
+                className="flex w-full cursor-pointer items-start gap-2.5 border-b border-[#f9f6ff] px-5 py-3.5 text-left transition-colors last:border-0 hover:bg-[#f9f6ff]"
               >
                 <span
                   className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: n.read_at ? 'transparent' : 'var(--leaf)' }}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className={`block text-[13px] leading-snug ${n.read_at ? 'text-[#62655c]' : 'font-semibold text-[#20211c]'}`}>
+                  <span className={`block text-[13px] leading-snug ${n.read_at ? 'text-[#605978]' : 'font-semibold text-[#0e0822]'}`}>
                     {n.body}
                   </span>
-                  <span className="mt-0.5 block text-[11.5px] text-[#9a9d92]">{formatNotifTime(n.created_at)}</span>
+                  <span className="mt-0.5 block text-[11.5px] text-[#605978]">{formatNotifTime(n.created_at)}</span>
                 </span>
               </button>
             ))

@@ -7,7 +7,7 @@ import { useClientBlacklist } from '../../hooks/useBlacklistedDomains';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { btn } from '../../lib/clientButtons';
 
-const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em]';
+const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em]';
 const inputCls = 'w-full rounded-lg border px-3.5 py-2.5 text-[13px] outline-none transition-colors';
 const inputStyle = { borderColor: 'var(--line)', background: 'var(--bg)', color: 'var(--ink)' };
 
@@ -62,7 +62,7 @@ export function BlockedDomainsModal({
   return (
     <motion.div
       className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:p-6"
-      style={{ background: 'rgba(28, 30, 25, 0.45)' }}
+      style={{ background: 'rgba(14, 8, 34, 0.45)' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -70,7 +70,7 @@ export function BlockedDomainsModal({
       {...useOverlayClose(onClose, { escape: true })}
     >
       <motion.div
-        className="modal-card flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:border md:border-[#e8e3f7]"
         style={{ background: 'var(--surface)' }}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
@@ -80,7 +80,7 @@ export function BlockedDomainsModal({
       >
         <div className="flex shrink-0 items-center justify-between border-b px-5 py-4" style={{ borderColor: 'var(--line)' }}>
           <div>
-            <h2 className="m-0 text-[18px] font-bold" style={{ color: 'var(--ink)' }}>Blocked domains</h2>
+            <h2 className="m-0 text-[18px] font-semibold" style={{ color: 'var(--ink)' }}>Blocked domains</h2>
             <p className="m-0 mt-0.5 text-[12.5px]" style={{ color: 'var(--ink-soft)' }}>
               We'll never send outreach to an address at a domain on this list.
             </p>
@@ -125,7 +125,7 @@ export function BlockedDomainsModal({
           </div>
 
           {error && (
-            <div className="mb-4 rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e6cbc0' }}>
+            <div className="mb-4 rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}>
               Couldn't load your blocked domains: {error}
             </div>
           )}
@@ -138,7 +138,7 @@ export function BlockedDomainsModal({
           ) : (
             <>
               {/* Own rows */}
-              <div className="mb-2 text-[10.5px] font-bold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
+              <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
                 Your blocked domains
               </div>
               {ownRows.length === 0 ? (
@@ -172,7 +172,7 @@ export function BlockedDomainsModal({
               )}
 
               {/* Global rows - read-only, visually distinct group */}
-              <div className="mb-2 flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
+              <div className="mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
                 <Lock size={11} />
                 Blocked for every client
               </div>

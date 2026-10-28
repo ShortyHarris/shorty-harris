@@ -50,7 +50,7 @@ export function ToastHost({ toasts, onDismiss }: { toasts: ToastItem[]; onDismis
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.98 }}
               transition={{ duration: 0.18 }}
-              className="pointer-events-auto flex w-full max-w-[380px] items-start gap-2.5 rounded-xl border border-(--ad-line) bg-(--ad-surface) px-4 py-3 shadow-[0_8px_24px_rgba(20,20,15,0.14)]"
+              className="pointer-events-auto flex w-full max-w-[380px] items-start gap-2.5 rounded-xl border border-(--ad-line) bg-(--ad-surface) px-4 py-3"
             >
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: iconBg }}>
                 <Icon size={15} strokeWidth={2.2} style={{ color: iconColor }} />

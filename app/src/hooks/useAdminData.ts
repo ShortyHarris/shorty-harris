@@ -5,6 +5,7 @@ import { queryClient } from '../lib/queryClient';
 import { applyProspectFilters, mapCategoryRows, pageRange } from '../lib/prospectQuery';
 import { buildAreaColumns, type TargetArea } from '../lib/targetAreas';
 import { CAMPAIGN_LIMITS, campaignLimitsError } from '../lib/campaignLimits';
+import { toReplyMatch, type ReplyMatch } from '../lib/replyMatch';
 
 // ─── Query keys ──────────────────────────────────────────────────────────────
 export const QK = {
@@ -412,8 +413,9 @@ export interface AdminHotLead {
   status: string;
   routed_at: string;
   prospect: { business_name: string; category: string | null; location: string | null } | null;
-  client: { business_name: string } | null;
+  client: { business_name: string; send_timezone: string | null } | null;
   reply: { body: string } | null;
+  reply_match: ReplyMatch | null;
 }
 
 async function fetchAdminHotLeads(): Promise<AdminHotLead[]> {
@@ -421,8 +423,8 @@ async function fetchAdminHotLeads(): Promise<AdminHotLead[]> {
     .from('hot_leads')
     .select(`id, ai_summary, suggested_action, status, routed_at,
              prospect:prospects ( business_name, category, location ),
-             client:clients ( business_name ),
-             reply:replies ( body )`)
+             client:clients ( business_name, send_timezone ),
+             reply:replies ( body, match_method, message:messages ( subject, sent_at ) )`)
     .order('routed_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []).map((r: Record<string, unknown>) => ({
@@ -430,6 +432,7 @@ async function fetchAdminHotLeads(): Promise<AdminHotLead[]> {
     prospect: Array.isArray(r.prospect) ? r.prospect[0] ?? null : r.prospect ?? null,
     client:   Array.isArray(r.client)   ? r.client[0]   ?? null : r.client   ?? null,
     reply:    Array.isArray(r.reply)    ? r.reply[0]    ?? null : r.reply    ?? null,
+    reply_match: toReplyMatch(r.reply),
   })) as AdminHotLead[];
 }
 

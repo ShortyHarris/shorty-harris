@@ -10,7 +10,7 @@ const CARD_HEIGHT_ESTIMATE = 170;
 const GAP = 14;
 const POLL_INTERVAL_MS = 100;
 const POLL_TIMEOUT_MS = 3000;
-const DIM = 'rgba(20, 20, 18, 0.65)';
+const DIM = 'rgba(14, 8, 34, 0.65)';
 
 // Multiple elements can share the same data-tour value across breakpoints
 // (e.g. a desktop button and a mobile FAB that does the same thing) - only
@@ -150,7 +150,7 @@ export function TourOverlay() {
             // rest of the viewport with the dim color, leaving only this
             // box's own (rounded) area see-through - correctly rounded by
             // construction, since it's this element's own border-radius.
-            boxShadow: `0 0 0 4px rgba(60, 122, 91, 0.18), 0 0 0 9999px ${DIM}`,
+            boxShadow: `0 0 0 4px rgba(116, 18, 239, 0.14), 0 0 0 9999px ${DIM}`,
           }}
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}

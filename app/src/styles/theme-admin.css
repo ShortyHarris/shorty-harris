@@ -43,7 +43,7 @@
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-feature-settings: 'cv11', 'ss01', 'tnum';
+  font-feature-settings: "tnum";
 }
 
 .theme-admin * { box-sizing: border-box; }
@@ -56,7 +56,7 @@
 .theme-admin textarea,
 .theme-admin select,
 .theme-admin li {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .theme-admin h1,

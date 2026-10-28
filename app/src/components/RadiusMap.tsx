@@ -79,7 +79,7 @@ export default function RadiusMap({
     map.on('error', () => { if (!readyRef.current) live.current.onFail?.(); });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
 
-    const marker = new mapboxgl.Marker({ draggable: true, color: '#3c7a5b' })
+    const marker = new mapboxgl.Marker({ draggable: true, color: '#7412ef' })
       .setLngLat([live.current.center.lng, live.current.center.lat])
       .addTo(map);
     markerRef.current = marker;
@@ -98,10 +98,10 @@ export default function RadiusMap({
     map.on('load', () => {
       map.addSource(EXISTING_SRC, { type: 'geojson', data: EMPTY });
       map.addSource(SELECTED_SRC, { type: 'geojson', data: EMPTY });
-      map.addLayer({ id: 'existing-fill', type: 'fill', source: EXISTING_SRC, paint: { 'fill-color': '#3c7a5b', 'fill-opacity': 0.07 } });
-      map.addLayer({ id: 'existing-line', type: 'line', source: EXISTING_SRC, paint: { 'line-color': '#3c7a5b', 'line-opacity': 0.35, 'line-width': 1.5 } });
-      map.addLayer({ id: 'selected-fill', type: 'fill', source: SELECTED_SRC, paint: { 'fill-color': '#3c7a5b', 'fill-opacity': 0.18 } });
-      map.addLayer({ id: 'selected-line', type: 'line', source: SELECTED_SRC, paint: { 'line-color': '#3c7a5b', 'line-width': 2 } });
+      map.addLayer({ id: 'existing-fill', type: 'fill', source: EXISTING_SRC, paint: { 'fill-color': '#7412ef', 'fill-opacity': 0.07 } });
+      map.addLayer({ id: 'existing-line', type: 'line', source: EXISTING_SRC, paint: { 'line-color': '#7412ef', 'line-opacity': 0.35, 'line-width': 1.5 } });
+      map.addLayer({ id: 'selected-fill', type: 'fill', source: SELECTED_SRC, paint: { 'fill-color': '#7412ef', 'fill-opacity': 0.18 } });
+      map.addLayer({ id: 'selected-line', type: 'line', source: SELECTED_SRC, paint: { 'line-color': '#7412ef', 'line-width': 2 } });
       readyRef.current = true;
       draw();
       fit(false);
@@ -135,7 +135,7 @@ export default function RadiusMap({
       ref={containerRef}
       role="application"
       aria-label="Map preview. Drag the pin to move the search area; use the slider to change the radius."
-      className="h-[240px] w-full overflow-hidden rounded-lg border border-[#ece8df]"
+      className="h-[240px] w-full overflow-hidden rounded-lg border border-[#e8e3f7]"
     />
   );
 }

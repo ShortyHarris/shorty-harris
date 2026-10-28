@@ -35,7 +35,7 @@ const AUDIENCE_PILL: Record<string, { bg: string; text: string }> = {
 };
 
 const ghostCls = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
-const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
+const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
 
 function slugify(text: string): string {
   return text.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
@@ -152,7 +152,7 @@ export function DocsAdmin() {
         <SkeletonTable rows={10} cols={5} />
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
-          <strong className="text-[15px] font-bold text-(--ad-ink)">No articles match.</strong>
+          <strong className="text-[15px] font-semibold text-(--ad-ink)">No articles match.</strong>
         </div>
       ) : (
         <div className="atbl hidden md:block">
@@ -178,7 +178,7 @@ export function DocsAdmin() {
                 return (
                   <tr key={a.id} onClick={() => setEditing(a)} className="cursor-pointer">
                     <td className="min-w-0">
-                      <div className="truncate font-bold text-(--ad-ink)" title={a.title}>{a.title}</div>
+                      <div className="truncate font-semibold text-(--ad-ink)" title={a.title}>{a.title}</div>
                       <div className="truncate text-[11px] text-(--ad-ink-faint)">{a.slug}</div>
                     </td>
                     <td className="min-w-0 text-(--ad-ink-soft)">
@@ -214,8 +214,8 @@ export function DocsAdmin() {
           return (
             <button key={a.id} onClick={() => setEditing(a)} className="cursor-pointer rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4 text-left">
               <div className="flex items-start justify-between gap-2">
-                <span className="min-w-0 truncate font-bold text-[14px] text-(--ad-ink)" title={a.title}>{a.title}</span>
-                <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]" style={{ background: pill.bg, color: pill.text }}>
+                <span className="min-w-0 truncate font-semibold text-[14px] text-(--ad-ink)" title={a.title}>{a.title}</span>
+                <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.04em]" style={{ background: pill.bg, color: pill.text }}>
                   {a.audience}
                 </span>
               </div>
@@ -254,7 +254,7 @@ export function DocsAdmin() {
   );
 }
 
-const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
 const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
 function NewArticleModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
@@ -289,11 +289,11 @@ function NewArticleModal({ onClose, onCreated }: { onClose: () => void; onCreate
     >
       <div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[480px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[480px] md:rounded-md md:border md:border-(--ad-line)"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">New article</h2>
+          <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">New article</h2>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
         <div className="flex flex-col gap-4 px-5 py-5">

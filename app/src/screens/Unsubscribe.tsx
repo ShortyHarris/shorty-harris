@@ -75,7 +75,7 @@ export function Unsubscribe() {
   }, []);
 
   return (
-    <div style={FONT} className="min-h-screen bg-white text-[#1a1b17] flex items-center justify-center px-6">
+    <div style={FONT} className="min-h-screen bg-white text-[#0e0822] flex items-center justify-center px-6">
       <main className="max-w-[480px] w-full py-16 text-center">
         <BrandLockup />
 
@@ -88,14 +88,14 @@ export function Unsubscribe() {
                 width: 20,
                 height: 20,
                 borderRadius: '50%',
-                border: '2px solid #ddd8cb',
-                borderTopColor: '#3c7a5b',
+                border: '2px solid #e8dafd',
+                borderTopColor: '#7412ef',
                 animation: 'sh-unsub-spin 0.7s linear infinite',
               }}
             />
             <style>{`@keyframes sh-unsub-spin { to { transform: rotate(360deg); } }`}</style>
-            <h1 className="m-0 text-[22px] font-bold leading-tight">Working on it…</h1>
-            <p className="mt-3 text-[15px] leading-relaxed text-[#54574e]">Processing your unsubscribe request.</p>
+            <h1 className="m-0 text-[22px] font-semibold leading-tight">Working on it…</h1>
+            <p className="mt-3 text-[15px] leading-relaxed text-[#605978]">Processing your unsubscribe request.</p>
           </>
         )}
 
@@ -114,7 +114,7 @@ export function Unsubscribe() {
               Sorry to see you go😔
             </h1>
        
-            <p className="mt-4 text-[15.5px] leading-tight text-[#54574e]">
+            <p className="mt-4 text-[15.5px] leading-tight text-[#605978]">
               You've been unsubscribed.{' '}
               {state.businessName
                 ? `You will no longer receive emails from ${state.businessName}.`
@@ -126,8 +126,8 @@ export function Unsubscribe() {
 
         {state.status === 'invalid' && (
           <>
-            <h1 className="m-0 text-[22px] font-bold leading-tight">This link is invalid or expired</h1>
-            <p className="mt-4 text-[15px] leading-relaxed text-[#54574e]">
+            <h1 className="m-0 text-[22px] font-semibold leading-tight">This link is invalid or expired</h1>
+            <p className="mt-4 text-[15px] leading-relaxed text-[#605978]">
               We couldn't process this unsubscribe link. If you'd still like to stop receiving these emails, reply
               to the email with the word "unsubscribe" and we'll take care of it.
             </p>
@@ -136,8 +136,8 @@ export function Unsubscribe() {
 
         {state.status === 'error' && (
           <>
-            <h1 className="m-0 text-[22px] font-bold leading-tight">Something went wrong</h1>
-            <p className="mt-4 text-[15px] leading-relaxed text-[#54574e]">
+            <h1 className="m-0 text-[22px] font-semibold leading-tight">Something went wrong</h1>
+            <p className="mt-4 text-[15px] leading-relaxed text-[#605978]">
               We couldn't process your request. Please try again.
             </p>
             <button
@@ -145,11 +145,11 @@ export function Unsubscribe() {
                 setState({ status: 'working' });
                 window.location.reload();
               }}
-              className="mt-6 cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-5 py-2.5 text-[13px] font-semibold text-white"
+              className="mt-6 cursor-pointer rounded-full border-0 bg-[#7412ef] px-6 min-h-11 text-[14px] hover:bg-[#5b0fc2] font-semibold text-white"
             >
               Try again
             </button>
-            <p className="mt-5 text-[13.5px] leading-relaxed text-[#54574e]">
+            <p className="mt-5 text-[13.5px] leading-relaxed text-[#605978]">
               Or reply to the email with the word "unsubscribe" and we'll take care of it.
             </p>
           </>

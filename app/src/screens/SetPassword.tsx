@@ -64,10 +64,10 @@ export function SetPassword() {
                 : (authRedirectError.description ?? 'This link is no longer valid.')}
             </p>
             <div style={{
-              background: '#edf4ef',
+              background: '#f1e9ff',
               borderRadius: 10,
               padding: '14px 16px',
-              color: '#2d5e46',
+              color: '#0e0822',
               fontSize: 13,
               fontWeight: 600,
               lineHeight: 1.5,
@@ -116,21 +116,21 @@ export function SetPassword() {
           <h1 className="login-title">Set your password</h1>
           <p className="login-sub">
             Choose a password for{' '}
-            <strong style={{ color: '#1a1c17', fontWeight: 600 }}>{email}</strong>.
+            <strong style={{ color: '#0e0822', fontWeight: 600 }}>{email}</strong>.
             You'll use it every time you sign in.
           </p>
 
           {done ? (
             <div style={{
-              background: '#edf4ef',
+              background: '#f1e9ff',
               borderRadius: 10,
               padding: '14px 16px',
-              color: '#2d5e46',
+              color: '#0e0822',
               fontSize: 14,
               fontWeight: 600,
               lineHeight: 1.4,
             }}>
-              Password saved! Taking you to your dashboard…
+              Password saved. Taking you to your dashboard…
             </div>
           ) : (
             <form onSubmit={submit}>

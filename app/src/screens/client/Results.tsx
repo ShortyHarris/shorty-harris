@@ -26,8 +26,8 @@ const FUNNEL_STEPS: { key: keyof ResultFunnel; label: string }[] = [
 ];
 
 const SEVERITY_STYLE: Record<ResultInsight['severity'], { bg: string; border: string; text: string; icon: boolean }> = {
-  critical: { bg: 'var(--clay-tint)', border: '#e6cbc0', text: 'var(--clay)', icon: true },
-  warning:  { bg: 'var(--amber-tint)', border: '#eddcb0', text: 'var(--amber)', icon: true },
+  critical: { bg: 'var(--clay-tint)', border: '#e8e3f7', text: 'var(--clay)', icon: true },
+  warning:  { bg: 'var(--amber-tint)', border: '#e8dafd', text: 'var(--amber)', icon: true },
   info:     { bg: 'var(--bg)', border: 'var(--line)', text: 'var(--ink-soft)', icon: false },
 };
 
@@ -85,7 +85,7 @@ export function Results({ clientId, client = supabase, basePath = '/app' }: {
       </div>
 
       {error && (
-        <div className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e6cbc0' }}>
+        <div className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}>
           Couldn't load your results: {error}
         </div>
       )}
@@ -119,7 +119,7 @@ export function Results({ clientId, client = supabase, basePath = '/app' }: {
                             not a footnote - since for a stalled client this is the whole story. */}
                         {i === 1 && funnel.awaiting_approval > 0 && (
                           <span
-                            className="mt-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold"
+                            className="mt-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold"
                             style={{ background: 'var(--clay-tint)', color: 'var(--clay)' }}
                           >
                             {funnel.awaiting_approval} stuck
@@ -160,7 +160,7 @@ export function Results({ clientId, client = supabase, basePath = '/app' }: {
 function SecondaryFigure({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-baseline gap-1.5">
-      <span className="text-[14px] font-bold" style={{ color: 'var(--ink-soft)' }}>{value}</span>
+      <span className="text-[14px] font-semibold" style={{ color: 'var(--ink-soft)' }}>{value}</span>
       <span className="text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>{label}</span>
     </div>
   );
@@ -185,7 +185,7 @@ function InsightCard({ insight, basePath }: { insight: ResultInsight; basePath: 
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <h3 className="m-0 text-[14.5px] font-bold" style={{ color: insight.severity === 'info' ? 'var(--ink)' : style.text }}>
+          <h3 className="m-0 text-[14.5px] font-semibold" style={{ color: insight.severity === 'info' ? 'var(--ink)' : style.text }}>
             {insight.headline}
           </h3>
           <p className="m-0 mt-1 text-[13px] leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
@@ -223,12 +223,12 @@ function CategoryTable({ rows }: { rows: ResultCategoryRow[] }) {
   return (
     <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
       <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--line)' }}>
-        <h2 className="m-0 text-[15px] font-bold" style={{ color: 'var(--ink)' }}>By category</h2>
+        <h2 className="m-0 text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>By category</h2>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-[13px]">
           <thead>
-            <tr style={{ color: 'var(--ink-faint)' }} className="text-left text-[10.5px] font-bold uppercase tracking-[.06em]">
+            <tr style={{ color: 'var(--ink-faint)' }} className="text-left text-[10.5px] font-semibold uppercase tracking-[.06em]">
               <th className="px-5 py-3">Category</th>
               <th className="px-3 py-3">Emailed</th>
               <th className="px-3 py-3">Replies</th>

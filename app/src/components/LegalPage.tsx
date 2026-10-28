@@ -22,21 +22,21 @@ export function LegalPage({
   useSeo({ title, description, path });
 
   return (
-    <div style={FONT} className="min-h-screen flex flex-col bg-cream text-[#0a0a0a]">
+    <div style={FONT} className="min-h-screen flex flex-col bg-paper text-[#0e0822]">
       <PublicNav />
 
       <main className="max-w-[720px] mx-auto px-6 pt-14 pb-24">
         <h1 className="m-0 text-[30px] sm:text-[38px] font-extrabold leading-[1.15] tracking-tight">{title}</h1>
-        <p className="mt-3 text-[13px] text-[#737373]">Last updated {lastUpdated}</p>
-        <p className="mt-6 text-[17px] leading-relaxed text-[#525252]">{intro}</p>
+        <p className="mt-3 text-[13px] text-[#605978]">Last updated {lastUpdated}</p>
+        <p className="mt-6 text-[17px] leading-relaxed text-[#605978]">{intro}</p>
 
         <style>{`
-          .legal-body h2 { font-size: 21px; font-weight: 800; margin: 44px 0 14px; letter-spacing: -0.01em; color: #0a0a0a; }
+          .legal-body h2 { font-size: 21px; font-weight: 800; margin: 44px 0 14px; letter-spacing: -0.01em; color: #0e0822; }
           .legal-body p { font-size: 15.5px; line-height: 1.75; color: #404040; margin: 0 0 16px; }
           .legal-body ul { margin: 0 0 16px; padding-left: 22px; }
           .legal-body li { font-size: 15.5px; line-height: 1.75; color: #404040; margin-bottom: 8px; }
-          .legal-body a { color: #3c7a5b; text-decoration: underline; text-underline-offset: 2px; }
-          .legal-body strong { font-weight: 700; color: #0a0a0a; }
+          .legal-body a { color: #7412ef; text-decoration: underline; text-underline-offset: 2px; }
+          .legal-body strong { font-weight: 600; color: #0e0822; }
         `}</style>
         <div className="legal-body mt-4">
           {sections.map((s) => (

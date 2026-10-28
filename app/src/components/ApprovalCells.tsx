@@ -9,10 +9,10 @@ export function ScheduledCell({ schedule, id, tz, now }: { schedule: ScheduleMap
   return (
     <span
       title={d.title ?? undefined}
-      className={d.overdue ? 'font-bold text-[#a8533a]' : d.hasDate ? '' : 'italic opacity-70'}
+      className={d.overdue ? 'font-semibold text-[#0e0822]' : d.hasDate ? '' : 'italic opacity-70'}
     >
       {d.text}
-      {d.overdue && <span className="ml-1 rounded-full bg-[#f6e8e2] px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-[.04em]">Overdue</span>}
+      {d.overdue && <span className="ml-1 rounded-full bg-[#f9f6ff] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[.04em]">Overdue</span>}
     </span>
   );
 }
@@ -28,12 +28,12 @@ export function HeldBadge({ row, settingsPath, className = '' }: {
   if (!row || row.basis !== 'held_by_send_rules') return null;
   return (
     <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
-      <span className="inline-flex items-center whitespace-nowrap rounded-full bg-[#f8efdb] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[.04em] text-[#8a6417]">
+      <span className="inline-flex items-center whitespace-nowrap rounded-full bg-[#f1e9ff] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.04em] text-[#5b0fc2]">
         Held by send rules
       </span>
       {settingsPath !== undefined && (
-        <span className="text-[11px] leading-snug text-[#8a6417]">
-          {settingsPath ? <Link to={settingsPath} className="font-bold underline">See Settings</Link> : 'See Settings'}
+        <span className="text-[11px] leading-snug text-[#5b0fc2]">
+          {settingsPath ? <Link to={settingsPath} className="font-semibold underline">See Settings</Link> : 'See Settings'}
         </span>
       )}
     </div>
@@ -43,7 +43,7 @@ export function HeldBadge({ row, settingsPath, className = '' }: {
 const STALE_DAYS = 3;
 
 /** Compact "2d" / "5h" wait time; the full date is in the tooltip. Turns loud once a draft is stale. */
-export function WaitingCell({ item, schedule, tz, now, staleClassName = 'font-bold text-(--ad-amber)' }: {
+export function WaitingCell({ item, schedule, tz, now, staleClassName = 'font-semibold text-(--ad-amber)' }: {
   item: SortableApproval; schedule: ScheduleMap; tz: string; now: Date; staleClassName?: string;
 }) {
   const iso = pendingSinceOf(item, schedule);
@@ -71,7 +71,7 @@ export function AnglePill({ angle, className = '' }: { angle: string | null | un
     <span
       title="Personalization angle"
       className={`atbl-pill ${className}`}
-      style={{ background: '#eef1f8', color: '#3b5b9a' }}
+      style={{ background: '#f1e9ff', color: '#7412ef' }}
     >
       {text.toUpperCase()}
     </span>

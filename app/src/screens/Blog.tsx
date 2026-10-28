@@ -121,19 +121,19 @@ export function Blog() {
     // Same pill language as the public nav: beige + dark text when active.
     `cursor-pointer rounded-full border h-9 px-4 text-[13.5px] transition-colors ${
       active
-        ? 'border-[#e5e5e5] bg-[#f0f0f0] text-[#0a0a0a] font-semibold'
-        : 'border-[#e5e5e5] bg-white text-[#525252] font-medium hover:bg-[#f5f5f5] hover:text-[#0a0a0a]'
+        ? 'border-[#e8e3f7] bg-[#f0f0f0] text-[#0e0822] font-semibold'
+        : 'border-[#e8e3f7] bg-white text-[#605978] font-medium hover:bg-[#f5f5f5] hover:text-[#0e0822]'
     }`;
 
   return (
-    <div style={FONT} className="min-h-screen flex flex-col bg-cream text-[#0a0a0a]">
+    <div style={FONT} className="min-h-screen flex flex-col bg-paper text-[#0e0822]">
       <PublicNav />
 
       <main className="max-w-[1160px] mx-auto px-6 py-20">
         {/* Centered eyebrow + heading + divider */}
         <div className="mx-auto max-w-[640px] text-center">
-          <span className="text-[12px] font-bold uppercase tracking-[.14em] text-[#3c7a5b]">Our Blog</span>
-          <h1 className="mt-3 mb-0 text-[34px] sm:text-[40px] font-extrabold leading-[1.15] tracking-tight text-[#0a0a0a]">
+          <span className="text-[12px] font-semibold uppercase tracking-[.14em] text-[#7412ef]">Our Blog</span>
+          <h1 className="mt-3 mb-0 text-[34px] sm:text-[40px] font-extrabold leading-[1.15] tracking-tight text-[#0e0822]">
             Practical advice for growing your small or family business
           </h1>
           <div className="mx-auto mt-8 h-px w-16 bg-[#d4d4d4]" />
@@ -171,7 +171,7 @@ export function Blog() {
             {Array.from({ length: BLOG_PAGE_SIZE }).map((_, i) => <PostCardSkeleton key={i} />)}
           </div>
         ) : posts.length === 0 ? (
-          <div className="mt-14 rounded-2xl border border-dashed border-[#e5e5e5] bg-white p-10 text-center text-[13px] text-[#525252]">
+          <div className="mt-14 rounded-2xl border border-dashed border-[#e8e3f7] bg-white p-10 text-center text-[13px] text-[#605978]">
             {activeCategory === 'all' ? 'Nothing published yet - check back soon.' : 'No posts in this category yet.'}
           </div>
         ) : (
@@ -220,21 +220,21 @@ function PostCard({ post, index }: { post: BlogCardPost; index: number }) {
         )}
       </div>
       <div className="flex flex-1 flex-col pt-5 px-4">
-        <span className="text-[12.5px] font-bold text-[#3c7a5b]">
+        <span className="text-[12.5px] font-semibold text-[#7412ef]">
           {CATEGORY_LABEL[post.category] ?? post.category}
         </span>
-        <span className="mt-1.5 text-[16px] font-bold leading-snug text-[#0a0a0a] transition-colors group-hover:text-[#3c7a5b]">
+        <span className="mt-1.5 text-[16px] font-semibold leading-snug text-[#0e0822] transition-colors group-hover:text-[#7412ef]">
           {post.title}
         </span>
         {post.excerpt && (
-          <span className="mt-2 text-[13.5px] leading-relaxed text-[#525252] line-clamp-3">{post.excerpt}</span>
+          <span className="mt-2 text-[13.5px] leading-relaxed text-[#605978] line-clamp-3">{post.excerpt}</span>
         )}
-        <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#e5e5e5] pt-4">
-          <span className="flex items-center gap-1.5 text-[12px] text-[#737373]">
+        <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#e8e3f7] pt-4">
+          <span className="flex items-center gap-1.5 text-[12px] text-[#605978]">
             <Calendar size={13} strokeWidth={2} />
             {formatDate(post.published_at)}
           </span>
-          <span className="flex items-center gap-1 text-[12.5px] font-semibold text-[#3c7a5b]">
+          <span className="flex items-center gap-1 text-[12.5px] font-semibold text-[#7412ef]">
             Read article
             <ArrowRight size={13} strokeWidth={2.2} className="transition-transform group-hover:translate-x-0.5" />
           </span>
@@ -252,8 +252,8 @@ function Pagination({ page, totalPages, category }: {
   const href = (p: number) => ({ pathname: '/blog', search: searchFor(p, category) });
   const prefetch = (p: number) => () => { void prefetchPublicBlogPage(p, category); };
   const base = 'flex h-9 min-w-9 items-center justify-center gap-1 rounded-full border px-3 text-[13px] font-semibold no-underline transition-colors';
-  const idle = 'border-[#e5e5e5] bg-white text-[#525252] hover:border-[#3c7a5b] hover:text-[#3c7a5b]';
-  const disabled = 'border-[#e5e5e5] bg-transparent text-[#a3a3a3] pointer-events-none';
+  const idle = 'border-[#e8e3f7] bg-white text-[#605978] hover:border-[#7412ef] hover:text-[#7412ef]';
+  const disabled = 'border-[#e8e3f7] bg-transparent text-[#a3a3a3] pointer-events-none';
 
   return (
     <nav aria-label="Blog pages" className="mt-16 flex flex-wrap items-center justify-center gap-2">
@@ -275,9 +275,9 @@ function Pagination({ page, totalPages, category }: {
 
       {pageNumbers(page, totalPages).map((p, i) =>
         p === 'gap' ? (
-          <span key={`gap-${i}`} className="px-1 text-[13px] text-[#737373]">…</span>
+          <span key={`gap-${i}`} className="px-1 text-[13px] text-[#605978]">…</span>
         ) : p === page ? (
-          <span key={p} aria-current="page" className={`${base} border-[#3c7a5b] bg-[#3c7a5b] text-white`}>
+          <span key={p} aria-current="page" className={`${base} border-[#7412ef] bg-[#7412ef] text-white`}>
             {p}
           </span>
         ) : (
@@ -323,7 +323,7 @@ function PostCardSkeleton() {
         <div className="mt-1.5 h-4 w-2/3 rounded bg-[#f5f5f5]" />
         <div className="mt-3 h-3 w-full rounded bg-[#f5f5f5]" />
         <div className="mt-1.5 h-3 w-4/5 rounded bg-[#f5f5f5]" />
-        <div className="mt-4 flex items-center justify-between border-t border-[#e5e5e5] pt-4">
+        <div className="mt-4 flex items-center justify-between border-t border-[#e8e3f7] pt-4">
           <div className="h-3 w-16 rounded bg-[#f5f5f5]" />
           <div className="h-3 w-14 rounded bg-[#f5f5f5]" />
         </div>

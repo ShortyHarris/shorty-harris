@@ -23,13 +23,13 @@ export function Header() {
   return (
     <header
       className={cn('sticky top-0 z-50 w-full border-b border-transparent', {
-        'bg-white/95 supports-[backdrop-filter]:bg-white/80 border-[#e8e3da] backdrop-blur-lg': scrolled,
+        'bg-white/95 supports-[backdrop-filter]:bg-white/80 border-[#e8e3f7] backdrop-blur-lg': scrolled,
       })}
     >
       <nav className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
-        <Link to="/" className="hover:bg-[#f5f2ec] rounded-md p-2 no-underline text-[17px] tracking-[-0.025em]">
-          <span className="font-medium text-[#54574e]">Shorty</span>
-          <span className="font-extrabold text-[#1a1b17]"> Harris</span>
+        <Link to="/" className="hover:bg-[#f9f6ff] rounded-md p-2 no-underline text-[17px] tracking-[-0.025em]">
+          <span className="font-medium text-[#605978]">Shorty</span>
+          <span className="font-extrabold text-[#0e0822]"> Harris</span>
         </Link>
 
         <div className="hidden items-center gap-2 md:flex">
@@ -93,7 +93,7 @@ function MobileMenu({ open, children }: MobileMenuProps) {
   return createPortal(
     <div
       id="mobile-menu"
-      className="bg-white/95 supports-[backdrop-filter]:bg-white/80 backdrop-blur-lg fixed top-14 right-0 bottom-0 left-0 z-40 flex flex-col overflow-hidden border-y border-[#e8e3da] md:hidden"
+      className="bg-white/95 supports-[backdrop-filter]:bg-white/80 backdrop-blur-lg fixed top-14 right-0 bottom-0 left-0 z-40 flex flex-col overflow-hidden border-y border-[#e8e3f7] md:hidden"
     >
       <div
         data-slot={open ? 'open' : 'closed'}

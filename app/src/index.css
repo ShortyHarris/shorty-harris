@@ -5,14 +5,15 @@
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, 'Cascadia Code', monospace;
 
-  /* Public-site palette, 60/30/10: cream (60) / forest (30) / sun (10).
-     sage and cream-deep are tints used for bands and image frames. */
-  --color-cream: #f8f3e8;
-  --color-cream-deep: #efe6d3;
-  --color-sage: #e4ecd9;
-  --color-forest: #1f4d3a;
-  --color-forest-deep: #163829;
-  --color-sun: #f2b544;
+  /* Public-site palette, matches the logo and product video: white paper,
+     vivid purple brand, soft lilac glow. paper-deep and lilac are the lavender
+     tints used for bands and image frames. */
+  --color-paper: #ffffff;
+  --color-paper-deep: #f9f6ff;
+  --color-lilac: #f1e9ff;
+  --color-brand: #7412ef;
+  --color-brand-deep: #5b0fc2;
+  --color-glow: #e8dafd;
 
   /* shadcn/ui tokens - bridged to the existing client/admin theme variables
      so shadcn components pick up brand colors automatically. Falls back to

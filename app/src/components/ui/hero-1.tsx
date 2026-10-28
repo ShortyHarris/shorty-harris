@@ -30,7 +30,7 @@ export function HeroSection() {
         {/* Badge */}
         <a
           className={cn(
-            "group mx-auto flex w-fit items-center gap-3 rounded-full border bg-card px-3 py-1 shadow",
+            "group mx-auto flex w-fit items-center gap-3 rounded-full border bg-card px-3 py-1",
             "fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards transition-all delay-500 duration-500 ease-out",
           )}
           href="#how"
@@ -48,7 +48,7 @@ export function HeroSection() {
           )}
         >
           We do the outreach. <br />
-          <span className="text-[#3c7a5b] italic">You close the deals.</span>
+          <span className="text-[#7412ef] italic">You close the deals.</span>
         </h1>
 
         {/* Subtitle */}

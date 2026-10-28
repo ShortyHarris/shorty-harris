@@ -284,7 +284,7 @@ function NavBadge({ count, color = 'var(--ad-orange)' }: { count?: number; color
   return (
     <span
       style={{ background: color }}
-      className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10.5px] font-bold leading-none text-white"
+      className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10.5px] font-semibold leading-none text-white"
     >
       {count > 99 ? '99+' : count}
     </span>
@@ -308,7 +308,7 @@ function AdminNotificationBell({ items }: { items: NotifItem[] }) {
       >
         <Bell size={17} strokeWidth={1.8} />
         {total > 0 && (
-          <span className="absolute right-0.5 top-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-(--ad-orange) px-1 text-[9.5px] font-bold leading-none text-white">
+          <span className="absolute right-0.5 top-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-(--ad-orange) px-1 text-[9.5px] font-semibold leading-none text-white">
             {total > 99 ? '99+' : total}
           </span>
         )}
@@ -329,7 +329,7 @@ function AdminNotificationBell({ items }: { items: NotifItem[] }) {
             onClick={() => setOpen(false)}
           >
             <motion.div
-              className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[420px] md:rounded-md md:shadow-2xl"
+              className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[420px] md:rounded-md md:border md:border-(--ad-line)"
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
@@ -337,7 +337,7 @@ function AdminNotificationBell({ items }: { items: NotifItem[] }) {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-                <span className="text-[15px] font-bold text-(--ad-ink)">Needs your attention</span>
+                <span className="text-[15px] font-semibold text-(--ad-ink)">Needs your attention</span>
                 <button onClick={() => setOpen(false)} className="cursor-pointer border-0 bg-transparent text-[22px] leading-none text-(--ad-ink-faint) transition-colors hover:text-(--ad-ink)">×</button>
               </div>
               <div className="flex-1 overflow-y-auto">
@@ -360,7 +360,7 @@ function AdminNotificationBell({ items }: { items: NotifItem[] }) {
                           <Icon size={15} strokeWidth={2} />
                         </span>
                         <span className="flex-1 text-[13px] font-semibold text-(--ad-ink)">{i.label}</span>
-                        <span className="text-[12.5px] font-bold" style={{ color: i.color }}>{i.count}</span>
+                        <span className="text-[12.5px] font-semibold" style={{ color: i.color }}>{i.count}</span>
                       </Link>
                     );
                   })

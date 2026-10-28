@@ -53,4 +53,12 @@ describe('replyIntents', () => {
     expect(['automated', 'auto_reply', 'out_of_office', 'bounced', 'uncertain'].every(isNonReplyIntent)).toBe(true);
     expect(['question', 'maybe', 'stop', null].some(isNonReplyIntent)).toBe(false);
   });
+
+  it('treats existing_conversation as a human reply that is not in reply rates', () => {
+    expect(replyGroup('existing_conversation')).toBe('existing_conversation');
+    expect(intentStyle('existing_conversation').label).toBe('Existing conversation');
+    expect(isNonReplyIntent('existing_conversation')).toBe(true);
+    const s = summarizeReplies([rec('a', 'existing_conversation'), rec('b', 'question')]);
+    expect(s).toMatchObject({ human: 2, other: 0, total: 2 });
+  });
 });

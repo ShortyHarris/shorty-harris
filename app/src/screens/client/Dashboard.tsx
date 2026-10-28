@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -12,6 +13,7 @@ import { RefreshCw, ChevronRight, Zap, MessageSquare, Trophy, XCircle, TrendingU
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { useToast, ToastHost } from '../../components/Toast';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { describeReplyMatch, WEAK_MATCH_WARNING } from '../../lib/replyMatch';
 import './Dashboard.css';
 
 const HELP: HelpContent = {
@@ -42,6 +44,20 @@ const FILTER_TABS: { key: Filter; label: string }[] = [
   { key: 'won', label: 'Won' },
   { key: 'lost', label: 'Lost' },
 ];
+
+const LEAD_PILL: Record<HotLeadStatus, StatusPillStyle> = {
+  new:       { ...PILL.hot,     icon: 'zap' },
+  viewed:    { ...PILL.ahead,   icon: 'circle' },
+  contacted: { ...PILL.sent,    icon: 'send' },
+  won:       { ...PILL.waiting, icon: 'check' },
+  lost:      { ...PILL.closed,  icon: 'minus' },
+};
+
+const WAITING_PILL: Record<string, StatusPillStyle> = {
+  neutral: { ...PILL.closed,  icon: 'clock' },
+  warning: { ...PILL.waiting, icon: 'clock' },
+  urgent:  { ...PILL.problem, icon: 'clock' },
+};
 
 const STATUS_LABEL: Record<HotLeadStatus, string> = {
   new: 'New',
@@ -105,7 +121,7 @@ export function Dashboard({
   /** False when an admin is acting for the client - their look shouldn't clear the client's "New". */
   markViewedOnOpen?: boolean;
 }) {
-  const { leads, loading, error, setOutcome: setOutcomeRaw, reload, isFetching, dataUpdatedAt } = useClientDashboard(clientId, client);
+  const { summary, leads, loading, error, setOutcome: setOutcomeRaw, reload, isFetching, dataUpdatedAt } = useClientDashboard(clientId, client);
   const { awaitingProspects = 0 } = useClientApprovals(clientId, client);
   const { prospects: warmProspects, loading: warmLoading, logCallOutcome: logCallOutcomeRaw } = useWarmProspects(clientId, client);
   const { toasts, toast, dismiss } = useToast();
@@ -297,6 +313,7 @@ export function Dashboard({
           <LeadPanel
             key={openLead.hot_lead_id}
             lead={openLead}
+            timeZone={summary?.send_timezone}
             onClose={() => setOpenId(null)}
             onOutcome={setOutcome}
           />
@@ -345,13 +362,13 @@ function LeadsTable({ leads, onOpen }: { leads: HotLead[]; onOpen: (lead: HotLea
                 </p>
               </td>
               <td className="align-top">
-                <span className={`status-pill pill-${lead.status}`}>{STATUS_LABEL[lead.status]}</span>
+                <StatusPill pill={LEAD_PILL[lead.status]} className="status-pill">{STATUS_LABEL[lead.status]}</StatusPill>
               </td>
               <td className="align-top">
                 {closed ? (
                   <span className="text-[12px] text-(--ink-faint)">{formatClosedDate(lead.closed_at)}</span>
                 ) : waiting ? (
-                  <span className={`waiting-pill waiting-${waiting.tone}`}>{waiting.text}</span>
+                  <StatusPill pill={WAITING_PILL[waiting.tone]}>{waiting.text}</StatusPill>
                 ) : (
                   <span className="text-[12px] text-(--ink-faint)">-</span>
                 )}
@@ -460,7 +477,7 @@ function LeadRow({ lead, onOpen }: { lead: HotLead; onOpen: () => void }) {
       <div className="lead-row-body">
         <div className="lead-row-top">
           <span className="lead-row-name">{lead.business_name}</span>
-          <span className={`status-pill pill-${lead.status}`}>{STATUS_LABEL[lead.status]}</span>
+          <StatusPill pill={LEAD_PILL[lead.status]} className="status-pill">{STATUS_LABEL[lead.status]}</StatusPill>
         </div>
         {closed ? (
           <div className="lead-row-meta">
@@ -468,7 +485,7 @@ function LeadRow({ lead, onOpen }: { lead: HotLead; onOpen: () => void }) {
           </div>
         ) : (
           <>
-            {waiting && <div className={`waiting-pill waiting-${waiting.tone}`} style={{ marginTop: 4 }}>{waiting.text}</div>}
+            {waiting && <StatusPill pill={WAITING_PILL[waiting.tone]} className="mt-1">{waiting.text}</StatusPill>}
             {lead.ai_summary && (
               <p className="lead-row-excerpt">{lead.ai_summary}</p>
             )}
@@ -522,10 +539,12 @@ const CALL_OUTCOME_LABEL: Record<CallOutcomeValue, string> = {
 
 function LeadPanel({
   lead,
+  timeZone,
   onClose,
   onOutcome,
 }: {
   lead: HotLead;
+  timeZone: string | null | undefined;
   onClose: () => void;
   onOutcome: OutcomeFn;
 }) {
@@ -539,6 +558,7 @@ function LeadPanel({
   const waiting = waitingInfo(lead);
   const reply = lead.reply ?? lead.latest_reply;
   const replyIsFallback = !lead.reply && !!lead.latest_reply;
+  const match = replyIsFallback ? null : describeReplyMatch(lead.reply_match, timeZone);
   const followUpsPaused = lead.status === 'new' || lead.status === 'viewed' || lead.status === 'contacted';
 
   async function replyNow() {
@@ -600,9 +620,9 @@ function LeadPanel({
           <header className="lp-header">
             <div className="lp-header-top">
               <div className="lp-chips">
-                <span className={`status-pill pill-${lead.status}`}>{STATUS_LABEL[lead.status]}</span>
+                <StatusPill pill={LEAD_PILL[lead.status]} className="status-pill">{STATUS_LABEL[lead.status]}</StatusPill>
                 {!closed && waiting && (
-                  <span className={`waiting-pill waiting-${waiting.tone}`}>{waiting.text}</span>
+                  <StatusPill pill={WAITING_PILL[waiting.tone]}>{waiting.text}</StatusPill>
                 )}
               </div>
               <button className="lp-close" onClick={onClose} aria-label="Close">
@@ -651,6 +671,18 @@ function LeadPanel({
                       <ReplyQuote body={reply.body} receivedAt={reply.received_at} />
                       {replyIsFallback && (
                         <p className="lp-muted lp-tight">Showing their most recent reply - the original isn't on record.</p>
+                      )}
+                      {match && (
+                        <div className="lp-match">
+                          {(match.subject || match.sentOn) && (
+                            <p>
+                              Replying to: {match.subject ?? 'our email'}
+                              {match.sentOn && ` (sent ${match.sentOn})`}
+                            </p>
+                          )}
+                          <p className={match.weak ? 'lp-match-weak' : undefined}>Matched by: {match.method}</p>
+                          {match.weak && <p className="lp-match-weak">{WEAK_MATCH_WARNING}</p>}
+                        </div>
                       )}
                     </>
                   ) : (
@@ -785,16 +817,16 @@ function LeadsSkeleton() {
             className="flex items-center gap-3 border border-(--line) bg-(--surface)"
             style={{ borderRadius: 14, padding: '16px 18px', margin: '0 16px 10px', width: 'calc(100% - 32px)', minHeight: 72 }}
           >
-            <div className="h-2.25 w-2.25 shrink-0 rounded-full bg-[#ddd8cb] animate-pulse" />
+            <div className="h-2.25 w-2.25 shrink-0 rounded-full bg-[#cfc9e8] animate-pulse" />
             <div className="flex-1 min-w-0 flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2">
-                <div className="h-4 w-2/5 rounded bg-[#ddd8cb] animate-pulse" />
-                <div className="h-5 w-14 rounded-full bg-[#ddd8cb] animate-pulse" />
+                <div className="h-4 w-2/5 rounded bg-[#cfc9e8] animate-pulse" />
+                <div className="h-5 w-14 rounded-full bg-[#cfc9e8] animate-pulse" />
               </div>
-              <div className="h-3 w-1/3 rounded bg-[#ece8df] animate-pulse" />
-              <div className="h-3 w-5/6 rounded bg-[#ece8df] animate-pulse" />
+              <div className="h-3 w-1/3 rounded bg-[#e8e3f7] animate-pulse" />
+              <div className="h-3 w-5/6 rounded bg-[#e8e3f7] animate-pulse" />
             </div>
-            <div className="w-2 h-3 shrink-0 rounded bg-[#ece8df] animate-pulse" />
+            <div className="w-2 h-3 shrink-0 rounded bg-[#e8e3f7] animate-pulse" />
           </div>
         ))}
       </div>
@@ -806,14 +838,14 @@ function LeadsSkeleton() {
             {[...Array(6)].map((_, i) => (
               <tr key={i}>
                 <td>
-                  <div className="h-4 w-40 rounded bg-[#ddd8cb] animate-pulse" />
-                  <div className="mt-1.5 h-3 w-24 rounded bg-[#ece8df] animate-pulse" />
+                  <div className="h-4 w-40 rounded bg-[#cfc9e8] animate-pulse" />
+                  <div className="mt-1.5 h-3 w-24 rounded bg-[#e8e3f7] animate-pulse" />
                 </td>
                 <td className="max-w-105">
-                  <div className="h-3 w-4/5 rounded bg-[#ece8df] animate-pulse" />
+                  <div className="h-3 w-4/5 rounded bg-[#e8e3f7] animate-pulse" />
                 </td>
                 <td>
-                  <div className="h-5 w-16 rounded-full bg-[#ddd8cb] animate-pulse" />
+                  <div className="h-5 w-16 rounded-full bg-[#cfc9e8] animate-pulse" />
                 </td>
                 <td className="w-10" />
               </tr>
@@ -1097,7 +1129,7 @@ function WarmProspectHistoryModal({
               <div className="lp-chips">
                 <span className="warm-opens-badge">{prospect.total_opens}x opened</span>
                 {prospect.last_opened_at && (
-                  <span className="waiting-pill waiting-neutral">Last opened {timeAgo(prospect.last_opened_at)}</span>
+                  <StatusPill pill={WAITING_PILL.neutral}>Last opened {timeAgo(prospect.last_opened_at)}</StatusPill>
                 )}
               </div>
               <button className="lp-close" onClick={onClose} aria-label="Close">

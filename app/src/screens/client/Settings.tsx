@@ -27,7 +27,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { confirmDiscard } from '../../lib/confirmDiscard';
 import { btn } from '../../lib/clientButtons';
 
-const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em]';
+const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em]';
 const inputCls = 'w-full rounded-lg border px-3.5 py-2.5 text-[13px] outline-none transition-colors';
 const inputStyle = { borderColor: 'var(--line)', background: 'var(--bg)', color: 'var(--ink)' };
 
@@ -73,7 +73,7 @@ function ProfileSection({ clientId, onSaved, onError }: { clientId: string; onSa
           <Building2 size={16} style={{ color: 'var(--leaf)' }} />
         </span>
         <span className="flex-1 min-w-0">
-          <span className="block truncate text-[15px] font-bold" style={{ color: 'var(--ink)' }}>{profile.business_name}</span>
+          <span className="block truncate text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>{profile.business_name}</span>
           <span className="block truncate text-[13px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>
             {profile.contact_name ? `Signs as ${profile.contact_name}` : 'Tap to add your business info'}
           </span>
@@ -146,7 +146,7 @@ function ProfileEditModal({
   return (
     <motion.div
       className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:p-6"
-      style={{ background: 'rgba(28, 30, 25, 0.45)' }}
+      style={{ background: 'rgba(14, 8, 34, 0.45)' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -154,7 +154,7 @@ function ProfileEditModal({
       {...useOverlayClose(requestClose, { escape: true })}
     >
       <motion.div
-        className="modal-card flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:border md:border-[#e8e3f7]"
         style={{ background: 'var(--surface)' }}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
@@ -163,7 +163,7 @@ function ProfileEditModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b px-5 py-4" style={{ borderColor: 'var(--line)' }}>
-          <h2 className="m-0 text-[18px] font-bold" style={{ color: 'var(--ink)' }}>Edit business profile</h2>
+          <h2 className="m-0 text-[18px] font-semibold" style={{ color: 'var(--ink)' }}>Edit business profile</h2>
           <button onClick={requestClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none" style={{ color: 'var(--ink-faint)' }}>×</button>
         </div>
 
@@ -259,7 +259,7 @@ function ProfileEditModal({
           </div>
 
           {err && (
-            <div className="mb-4 rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e6cbc0' }}>
+            <div className="mb-4 rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}>
               {err}
             </div>
           )}
@@ -329,7 +329,7 @@ function AutoApproveSection({ clientId }: { clientId: string }) {
             <Zap size={16} style={{ color: 'var(--leaf)' }} />
           </span>
           <div className="min-w-0">
-            <h2 className="m-0 text-[15px] font-bold" style={{ color: 'var(--ink)' }}>Auto-approve new campaigns</h2>
+            <h2 className="m-0 text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>Auto-approve new campaigns</h2>
             <p className="m-0 mt-0.5 text-[13px]" style={{ color: 'var(--ink-soft)' }}>
               Auto-approve new campaigns. Emails are written and approved automatically, with no review step.
             </p>
@@ -374,7 +374,7 @@ function TourReplayRow() {
         <Compass size={16} style={{ color: 'var(--leaf)' }} />
       </span>
       <span className="flex-1 min-w-0">
-        <span className="block text-[15px] font-bold" style={{ color: 'var(--ink)' }}>Take a tour</span>
+        <span className="block text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>Take a tour</span>
         <span className="block text-[13px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>A quick walkthrough of your dashboard.</span>
       </span>
       <ChevronRight size={16} style={{ color: 'var(--ink-faint)' }} />
@@ -404,7 +404,7 @@ function PasswordSection() {
 
   return (
     <div className="p-5">
-      <h2 className="text-[15px] font-bold flex items-center gap-2 mb-1" style={{ color: 'var(--ink)' }}>
+      <h2 className="text-[15px] font-semibold flex items-center gap-2 mb-1" style={{ color: 'var(--ink)' }}>
         <Lock size={16} style={{ color: 'var(--ink-faint)' }} />
         Password
       </h2>
@@ -412,19 +412,19 @@ function PasswordSection() {
         We'll email a reset link to <strong>{email}</strong>.
       </p>
       {err && (
-        <div className="mb-3 rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e6cbc0' }}>
+        <div className="mb-3 rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}>
           {err}
         </div>
       )}
       {sent && !err ? (
-        <div className="rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)', borderColor: '#c5e3d4' }}>
+        <div className="rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)', borderColor: '#e8dafd' }}>
           Check your inbox for a link to set a new password.
         </div>
       ) : (
         <button
           onClick={submit}
           disabled={busy || !email}
-          className="cursor-pointer rounded-lg border px-4 py-2 text-[13px] font-bold transition-colors disabled:opacity-50"
+          className="cursor-pointer rounded-lg border px-4 py-2 text-[13px] font-semibold transition-colors disabled:opacity-50"
           style={{ borderColor: 'var(--line-strong)', color: 'var(--ink)', background: 'transparent' }}
         >
           {busy ? 'Sending…' : 'Send password reset link'}
@@ -484,21 +484,21 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
         <div
           className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px] font-medium"
           style={banner.kind === 'success'
-            ? { background: 'var(--leaf-tint)', color: 'var(--leaf)', borderColor: '#c5e3d4' }
-            : { background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e6cbc0' }}
+            ? { background: 'var(--leaf-tint)', color: 'var(--leaf)', borderColor: '#e8dafd' }
+            : { background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}
         >
           {banner.text}
         </div>
       )}
 
       {error && (
-        <div className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e6cbc0' }}>
+        <div className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}>
           Couldn't check your Gmail connection: {error}
         </div>
       )}
 
       {/* ─── Business profile ─── */}
-      <div className="mb-2 px-0.5 text-[10.5px] font-bold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
+      <div className="mb-2 px-0.5 text-[10.5px] font-semibold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
         Business profile
       </div>
       <div className="mb-6 overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
@@ -514,7 +514,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
             <Target size={16} style={{ color: 'var(--leaf)' }} />
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block text-[15px] font-bold" style={{ color: 'var(--ink)' }}>Targeting profile</span>
+            <span className="block text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>Targeting profile</span>
             <span className="block text-[13px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>Who we target on your behalf, and what's working.</span>
           </span>
           <ChevronRight size={16} style={{ color: 'var(--ink-faint)' }} />
@@ -522,7 +522,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
       </div>
 
       {/* ─── Outreach ─── */}
-      <div className="mb-2 px-0.5 text-[10.5px] font-bold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
+      <div className="mb-2 px-0.5 text-[10.5px] font-semibold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
         Outreach
       </div>
       <div className="mb-6 overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
@@ -535,12 +535,12 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
         ) : connection.connected ? (
           <div className="p-5" data-tour="gmail-connect">
             <div className="flex items-center justify-between gap-3 mb-1">
-              <h2 className="text-[15px] font-bold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
+              <h2 className="text-[15px] font-semibold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
                 <Mail size={16} style={{ color: 'var(--leaf)' }} />
                 Email Connection
               </h2>
               <span
-                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
+                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
                 style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)' }}
               >
                 <CheckCircle2 size={12} />
@@ -561,8 +561,8 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
             <button
               onClick={() => setConfirmDisconnect(true)}
               disabled={disconnecting}
-              className="cursor-pointer rounded-lg border px-4 py-2 text-[13px] font-bold transition-colors disabled:opacity-50"
-              style={{ borderColor: '#e0b8ae', color: 'var(--clay)', background: 'transparent' }}
+              className="cursor-pointer rounded-lg border px-4 py-2 text-[13px] font-semibold transition-colors disabled:opacity-50"
+              style={{ borderColor: '#e8e3f7', color: 'var(--clay)', background: 'transparent' }}
             >
               {disconnecting ? 'Disconnecting…' : 'Disconnect'}
             </button>
@@ -570,12 +570,12 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
         ) : connection.status === 'error' ? (
           <div className="p-5" data-tour="gmail-connect">
             <div className="flex items-center justify-between gap-3 mb-1">
-              <h2 className="text-[15px] font-bold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
+              <h2 className="text-[15px] font-semibold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
                 <Mail size={16} style={{ color: 'var(--clay)' }} />
                 Email Connection
               </h2>
               <span
-                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
+                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
                 style={{ background: 'var(--clay-tint)', color: 'var(--clay)' }}
               >
                 <AlertTriangle size={12} />
@@ -599,7 +599,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
           </div>
         ) : (
           <div className="p-5" data-tour="gmail-connect">
-            <h2 className="text-[15px] font-bold flex items-center gap-2 mb-1" style={{ color: 'var(--ink)' }}>
+            <h2 className="text-[15px] font-semibold flex items-center gap-2 mb-1" style={{ color: 'var(--ink)' }}>
               <Mail size={16} style={{ color: 'var(--ink-faint)' }} />
               Email Connection
             </h2>
@@ -629,7 +629,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
             <BarChart3 size={16} style={{ color: 'var(--leaf)' }} />
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block text-[15px] font-bold" style={{ color: 'var(--ink)' }}>Analytics</span>
+            <span className="block text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>Analytics</span>
             <span className="block text-[13px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>Open rates, reply rates, and per-campaign performance.</span>
           </span>
           <ChevronRight size={16} style={{ color: 'var(--ink-faint)' }} />
@@ -645,7 +645,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
             <ShieldOff size={16} style={{ color: 'var(--leaf)' }} />
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block text-[15px] font-bold" style={{ color: 'var(--ink)' }}>Blocked domains</span>
+            <span className="block text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>Blocked domains</span>
             <span className="block text-[13px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>Domains we'll never send outreach to.</span>
           </span>
           <ChevronRight size={16} style={{ color: 'var(--ink-faint)' }} />
@@ -661,7 +661,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
             <BookOpen size={16} style={{ color: 'var(--leaf)' }} />
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block text-[15px] font-bold" style={{ color: 'var(--ink)' }}>Help &amp; Docs</span>
+            <span className="block text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>Help &amp; Docs</span>
             <span className="block text-[13px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>Guides and answers for using your dashboard.</span>
           </span>
           <ChevronRight size={16} style={{ color: 'var(--ink-faint)' }} />
@@ -694,7 +694,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
       )}
 
       {/* ─── Account ─── */}
-      <div className="mb-2 px-0.5 text-[10.5px] font-bold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
+      <div className="mb-2 px-0.5 text-[10.5px] font-semibold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
         Account
       </div>
       <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
@@ -710,7 +710,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
             <ShieldCheck size={16} style={{ color: 'var(--leaf)' }} />
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block text-[15px] font-bold" style={{ color: 'var(--ink)' }}>Privacy &amp; cookie settings</span>
+            <span className="block text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>Privacy &amp; cookie settings</span>
             <span className="block text-[13px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>Control analytics and session-recording cookies for this dashboard.</span>
           </span>
           <ChevronRight size={16} style={{ color: 'var(--ink-faint)' }} />
@@ -722,8 +722,8 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
           <p className="m-0 text-[13px]" style={{ color: 'var(--ink-soft)' }}>You're signed in to this dashboard.</p>
           <button
             onClick={onSignOut}
-            className="cursor-pointer inline-flex shrink-0 items-center gap-2 rounded-lg border px-4 py-2 text-[13px] font-bold transition-colors"
-            style={{ borderColor: '#e0b8ae', color: 'var(--clay)', background: 'transparent' }}
+            className="cursor-pointer inline-flex shrink-0 items-center gap-2 rounded-lg border px-4 py-2 text-[13px] font-semibold transition-colors"
+            style={{ borderColor: '#e8e3f7', color: 'var(--clay)', background: 'transparent' }}
           >
             <LogOut size={14} />
             Sign out

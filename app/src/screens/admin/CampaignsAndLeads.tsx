@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
 import { motion, AnimatePresence } from 'framer-motion';
+import { describeReplyMatch, WEAK_MATCH_WARNING } from '../../lib/replyMatch';
 import { ChevronRight, Info, X, Clock, MapPin, Building2, Sparkles, ArrowRight, MessageSquare, Trophy, XCircle } from 'lucide-react';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import {
@@ -38,7 +40,7 @@ const HELP_CAMPAIGNS: HelpContent = {
   title: 'Campaigns',
   body: [
     { type: 'p', text: "Each campaign belongs to a client and controls who gets targeted and how. The search terms and target locations tell the scraper where to find new prospects." },
-    { type: 'p', text: "A ⚠ Needs setup badge means the campaign is missing search terms or locations - it won't find new prospects until those are filled in." },
+    { type: 'p', text: "A Needs setup badge means the campaign is missing search terms or locations - it won't find new prospects until those are filled in." },
     { type: 'ul', items: [
       "Edit - update campaign settings, search terms, or locations",
       "Pause / Activate - stop or resume outreach for this campaign",
@@ -73,12 +75,12 @@ const CAMP_STATUS_LABEL: Record<string, string> = {
   completed: 'Completed',
 };
 
-const LEAD_PILL: Record<string, { bg: string; text: string; border?: string }> = {
-  new:       { bg: 'var(--ad-green-tint)', text: 'var(--ad-green)' },
-  viewed:    { bg: 'var(--ad-fill)', text: 'var(--ad-ink-soft)', border: '1px solid var(--ad-line)' },
-  contacted: { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
-  won:       { bg: 'var(--ad-green)', text: '#fff' },
-  lost:      { bg: 'transparent', text: 'var(--ad-ink-faint)', border: '1px solid var(--ad-line-strong)' },
+const LEAD_PILL: Record<string, StatusPillStyle> = {
+  new:       { ...PILL.hot,     icon: 'zap' },
+  viewed:    { ...PILL.ahead,   icon: 'circle' },
+  contacted: { ...PILL.sent,    icon: 'send' },
+  won:       { ...PILL.waiting, icon: 'check' },
+  lost:      { ...PILL.closed,  icon: 'minus' },
 };
 
 const PAGE_SIZE = 10;
@@ -91,7 +93,7 @@ const LANGUAGE_OPTIONS = [
 /* Text input + datalist (combobox) - not a Select, since the admin should be
    able to type any language, not just pick from the suggestion list. */
 function LanguageField({ value, onChange, listId }: { value: string; onChange: (v: string) => void; listId: string }) {
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
   const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
   return (
     <div>
@@ -114,7 +116,7 @@ function LanguageField({ value, onChange, listId }: { value: string; onChange: (
 
 /* ── Ghost / primary button helpers ───────────────────────────────── */
 const ghostCls = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
-const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
+const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
 
 /* ── Pagination ────────────────────────────────────────────────────── */
 function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
@@ -239,7 +241,7 @@ function ScrapeSummaryModal({
     return (
       <CampModalShell onClose={onClose}>
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-          <h2 className="m-0 text-[16px] font-bold text-(--ad-ink)">Scrape failed</h2>
+          <h2 className="m-0 text-[16px] font-semibold text-(--ad-ink)">Scrape failed</h2>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
@@ -250,7 +252,7 @@ function ScrapeSummaryModal({
               {d.repeatedlyFailing && (
                 <span
                   title={`Failed ${campaign.scrape_attempt_count} times in a row`}
-                  className="inline-flex items-center rounded-full bg-(--ad-clay) px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[.04em] text-white"
+                  className="inline-flex items-center rounded-full bg-(--ad-clay) px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[.04em] text-white"
                 >
                   Repeated
                 </span>
@@ -260,13 +262,13 @@ function ScrapeSummaryModal({
           <p className="m-0 text-[13px] leading-relaxed text-(--ad-ink-soft)">{d.detail}</p>
           {d.fix && (
             <div className="rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3.5">
-              <p className="m-0 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Suggested fix</p>
+              <p className="m-0 text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">Suggested fix</p>
               <p className="m-0 mt-1 text-[13px] leading-relaxed text-(--ad-ink)">{d.fix}</p>
             </div>
           )}
           {d.technical && (
             <div>
-              <p className="m-0 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Technical detail</p>
+              <p className="m-0 text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">Technical detail</p>
               <p className="m-0 mt-1 break-words text-[12px] leading-relaxed text-(--ad-ink-faint)">{d.technical}</p>
             </div>
           )}
@@ -297,7 +299,7 @@ function ScrapeSummaryModal({
   return (
     <CampModalShell onClose={onClose}>
       <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-        <h2 className="m-0 text-[16px] font-bold text-(--ad-ink)">Scrape results</h2>
+        <h2 className="m-0 text-[16px] font-semibold text-(--ad-ink)">Scrape results</h2>
         <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
@@ -309,8 +311,8 @@ function ScrapeSummaryModal({
           <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-3.5 border-t border-(--ad-fill) pt-4">
             {rows.map(([label, value]) => (
               <div key={label}>
-                <dt className="text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">{label}</dt>
-                <dd className="m-0 mt-0.5 text-[17px] font-bold text-(--ad-ink)">{value}</dd>
+                <dt className="text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">{label}</dt>
+                <dd className="m-0 mt-0.5 text-[17px] font-semibold text-(--ad-ink)">{value}</dd>
               </div>
             ))}
           </dl>
@@ -493,7 +495,7 @@ export function Campaigns() {
         <SkeletonTable rows={PAGE_SIZE} cols={6} />
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
-          <strong className="text-[15px] font-bold text-(--ad-ink)">No campaigns yet.</strong>
+          <strong className="text-[15px] font-semibold text-(--ad-ink)">No campaigns yet.</strong>
         </div>
       ) : (
         <>
@@ -525,7 +527,7 @@ export function Campaigns() {
                   return (
                     <tr key={c.id} onClick={() => setEditCampaign(c)} className="group cursor-pointer">
                       <td className="min-w-0">
-                        <div className="line-clamp-2 font-bold leading-snug text-(--ad-ink) group-hover:underline" title={c.name}>{c.name}</div>
+                        <div className="line-clamp-2 font-semibold leading-snug text-(--ad-ink) group-hover:underline" title={c.name}>{c.name}</div>
                         {isEuCountry(c.country) && <div className="mt-1"><EuBadge /></div>}
                         {c.needsReview && (
                           <span className="atbl-pill mt-1" style={{ background: 'var(--ad-purple-tint)', color: 'var(--ad-purple)' }}>
@@ -533,9 +535,7 @@ export function Campaigns() {
                           </span>
                         )}
                         {needsSetup && (
-                          <span className="atbl-pill mt-1" style={{ background: 'var(--ad-amber-tint)', color: 'var(--ad-amber)' }}>
-                            ⚠ Needs setup
-                          </span>
+                          <StatusPill pill={{ ...PILL.waiting, icon: 'alert' }} className="mt-1">Needs setup</StatusPill>
                         )}
                         <div className="mt-1 text-[11px] text-(--ad-ink-faint)">{lastScrapedLabel(c)}</div>
                         {c.target_areas && (
@@ -549,9 +549,9 @@ export function Campaigns() {
                         <ScrapeResultChip campaign={c} onOpenDetail={() => setScrapeDetailCampaign(c)} />
                       </td>
                       <td>
-                        <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
+                        <StatusPill pill={pill}>
                           {campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}
-                        </span>
+                        </StatusPill>
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <ScrapeCell
@@ -565,7 +565,7 @@ export function Campaigns() {
                           {draft && (
                             <button
                               onClick={() => setEditCampaign(c)}
-                              className="cursor-pointer whitespace-nowrap rounded-lg border border-(--ad-line) bg-(--ad-surface) px-2 py-1 text-[11px] font-bold text-(--ad-ink) transition-colors hover:bg-(--ad-fill)"
+                              className="cursor-pointer whitespace-nowrap rounded-lg border border-(--ad-line) bg-(--ad-surface) px-2 py-1 text-[11px] font-semibold text-(--ad-ink) transition-colors hover:bg-(--ad-fill)"
                             >
                               Edit
                             </button>
@@ -573,7 +573,7 @@ export function Campaigns() {
                           {c.needsReview && (
                             <button
                               onClick={() => changeStatus(c, 'active')}
-                              className="cursor-pointer whitespace-nowrap rounded-lg border-0 bg-(--ad-green) px-2 py-1 text-[11px] font-bold text-white transition-colors hover:bg-(--ad-green-hover)"
+                              className="cursor-pointer whitespace-nowrap rounded-lg border-0 bg-(--ad-green) px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover)"
                             >
                               Approve
                             </button>
@@ -612,20 +612,18 @@ export function Campaigns() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <span className="line-clamp-2 block font-bold leading-snug text-(--ad-ink) text-[14px]" title={c.name}>{c.name}</span>
+                      <span className="line-clamp-2 block font-semibold leading-snug text-(--ad-ink) text-[14px]" title={c.name}>{c.name}</span>
                       {isEuCountry(c.country) && <div className="mt-1"><EuBadge /></div>}
                       {c.needsReview && (
                         <div className="mt-1">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-(--ad-purple-tint) px-2 py-0.5 text-[10.5px] font-bold text-(--ad-purple)">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-(--ad-purple-tint) px-2 py-0.5 text-[10.5px] font-semibold text-(--ad-purple)">
                             🔔 Awaiting approval
                           </span>
                         </div>
                       )}
                       {needsSetup && (
                         <div className="mt-1">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-(--ad-amber-tint) px-2 py-0.5 text-[10.5px] font-bold text-(--ad-amber)">
-                            ⚠ Needs setup
-                          </span>
+                          <StatusPill pill={{ ...PILL.waiting, icon: 'alert' }}>Needs setup</StatusPill>
                         </div>
                       )}
                       <div className="mt-1 text-[11px] text-(--ad-ink-faint)">{lastScrapedLabel(c)}</div>
@@ -634,7 +632,7 @@ export function Campaigns() {
                       )}
                     </div>
                     <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-                      className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
+                      className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.04em]">
                       {campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}
                     </span>
                   </div>
@@ -648,7 +646,7 @@ export function Campaigns() {
                     {c.needsReview && (
                       <button
                         onClick={() => changeStatus(c, 'active')}
-                        className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-(--ad-green-hover)"
+                        className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover)"
                       >
                         Approve
                       </button>
@@ -657,7 +655,7 @@ export function Campaigns() {
                       <button
                         onClick={() => changeStatus(c, active ? 'paused' : 'active')}
                         title={active ? 'Pause campaign' : 'Activate campaign'}
-                        className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[.04em] transition-colors ${
+                        className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[.04em] transition-colors ${
                           active
                             ? 'border-(--ad-green) bg-(--ad-green) text-white hover:bg-(--ad-green-hover)'
                             : 'border-(--ad-line-strong) bg-(--ad-surface) text-(--ad-ink-soft) hover:border-(--ad-amber) hover:text-(--ad-amber)'
@@ -849,7 +847,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
     if (error) setErr(error.message); else onCreated();
   }
 
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
   const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
   return (
@@ -863,7 +861,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -872,7 +870,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">New campaign</h2>
+          <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">New campaign</h2>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
 
@@ -925,7 +923,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
           </div>
 
           <div className="border-t border-(--ad-fill) pt-3">
-            <p className="mb-3 text-[11px] font-bold uppercase tracking-[.08em] text-(--ad-ink-faint)">Prospect discovery (Apify)</p>
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[.08em] text-(--ad-ink-faint)">Prospect discovery (Apify)</p>
             <div className="flex flex-col gap-3">
               {clientId ? (
                 <SuggestForMe
@@ -1012,7 +1010,7 @@ function CampModalShell({ onClose, children }: { onClose: () => void; children: 
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
@@ -1023,7 +1021,7 @@ function CampModalShell({ onClose, children }: { onClose: () => void; children: 
   );
 }
 
-const campFieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+const campFieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
 const campInputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
 /* ── Edit Campaign Modal ───────────────────────────────────────────── */
@@ -1073,7 +1071,7 @@ function EditCampaignModal({
   return (
     <CampModalShell onClose={onClose}>
       <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Edit campaign</h2>
+        <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Edit campaign</h2>
         <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
@@ -1111,7 +1109,7 @@ function EditCampaignModal({
           </Select>
         </div>
         <div className="border-t border-(--ad-fill) pt-3">
-          <p className="mb-3 text-[11px] font-bold uppercase tracking-[.08em] text-(--ad-ink-faint)">Prospect discovery (Apify)</p>
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[.08em] text-(--ad-ink-faint)">Prospect discovery (Apify)</p>
           <div className="flex flex-col gap-3">
             <SuggestForMe
               clientId={campaign.client_id}
@@ -1198,12 +1196,12 @@ function DeleteCampaignModal({
   return (
     <CampModalShell onClose={onClose}>
       <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-        <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Delete campaign</h2>
+        <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Delete campaign</h2>
         <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
         <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-4">
-          <p className="m-0 text-[14px] font-bold text-(--ad-clay)">
+          <p className="m-0 text-[14px] font-semibold text-(--ad-clay)">
             Permanently delete "{campaign.name}"?
           </p>
           <p className="m-0 mt-1.5 text-[13px] text-(--ad-clay)/80">
@@ -1211,7 +1209,7 @@ function DeleteCampaignModal({
           </p>
         </div>
         <div>
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">This will permanently delete:</p>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">This will permanently delete:</p>
           {!counts ? (
             <div className="flex items-center gap-2 text-[13px] text-(--ad-ink-faint)">
               <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-(--ad-line-strong) border-t-(--ad-clay)" />
@@ -1223,7 +1221,7 @@ function DeleteCampaignModal({
             <ul className="m-0 list-none p-0 flex flex-col gap-1">
               {blastItems.map((item) => (
                 <li key={String(item)} className="flex items-center gap-2 text-[13px] text-(--ad-ink-soft)">
-                  <span className="text-(--ad-clay)">✕</span>
+                  <X size={12} strokeWidth={2} className="shrink-0 text-(--ad-ink)" aria-hidden />
                   {item}
                 </li>
               ))}
@@ -1237,7 +1235,7 @@ function DeleteCampaignModal({
         <button
           onClick={confirm}
           disabled={busy || !counts}
-          className="cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
+          className="cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
         >
           {busy ? 'Deleting…' : `Delete campaign and all prospects`}
         </button>
@@ -1308,7 +1306,7 @@ export function HotLeads() {
         <SkeletonTable rows={PAGE_SIZE} cols={4} />
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
-          <strong className="text-[15px] font-bold text-(--ad-ink)">No hot leads yet.</strong>
+          <strong className="text-[15px] font-semibold text-(--ad-ink)">No hot leads yet.</strong>
           <span className="text-[13px] text-(--ad-ink-soft)">Leads appear here when prospects reply with buying intent.</span>
         </div>
       ) : (
@@ -1326,13 +1324,13 @@ export function HotLeads() {
                     onClick={() => selectFilter(tab.key)}
                     className={`shrink-0 cursor-pointer inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] whitespace-nowrap transition-all ${
                       active
-                        ? 'bg-(--ad-green-tint) border-transparent text-(--ad-green) font-bold'
+                        ? 'bg-(--ad-green-tint) border-transparent text-(--ad-green) font-semibold'
                         : 'bg-(--ad-surface) border-(--ad-line-strong) text-(--ad-ink-soft) font-semibold hover:border-(--ad-green)'
                     }`}
                   >
                     {tab.label}
                     {cnt > 0 && (
-                      <span className={`inline-flex items-center justify-center rounded-full px-1.5 min-w-[18px] h-[18px] text-[10.5px] font-bold ${
+                      <span className={`inline-flex items-center justify-center rounded-full px-1.5 min-w-[18px] h-[18px] text-[10.5px] font-semibold ${
                         active ? 'bg-(--ad-green)/10 text-(--ad-green)' : 'bg-(--ad-fill) text-(--ad-ink-faint)'
                       }`}>{cnt}</span>
                     )}
@@ -1365,7 +1363,7 @@ export function HotLeads() {
                           <div className="flex items-start justify-between gap-2">
                             <span className="font-semibold text-[14px] text-(--ad-ink)">{lead.prospect?.business_name ?? 'Unknown'}</span>
                             <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-                              className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
+                              className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.04em]">
                               {HL_STATUS_LABEL[lead.status] ?? lead.status}
                             </span>
                           </div>
@@ -1408,7 +1406,7 @@ export function HotLeads() {
                   >
                     {tab.label}
                     {cnt > 0 && (
-                      <span className={`ml-1.5 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10.5px] font-bold ${
+                      <span className={`ml-1.5 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10.5px] font-semibold ${
                         active ? 'bg-(--ad-green-tint) text-(--ad-green)' : 'bg-(--ad-fill) text-(--ad-ink-faint)'
                       }`}>{cnt}</span>
                     )}
@@ -1451,9 +1449,9 @@ export function HotLeads() {
                             <p className="m-0 line-clamp-1 text-(--ad-ink-soft)">{lead.ai_summary ?? '-'}</p>
                           </td>
                           <td className="align-top">
-                            <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
+                            <StatusPill pill={pill}>
                               {HL_STATUS_LABEL[lead.status] ?? lead.status}
-                            </span>
+                            </StatusPill>
                           </td>
                           <td className="px-3 align-top text-right">
                             <ChevronRight size={15} className="text-(--ad-ink-ghost)" />
@@ -1504,6 +1502,7 @@ function LeadDetailModal({
 }) {
   const pill   = LEAD_PILL[lead.status] ?? LEAD_PILL.new;
   const p      = lead.prospect;
+  const match  = describeReplyMatch(lead.reply_match, lead.client?.send_timezone);
   const closed = lead.status === 'won' || lead.status === 'lost';
   const eyebrow = 'mb-2.5 flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
 
@@ -1521,7 +1520,7 @@ function LeadDetailModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="hl-title"
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[640px] md:rounded-md md:border md:border-(--ad-line) md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[640px] md:rounded-md md:border md:border-(--ad-line) md:border md:border-(--ad-line)"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -1534,7 +1533,7 @@ function LeadDetailModal({
             <div className="flex flex-wrap items-center gap-2">
               <span
                 style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-                className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]"
+                className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.04em]"
               >
                 {HL_STATUS_LABEL[lead.status] ?? lead.status}
               </span>
@@ -1603,6 +1602,18 @@ function LeadDetailModal({
                 The original reply isn't on record for this lead.
               </div>
             )}
+            {match && (
+              <div className="mt-3 flex flex-col gap-0.5 text-[12.5px] leading-[1.5] text-(--ad-ink-faint)">
+                {(match.subject || match.sentOn) && (
+                  <p className="m-0">
+                    Replying to: {match.subject ?? 'our email'}
+                    {match.sentOn && ` (sent ${match.sentOn})`}
+                  </p>
+                )}
+                <p className={`m-0 ${match.weak ? 'font-semibold text-[var(--ad-amber-ink)]' : ''}`}>Matched by: {match.method}</p>
+                {match.weak && <p className="m-0 font-semibold text-[var(--ad-amber-ink)]">{WEAK_MATCH_WARNING}</p>}
+              </div>
+            )}
           </section>
         </div>
 
@@ -1623,7 +1634,7 @@ function LeadDetailModal({
             </button>
             <button
               onClick={() => onStatus(lead.id, 'won')}
-              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border-0 bg-(--ad-green) px-5 text-[14px] font-bold text-white transition-colors hover:bg-(--ad-green-hover)"
+              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border-0 bg-(--ad-green) px-5 text-[14px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover)"
             >
               <Trophy size={16} strokeWidth={2} /> Mark as won
             </button>

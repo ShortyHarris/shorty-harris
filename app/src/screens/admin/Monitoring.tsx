@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
 import { useErrorLogs, useEscalatedHotLeads, useFailedNotifications } from '../../hooks/useAdminData';
 import { SkeletonTable } from '../../components/Skeleton';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
@@ -18,10 +19,10 @@ const HELP: HelpContent = {
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
-const SEV_PILL: Record<string, { bg: string; text: string; border?: string }> = {
-  warning:  { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
-  error:    { bg: 'var(--ad-clay-tint)', text: 'var(--ad-clay)', border: '1px solid rgba(168,83,58,0.2)' },
-  critical: { bg: 'var(--ad-clay)', text: '#fff' },
+const SEV_PILL: Record<string, StatusPillStyle> = {
+  warning:  { ...PILL.waiting, icon: 'alert' },
+  error:    { ...PILL.sent,    icon: 'alert' },
+  critical: { ...PILL.problem, icon: 'alert' },
 };
 
 const PAGE_SIZE = 10;
@@ -39,7 +40,7 @@ function EscalatedLeadsTab() {
   if (rows.length === 0) {
     return (
       <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
-        <strong className="text-[15px] font-bold text-(--ad-ink)">Nothing escalated.</strong>
+        <strong className="text-[15px] font-semibold text-(--ad-ink)">Nothing escalated.</strong>
         <span className="text-[13px] text-(--ad-ink-soft)">No hot leads are sitting unattended.</span>
       </div>
     );
@@ -77,7 +78,7 @@ function FailedNotificationsTab() {
   if (rows.length === 0) {
     return (
       <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
-        <strong className="text-[15px] font-bold text-(--ad-ink)">All delivered.</strong>
+        <strong className="text-[15px] font-semibold text-(--ad-ink)">All delivered.</strong>
         <span className="text-[13px] text-(--ad-ink-soft)">No failed or cancelled notifications.</span>
       </div>
     );
@@ -154,7 +155,7 @@ function ErrorLogsTab() {
         <SkeletonTable rows={PAGE_SIZE} cols={6} />
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
-          <strong className="text-[15px] font-bold text-(--ad-ink)">All clear.</strong>
+          <strong className="text-[15px] font-semibold text-(--ad-ink)">All clear.</strong>
           <span className="text-[13px] text-(--ad-ink-soft)">No {showResolved ? '' : 'unresolved '}errors.</span>
         </div>
       ) : (
@@ -175,9 +176,9 @@ function ErrorLogsTab() {
                   return (
                     <tr key={e.id}>
                       <td>
-                        <span className="atbl-pill" style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}>
+                        <StatusPill pill={pill}>
                           {e.severity}
-                        </span>
+                        </StatusPill>
                       </td>
                       <td>
                         <span className="rounded-sm border border-(--ad-line) bg-(--ad-surface-2) px-2 py-0.5 font-mono text-[11px] text-(--ad-ink-soft)">{e.source}</span>
@@ -216,7 +217,7 @@ function ErrorLogsTab() {
                 <div key={e.id} className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
                   <div className="flex items-start justify-between">
                     <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-                      className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
+                      className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.04em]">
                       {e.severity}
                     </span>
                     <span className="rounded border border-(--ad-line) bg-(--ad-surface-2) px-2 py-0.5 font-mono text-[11px] text-(--ad-ink-soft)">{e.source}</span>
@@ -300,7 +301,7 @@ export function Monitoring() {
               {t.key === 'escalated' && <AlertTriangle size={14} className={active ? 'text-(--ad-clay)' : 'text-(--ad-ink-ghost)'} />}
               {t.label}
               {t.count > 0 && (
-                <span className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10.5px] font-bold ${
+                <span className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10.5px] font-semibold ${
                   active ? 'bg-(--ad-green-tint) text-(--ad-green)' : 'bg-(--ad-fill) text-(--ad-ink-faint)'
                 }`}>{t.count}</span>
               )}

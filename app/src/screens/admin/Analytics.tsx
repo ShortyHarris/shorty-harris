@@ -25,7 +25,7 @@ const CLIENT_COLORS = ['var(--ad-line-strong)', 'var(--ad-amber)', 'var(--ad-gre
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
-const FUNNEL_COLORS = ['var(--ad-green)', '#5a9a78', '#85bfa0', 'var(--ad-green-line)'];
+const FUNNEL_COLORS = ['var(--ad-green)', '#9a62f3', '#c4a3ff', 'var(--ad-green-line)'];
 
 const TOOLTIP_STYLE = {
   borderRadius: 10,
@@ -197,7 +197,7 @@ export function Analytics() {
           boxes stretch to the row's tallest content so they line up evenly. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="flex flex-col">
-          <h2 className="m-0 mb-4 text-[18px] font-bold text-(--ad-ink)">A/B tests</h2>
+          <h2 className="m-0 mb-4 text-[18px] font-semibold text-(--ad-ink)">A/B tests</h2>
           {loading || !data ? (
             <SkeletonChart />
           ) : data.abTests.length === 0 ? (
@@ -211,11 +211,11 @@ export function Analytics() {
                 return (
                   <div key={t.id} className="flex flex-1 flex-col overflow-hidden rounded-lg border border-(--ad-line) bg-(--ad-surface) p-5">
                     <div className="mb-4 flex items-center justify-between">
-                      <span className="font-bold text-(--ad-ink)">{t.name}</span>
+                      <span className="font-semibold text-(--ad-ink)">{t.name}</span>
                       <span style={{
                         background: t.status === 'running' ? 'var(--ad-green-tint)' : 'var(--ad-fill)',
                         color:      t.status === 'running' ? 'var(--ad-green)' : 'var(--ad-ink-soft)',
-                      }} className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.04em]">
+                      }} className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.04em]">
                         {t.status}
                       </span>
                     </div>
@@ -255,14 +255,14 @@ export function Analytics() {
         </div>
 
         <div className="flex flex-col">
-          <h2 className="m-0 mb-4 text-[18px] font-bold text-(--ad-ink)">Do Not Contact</h2>
+          <h2 className="m-0 mb-4 text-[18px] font-semibold text-(--ad-ink)">Do Not Contact</h2>
           {dncError && (
             <div className="mb-4 rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{dncError}</div>
           )}
           {dncLoading ? (
             <SkeletonChart />
           ) : (
-            <div className="flex flex-1 flex-col rounded-lg border border-(--ad-line) bg-(--ad-surface) p-5 shadow-[0_1px_2px_rgba(32,33,28,0.04),0_8px_28px_rgba(32,33,28,0.06)]">
+            <div className="flex flex-1 flex-col rounded-lg border border-(--ad-line) bg-(--ad-surface) p-5">
               <div className="flex-1">
                 <ResponsiveContainer width="100%" height="100%" minHeight={240}>
                   <BarChart data={[{ label: 'Opt-outs', value: dncStats?.total_optouts ?? 0 }]} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
@@ -294,8 +294,8 @@ function MetricTile({ label, value }: { label: string; value: number | string; a
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-(--ad-line) bg-(--ad-surface) p-5 shadow-[0_1px_2px_rgba(32,33,28,0.04),0_8px_28px_rgba(32,33,28,0.06)]">
-      <h3 className="m-0 mb-4 text-[14.5px] font-bold text-(--ad-ink)">{title}</h3>
+    <div className="rounded-lg border border-(--ad-line) bg-(--ad-surface) p-5">
+      <h3 className="m-0 mb-4 text-[14.5px] font-semibold text-(--ad-ink)">{title}</h3>
       {children}
     </div>
   );

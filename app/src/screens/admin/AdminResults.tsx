@@ -55,7 +55,7 @@ export function AdminResults() {
         <SkeletonTable rows={8} cols={6} />
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
-          <strong className="text-[15px] font-bold text-(--ad-ink)">No clients yet.</strong>
+          <strong className="text-[15px] font-semibold text-(--ad-ink)">No clients yet.</strong>
         </div>
       ) : (
         <div className="atbl">

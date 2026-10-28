@@ -10,10 +10,17 @@ export const BOUNCED_INTENT = 'bounced';
 export const UNCERTAIN_INTENT = 'uncertain';
 export const HUMAN_INTENTS = [
   'interested', 'question', 'resend_request', 'referred', 'maybe', 'not_interested', 'wrong_person', 'stop',
+  'existing_conversation',
 ] as const;
 
-// Intents that are not a person's real reply: left out of reply rates and trends.
-const NON_REPLY_INTENTS: readonly string[] = [...AUTOMATED_INTENTS, BOUNCED_INTENT, UNCERTAIN_INTENT];
+// "existing_conversation" is a person writing, but about correspondence outside our
+// outreach - never a lead - so it is shown as a human reply yet kept out of rates.
+export const EXISTING_CONVERSATION_INTENT = 'existing_conversation';
+
+// Intents that are not a response to our outreach: left out of reply rates and trends.
+const NON_REPLY_INTENTS: readonly string[] = [
+  ...AUTOMATED_INTENTS, BOUNCED_INTENT, UNCERTAIN_INTENT, EXISTING_CONVERSATION_INTENT,
+];
 export function isNonReplyIntent(intent: string | null): boolean {
   return !!intent && NON_REPLY_INTENTS.includes(intent);
 }
@@ -30,6 +37,7 @@ export const HUMAN_INTENT_LABEL: Record<HumanIntent, string> = {
   not_interested: 'Not interested',
   wrong_person: 'Wrong person',
   stop: 'Stop',
+  existing_conversation: 'Existing conversation',
 };
 
 // Fixed order, one colour per intent (never repainted when a slice is empty).
@@ -44,6 +52,7 @@ export const HUMAN_INTENT_COLOR: Record<HumanIntent, string> = {
   not_interested: '#2f6fd0',
   wrong_person: '#c2418f',
   stop: '#d9532b',
+  existing_conversation: '#8b919a',
 };
 
 const OTHER_STYLE = { label: 'Other', color: '#6b7280' };
@@ -95,7 +104,7 @@ export interface ReplySummary {
 export function summarizeReplies(replies: ReplyRecord[]): ReplySummary {
   const counts: Record<ReplyGroup, number> = {
     interested: 0, question: 0, resend_request: 0, referred: 0, maybe: 0, not_interested: 0, wrong_person: 0,
-    stop: 0, automated: 0, bounced: 0, uncertain: 0, other: 0,
+    stop: 0, existing_conversation: 0, automated: 0, bounced: 0, uncertain: 0, other: 0,
   };
   for (const r of replies) {
     const g = replyGroup(r.intent);

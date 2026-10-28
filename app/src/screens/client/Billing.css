@@ -13,7 +13,7 @@
   ═══════════════════════════════════════ */
 
   .pay-banner {
-    @apply text-sm font-[550];
+    @apply text-sm font-semibold;
     border-radius: 12px;
     padding: 14px 18px;
     margin-bottom: 20px;
@@ -22,13 +22,13 @@
     @apply border;
     background: var(--leaf-tint);
     color: var(--leaf);
-    border-color: #c5e3d4;
+    border-color: #e8dafd;
   }
   .pay-banner.cancel {
     @apply border;
     background: var(--amber-tint);
     color: var(--amber);
-    border-color: #e8d5a8;
+    border-color: #e8dafd;
   }
 
 
@@ -58,10 +58,10 @@
   }
   .credit-hero-sms-chip {
     font-size: 12px;
-    font-weight: 650;
+    font-weight: 600;
     color: var(--leaf);
     background: #fff;
-    border: 1px solid #cce4d6;
+    border: 1px solid #e8dafd;
     border-radius: 99px;
     padding: 4px 10px;
   }
@@ -99,7 +99,7 @@
   }
   .bill-section-head h2 {
     font-size: 17px;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: -0.01em;
     color: var(--ink);
     margin: 0;
@@ -163,7 +163,7 @@
   .pack-row.is-selected {
     border-color: var(--leaf);
     background: var(--leaf-tint);
-    box-shadow: 0 0 0 3px var(--leaf-tint);
+    outline: 2px solid var(--leaf); outline-offset: 2px;
   }
 
   /* Radio circle */
@@ -196,12 +196,12 @@
   .pack-row-name {
     @apply flex items-center gap-2;
     font-size: 15px;
-    font-weight: 650;
+    font-weight: 600;
     color: var(--ink);
   }
   .pack-tag {
     font-size: 11px;
-    font-weight: 650;
+    font-weight: 600;
     border-radius: 99px;
     padding: 2px 8px;
     background: var(--leaf-tint);
@@ -214,7 +214,7 @@
   }
   .pack-row-price {
     font-size: 19px;
-    font-weight: 720;
+    font-weight: 600;
     color: var(--ink);
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
@@ -226,7 +226,7 @@
   ═══════════════════════════════════════ */
 
   .checkout-btn {
-    @apply w-full border-none font-[650];
+    @apply w-full border-none font-semibold;
     font-size: 15.5px;
     padding: 15px 0;
     border-radius: 14px;
@@ -235,7 +235,7 @@
     margin-bottom: 10px;
     transition: background 0.12s;
   }
-  .checkout-btn:hover:not(:disabled) { background: #2c5e47; }
+  .checkout-btn:hover:not(:disabled) { background: #5b0fc2; }
   .checkout-btn:disabled { opacity: 0.6; }
 
   .checkout-note {
@@ -271,7 +271,7 @@
   }
   .payment-item-credits {
     font-size: 15px;
-    font-weight: 650;
+    font-weight: 600;
     color: var(--ink);
   }
   .payment-item-date {
@@ -284,7 +284,7 @@
   }
   .payment-item-amount {
     font-size: 15px;
-    font-weight: 650;
+    font-weight: 600;
     color: var(--ink);
     font-variant-numeric: tabular-nums;
   }
@@ -292,7 +292,7 @@
   /* Status pills */
   .pay-pill {
     font-size: 11px;
-    font-weight: 650;
+    font-weight: 600;
     border-radius: 99px;
     padding: 3px 9px;
     font-style: normal;
@@ -300,7 +300,7 @@
   .pay-pill.succeeded { background: var(--leaf-tint);  color: var(--leaf); }
   .pay-pill.failed    { background: var(--clay-tint);  color: var(--clay); }
   .pay-pill.pending   { background: var(--amber-tint); color: var(--amber); }
-  .pay-pill.refunded  { background: #eef0ea;           color: var(--ink-soft); }
+  .pay-pill.refunded  { background: #f9f6ff;           color: var(--ink-soft); }
 
 
   /* ═══════════════════════════════════════
@@ -334,7 +334,7 @@
   }
   .activity-amt {
     font-size: 15px;
-    font-weight: 680;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
   }

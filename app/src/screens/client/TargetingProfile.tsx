@@ -12,7 +12,7 @@ import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { summarizeRebuild, type RebuildSummary } from '../../lib/rebuildSummary';
 import { btn } from '../../lib/clientButtons';
 
-const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em]';
+const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em]';
 const inputCls = 'w-full rounded-lg border px-3.5 py-2.5 text-[13px] outline-none transition-colors';
 const inputStyle = { borderColor: 'var(--line)', background: 'var(--bg)', color: 'var(--ink)' };
 
@@ -122,12 +122,12 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
       </div>
 
       {error && (
-        <div className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e6cbc0' }}>
+        <div className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}>
           Couldn't load your targeting profile: {error}
         </div>
       )}
       {err && (
-        <div className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e6cbc0' }}>
+        <div className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}>
           {err}
         </div>
       )}
@@ -135,7 +135,7 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
       {!readOnly && (
         <div className="mb-6 flex items-start justify-between gap-4 rounded-2xl border px-5 py-4" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
           <div>
-            <h2 className="m-0 text-[14px] font-bold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
+            <h2 className="m-0 text-[14px] font-semibold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
               <Sparkles size={15} style={{ color: 'var(--leaf)' }} /> Rebuild from my website
             </h2>
             <p className="m-0 mt-1 text-[12.5px]" style={{ color: 'var(--ink-soft)' }}>
@@ -185,7 +185,7 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
                   <div className="mb-1.5 flex items-center justify-between gap-2">
                     <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>{f.label}</label>
                     {edited && valuesFor(f.key).length > 0 && (
-                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)' }}>
+                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide" style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)' }}>
                         your edit - won't be overwritten
                       </span>
                     )}
@@ -226,7 +226,7 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Notes</label>
               {icp.edited_fields.includes('notes') && (
-                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)' }}>
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide" style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)' }}>
                   your edit - won't be overwritten
                 </span>
               )}
@@ -253,7 +253,7 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
         </div>
       )}
 
-      <div className="mb-2 px-0.5 text-[10.5px] font-bold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
+      <div className="mb-2 px-0.5 text-[10.5px] font-semibold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
         What's actually working
       </div>
       <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
@@ -269,7 +269,7 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
               <thead>
-                <tr style={{ color: 'var(--ink-faint)' }} className="text-left text-[10.5px] font-bold uppercase tracking-[.06em]">
+                <tr style={{ color: 'var(--ink-faint)' }} className="text-left text-[10.5px] font-semibold uppercase tracking-[.06em]">
                   <th className="px-5 py-3">Category</th>
                   <th className="px-3 py-3">Emailed</th>
                   <th className="px-3 py-3">Replied</th>

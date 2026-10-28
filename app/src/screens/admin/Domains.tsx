@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Globe, Lock, ShieldAlert } from 'lucide-react';
+import { AlertCircle, Globe, Lock, ShieldAlert } from 'lucide-react';
 import { useClientsList } from '../../hooks/useAdminData';
 import {
   useAdminBlacklist, purgeBlacklistedProspects, countFreeProviderMatches, FREE_EMAIL_PROVIDERS,
@@ -27,8 +27,8 @@ const HELP: HelpContent = {
 };
 
 const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
-const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
-const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50';
+const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
+const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -74,7 +74,7 @@ export function Domains() {
       </header>
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-(--ad-line) bg-(--ad-surface) p-3">
-        <span className="text-[12px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Scope</span>
+        <span className="text-[12px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">Scope</span>
         <Select value={scopeFilter} onValueChange={setScopeFilter}>
           <SelectTrigger style={FONT} className="h-9 w-[220px] rounded-lg border-(--ad-line) bg-(--ad-surface) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)">
             <SelectValue />
@@ -95,7 +95,7 @@ export function Domains() {
         <SkeletonTable rows={10} cols={5} />
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
-          <strong className="text-[15px] font-bold text-(--ad-ink)">Nothing blocked in this view.</strong>
+          <strong className="text-[15px] font-semibold text-(--ad-ink)">Nothing blocked in this view.</strong>
           <span className="text-[13px] text-(--ad-ink-soft) max-w-[440px]">
             Blocked domains stop prospects at that domain from ever being scraped or emailed - either platform-wide
             (a GLOBAL row) or for one client only.
@@ -209,7 +209,7 @@ function AddDomainModal({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
   const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
   async function submit() {
@@ -230,13 +230,13 @@ function AddDomainModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[480px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[480px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Add blocked domain</h2>
+          <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Add blocked domain</h2>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
@@ -306,13 +306,13 @@ function FreeProvidersModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[480px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[480px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Block free email providers</h2>
+          <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Block free email providers</h2>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
@@ -324,9 +324,9 @@ function FreeProvidersModal({
               <p className="m-0 text-[13px] text-(--ad-amber-ink)">Checking how many existing prospects this would affect…</p>
             ) : (
               <p className="m-0 text-[13px] leading-relaxed text-(--ad-amber-ink)">
-                <strong className="font-bold">This currently affects {counts.matching} of {counts.total}</strong> existing prospects -
+                <strong className="font-semibold">This currently affects {counts.matching} of {counts.total}</strong> existing prospects -
                 it's not a trivial toggle. Those prospects are not deleted by this action; use{' '}
-                <strong className="font-bold">Remove matching prospects</strong> separately if you also want to clean them up.
+                <strong className="font-semibold">Remove matching prospects</strong> separately if you also want to clean them up.
               </p>
             )}
           </div>
@@ -373,7 +373,7 @@ export function PurgeModal({
     setDryRun(null);
   }
 
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
 
   return (
     <motion.div
@@ -384,13 +384,13 @@ export function PurgeModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[520px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[520px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Remove matching prospects</h2>
+          <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Remove matching prospects</h2>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
@@ -418,13 +418,14 @@ export function PurgeModal({
             <div className="flex flex-col gap-3">
               <div className="rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3.5">
                 <p className="m-0 text-[13px] text-(--ad-ink)">
-                  <strong className="font-bold text-[17px]">{dryRun.would_delete}</strong> prospect{dryRun.would_delete !== 1 ? 's' : ''} would be deleted.
+                  <strong className="font-semibold text-[17px]">{dryRun.would_delete}</strong> prospect{dryRun.would_delete !== 1 ? 's' : ''} would be deleted.
                 </p>
               </div>
               {dryRun.of_which_already_emailed > 0 && (
                 <div className="rounded-xl border border-(--ad-clay-line) bg-(--ad-clay-tint) px-4 py-3.5">
-                  <p className="m-0 text-[13px] font-bold text-(--ad-clay)">
-                    ⚠ {dryRun.of_which_already_emailed} of those were already emailed.
+                  <p className="m-0 flex items-center gap-1.5 text-[13px] font-semibold text-(--ad-clay)">
+                    <AlertCircle size={14} strokeWidth={2} aria-hidden />
+                    {dryRun.of_which_already_emailed} of those were already emailed.
                   </p>
                   <p className="m-0 mt-1 text-[12.5px] leading-relaxed text-(--ad-clay)">
                     Deleting them loses the record that we contacted them - which is exactly what stops us
@@ -434,7 +435,7 @@ export function PurgeModal({
               )}
               {dryRun.sample.length > 0 && (
                 <div>
-                  <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Sample</p>
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">Sample</p>
                   <div className="overflow-hidden rounded-xl border border-(--ad-line)">
                     {dryRun.sample.map((p, i) => (
                       <div key={i} className="flex items-center justify-between gap-2 border-b border-(--ad-fill) px-3.5 py-2 text-[12.5px] last:border-0">
@@ -451,7 +452,7 @@ export function PurgeModal({
           {result && (
             <div className="rounded-xl border border-(--ad-green-line) bg-(--ad-green-tint) px-4 py-3.5">
               <p className="m-0 text-[13px] text-(--ad-green)">
-                Deleted <strong className="font-bold">{result.deleted}</strong> prospect{result.deleted !== 1 ? 's' : ''}
+                Deleted <strong className="font-semibold">{result.deleted}</strong> prospect{result.deleted !== 1 ? 's' : ''}
                 {result.of_which_had_been_emailed > 0 && ` (${result.of_which_had_been_emailed} had been emailed).`}
               </p>
             </div>

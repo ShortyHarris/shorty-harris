@@ -16,6 +16,7 @@ import {
   PIPELINE_STATUS_LABEL, PIPELINE_STATUS_PILL, SEQUENCE_STATUS_LABEL, SEQUENCE_STATUS_PILL,
   SEQUENCE_STATUS_ORDER, SEQUENCE_STATUS_PANEL_LABEL, SEQUENCE_FILTER_PREFIX, isSequenceStatus,
 } from '../../lib/pipelineStatus';
+import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
 import { useAuth } from '../../auth/AuthProvider';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
 import { useToast, ToastHost } from '../../components/Toast';
@@ -112,21 +113,21 @@ export function Prospects({
     <div style={FONT} className="flex flex-col gap-6 content">
       <header className="page-header flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
-          <h1 className="m-0 text-[26px] font-extrabold tracking-tight text-[#20211c]">Prospects</h1>
-          <p className="m-0 mt-1 text-[13px] text-[#62655c]">{result.total} prospect{result.total !== 1 ? 's' : ''}</p>
+          <h1 className="m-0 text-[26px] font-extrabold tracking-tight text-[#0e0822]">Prospects</h1>
+          <p className="m-0 mt-1 text-[13px] text-[#605978]">{result.total} prospect{result.total !== 1 ? 's' : ''}</p>
         </div>
         <HelpButton content={HELP} />
       </header>
 
       {/* Search */}
       <div className="relative max-w-sm">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9a9d92]" />
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#605978]" />
         <input
           value={searchInput}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search by business, email, or contact"
           style={FONT}
-          className="w-full rounded-lg border border-[#ece8df] bg-[#fbf9f5] py-2 pl-9 pr-3 text-[13px] text-[#20211c] outline-none placeholder:text-[#c4bfb5] transition-colors focus:border-[#3c7a5b] focus:bg-white"
+          className="w-full rounded-lg border border-[#e8e3f7] bg-[#f9f6ff] py-2 pl-9 pr-3 text-[13px] text-[#0e0822] outline-none placeholder:text-[#8f8aa8] transition-colors focus:border-[#7412ef] focus:bg-white"
         />
       </div>
 
@@ -140,13 +141,13 @@ export function Prospects({
               onClick={() => selectStatus(t.key)}
               className={`shrink-0 cursor-pointer inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] whitespace-nowrap transition-all ${
                 active
-                  ? 'bg-[#edf4ef] border-transparent text-[#3c7a5b] font-bold'
-                  : 'bg-white border-[#ddd8cb] text-[#62655c] font-semibold hover:border-[#3c7a5b]'
+                  ? 'bg-[#f1e9ff] border-transparent text-[#7412ef] font-semibold'
+                  : 'bg-white border-[#cfc9e8] text-[#605978] font-semibold hover:border-[#7412ef]'
               }`}
             >
               {t.label}
-              <span className={`inline-flex items-center justify-center rounded-full px-1.5 min-w-[18px] h-[18px] text-[10.5px] font-bold ${
-                active ? 'bg-[#3c7a5b]/10 text-[#3c7a5b]' : 'bg-[#f5f2ec] text-[#9a9d92]'
+              <span className={`inline-flex items-center justify-center rounded-full px-1.5 min-w-[18px] h-[18px] text-[10.5px] font-semibold ${
+                active ? 'bg-[#7412ef]/10 text-[#7412ef]' : 'bg-[#f9f6ff] text-[#605978]'
               }`}>{t.count}</span>
             </button>
           );
@@ -154,15 +155,15 @@ export function Prospects({
       </div>
 
       {error && (
-        <div className="rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{error}</div>
+        <div className="rounded-xl border border-[#0e0822]/20 bg-[#f9f6ff] px-4 py-3 text-[13px] text-[#0e0822]">{error}</div>
       )}
 
       {loading ? (
         <SkeletonTable rows={8} cols={4} />
       ) : result.rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#ece8df] bg-white p-10 text-center">
-          <strong className="text-[15px] font-bold text-[#20211c]">No prospects found.</strong>
-          {search && <span className="text-[13px] text-[#62655c]">Try a different search.</span>}
+        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#e8e3f7] bg-white p-10 text-center">
+          <strong className="text-[15px] font-semibold text-[#0e0822]">No prospects found.</strong>
+          {search && <span className="text-[13px] text-[#605978]">Try a different search.</span>}
         </div>
       ) : (
         <>
@@ -198,7 +199,7 @@ export function Prospects({
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between rounded-lg border border-[#ece8df] bg-white px-4 py-3 text-[12.5px] text-[#9a9d92]">
+            <div className="flex items-center justify-between rounded-lg border border-[#e8e3f7] bg-white px-4 py-3 text-[12.5px] text-[#605978]">
               <span>Page {page} of {totalPages}</span>
               <div className="flex gap-2">
                 <button
@@ -249,7 +250,7 @@ function ProspectRow({
   const seq = isSequenceStatus(row.sequence_status) ? row.sequence_status : null;
   const pill = seq
     ? SEQUENCE_STATUS_PILL[seq]
-    : STATUS_PILL[row.pipeline_status] ?? { bg: '#f5f2ec', text: '#62655c' };
+    : STATUS_PILL[row.pipeline_status] ?? { bg: '#f9f6ff', text: '#605978' };
   const statusLabel = seq ? SEQUENCE_STATUS_LABEL[seq] : STATUS_LABEL[row.pipeline_status] ?? row.pipeline_status;
   const awaitingInStatus = row.awaiting_approval > 0 && !seq;
   const lastActivity = row.last_reply_at && (!row.last_sent_at || row.last_reply_at > row.last_sent_at)
@@ -261,25 +262,25 @@ function ProspectRow({
   return (
     <tr>
       <td className="min-w-0 cursor-pointer" onClick={onOpen}>
-        <div className="truncate font-bold text-[#20211c]" title={row.business_name}>{row.business_name}</div>
+        <div className="truncate font-semibold text-[#0e0822]" title={row.business_name}>{row.business_name}</div>
         {(row.category || row.location) && (
-          <div className="truncate text-[12px] text-[#9a9d92]">
+          <div className="truncate text-[12px] text-[#605978]">
             {[row.category, row.location].filter(Boolean).join(' · ')}
           </div>
         )}
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
           {row.suppressed && !seq && (
-            <span className="inline-flex items-center rounded-full border border-[#ddd8cb] px-2 py-0.5 text-[10.5px] font-semibold text-[#9a9d92]">
+            <span className="inline-flex items-center rounded-full border border-[#cfc9e8] px-2 py-0.5 text-[10.5px] font-semibold text-[#605978]">
               Unsubscribed
             </span>
           )}
           {row.followups_stopped && (
-            <span className="inline-flex items-center rounded-full bg-[#f6e8e2] px-2 py-0.5 text-[10.5px] font-bold text-[#a8533a]">
+            <span className="inline-flex items-center rounded-full bg-[#f9f6ff] px-2 py-0.5 text-[10.5px] font-semibold text-[#0e0822]">
               Follow-ups stopped
             </span>
           )}
           {row.sequence_paused && !row.followups_stopped && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#f8efdb] px-2 py-0.5 text-[10.5px] font-bold text-[#b9831f]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#f1e9ff] px-2 py-0.5 text-[10.5px] font-semibold text-[#7412ef]">
               <Pause size={10} /> Paused
             </span>
           )}
@@ -287,7 +288,7 @@ function ProspectRow({
             <Link
               to={`${basePath}/approvals`}
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 rounded-full bg-[#f0ecf8] px-2 py-0.5 text-[10.5px] font-bold text-[#6b4fa0] no-underline hover:bg-[#e9e2f5]"
+              className="inline-flex items-center gap-1 rounded-full bg-[#f1e9ff] px-2 py-0.5 text-[10.5px] font-semibold text-[#7412ef] no-underline hover:bg-[#f1e9ff]"
             >
               <ClipboardCheck size={10} /> {row.awaiting_approval} awaiting approval
             </Link>
@@ -296,7 +297,7 @@ function ProspectRow({
             <Link
               to={basePath}
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 rounded-full bg-[#edf4ef] px-2 py-0.5 text-[10.5px] font-bold text-[#3c7a5b] no-underline hover:bg-[#e0ede4]"
+              className="inline-flex items-center gap-1 rounded-full bg-[#f1e9ff] px-2 py-0.5 text-[10.5px] font-semibold text-[#7412ef] no-underline hover:bg-[#e8dafd]"
             >
               <Flame size={10} /> Hot lead
             </Link>
@@ -310,34 +311,29 @@ function ProspectRow({
           <Link
             to={`${basePath}/approvals`}
             onClick={(e) => e.stopPropagation()}
-            className="atbl-pill inline-flex items-center gap-1 whitespace-nowrap bg-[#f0ecf8] text-[#6b4fa0] no-underline hover:bg-[#e9e2f5]"
+            className="atbl-pill inline-flex items-center gap-1 whitespace-nowrap bg-[#f1e9ff] text-[#7412ef] no-underline hover:bg-[#f1e9ff]"
           >
             <ClipboardCheck size={11} /> Awaiting approval{row.awaiting_approval > 1 ? ` (${row.awaiting_approval})` : ''}
           </Link>
         ) : (
-          <span
-            className="atbl-pill whitespace-nowrap"
-            style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-          >
-            {statusLabel}
-          </span>
+          <StatusPill pill={pill}>{statusLabel}</StatusPill>
         )}
       </td>
       <td onClick={onOpen} className="cursor-pointer">
         {row.emails_sent > 0 ? (
           <>
-            <div className="text-[13px] text-[#20211c]">
+            <div className="text-[13px] text-[#0e0822]">
               {row.emails_sent} sent
-              <span className="text-[#c4bfb5]"> · </span>{row.opened} opened
-              <span className="text-[#c4bfb5]"> · </span>
-              <span className={row.replies > 0 ? 'font-bold text-[#3c7a5b]' : undefined}>{row.replies} {row.replies === 1 ? 'reply' : 'replies'}</span>
+              <span className="text-[#8f8aa8]"> · </span>{row.opened} opened
+              <span className="text-[#8f8aa8]"> · </span>
+              <span className={row.replies > 0 ? 'font-semibold text-[#7412ef]' : undefined}>{row.replies} {row.replies === 1 ? 'reply' : 'replies'}</span>
             </div>
             {lastActivity && (
-              <div className="mt-0.5 text-[11.5px] text-[#9a9d92]">{lastActivity.label} {formatShortDate(lastActivity.date)}</div>
+              <div className="mt-0.5 text-[11.5px] text-[#605978]">{lastActivity.label} {formatShortDate(lastActivity.date)}</div>
             )}
           </>
         ) : (
-          <span className="text-[#c4bfb5]">—</span>
+          <span className="text-[#8f8aa8]">—</span>
         )}
       </td>
       <td className="min-w-0">
@@ -370,7 +366,7 @@ function NoteCell({
   }
 
   if (readOnly) {
-    return note ? <StickyNote size={14} className="text-[#b9831f]" /> : null;
+    return note ? <StickyNote size={14} className="text-[#7412ef]" /> : null;
   }
 
   if (editing) {
@@ -380,7 +376,7 @@ function NoteCell({
     // else off-screen" problem being fixed here.
     return (
       <div onClick={(e) => e.stopPropagation()} className="relative">
-        <div className="absolute right-0 top-0 z-20 w-60 rounded-lg border border-[#3c7a5b] bg-white p-1.5 shadow-lg">
+        <div className="absolute right-0 top-0 z-20 w-60 rounded-lg border border-[#7412ef] bg-white p-1.5">
           <textarea
             autoFocus
             value={draft}
@@ -389,9 +385,9 @@ function NoteCell({
             maxLength={4000}
             rows={3}
             style={FONT}
-            className="w-full resize-none rounded-md border-0 px-1.5 py-1 text-[12px] text-[#20211c] outline-none"
+            className="w-full resize-none rounded-md border-0 px-1.5 py-1 text-[12px] text-[#0e0822] outline-none"
           />
-          {busy && <span className="px-1.5 text-[10.5px] text-[#9a9d92]">Saving…</span>}
+          {busy && <span className="px-1.5 text-[10.5px] text-[#605978]">Saving…</span>}
         </div>
       </div>
     );
@@ -400,10 +396,10 @@ function NoteCell({
   return (
     <button
       onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-      className="cursor-pointer inline-flex items-center gap-1 rounded-lg border-0 bg-transparent p-1 text-[#9a9d92] transition-colors hover:text-[#3c7a5b]"
+      className="cursor-pointer inline-flex items-center gap-1 rounded-lg border-0 bg-transparent p-1 text-[#605978] transition-colors hover:text-[#7412ef]"
       title={note ? 'Edit note' : 'Add a note'}
     >
-      {note ? <StickyNote size={14} className="text-[#b9831f]" /> : <Pencil size={13} />}
+      {note ? <StickyNote size={14} className="text-[#7412ef]" /> : <Pencil size={13} />}
     </button>
   );
 }
@@ -423,17 +419,17 @@ const STEP_STATE_LABEL: Record<SequenceStepState, string> = {
   not_written: 'Not written yet',
 };
 
-const STEP_STATE_PILL: Record<SequenceStepState, { bg: string; text: string }> = {
-  sent:                 { bg: '#edf4ef', text: '#3c7a5b' },
-  ready:                { bg: '#f8efdb', text: '#b9831f' },
-  awaiting_approval:    { bg: '#f0ecf8', text: '#6b4fa0' },
-  rejected:             { bg: '#f6e8e2', text: '#a8533a' },
-  scheduled:            { bg: '#f5f2ec', text: '#62655c' },
-  not_written:          { bg: '#f5f2ec', text: '#9a9d92' },
-  cancelled:            { bg: '#f5f2ec', text: '#9a9d92' },
-  stopped_hot_lead:     { bg: '#edf4ef', text: '#3c7a5b' },
-  stopped_unsubscribed: { bg: '#f6e8e2', text: '#a8533a' },
-  failed:               { bg: '#f6e8e2', text: '#a8533a' },
+const STEP_STATE_PILL: Record<SequenceStepState, StatusPillStyle> = {
+  sent:                 { ...PILL.sent,    icon: 'send' },
+  ready:                { ...PILL.ahead,   icon: 'clock' },
+  awaiting_approval:    { ...PILL.waiting, icon: 'clock' },
+  rejected:             { ...PILL.closed,  icon: 'minus' },
+  scheduled:            { ...PILL.ahead,   icon: 'refresh' },
+  not_written:          { ...PILL.ahead,   icon: 'circle' },
+  cancelled:            { ...PILL.closed,  icon: 'minus' },
+  stopped_hot_lead:     { ...PILL.hot,     icon: 'zap' },
+  stopped_unsubscribed: { ...PILL.closed,  icon: 'minus' },
+  failed:               { ...PILL.problem, icon: 'alert' },
 };
 
 const GMAIL_REQUIRED_TITLE = "Connect your Gmail in Settings before approving - that's what actually sends this.";
@@ -444,14 +440,9 @@ function PanelStatusBadge({
   sequenceStatus, pipelineStatus,
 }: { sequenceStatus: string | null | undefined; pipelineStatus: string }) {
   const seq = isSequenceStatus(sequenceStatus) ? sequenceStatus : null;
-  const pill = seq ? SEQUENCE_STATUS_PILL[seq] : STATUS_PILL[pipelineStatus] ?? { bg: '#f5f2ec', text: '#62655c' };
+  const pill = seq ? SEQUENCE_STATUS_PILL[seq] : STATUS_PILL[pipelineStatus] ?? { bg: '#f9f6ff', text: '#605978' };
   return (
-    <span
-      className="inline-flex items-center rounded-full px-2.5 py-1 text-[11.5px] font-bold"
-      style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-    >
-      {seq ? SEQUENCE_STATUS_PANEL_LABEL[seq] : STATUS_LABEL[pipelineStatus] ?? pipelineStatus}
-    </span>
+    <StatusPill pill={pill}>{seq ? SEQUENCE_STATUS_PANEL_LABEL[seq] : STATUS_LABEL[pipelineStatus] ?? pipelineStatus}</StatusPill>
   );
 }
 
@@ -597,19 +588,19 @@ function SequencePanel({
             <div className="lp-header-top">
               <div className="lp-chips">
                 {awaitingFirst ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#f0ecf8] px-2.5 py-1 text-[11.5px] font-bold text-[#6b4fa0]">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#f1e9ff] px-2.5 py-1 text-[11.5px] font-semibold text-[#7412ef]">
                     <ClipboardCheck size={11} /> Awaiting your approval
                   </span>
                 ) : sequence ? (
                   <PanelStatusBadge sequenceStatus={sequence.sequence_status} pipelineStatus={sequence.prospect.pipeline_status} />
                 ) : null}
                 {paused && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#f8efdb] px-2.5 py-1 text-[11.5px] font-bold text-[#b9831f]">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#f1e9ff] px-2.5 py-1 text-[11.5px] font-semibold text-[#7412ef]">
                     <Pause size={11} /> Paused
                   </span>
                 )}
                 {sequence?.followups_stopped && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#f6e8e2] px-2.5 py-1 text-[11.5px] font-bold text-[#a8533a]">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#f9f6ff] px-2.5 py-1 text-[11.5px] font-semibold text-[#0e0822]">
                     Follow-ups stopped
                   </span>
                 )}
@@ -624,11 +615,11 @@ function SequencePanel({
 
           {loading ? (
             <div className="flex flex-col gap-3 p-6">
-              <div className="h-6 w-1/2 animate-pulse rounded bg-[#ece8df]" />
-              <div className="h-24 w-full animate-pulse rounded-xl bg-[#ece8df]" />
+              <div className="h-6 w-1/2 animate-pulse rounded bg-[#e8e3f7]" />
+              <div className="h-24 w-full animate-pulse rounded-xl bg-[#e8e3f7]" />
             </div>
           ) : error ? (
-            <div className="m-6 rounded-xl border border-[#a8533a]/20 bg-[#f6e8e2] px-4 py-3 text-[13px] text-[#a8533a]">{error}</div>
+            <div className="m-6 rounded-xl border border-[#0e0822]/20 bg-[#f9f6ff] px-4 py-3 text-[13px] text-[#0e0822]">{error}</div>
           ) : sequence ? (
             <div className="lp-body">
               {/* ─── Left: what is planned and what happened ─── */}
@@ -641,8 +632,8 @@ function SequencePanel({
 
                 {/* Uncertain reply: the sequence is held until someone decides what it was. */}
                 {needsReview && (
-                  <div className="mb-5 rounded-xl border px-4 py-3.5" style={{ background: 'var(--amber-tint)', borderColor: '#e8d5a8' }}>
-                    <div className="mb-1 text-[12px] font-bold uppercase tracking-[.06em]" style={{ color: 'var(--amber)' }}>
+                  <div className="mb-5 rounded-xl border px-4 py-3.5" style={{ background: 'var(--amber-tint)', borderColor: '#e8dafd' }}>
+                    <div className="mb-1 text-[12px] font-semibold uppercase tracking-[.06em]" style={{ color: 'var(--amber)' }}>
                       We couldn't tell if this reply is from a person
                     </div>
                     {reviewReply ? (
@@ -690,7 +681,7 @@ function SequencePanel({
                     {unwrittenSteps.length > 0 && (
                       <div className="flex gap-3">
                         <div className="flex flex-col items-center">
-                          <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#9a9d92]" />
+                          <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#605978]" />
                         </div>
                         <p className="m-0 text-[13px] leading-relaxed" style={{ color: 'var(--ink-faint)' }}>
                           {unwrittenSteps.length} follow-up{unwrittenSteps.length === 1 ? '' : 's'} will be written after the first email sends.
@@ -703,16 +694,16 @@ function SequencePanel({
                 <section className="lp-section">
                   <div className="lp-eyebrow">Their replies</div>
                   {sequence.replies.length === 0 ? (
-                    <p className="m-0 text-[13px] text-[#9a9d92]">No replies on record for this prospect yet.</p>
+                    <p className="m-0 text-[13px] text-[#605978]">No replies on record for this prospect yet.</p>
                   ) : (
                     <div className="flex flex-col gap-3">
                       {sequence.replies.map((r, i) => (
                         <div key={r.id ?? i} className="rounded-xl border px-3.5 py-3" style={{ borderColor: 'var(--line)' }}>
                           <div className="mb-1 flex items-center justify-between gap-2">
                             {r.intent && (
-                              <span className="text-[10.5px] font-bold uppercase tracking-[.06em]" style={{ color: intentStyle(r.intent).color }}>{intentStyle(r.intent).label}</span>
+                              <span className="text-[10.5px] font-semibold uppercase tracking-[.06em]" style={{ color: intentStyle(r.intent).color }}>{intentStyle(r.intent).label}</span>
                             )}
-                            <span className="text-[11px] text-[#9a9d92]">{formatShortDate(r.received_at)}</span>
+                            <span className="text-[11px] text-[#605978]">{formatShortDate(r.received_at)}</span>
                           </div>
                           <p className="m-0 text-[13px] leading-relaxed" style={{ color: 'var(--ink-soft)' }}>{r.body}</p>
                         </div>
@@ -845,7 +836,7 @@ export function escapeHtml(s: string): string {
 export function bodyToSrcDoc(body: string): string {
   const html = escapeHtml(body).replace(/\n/g, '<br>');
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-    body { margin:0; padding:12px 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size:13.5px; line-height:1.6; color:#20211c; word-wrap:break-word; }
+    body { margin:0; padding:12px 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size:13.5px; line-height:1.6; color:#0e0822; word-wrap:break-word; }
   </style></head><body>${html}</body></html>`;
 }
 
@@ -862,7 +853,7 @@ function SequenceStepRow({
   const [bodyDraft, setBodyDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmSave, setConfirmSave] = useState(false);
-  const pill = STEP_STATE_PILL[step.state] ?? { bg: '#f5f2ec', text: '#62655c' };
+  const pill = STEP_STATE_PILL[step.state] ?? { bg: '#f9f6ff', text: '#605978' };
   const dateLabel = stepDateLabel(step);
   const hasBody = !!step.body;
 
@@ -906,10 +897,8 @@ function SequenceStepRow({
       </div>
       <div className="min-w-0 flex-1 pb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[13.5px] font-bold" style={{ color: 'var(--ink)' }}>{step.step}</span>
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-bold" style={{ background: pill.bg, color: pill.text }}>
-            {STEP_STATE_LABEL[step.state] ?? step.state}
-          </span>
+          <span className="text-[13.5px] font-semibold" style={{ color: 'var(--ink)' }}>{step.step}</span>
+          <StatusPill pill={pill}>{STEP_STATE_LABEL[step.state] ?? step.state}</StatusPill>
           {dateLabel && <span className="text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>{dateLabel}</span>}
           {step.opened > 0 && (
             <span className="text-[11px]" style={{ color: 'var(--ink-faint)' }}>· opened {step.opened}x</span>
@@ -924,7 +913,7 @@ function SequenceStepRow({
                 onChange={(e) => setSubjectDraft(e.target.value)}
                 aria-label={`${step.step} subject`}
                 style={FONT}
-                className="w-full rounded-lg border border-[#3c7a5b] bg-white px-3 py-2 text-[13px] font-bold text-[#20211c] outline-none"
+                className="w-full rounded-lg border border-[#7412ef] bg-white px-3 py-2 text-[13px] font-semibold text-[#0e0822] outline-none"
               />
             )}
             <textarea
@@ -933,7 +922,7 @@ function SequenceStepRow({
               aria-label={`${step.step} body`}
               rows={Math.max(6, bodyDraft.split('\n').length + 1)}
               style={FONT}
-              className="w-full resize-y rounded-lg border border-[#3c7a5b] bg-white px-3 py-2 text-[13px] leading-relaxed text-[#20211c] outline-none"
+              className="w-full resize-y rounded-lg border border-[#7412ef] bg-white px-3 py-2 text-[13px] leading-relaxed text-[#0e0822] outline-none"
             />
             <div className="flex gap-2">
               <button

@@ -12,7 +12,7 @@ const OUTER_RADIUS = 88;
 const INNER_RADIUS = 58;
 
 const CARD =
-  'rounded-lg border border-(--ad-line) bg-(--ad-surface) p-5 shadow-[0_1px_2px_rgba(32,33,28,0.04),0_8px_28px_rgba(32,33,28,0.06)]';
+  'rounded-lg border border-(--ad-line) bg-(--ad-surface) p-5';
 const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ad-green)';
 
@@ -73,7 +73,7 @@ export function ReplyBreakdown({ replies }: { replies: ReplyRecord[] }) {
     <>
       <div className={`${CARD} @container md:col-span-2`}>
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-          <h3 className="m-0 text-[14.5px] font-bold text-(--ad-ink)">Replies</h3>
+          <h3 className="m-0 text-[14.5px] font-semibold text-(--ad-ink)">Replies</h3>
           <span className="text-[12px] text-(--ad-ink-soft)">of {summary.total} total replies</span>
         </div>
 
@@ -127,7 +127,7 @@ export function ReplyBreakdown({ replies }: { replies: ReplyRecord[] }) {
                 {tip && (
                   <div
                     role="tooltip"
-                    className="pointer-events-none absolute z-10 whitespace-nowrap rounded-[10px] border border-(--ad-line) bg-(--ad-surface) px-2.5 py-1.5 text-[12.5px] text-(--ad-ink) shadow-[0_4px_16px_rgba(32,33,28,0.12)]"
+                    className="pointer-events-none absolute z-10 whitespace-nowrap rounded-[10px] border border-(--ad-line) bg-(--ad-surface) px-2.5 py-1.5 text-[12.5px] text-(--ad-ink)"
                     style={{
                       left: Math.min(Math.max(tip.x, 64), DONUT_SIZE - 64),
                       top: tip.y,
@@ -159,7 +159,7 @@ export function ReplyBreakdown({ replies }: { replies: ReplyRecord[] }) {
                         }`}
                       >
                         <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: HUMAN_INTENT_COLOR[s.intent] }} />
-                        <span className={`truncate ${isActive ? 'font-bold' : 'font-medium'}`}>{s.name}</span>
+                        <span className={`truncate ${isActive ? 'font-semibold' : 'font-medium'}`}>{s.name}</span>
                         <span className="min-w-6 text-right font-semibold tabular-nums">{s.count}</span>
                         <span className="min-w-10 text-right tabular-nums text-(--ad-ink-soft)">{s.percent}%</span>
                       </button>
@@ -205,7 +205,7 @@ export function ReplyBreakdown({ replies }: { replies: ReplyRecord[] }) {
 
       <div className={`${CARD} md:col-span-2`}>
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="m-0 text-[14.5px] font-bold text-(--ad-ink)">
+          <h3 className="m-0 text-[14.5px] font-semibold text-(--ad-ink)">
             {listTitle} <span className="font-medium text-(--ad-ink-faint)">({list.length})</span>
           </h3>
           {selected && (
@@ -226,7 +226,7 @@ export function ReplyBreakdown({ replies }: { replies: ReplyRecord[] }) {
             {list.map((r) => (
               <li key={r.id} className="border-t border-(--ad-line) py-2.5 first:border-t-0 first:pt-0">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="truncate text-[13px] font-bold text-(--ad-ink)">{r.prospectName}</span>
+                  <span className="truncate text-[13px] font-semibold text-(--ad-ink)">{r.prospectName}</span>
                   <span className="shrink-0 text-[11.5px] text-(--ad-ink-faint)">{formatDate(r.at)}</span>
                 </div>
                 <p className="m-0 mt-0.5 text-[12.5px] leading-snug text-(--ad-ink-soft)">{snippet(r.body) || '(empty reply)'}</p>
@@ -253,7 +253,7 @@ function StatTile({
     >
       <span className="truncate text-[12.5px] font-semibold text-(--ad-ink-soft)">{label}</span>
       <span className="shrink-0 whitespace-nowrap tabular-nums">
-        <span className="text-[16px] font-bold text-(--ad-ink)">{count}</span>
+        <span className="text-[16px] font-semibold text-(--ad-ink)">{count}</span>
         <span className="ml-1.5 text-[12px] text-(--ad-ink-faint)">{percent}%</span>
       </span>
     </button>

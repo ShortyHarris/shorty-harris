@@ -1,3 +1,5 @@
+import { PILL, type StatusPillStyle } from '../components/StatusPill';
+
 // Shared plain-language labels for prospects.pipeline_status. The raw value
 // ("message_pending") reads like an error when it's actually a normal queue
 // state, so every screen that shows a status must go through this map.
@@ -20,18 +22,18 @@ export const PIPELINE_STATUS_LABEL: Record<string, string> = {
   bounced: 'Email bounced',
 };
 
-export const PIPELINE_STATUS_PILL: Record<string, { bg: string; text: string; border?: string }> = {
-  new:                { bg: '#edf4ef', text: '#3c7a5b' },
-  message_pending:    { bg: '#f0ecf8', text: '#6b4fa0', border: '1px solid rgba(107,79,160,0.2)' },
-  generating:         { bg: '#f0ecf8', text: '#6b4fa0' },
-  generation_failed:  { bg: '#f6e8e2', text: '#a8533a', border: '1px solid rgba(168,83,58,0.2)' },
-  contacted:          { bg: '#f8efdb', text: '#b9831f' },
-  replied:            { bg: '#f8efdb', text: '#b9831f' },
-  hot_lead:           { bg: '#3c7a5b', text: '#fff' },
-  called:             { bg: '#f8efdb', text: '#b9831f' },
-  won:                { bg: '#3c7a5b', text: '#fff' },
-  lost:               { bg: 'transparent', text: '#9a9d92', border: '1px solid #ddd8cb' },
-  bounced:            { bg: '#f6e8e2', text: '#a8533a', border: '1px solid rgba(168,83,58,0.2)' },
+export const PIPELINE_STATUS_PILL: Record<string, StatusPillStyle> = {
+  new:                { ...PILL.ahead,   icon: 'circle' },
+  message_pending:    { ...PILL.waiting, icon: 'clock' },
+  generating:         { ...PILL.ahead,   icon: 'refresh' },
+  generation_failed:  { ...PILL.problem, icon: 'alert' },
+  contacted:          { ...PILL.sent,    icon: 'send' },
+  replied:            { ...PILL.waiting, icon: 'reply' },
+  hot_lead:           { ...PILL.hot,     icon: 'zap' },
+  called:             { ...PILL.sent,    icon: 'phone' },
+  won:                { ...PILL.waiting, icon: 'check' },
+  lost:               { ...PILL.closed,  icon: 'minus' },
+  bounced:            { ...PILL.problem, icon: 'alert' },
 };
 
 // Sequence status: what is happening to the outreach sequence, derived in the
@@ -58,12 +60,12 @@ export const SEQUENCE_STATUS_PANEL_LABEL: Record<SequenceStatus, string> = {
   needs_review: 'Needs your review',
 };
 
-export const SEQUENCE_STATUS_PILL: Record<SequenceStatus, { bg: string; text: string; border?: string }> = {
-  unsubscribed:    { bg: 'transparent', text: '#62655c', border: '1px solid #ddd8cb' },
-  hard_bounce:     { bg: '#f6e8e2', text: '#a8533a', border: '1px solid rgba(168,83,58,0.2)' },
-  automated_reply: { bg: '#f5f2ec', text: '#62655c' },
-  human_reply:     { bg: '#edf4ef', text: '#3c7a5b' },
-  needs_review:    { bg: '#f8efdb', text: '#b9831f' },
+export const SEQUENCE_STATUS_PILL: Record<SequenceStatus, StatusPillStyle> = {
+  unsubscribed:    { ...PILL.closed,  icon: 'minus' },
+  hard_bounce:     { ...PILL.problem, icon: 'alert' },
+  automated_reply: { ...PILL.ahead,   icon: 'refresh' },
+  human_reply:     { ...PILL.waiting, icon: 'reply' },
+  needs_review:    { ...PILL.waiting, icon: 'clock' },
 };
 
 export function isSequenceStatus(v: unknown): v is SequenceStatus {

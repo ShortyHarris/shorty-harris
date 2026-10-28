@@ -274,7 +274,7 @@ export function Blog() {
         </div>
       ) : list.length === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
-          <strong className="text-[15px] font-bold text-(--ad-ink)">
+          <strong className="text-[15px] font-semibold text-(--ad-ink)">
             {view === 'pending' ? 'Nothing waiting for review.' : 'Nothing published yet.'}
           </strong>
           <span className="text-[13px] text-(--ad-ink-soft)">
@@ -300,7 +300,7 @@ export function Blog() {
                     className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 border-0 bg-transparent p-0 text-left"
                   >
                     <span
-                      className="shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[.04em]"
+                      className="shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[.04em]"
                       style={{ background: pill.bg, color: pill.text }}
                     >
                       {CATEGORY_LABEL[post.category] ?? post.category}
@@ -431,7 +431,7 @@ function GeneratePostPanel() {
     <div className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4 flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="m-0 text-[13.5px] font-bold text-(--ad-ink)">Generate new post</p>
+          <p className="m-0 text-[13.5px] font-semibold text-(--ad-ink)">Generate new post</p>
           <p className="m-0 mt-0.5 text-[12px] text-(--ad-ink-faint)">Pulls the next topic from the bank, same as the weekly automatic run.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -444,7 +444,7 @@ function GeneratePostPanel() {
           <button
             onClick={() => submitGenerate({})}
             disabled={generating}
-            className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
+            className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
           >
             <Sparkles size={14} strokeWidth={2} />
             {generating ? 'Starting…' : 'Generate now'}
@@ -487,7 +487,7 @@ function TopicModal({
   const [targetKeyword, setTargetKeyword] = useState('');
 
   const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
 
   function submit() {
     const fields: Record<string, string> = {};
@@ -507,13 +507,13 @@ function TopicModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[520px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[520px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Specify a topic</h2>
+          <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Specify a topic</h2>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
@@ -569,7 +569,7 @@ function TopicModal({
           <button
             onClick={submit}
             disabled={busy}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
           >
             <Sparkles size={14} strokeWidth={2} />
             {busy ? 'Starting…' : 'Generate'}
@@ -637,7 +637,7 @@ function ReviewModal({
   const isScheduled = post.status === 'scheduled';
   const pill = CATEGORY_PILL[post.category] ?? CATEGORY_PILL.general;
   const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
-  const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
 
   function currentEdits(): EditableFields {
     return {
@@ -669,7 +669,7 @@ function ReviewModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[680px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[680px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
@@ -677,12 +677,12 @@ function ReviewModal({
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-(--ad-line) px-5 py-4">
           <div className="min-w-0">
             <span
-              className="rounded-full px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[.04em]"
+              className="rounded-full px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[.04em]"
               style={{ background: pill.bg, color: pill.text }}
             >
               {CATEGORY_LABEL[post.category] ?? post.category}
             </span>
-            <h2 className="m-0 mt-2 truncate text-[17px] font-bold text-(--ad-ink)">{post.title}</h2>
+            <h2 className="m-0 mt-2 truncate text-[17px] font-semibold text-(--ad-ink)">{post.title}</h2>
           </div>
           <button onClick={onClose} className="cursor-pointer shrink-0 border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
@@ -699,12 +699,12 @@ function ReviewModal({
               {/* Status: the date once, big, with how long until it goes live */}
               <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--ad-surface) text-(--ad-amber) shadow-[0_1px_2px_rgba(185,131,31,0.15)]">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--ad-surface) text-(--ad-amber)">
                     <CalendarClock size={18} strokeWidth={2} />
                   </span>
                   <div className="min-w-0">
-                    <div className="text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-amber)">Scheduled</div>
-                    <div className="truncate text-[15px] font-bold text-(--ad-ink)">{formatScheduled(post.scheduled_for)}</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-amber)">Scheduled</div>
+                    <div className="truncate text-[15px] font-semibold text-(--ad-ink)">{formatScheduled(post.scheduled_for)}</div>
                     <div className="text-[12px] text-(--ad-ink-faint)">
                       Goes live automatically {timeUntil(post.scheduled_for)}
                     </div>
@@ -722,7 +722,7 @@ function ReviewModal({
                     <button
                       onClick={onPublishNow}
                       disabled={busy}
-                      className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-3.5 py-2 text-[12.5px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
+                      className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
                     >
                       Publish now
                     </button>
@@ -745,7 +745,7 @@ function ReviewModal({
                     <button
                       onClick={submitReschedule}
                       disabled={busy || !scheduledDate || scheduledDate.toISOString() === post.scheduled_for}
-                      className="cursor-pointer rounded-lg border-0 bg-(--ad-ink) px-3.5 py-2 text-[12.5px] font-bold text-white transition-colors hover:bg-(--ad-green) disabled:opacity-50"
+                      className="cursor-pointer rounded-lg border-0 bg-(--ad-ink) px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-(--ad-green) disabled:opacity-50"
                     >
                       Save new time
                     </button>
@@ -840,14 +840,14 @@ function ReviewModal({
               <button
                 onClick={onReject}
                 disabled={busy}
-                className="cursor-pointer rounded-xl border border-(--ad-clay) bg-transparent px-4 py-2 text-[13px] font-bold text-(--ad-clay) transition-colors hover:bg-(--ad-clay) hover:text-white disabled:opacity-50"
+                className="cursor-pointer rounded-xl border border-(--ad-clay) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-clay) transition-colors hover:bg-(--ad-clay) hover:text-white disabled:opacity-50"
               >
                 Reject
               </button>
               <button
                 onClick={submitApprove}
                 disabled={busy || !title.trim() || (scheduling && !scheduledDate)}
-                className="cursor-pointer rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
+                className="cursor-pointer rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
               >
                 {busy ? (scheduling ? 'Scheduling…' : 'Publishing…') : scheduling ? 'Schedule post' : 'Approve & publish'}
               </button>
@@ -864,7 +864,7 @@ function ReviewModal({
               <button
                 onClick={submitSave}
                 disabled={busy || !title.trim()}
-                className="cursor-pointer rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
+                className="cursor-pointer rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
               >
                 {busy ? 'Saving…' : 'Save changes'}
               </button>
@@ -912,21 +912,21 @@ function RejectModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[480px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[480px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Reject post</h2>
+          <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Reject post</h2>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-3">
           <p className="m-0 text-[13px] text-(--ad-ink-soft)">
-            Rejecting <strong className="font-bold text-(--ad-ink)">{post.title}</strong>. WF12 won't retry this exact draft.
+            Rejecting <strong className="font-semibold text-(--ad-ink)">{post.title}</strong>. WF12 won't retry this exact draft.
           </p>
           <div>
-            <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Reason</label>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">Reason</label>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -942,7 +942,7 @@ function RejectModal({
           <button
             onClick={() => onConfirm(reason.trim())}
             disabled={busy || !reason.trim()}
-            className="cursor-pointer rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
+            className="cursor-pointer rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
           >
             {busy ? 'Rejecting…' : 'Reject post'}
           </button>
@@ -966,18 +966,18 @@ function DeleteModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[480px] md:rounded-md md:shadow-2xl"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[480px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
-          <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">{isPublished ? 'Delete post' : 'Delete draft'}</h2>
+          <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">{isPublished ? 'Delete post' : 'Delete draft'}</h2>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-3">
           <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-4">
-            <p className="m-0 text-[14px] font-bold text-(--ad-clay)">Delete "{post.title}"?</p>
+            <p className="m-0 text-[14px] font-semibold text-(--ad-clay)">Delete "{post.title}"?</p>
             <p className="m-0 mt-1.5 text-[13px] text-(--ad-clay)/80">
               {isPublished
                 ? 'This permanently removes it from the public site. This cannot be undone.'
@@ -990,7 +990,7 @@ function DeleteModal({
           <button
             onClick={onConfirm}
             disabled={busy}
-            className="cursor-pointer rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
+            className="cursor-pointer rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
           >
             {busy ? 'Deleting…' : isPublished ? 'Delete post' : 'Delete draft'}
           </button>
