@@ -4,6 +4,8 @@ import {
   absolutizeHtml,
   assertShortyHarrisBrand,
   computeContentHash,
+  isEligibleNewImport,
+  isImportableCmsStatus,
   isScheduledImport,
   mapCategory,
   mapPostkingStatus,
@@ -78,11 +80,23 @@ describe('status mapping', () => {
     expect(mapPostkingStatus(undefined)).toBe('draft');
   });
 
-  it('treats only scheduled-with-a-date as a new import', () => {
+  it('treats scheduled-with-a-date as a scheduled import', () => {
     expect(isScheduledImport({ status: 'scheduled', scheduledAt: '2026-10-22T09:00:00.000Z' })).toBe(true);
     expect(isScheduledImport({ status: 'scheduled', scheduledAt: null })).toBe(false);
     expect(isScheduledImport({ status: 'unpublished', scheduledAt: '2026-10-22T09:00:00.000Z' })).toBe(false);
     expect(isScheduledImport({ status: 'published', scheduledAt: null })).toBe(false);
+  });
+
+  it('allows first-time import of published and scheduled-with-date, not drafts', () => {
+    expect(isImportableCmsStatus('published')).toBe(true);
+    expect(isImportableCmsStatus('scheduled')).toBe(true);
+    expect(isImportableCmsStatus('draft')).toBe(false);
+    expect(isEligibleNewImport({ status: 'published', scheduledAt: null })).toBe(true);
+    expect(isEligibleNewImport({ status: 'live', scheduledAt: null })).toBe(true);
+    expect(isEligibleNewImport({ status: 'scheduled', scheduledAt: '2026-10-22T09:00:00.000Z' })).toBe(true);
+    expect(isEligibleNewImport({ status: 'scheduled', scheduledAt: null })).toBe(false);
+    expect(isEligibleNewImport({ status: 'unpublished', scheduledAt: '2026-10-22T09:00:00.000Z' })).toBe(false);
+    expect(isEligibleNewImport({ status: 'draft', scheduledAt: null })).toBe(false);
   });
 });
 
@@ -98,7 +112,7 @@ describe('toUpsertRow', () => {
     expect(row.cover_image_url).toBe('https://try.postking.app/api/uploads/cover.jpg');
   });
 
-  it('maps a published payload for in-place updates of already-imported rows', () => {
+  it('maps a published payload (first-time import or in-place update)', () => {
     const row = toUpsertRow(article({
       status: 'published',
       publishedAt: '2026-09-01T12:00:00.000Z',
@@ -132,12 +146,41 @@ describe('planSync', () => {
       .toMatchObject({ type: 'skip', reason: 'missing_schedule_date' });
   });
 
-  it('does not insert a published article that was never imported', () => {
-    expect(planSync(article({
+  it('inserts a published article that was never scheduled', () => {
+    const action = planSync(article({
       status: 'published',
       publishedAt: '2026-09-01T12:00:00.000Z',
       scheduledAt: null,
-    }), new Map(), new Map(), NOW, API)).toMatchObject({ type: 'skip', reason: 'not_scheduled' });
+    }), new Map(), new Map(), NOW, API);
+    expect(action.type).toBe('insert');
+    if (action.type === 'insert') {
+      expect(action.row.status).toBe('published');
+      expect(action.row.published_at).toBe('2026-09-01T12:00:00.000Z');
+      expect(action.row.scheduled_for).toBeNull();
+    }
+  });
+
+  it('inserts the known published-never-scheduled Shorty Harris articles', () => {
+    const known = [
+      { id: 'cmvgmydvn1fugg07z0oxjxcd4', slug: 'what-is-a-lead-generation' },
+      { id: 'cmvgmxf021ftag07zeg7tkkql', slug: 'b2b-client-acquisition' },
+      { id: 'cmvgmx4bk1fslg07zntts2spw', slug: 'client-acquisition-for-freelancers' },
+    ];
+    for (const { id, slug } of known) {
+      const action = planSync(article({
+        id,
+        slug,
+        status: 'published',
+        publishedAt: '2026-10-21T12:00:00.000Z',
+        scheduledAt: null,
+      }), new Map(), new Map(), NOW, API);
+      expect(action.type).toBe('insert');
+      if (action.type === 'insert') {
+        expect(action.row.status).toBe('published');
+        expect(action.row.slug).toBe(slug);
+        expect(action.row.postking_article_id).toBe(id);
+      }
+    }
   });
 
   it('updates an already-imported row when PostKing later publishes it', () => {

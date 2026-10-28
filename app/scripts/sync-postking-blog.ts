@@ -1,6 +1,7 @@
 // Daily (05:00 UTC) and manual importer: Shorty Harris PostKing blog → this app's
-// `blog_posts` CMS (the /admin/blog queue). New rows are created only for
-// PostKing `scheduled` articles that have a schedule date.
+// `blog_posts` CMS (the /admin/blog queue). New rows are created for PostKing
+// `published` articles and for `scheduled` articles that have a schedule date.
+// Drafts / unpublished are skipped.
 //
 // Hard-wired to brand cmvgju3fk1bg9g07zorefgwgu. Never lists or writes any
 // other PostKing brand. Does not call the WF12 generate-blog-post webhook.
@@ -15,6 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 import {
   SHORTY_HARRIS_POSTKING_BRAND_ID,
   assertShortyHarrisBrand,
+  isImportableCmsStatus,
   mapPostkingStatus,
   parseTags,
   planSync,
@@ -353,7 +355,10 @@ async function main() {
 
   for (const item of listed) {
     const alreadyImported = existing.byId.has(item.id);
-    if (!alreadyImported && mapPostkingStatus(item.status) !== 'scheduled') {
+    // Fetch full payloads for published + scheduled. Skip drafts here so we
+    // do not import unpublished content that should not go live. Already-
+    // imported rows still load so scheduled → published updates apply.
+    if (!alreadyImported && !isImportableCmsStatus(mapPostkingStatus(item.status))) {
       const action: SyncAction = {
         type: 'skip',
         reason: 'not_scheduled',

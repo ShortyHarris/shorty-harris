@@ -106,9 +106,23 @@ export function parseScheduleDate(value: string | null | undefined): string | nu
   return Number.isNaN(t) ? null : new Date(t).toISOString();
 }
 
-/** New rows are only created for PostKing `scheduled` articles that have a date. */
+/** True for CMS statuses that may be written to blog_posts. Drafts never import. */
+export function isImportableCmsStatus(status: CmsStatus): boolean {
+  return status === 'published' || status === 'scheduled';
+}
+
+/** Scheduled-with-a-date articles (the original first-time import rule). */
 export function isScheduledImport(article: Pick<PostkingArticle, 'status' | 'scheduledAt'>): boolean {
   return mapPostkingStatus(article.status) === 'scheduled' && parseScheduleDate(article.scheduledAt) !== null;
+}
+
+/**
+ * First-time inserts: PostKing `published` (including draft → published with
+ * no schedule date) and `scheduled` articles that have a date.
+ * Drafts / unpublished never create a blog_posts row.
+ */
+export function isEligibleNewImport(article: Pick<PostkingArticle, 'status' | 'scheduledAt'>): boolean {
+  return mapPostkingStatus(article.status) === 'published' || isScheduledImport(article);
 }
 
 export function mapCategory(raw: string | null | undefined): BlogCategory {
@@ -287,15 +301,16 @@ export function planSync(
     return { type: 'skip', reason: 'missing_schedule_date', articleId: article.id, slug };
   }
 
-  // New rows: scheduled-with-date only. Unpublished/draft/published-never-imported
-  // are skipped so they never land in blog_posts as drafts.
-  if (!byId && cmsStatus !== 'scheduled') {
+  // New rows: published, or scheduled-with-date. Drafts/unpublished are
+  // skipped so they never land in blog_posts.
+  if (!byId && !isEligibleNewImport(article)) {
     return { type: 'skip', reason: 'not_scheduled', articleId: article.id, slug };
   }
 
-  // Already imported: allow scheduled updates and scheduled → published.
-  // Do not rewrite an imported row back to draft if PostKing unpublishes it.
-  if (byId && cmsStatus !== 'scheduled' && cmsStatus !== 'published') {
+  // Already imported: allow scheduled/published updates (including
+  // scheduled → published). Do not rewrite an imported row back to draft
+  // if PostKing unpublishes it.
+  if (byId && !isImportableCmsStatus(cmsStatus)) {
     return { type: 'skip', reason: 'not_scheduled', articleId: article.id, slug };
   }
 
