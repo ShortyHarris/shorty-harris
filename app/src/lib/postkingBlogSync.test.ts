@@ -132,12 +132,60 @@ describe('planSync', () => {
       .toMatchObject({ type: 'skip', reason: 'missing_schedule_date' });
   });
 
-  it('does not insert a published article that was never imported', () => {
+  it('inserts a never-imported published article as published', () => {
+    const action = planSync(article({
+      id: 'pk_pub_1',
+      slug: 'already-live-on-postking',
+      status: 'published',
+      publishedAt: '2026-09-01T12:00:00.000Z',
+      scheduledAt: null,
+    }), new Map(), new Map(), NOW, API);
+    expect(action.type).toBe('insert');
+    if (action.type === 'insert') {
+      expect(action.row.status).toBe('published');
+      expect(action.row.published_at).toBe('2026-09-01T12:00:00.000Z');
+      expect(action.row.scheduled_for).toBeNull();
+      expect(action.row.approved_at).toBe(NOW);
+      expect(action.row.postking_article_id).toBe('pk_pub_1');
+      expect(action.row.content_hash).toMatch(/^sha256:/);
+    }
+  });
+
+  it('falls back to the run time when a published article has no publish date', () => {
+    const action = planSync(article({
+      status: 'published',
+      publishedAt: null,
+      scheduledAt: null,
+    }), new Map(), new Map(), NOW, API);
+    expect(action.type).toBe('insert');
+    if (action.type === 'insert') expect(action.row.published_at).toBe(NOW);
+  });
+
+  it('does not insert a published article whose slug already exists', () => {
+    const bySlug = new Map([['how-rural-shops-get-found', existing({
+      postking_article_id: null,
+      content_hash: null,
+      status: 'published',
+    })]]);
     expect(planSync(article({
       status: 'published',
       publishedAt: '2026-09-01T12:00:00.000Z',
       scheduledAt: null,
-    }), new Map(), new Map(), NOW, API)).toMatchObject({ type: 'skip', reason: 'not_scheduled' });
+    }), new Map(), bySlug, NOW, API)).toMatchObject({
+      type: 'skip',
+      reason: 'slug_conflict',
+      conflictingId: 'cms-uuid-1',
+    });
+  });
+
+  it('still skips a published article tagged with another brand', () => {
+    expect(() => planSync(
+      article({ status: 'published', brandId: 'cmratarbi0096g0f4qu529lm2' }),
+      new Map(),
+      new Map(),
+      NOW,
+      API,
+    )).toThrow(/TUTEL/);
   });
 
   it('updates an already-imported row when PostKing later publishes it', () => {
@@ -216,8 +264,23 @@ describe('helpers', () => {
     expect(mapCategory('Small Business')).toBe('small_business');
     expect(mapCategory('general')).toBe('general');
     expect(mapCategory('unknown')).toBe('general');
+    expect(mapCategory(null)).toBe('general');
     expect(parseTags('["a","b"]')).toEqual(['a', 'b']);
     expect(parseTags(['c'])).toEqual(['c']);
+  });
+
+  it('maps seo, lead generation, b2b, sales and marketing to small_business', () => {
+    for (const raw of ['seo', 'SEO', 'lead generation', 'Lead-Generation', 'lead_generation', 'b2b', 'B2B', 'sales', 'Sales', 'marketing', 'Marketing']) {
+      expect(mapCategory(raw), raw).toBe('small_business');
+    }
+  });
+
+  it('keeps existing category mappings and the general fallback', () => {
+    expect(mapCategory('rural')).toBe('business_development_rural');
+    expect(mapCategory('Family Business')).toBe('family_business');
+    expect(mapCategory('Marketing for family firms')).toBe('family_business');
+    expect(mapCategory('content strategy')).toBe('general');
+    expect(toUpsertRow(article({ category: 'marketing' }), NOW, API).category).toBe('small_business');
   });
 
   it('resolves relative PostKing media and HTML urls', () => {

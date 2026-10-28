@@ -1,6 +1,7 @@
 // Daily (05:00 UTC) and manual importer: Shorty Harris PostKing blog → this app's
-// `blog_posts` CMS (the /admin/blog queue). New rows are created only for
-// PostKing `scheduled` articles that have a schedule date.
+// `blog_posts` CMS (the /admin/blog queue). New rows are created for PostKing
+// `scheduled` articles that have a schedule date and for `published` articles
+// whose slug is free; drafts/unpublished are never imported.
 //
 // Hard-wired to brand cmvgju3fk1bg9g07zorefgwgu. Never lists or writes any
 // other PostKing brand. Does not call the WF12 generate-blog-post webhook.
@@ -11,6 +12,7 @@
 // Required env: POSTKING_API_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 // Optional: POSTKING_API_URL (default https://try.postking.app), DRY_RUN=1
 
+import { appendFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import {
   SHORTY_HARRIS_POSTKING_BRAND_ID,
@@ -350,10 +352,13 @@ async function main() {
 
   const nowIso = new Date().toISOString();
   const actions: SyncAction[] = [];
+  // Written rows with status 'published'. Public /blog/:slug pages and the
+  // sitemap are prerendered at build time, so these need a redeploy.
+  let publishedWrites = 0;
 
   for (const item of listed) {
     const alreadyImported = existing.byId.has(item.id);
-    if (!alreadyImported && mapPostkingStatus(item.status) !== 'scheduled') {
+    if (!alreadyImported && mapPostkingStatus(item.status) === 'draft') {
       const action: SyncAction = {
         type: 'skip',
         reason: 'not_scheduled',
@@ -374,6 +379,7 @@ async function main() {
 
     if (!opts.dryRun && action.type !== 'skip') {
       await applyAction(supabase as unknown as BlogPostsWriter, action);
+      if (action.row.status === 'published') publishedWrites += 1;
       const written: ExistingBlogPost = {
         id: action.type === 'update' ? action.existingId : action.articleId,
         slug: action.row.slug,
@@ -389,6 +395,11 @@ async function main() {
   }
 
   console.log(`done ${summarize(actions)}${opts.dryRun ? ' (dry-run, no writes)' : ''}`);
+
+  // Expose to the workflow so it can trigger a redeploy only when needed.
+  if (process.env.GITHUB_OUTPUT) {
+    appendFileSync(process.env.GITHUB_OUTPUT, `published_writes=${publishedWrites}\n`);
+  }
 }
 
 main().catch((err) => {

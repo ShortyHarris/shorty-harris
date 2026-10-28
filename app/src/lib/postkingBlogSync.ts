@@ -124,6 +124,16 @@ export function mapCategory(raw: string | null | undefined): BlogCategory {
     return 'business_development_rural';
   }
   if (key === 'general') return 'general';
+  // PostKing marketing-flavoured categories all live under small_business.
+  if (
+    key === 'seo'
+    || key === 'lead_generation'
+    || key === 'b2b'
+    || key === 'sales'
+    || key === 'marketing'
+  ) {
+    return 'small_business';
+  }
 
   const label = (raw ?? '').trim().toLowerCase();
   if (label.includes('family')) return 'family_business';
@@ -287,10 +297,20 @@ export function planSync(
     return { type: 'skip', reason: 'missing_schedule_date', articleId: article.id, slug };
   }
 
-  // New rows: scheduled-with-date only. Unpublished/draft/published-never-imported
-  // are skipped so they never land in blog_posts as drafts.
-  if (!byId && cmsStatus !== 'scheduled') {
+  // New rows: scheduled-with-date, or published. Unpublished/draft articles are
+  // skipped so they never land in blog_posts as drafts.
+  if (!byId && cmsStatus === 'draft') {
     return { type: 'skip', reason: 'not_scheduled', articleId: article.id, slug };
+  }
+
+  // A never-imported published article is only inserted when its slug is free;
+  // an existing row with that slug (hand-written or owned by another PostKing
+  // article) is left untouched rather than overwritten.
+  if (!byId && cmsStatus === 'published') {
+    const slugOwner = existingBySlug.get(slug);
+    if (slugOwner) {
+      return { type: 'skip', reason: 'slug_conflict', articleId: article.id, slug, conflictingId: slugOwner.id };
+    }
   }
 
   // Already imported: allow scheduled updates and scheduled → published.
