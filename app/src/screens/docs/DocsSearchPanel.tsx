@@ -145,7 +145,7 @@ export function DocsSearchPanel({
                 )}
                 {sources.length > 0 && (
                   <div className="mt-4 flex flex-col gap-1.5 border-t border-(--ad-fill) pt-3">
-                    <span className="text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)">Sources</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">Sources</span>
                     {sources.map((s) => (
                       <button
                         key={s.slug}

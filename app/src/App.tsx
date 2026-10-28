@@ -259,8 +259,8 @@ function ImpersonateZone() {
   if (error) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="text-[14px] text-[#a8533a]">{error}</p>
-        <button onClick={exit} className="cursor-pointer rounded-xl border-0 bg-[#3c7a5b] px-4 py-2 text-[13px] font-semibold text-white">
+        <p className="text-[14px] text-[#0e0822]">{error}</p>
+        <button onClick={exit} className="cursor-pointer rounded-xl border-0 bg-[#7412ef] px-4 py-2 text-[13px] font-semibold text-white">
           Back to Clients
         </button>
       </div>
@@ -333,7 +333,7 @@ function Spinner() {
     <div style={{
       position: 'fixed', inset: 0,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      background: '#f5f2ec',
+      background: '#f9f6ff',
       fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
     }}>
       <style>{`@keyframes sh-spin { to { transform: rotate(360deg); } }`}</style>
@@ -345,7 +345,7 @@ function Spinner() {
           fontWeight: 700,
           letterSpacing: '0.26em',
           textTransform: 'uppercase',
-          color: '#3c7a5b',
+          color: '#7412ef',
         }}>
           Shorty
         </span>
@@ -354,7 +354,7 @@ function Spinner() {
           fontWeight: 800,
           letterSpacing: '-0.045em',
           lineHeight: 1,
-          color: '#20211c',
+          color: '#0e0822',
         }}>
           Harris
         </span>
@@ -366,8 +366,8 @@ function Spinner() {
         width: 18,
         height: 18,
         borderRadius: '50%',
-        border: '2px solid #ddd8cb',
-        borderTopColor: '#3c7a5b',
+        border: '2px solid #cfc9e8',
+        borderTopColor: '#7412ef',
         animation: 'sh-spin 0.7s linear infinite',
       }} />
     </div>

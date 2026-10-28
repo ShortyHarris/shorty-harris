@@ -71,10 +71,10 @@ export function BlogPost() {
       <div style={FONT} className="min-h-screen flex flex-col bg-paper">
         <PublicNav />
         <div className="max-w-[680px] mx-auto px-6 py-24">
-          <div className="h-4 w-24 animate-pulse rounded-full bg-[#f5f5f5]" />
-          <div className="mt-4 h-9 w-full animate-pulse rounded-lg bg-[#f5f5f5]" />
-          <div className="mt-2 h-9 w-2/3 animate-pulse rounded-lg bg-[#f5f5f5]" />
-          <div className="mt-10 aspect-[16/9] w-full animate-pulse rounded-2xl bg-[#f5f5f5]" />
+          <div className="h-4 w-24 animate-pulse rounded-full bg-[#f9f6ff]" />
+          <div className="mt-4 h-9 w-full animate-pulse rounded-lg bg-[#f9f6ff]" />
+          <div className="mt-2 h-9 w-2/3 animate-pulse rounded-lg bg-[#f9f6ff]" />
+          <div className="mt-10 aspect-[16/9] w-full animate-pulse rounded-2xl bg-[#f9f6ff]" />
         </div>
         <PublicFooter />
       </div>
@@ -87,7 +87,7 @@ export function BlogPost() {
         <PublicNav />
         <main className="max-w-[680px] mx-auto px-6 py-24 text-center">
           <h1 className="m-0 text-[22px] font-extrabold">Post not found</h1>
-          {error && <p className="mt-2 text-[13px] text-[#a8533a]">{error}</p>}
+          {error && <p className="mt-2 text-[13px] text-[#0e0822]">{error}</p>}
           <Link to="/blog" className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#7412ef] no-underline hover:underline">
             <ArrowLeft size={14} strokeWidth={2.4} /> Back to all posts
           </Link>
@@ -128,13 +128,13 @@ export function BlogPost() {
           </span>
           {post.published_at && (
             <>
-              <span aria-hidden="true" className="text-[#a3a3a3]">·</span>
+              <span aria-hidden="true" className="text-[#8f8aa8]">·</span>
               <time dateTime={post.published_at} className="font-medium text-[#605978]">
                 {formatDate(post.published_at)}
               </time>
             </>
           )}
-          <span aria-hidden="true" className="text-[#a3a3a3]">·</span>
+          <span aria-hidden="true" className="text-[#8f8aa8]">·</span>
           <span className="font-medium text-[#605978]">{readingMinutes(post.body_md)} min read</span>
         </div>
 
@@ -153,12 +153,12 @@ export function BlogPost() {
             width={1200}
             height={630}
             fetchPriority="high"
-            className="mt-10 aspect-[1200/630] w-full rounded-2xl bg-[#f5f5f5] object-cover"
+            className="mt-10 aspect-[1200/630] w-full rounded-2xl bg-[#f9f6ff] object-cover"
           />
         )}
 
         <style>{`
-          .blog-post-body { font-size: 17px; line-height: 1.85; color: #171717; margin-top: 44px; }
+          .blog-post-body { font-size: 17px; line-height: 1.85; color: #0e0822; margin-top: 44px; }
           .blog-post-body h2 { font-size: 26px; font-weight: 800; margin: 52px 0 18px; letter-spacing: -0.015em; line-height: 1.3; }
           .blog-post-body h3 { font-size: 21px; font-weight: 600; margin: 40px 0 14px; letter-spacing: -0.01em; }
           .blog-post-body p { margin: 0 0 26px; }
@@ -169,7 +169,7 @@ export function BlogPost() {
           .blog-post-body img { max-width: 100%; border-radius: 12px; margin: 8px 0 26px; }
           .blog-post-body blockquote {
             margin: 32px 0; padding: 4px 0 4px 22px; border-left: 3px solid #7412ef;
-            font-size: 19px; font-style: italic; color: #404040; line-height: 1.6;
+            font-size: 19px; font-style: italic; color: #0e0822; line-height: 1.6;
           }
           .blog-post-body blockquote p { margin: 0; }
           .blog-post-body hr { border: none; border-top: 1px solid #e8e3f7; margin: 44px 0; }
@@ -217,7 +217,7 @@ export function BlogPost() {
                   to={`/blog/${r.slug}`}
                   className="flex flex-col no-underline text-inherit group"
                 >
-                  <div className="aspect-[4/3] w-full overflow-hidden rounded-xl bg-[#f5f5f5]">
+                  <div className="aspect-[4/3] w-full overflow-hidden rounded-xl bg-[#f9f6ff]">
                     {r.cover_image_url && (
                       <img
                         {...responsiveImage(r.cover_image_url, 400, [400, 640])}

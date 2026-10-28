@@ -15,7 +15,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
   render() {
     if (this.state.error) {
       return (
-        <div style={{ padding: 32, fontFamily: 'monospace', color: '#9d3b3b', background: '#fff' }}>
+        <div style={{ padding: 32, fontFamily: 'monospace', color: '#0e0822', background: '#fff' }}>
           <strong>Something went wrong, check the browser console.</strong>
           <pre style={{ marginTop: 12, fontSize: 13, whiteSpace: 'pre-wrap' }}>
             {(this.state.error as Error).message}

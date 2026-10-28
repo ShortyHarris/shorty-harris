@@ -121,8 +121,8 @@ export function Blog() {
     // Same pill language as the public nav: beige + dark text when active.
     `cursor-pointer rounded-full border h-9 px-4 text-[13.5px] transition-colors ${
       active
-        ? 'border-[#e8e3f7] bg-[#f0f0f0] text-[#0e0822] font-semibold'
-        : 'border-[#e8e3f7] bg-white text-[#605978] font-medium hover:bg-[#f5f5f5] hover:text-[#0e0822]'
+        ? 'border-[#e8e3f7] bg-[#f1e9ff] text-[#0e0822] font-semibold'
+        : 'border-[#e8e3f7] bg-white text-[#605978] font-medium hover:bg-[#f9f6ff] hover:text-[#0e0822]'
     }`;
 
   return (
@@ -136,7 +136,7 @@ export function Blog() {
           <h1 className="mt-3 mb-0 text-[34px] sm:text-[40px] font-extrabold leading-[1.15] tracking-tight text-[#0e0822]">
             Practical advice for growing your small or family business
           </h1>
-          <div className="mx-auto mt-8 h-px w-16 bg-[#d4d4d4]" />
+          <div className="mx-auto mt-8 h-px w-16 bg-[#e8e3f7]" />
         </div>
 
         {/* Category filter pills */}
@@ -163,7 +163,7 @@ export function Blog() {
         )}
 
         {error && (
-          <div className="mt-10 rounded-xl border border-[#a8533a]/20 bg-[#fdf0ec] px-4 py-3 text-[13px] text-[#a8533a]">{error}</div>
+          <div className="mt-10 rounded-xl border border-[#e8e3f7] bg-[#f9f6ff] px-4 py-3 text-[13px] text-[#0e0822]">{error}</div>
         )}
 
         {loading ? (
@@ -203,7 +203,7 @@ function PostCard({ post, index }: { post: BlogCardPost; index: number }) {
       className="flex flex-col no-underline border pb-4 bg-white border-gray-200 text-inherit group"
     >
       {/* Fixed 2:1 box with a light placeholder colour, so nothing jumps while the image loads */}
-      <div className="aspect-[2/1] w-full overflow-hidden bg-[#f5f5f5]">
+      <div className="aspect-[2/1] w-full overflow-hidden bg-[#f9f6ff]">
         {image && (
           <img
             src={image.src}
@@ -253,7 +253,7 @@ function Pagination({ page, totalPages, category }: {
   const prefetch = (p: number) => () => { void prefetchPublicBlogPage(p, category); };
   const base = 'flex h-9 min-w-9 items-center justify-center gap-1 rounded-full border px-3 text-[13px] font-semibold no-underline transition-colors';
   const idle = 'border-[#e8e3f7] bg-white text-[#605978] hover:border-[#7412ef] hover:text-[#7412ef]';
-  const disabled = 'border-[#e8e3f7] bg-transparent text-[#a3a3a3] pointer-events-none';
+  const disabled = 'border-[#e8e3f7] bg-transparent text-[#8f8aa8] pointer-events-none';
 
   return (
     <nav aria-label="Blog pages" className="mt-16 flex flex-wrap items-center justify-center gap-2">
@@ -316,16 +316,16 @@ function Pagination({ page, totalPages, category }: {
 function PostCardSkeleton() {
   return (
     <div data-testid="blog-card-skeleton" className="flex flex-col border pb-4 bg-white border-gray-200 animate-pulse">
-      <div className="aspect-[2/1] w-full bg-[#f5f5f5]" />
+      <div className="aspect-[2/1] w-full bg-[#f9f6ff]" />
       <div className="flex flex-1 flex-col pt-5 px-4">
-        <div className="h-3 w-20 rounded bg-[#f5f5f5]" />
-        <div className="mt-2.5 h-4 w-full rounded bg-[#f5f5f5]" />
-        <div className="mt-1.5 h-4 w-2/3 rounded bg-[#f5f5f5]" />
-        <div className="mt-3 h-3 w-full rounded bg-[#f5f5f5]" />
-        <div className="mt-1.5 h-3 w-4/5 rounded bg-[#f5f5f5]" />
+        <div className="h-3 w-20 rounded bg-[#f9f6ff]" />
+        <div className="mt-2.5 h-4 w-full rounded bg-[#f9f6ff]" />
+        <div className="mt-1.5 h-4 w-2/3 rounded bg-[#f9f6ff]" />
+        <div className="mt-3 h-3 w-full rounded bg-[#f9f6ff]" />
+        <div className="mt-1.5 h-3 w-4/5 rounded bg-[#f9f6ff]" />
         <div className="mt-4 flex items-center justify-between border-t border-[#e8e3f7] pt-4">
-          <div className="h-3 w-16 rounded bg-[#f5f5f5]" />
-          <div className="h-3 w-14 rounded bg-[#f5f5f5]" />
+          <div className="h-3 w-16 rounded bg-[#f9f6ff]" />
+          <div className="h-3 w-14 rounded bg-[#f9f6ff]" />
         </div>
       </div>
     </div>

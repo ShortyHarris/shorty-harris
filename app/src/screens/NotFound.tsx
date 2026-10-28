@@ -51,7 +51,7 @@ export function NotFound() {
           </Link>
           <Link
             to="/blog"
-            className="inline-flex items-center justify-center h-11 px-6 rounded-full border border-[#d4d4d4] bg-white text-[#0e0822] text-[14.5px] font-semibold no-underline hover:bg-[#f5f5f5] transition-colors"
+            className="inline-flex items-center justify-center h-11 px-6 rounded-full border border-[#e8e3f7] bg-white text-[#0e0822] text-[14.5px] font-semibold no-underline hover:bg-[#f5f5f5] transition-colors"
           >
             Read the blog
           </Link>

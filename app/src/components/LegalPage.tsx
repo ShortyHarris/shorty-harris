@@ -32,9 +32,9 @@ export function LegalPage({
 
         <style>{`
           .legal-body h2 { font-size: 21px; font-weight: 800; margin: 44px 0 14px; letter-spacing: -0.01em; color: #0e0822; }
-          .legal-body p { font-size: 15.5px; line-height: 1.75; color: #404040; margin: 0 0 16px; }
+          .legal-body p { font-size: 15.5px; line-height: 1.75; color: #0e0822; margin: 0 0 16px; }
           .legal-body ul { margin: 0 0 16px; padding-left: 22px; }
-          .legal-body li { font-size: 15.5px; line-height: 1.75; color: #404040; margin-bottom: 8px; }
+          .legal-body li { font-size: 15.5px; line-height: 1.75; color: #0e0822; margin-bottom: 8px; }
           .legal-body a { color: #7412ef; text-decoration: underline; text-underline-offset: 2px; }
           .legal-body strong { font-weight: 600; color: #0e0822; }
         `}</style>

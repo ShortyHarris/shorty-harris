@@ -206,26 +206,26 @@ function buildHtml(template: string, post: BlogPostRow): string {
   const bodyHtml = marked.parse(expandInternalLinks(post.body_md || ''), { async: false }) as string;
   if (hasInternalLink(bodyHtml)) throw new Error('rendered body still contains "internal_link"');
   const excerptHtml = post.excerpt
-    ? `<p class="mt-5 text-[17px] sm:text-[19px] leading-relaxed text-[#54574e]">${escapeHtml(post.excerpt)}</p>`
+    ? `<p class="mt-5 text-[17px] sm:text-[19px] leading-relaxed text-[#605978]">${escapeHtml(post.excerpt)}</p>`
     : '';
   const imageHtml = image
-    ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(post.title)}" width="1200" height="630" class="mt-10 aspect-[1200/630] w-full rounded-2xl bg-[#f0ede6] object-cover" />`
+    ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(post.title)}" width="1200" height="630" class="mt-10 aspect-[1200/630] w-full rounded-2xl bg-[#f1e9ff] object-cover" />`
     : '';
 
-  const rootContent = `<div style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif" class="min-h-screen bg-white text-[#1a1b17]">
+  const rootContent = `<div style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif" class="min-h-screen bg-white text-[#0e0822]">
       <main class="max-w-[680px] mx-auto px-6 pt-14 pb-24">
-        <span class="text-[12.5px] font-bold uppercase tracking-[.1em] text-[#3c7a5b]">${escapeHtml(categoryLabel)}</span>
+        <span class="text-[12.5px] font-semibold uppercase tracking-[.1em] text-[#7412ef]">${escapeHtml(categoryLabel)}</span>
         <h1 class="mt-4 mb-0 text-[30px] sm:text-[38px] lg:text-[44px] font-extrabold leading-[1.15] tracking-tight">${escapeHtml(post.title)}</h1>
         ${excerptHtml}
-        <div class="mt-8 flex items-center gap-3 border-y border-[#ece8df] py-4">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#edf4ef] text-[13px] font-bold text-[#3c7a5b]">${escapeHtml(initials(author))}</div>
+        <div class="mt-8 flex items-center gap-3 border-y border-[#e8e3f7] py-4">
+          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f1e9ff] text-[13px] font-semibold text-[#7412ef]">${escapeHtml(initials(author))}</div>
           <div class="flex flex-col leading-tight">
-            <span class="text-[13.5px] font-semibold text-[#1a1b17]">${escapeHtml(author)}</span>
-            <span class="text-[12.5px] text-[#9a9d92]">${escapeHtml(formatDate(post.published_at))}</span>
+            <span class="text-[13.5px] font-semibold text-[#0e0822]">${escapeHtml(author)}</span>
+            <span class="text-[12.5px] text-[#605978]">${escapeHtml(formatDate(post.published_at))}</span>
           </div>
         </div>
         ${imageHtml}
-        <div class="blog-post-body" style="font-size:17px;line-height:1.85;color:#262620;margin-top:44px;">${bodyHtml}</div>
+        <div class="blog-post-body" style="font-size:17px;line-height:1.85;color:#0e0822;margin-top:44px;">${bodyHtml}</div>
       </main>
     </div>`;
 

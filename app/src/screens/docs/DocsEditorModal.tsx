@@ -10,10 +10,10 @@ import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { RequiredMark } from '../../components/RequiredMark';
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
-const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
 const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 const ghostCls = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
-const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
+const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
 
 const AUDIENCE_OPTIONS: DocsArticle['audience'][] = ['client', 'admin', 'both', 'internal'];
 
@@ -62,7 +62,7 @@ export function DocsEditorModal({
       >
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
           <div>
-            <h2 className="m-0 text-[18px] font-bold text-(--ad-ink)">Edit article</h2>
+            <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Edit article</h2>
             <p className="m-0 mt-0.5 text-[12px] text-(--ad-ink-faint)">{article.slug} · v{article.version}</p>
           </div>
           <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
@@ -122,14 +122,14 @@ export function DocsEditorModal({
                 <button
                   type="button"
                   onClick={() => setTab('write')}
-                  className={`cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-bold ${tab === 'write' ? 'bg-(--ad-green) text-white' : 'bg-transparent text-(--ad-ink-soft)'}`}
+                  className={`cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-semibold ${tab === 'write' ? 'bg-(--ad-green) text-white' : 'bg-transparent text-(--ad-ink-soft)'}`}
                 >
                   Write
                 </button>
                 <button
                   type="button"
                   onClick={() => setTab('preview')}
-                  className={`cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-bold ${tab === 'preview' ? 'bg-(--ad-green) text-white' : 'bg-transparent text-(--ad-ink-soft)'}`}
+                  className={`cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-semibold ${tab === 'preview' ? 'bg-(--ad-green) text-white' : 'bg-transparent text-(--ad-ink-soft)'}`}
                 >
                   Preview
                 </button>

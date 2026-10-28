@@ -60,7 +60,7 @@ function useActiveSection(enabled: boolean, ids: string[]) {
 const linkBase =
   'relative inline-flex items-center h-9 px-3.5 rounded-full text-[14px] no-underline whitespace-nowrap transition-colors cursor-pointer border-0 bg-transparent';
 const linkIdle = 'font-medium text-[#605978] hover:text-[#0e0822] hover:bg-[#f9f6ff]';
-const linkActive = 'font-semibold text-[#0e0822] bg-[#e9dfca]';
+const linkActive = 'font-semibold text-[#0e0822] bg-[#f1e9ff]';
 
 export function PublicNav() {
   const location = useLocation();
@@ -206,7 +206,7 @@ export function PublicNav() {
                   onClick={() => go(item)}
                   aria-current={active ? 'page' : undefined}
                   className={`flex items-center justify-between rounded-xl px-4 h-13 text-[16px] text-left border-0 cursor-pointer transition-colors ${
-                    active ? 'bg-[#e9dfca] text-[#0e0822] font-semibold' : 'bg-transparent text-[#46423a] font-medium hover:bg-[#f9f6ff]'
+                    active ? 'bg-[#f1e9ff] text-[#0e0822] font-semibold' : 'bg-transparent text-[#605978] font-medium hover:bg-[#f9f6ff]'
                   }`}
                 >
                   {item.label}

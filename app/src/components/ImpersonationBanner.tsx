@@ -4,8 +4,8 @@ import { Eye, Pencil, X } from 'lucide-react';
 // Fixed colours rather than --ad-* tokens: the admin dark theme flips
 // --ad-black to a light value, which would put white text on a light bar.
 // Edit mode is dark amber so it's unmistakable that changes are live.
-const VIEW_BG = '#1c1e19';
-const EDIT_BG = '#8a6417';
+const VIEW_BG = '#0e0822';
+const EDIT_BG = '#5b0fc2';
 
 export function ImpersonationBanner({
   businessName, editMode, onToggleEdit, onExit,
@@ -40,8 +40,8 @@ export function ImpersonationBanner({
         : <Eye size={15} className="shrink-0 text-(--ad-amber-line)" aria-hidden />}
       <span className="text-center">
         {editMode
-          ? <>Editing <strong className="font-bold">{businessName}</strong> as admin - changes are live</>
-          : <>Viewing as <strong className="font-bold">{businessName}</strong> - read-only</>}
+          ? <>Editing <strong className="font-semibold">{businessName}</strong> as admin - changes are live</>
+          : <>Viewing as <strong className="font-semibold">{businessName}</strong> - read-only</>}
       </span>
       <button onClick={onToggleEdit} className={btnCls}>
         {editMode ? <><Eye size={12} aria-hidden /> Back to view only</> : <><Pencil size={12} aria-hidden /> Edit as admin</>}

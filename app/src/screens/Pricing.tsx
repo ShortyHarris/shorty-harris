@@ -152,7 +152,7 @@ function ListBlock({ title, items, tone }: { title: string; items: string[]; ton
       <h2 className="text-[24px] font-semibold tracking-[-0.02em] m-0 mb-6">{title}</h2>
       <ul className="m-0 p-0 list-none flex flex-col gap-3.5">
         {items.map((t) => (
-          <li key={t} className="flex items-start gap-3 text-[16px] leading-[1.5] text-[#46423a]">
+          <li key={t} className="flex items-start gap-3 text-[16px] leading-[1.5] text-[#605978]">
             <Check
               size={18}
               strokeWidth={2.4}
