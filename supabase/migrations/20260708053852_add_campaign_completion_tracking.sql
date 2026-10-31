@@ -1,0 +1,1 @@
+alter table campaigns add column if not exists completion_notified_at timestamptz;

@@ -1,0 +1,1 @@
+create unique index if not exists payments_checkout_session_uniq on public.payments (stripe_checkout_session_id) where stripe_checkout_session_id is not null;

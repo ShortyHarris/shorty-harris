@@ -1,0 +1,2 @@
+ALTER TABLE prospects DROP CONSTRAINT prospects_pipeline_status_check;
+ALTER TABLE prospects ADD CONSTRAINT prospects_pipeline_status_check CHECK (pipeline_status = ANY (ARRAY['new','contacted','replied','hot_lead','won','lost','generation_failed','message_pending','generating']));

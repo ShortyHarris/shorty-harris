@@ -1,0 +1,1 @@
+alter view public.client_usage set (security_invoker = true);

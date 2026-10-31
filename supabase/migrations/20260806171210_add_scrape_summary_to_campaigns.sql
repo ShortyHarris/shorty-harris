@@ -1,0 +1,2 @@
+alter table campaigns add column last_scrape_summary jsonb;
+comment on column campaigns.last_scrape_summary is 'Breakdown of the most recent scrape: total_scraped, total_with_email, skipped_dnc, skipped_duplicate, new_prospects. Lets the frontend distinguish "found nothing new because everything was already a prospect" from "found nothing" from a real failure.';

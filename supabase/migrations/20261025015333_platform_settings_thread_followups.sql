@@ -1,0 +1,1 @@
+alter table public.platform_settings add column if not exists thread_followups boolean not null default false;

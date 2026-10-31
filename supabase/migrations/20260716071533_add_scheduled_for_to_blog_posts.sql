@@ -1,0 +1,1 @@
+alter table public.blog_posts add column if not exists scheduled_for timestamptz;

@@ -1,0 +1,1 @@
+alter table campaigns alter column scrape_enabled set default true;

@@ -1,0 +1,1 @@
+alter table client_website_enrichment add column if not exists business_name text;

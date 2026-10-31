@@ -1,0 +1,2 @@
+ALTER TABLE public.replies ADD COLUMN IF NOT EXISTS gmail_message_id text;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_reply_gmail_message_id ON replies (gmail_message_id) WHERE gmail_message_id IS NOT NULL AND gmail_message_id != '';
