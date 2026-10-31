@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { useClientDashboard } from '../../hooks/useClientDashboard';
-import { useClientApprovals } from '../../hooks/useClientApprovals';
+import { useApprovedQueueCounts } from '../../hooks/useClientApprovals';
 import { useWarmProspects, useProspectMessages, type WarmProspect, type CallOutcome } from '../../hooks/useWarmProspects';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import type { HotLead, HotLeadStatus, CallOutcomeValue } from '../../types';
@@ -122,7 +122,7 @@ export function Dashboard({
   markViewedOnOpen?: boolean;
 }) {
   const { summary, leads, loading, error, setOutcome: setOutcomeRaw, reload, isFetching, dataUpdatedAt } = useClientDashboard(clientId, client);
-  const { awaitingProspects = 0 } = useClientApprovals(clientId, client);
+  const { awaitingProspects } = useApprovedQueueCounts(clientId, client);
   const { prospects: warmProspects, loading: warmLoading, logCallOutcome: logCallOutcomeRaw } = useWarmProspects(clientId, client);
   const { toasts, toast, dismiss } = useToast();
   // Toast every real action. The automatic new -> viewed flip on open stays

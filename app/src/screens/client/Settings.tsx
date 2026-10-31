@@ -75,7 +75,7 @@ function ProfileSection({ clientId, onSaved, onError }: { clientId: string; onSa
         <span className="flex-1 min-w-0">
           <span className="block truncate text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>{profile.business_name}</span>
           <span className="block truncate text-[13px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>
-            {profile.contact_name ? `Signs as ${profile.contact_name}` : 'Tap to add your business info'}
+            {profile.representative_name ? `Signs as ${profile.representative_name}` : 'Tap to add your business info'}
           </span>
         </span>
         <ChevronRight size={16} style={{ color: 'var(--ink-faint)' }} />
@@ -110,6 +110,7 @@ function ProfileEditModal({
     contact_email: profile.contact_email ?? '',
     contact_phone: profile.contact_phone ?? '',
     contact_name: profile.contact_name ?? '',
+    representative_name: profile.representative_name ?? '',
     notification_channel: profile.notification_channel ?? 'whatsapp',
     country: profile.country ?? '',
     privacy_url: profile.privacy_url ?? '',
@@ -169,10 +170,18 @@ function ProfileEditModal({
 
         <div className="flex-1 overflow-y-auto px-5 py-5">
           <div className="mb-4">
-            <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Representative name</label>
-            <input value={form.contact_name} onChange={(e) => set('contact_name', e.target.value)} placeholder="e.g. Yvonne" style={inputStyle} className={inputCls} />
+            <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Signs emails as</label>
+            <input value={form.representative_name} onChange={(e) => set('representative_name', e.target.value)} placeholder="e.g. Yvonne" style={inputStyle} className={inputCls} />
             <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>
-              Used to sign outreach emails - e.g. "Have a wonderful day, {form.contact_name || '…'}"
+              First name only. Leave empty to sign with your business name.
+            </p>
+          </div>
+
+          <div className="mb-4">
+            <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Contact name</label>
+            <input value={form.contact_name} onChange={(e) => set('contact_name', e.target.value)} style={inputStyle} className={inputCls} />
+            <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>
+              Who we contact about your account. Not used to sign emails.
             </p>
           </div>
 

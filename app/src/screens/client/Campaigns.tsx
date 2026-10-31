@@ -914,7 +914,7 @@ function CampaignDetailModal({
   const hotLeads  = prospects.filter((p) => p.pipeline_status === 'hot_lead').length;
   // Prospects with a draft awaiting review (distinct, this campaign only). Not
   // pipeline_status 'message_pending', which means "email not written yet".
-  const pendingApproval = useCampaignPendingProspects(campaign.id, client);
+  const pendingApproval = useCampaignPendingProspects(clientId, campaign.id, client);
 
   function startEdit() {
     setErr(null);

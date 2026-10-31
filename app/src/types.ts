@@ -119,6 +119,11 @@ export interface ClientMessageItem {
   observation_source_url?: string | null;
   /** From message_block_reasons; only set on approved drafts that aren't simply sendable. */
   block_reason?: string | null;
+  /** From approved_queue: status of the draft's campaign (draft/paused/cancelled explain campaign_inactive). */
+  campaign_status?: string | null;
+  /** From approved_queue: held by the generic/freemail send rules. Only ever true for admins. */
+  policy_held?: boolean;
+  approved_at?: string | null;
   prospect: {
     id: string;
     business_name: string;

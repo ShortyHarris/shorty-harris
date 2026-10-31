@@ -7,6 +7,7 @@ export type BlockReason =
   | 'country_hold'
   | 'do_not_contact'
   | 'sequence_paused'
+  | 'followups_stopped'
   | 'campaign_inactive'
   | 'prospect_status'
   | 'unsubscribe_unhealthy'
@@ -41,6 +42,11 @@ export const BLOCK_INFO: Record<BlockReason, BlockInfo> = {
     badge: 'Paused', tone: 'paused',
     text: 'Paused',
   },
+  followups_stopped: {
+    badge: 'Blocked', tone: 'blocked',
+    text: "Won't send: follow-ups for this prospect were stopped",
+  },
+  // Fallback when the campaign status isn't known; blockInfo() splits it by status.
   campaign_inactive: {
     badge: 'Paused', tone: 'paused',
     text: 'Paused',
@@ -62,7 +68,17 @@ export const BLOCK_INFO: Record<BlockReason, BlockInfo> = {
 // Unknown codes (a newer view than this build) still read as blocked.
 const FALLBACK: BlockInfo = { badge: 'Blocked', tone: 'blocked', text: "Won't send right now" };
 
-export function blockInfo(reason: string): BlockInfo {
+// campaign_inactive covers three different situations, told apart by the campaign's status.
+const CAMPAIGN_INACTIVE_INFO: Record<string, BlockInfo> = {
+  draft:     { badge: 'Campaign not launched', tone: 'paused',  text: 'Campaign not launched' },
+  paused:    { badge: 'Campaign paused',       tone: 'paused',  text: 'Campaign paused' },
+  cancelled: { badge: 'Campaign cancelled',    tone: 'blocked', text: 'Campaign cancelled' },
+};
+
+export function blockInfo(reason: string, campaignStatus?: string | null): BlockInfo {
+  if (reason === 'campaign_inactive' && campaignStatus && CAMPAIGN_INACTIVE_INFO[campaignStatus]) {
+    return CAMPAIGN_INACTIVE_INFO[campaignStatus];
+  }
   return BLOCK_INFO[reason as BlockReason] ?? FALLBACK;
 }
 

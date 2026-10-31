@@ -299,7 +299,7 @@ function ImpersonateZone() {
           {/* Deleting a campaign wipes its prospects and messages - never from here. */}
           <Route path="campaigns" element={<ClientCampaigns clientId={clientId} client={client} readOnly={readOnly} canDelete={false} basePath={basePath} />} />
           <Route path="prospects" element={<Prospects clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} />} />
-          <Route path="approvals" element={<Approvals clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} isAdmin />} />
+          <Route path="approvals" element={<Approvals clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} />} />
           <Route path="analytics" element={<ClientAnalytics clientId={clientId} client={client} />} />
           <Route path="results" element={<Results clientId={clientId} client={client} basePath={basePath} />} />
           <Route path="targeting" element={<TargetingProfile clientId={clientId} client={client} readOnly={readOnly} />} />

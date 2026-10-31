@@ -170,53 +170,6 @@ export function pendingSinceOf(item: SortableApproval, schedule?: ScheduleMap): 
   return item.pending_since ?? schedule?.get(item.id)?.pending_since ?? item.created_at;
 }
 
-// ── Messages held by the client's send rules ─────────────────────────────────
-// The client never sees these (they are not theirs to act on); admins do.
-
-export function heldRows(schedule: ScheduleMap): ScheduleRow[] {
-  return Array.from(schedule.values()).filter((r) => r.basis === 'held_by_send_rules');
-}
-
-export interface ApprovedLists<T extends { id: string }> {
-  sendable: T[];
-  blocked: T[];
-  counts: { sendable: number; blocked: number };
-}
-
-/**
- * Removes held messages from the approved lists and their counts. A held message
- * that is in neither loaded list (the lists are capped) comes off the sendable count.
- */
-export function excludeHeldDrafts<T extends { id: string }, L extends ApprovedLists<T>>(data: L, held: ScheduleRow[]): L {
-  const heldApproved = held.filter((r) => r.approval_status === 'approved');
-  if (heldApproved.length === 0) return data;
-  const ids = new Set(heldApproved.map((r) => r.message_id));
-  const inSendable = data.sendable.filter((m) => ids.has(m.id)).length;
-  const inBlocked = data.blocked.filter((m) => ids.has(m.id)).length;
-  const unloaded = Math.max(0, heldApproved.length - inSendable - inBlocked);
-  return {
-    ...data,
-    sendable: data.sendable.filter((m) => !ids.has(m.id)),
-    blocked: data.blocked.filter((m) => !ids.has(m.id)),
-    counts: {
-      sendable: Math.max(0, data.counts.sendable - inSendable - unloaded),
-      blocked: Math.max(0, data.counts.blocked - inBlocked),
-    },
-  };
-}
-
-/** Takes held messages out of the stat tiles (held ones are unsent, so Sent Today is unaffected). */
-export function adjustApprovalStats<S extends { pending: number; approvedToday: number }>(
-  stats: S, held: ScheduleRow[], heldApprovedToday: number,
-): S {
-  const heldPending = held.filter((r) => r.approval_status === 'pending').length;
-  return {
-    ...stats,
-    pending: Math.max(0, stats.pending - heldPending),
-    approvedToday: Math.max(0, stats.approvedToday - heldApprovedToday),
-  };
-}
-
 const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
 
 function stepIndex(messageType: string): number {

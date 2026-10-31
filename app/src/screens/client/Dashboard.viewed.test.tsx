@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import type { ReactElement } from 'react';
 import { Dashboard } from './Dashboard';
 import { useClientDashboard } from '../../hooks/useClientDashboard';
-import { useClientApprovals } from '../../hooks/useClientApprovals';
+import { useApprovedQueueCounts } from '../../hooks/useClientApprovals';
 import { useWarmProspects } from '../../hooks/useWarmProspects';
 import type { HotLead } from '../../types';
 
@@ -47,7 +47,7 @@ describe('Dashboard: opening a hot lead marks it viewed', () => {
 
   beforeEach(() => {
     setOutcome.mockClear();
-    (useClientApprovals as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ items: [] });
+    (useApprovedQueueCounts as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ awaitingProspects: 0 });
     (useWarmProspects as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       prospects: [], loading: false, logCallOutcome: vi.fn(),
     });
@@ -103,7 +103,7 @@ describe('Dashboard: status filters', () => {
 
   beforeEach(() => {
     setOutcome.mockClear();
-    (useClientApprovals as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ items: [] });
+    (useApprovedQueueCounts as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ awaitingProspects: 0 });
     (useWarmProspects as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       prospects: [], loading: false, logCallOutcome: vi.fn(),
     });

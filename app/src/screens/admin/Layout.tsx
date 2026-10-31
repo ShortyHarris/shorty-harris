@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, LogOut, Bell, Sun, Moon,
   ClipboardCheck, Flame, Newspaper,
-  Building2, Users, Megaphone, BarChart2, Activity, BookOpen, ShieldAlert, Filter,
+  Building2, Users, Megaphone, BarChart2, Activity, BookOpen, ShieldAlert, Filter, Ban,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { BrandLockup } from '../../components/BrandLockup';
@@ -23,6 +23,7 @@ import { Monitoring } from './Monitoring';
 import { AdminResults } from './AdminResults';
 import { DocsAdmin } from './DocsAdmin';
 import { Domains } from './Domains';
+import { HeldDrafts } from './HeldDrafts';
 import '../../styles/theme-admin.css';
 import '../../styles/admin-tables.css';
 import './Layout.css';
@@ -57,6 +58,7 @@ export function AdminLayout() {
   ];
   const NAV_OPS: NavItem[] = [
     { to: '/admin/clients',    label: 'Clients',    icon: Building2  },
+    { to: '/admin/held-drafts', label: 'Held drafts', icon: Ban       },
     { to: '/admin/prospects',  label: 'Prospects',  icon: Users      },
     { to: '/admin/campaigns',  label: 'Campaigns',  icon: Megaphone, badge: campaignsToReview, badgeColor: 'var(--ad-purple)' },
     { to: '/admin/results',    label: 'Results',    icon: Filter     },
@@ -132,6 +134,7 @@ export function AdminLayout() {
               <Route path="approvals"  element={<ApprovalQueue />} />
               <Route path="blog"       element={<Blog />} />
               <Route path="clients"    element={<Clients />} />
+              <Route path="held-drafts" element={<HeldDrafts />} />
               <Route path="prospects"  element={<Prospects />} />
               <Route path="campaigns"  element={<Campaigns />} />
               <Route path="hot-leads"  element={<HotLeads />} />

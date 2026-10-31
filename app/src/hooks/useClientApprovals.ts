@@ -1,18 +1,15 @@
-import { useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
 import { useAuth } from '../auth/AuthProvider';
 import type { ClientMessageItem } from '../types';
-import { fetchAllRows } from '../lib/fetchAllRows';
+import { MAX_LOADED_ROWS } from '../lib/fetchAllRows';
 import { runInChunks, type ChunkedResult } from '../lib/chunkedBulk';
-import { TERMINAL_PIPELINE_STATUSES } from '../lib/pipelineStatus';
-import { campaignPendingProspectsPrefix } from './useClientCampaigns';
-import { POLICY_HELD_REASONS } from '../lib/blockReasons';
 import { saveDraftEdits } from '../lib/draftEdits';
-import { startOfDayInTz, browserTimeZone, heldRows, excludeHeldDrafts, adjustApprovalStats } from '../lib/approvalsView';
-import { approvalsScheduleKey, useApprovalsSchedule } from './useApprovalsSchedule';
+import { browserTimeZone } from '../lib/approvalsView';
+import { approvalsScheduleKey } from './useApprovalsSchedule';
 import { useClientProfile } from './useClientProfile';
 
 // Returned when an update matched no pending row (already approved or
@@ -20,91 +17,181 @@ import { useClientProfile } from './useClientProfile';
 const ALREADY_HANDLED = 'this draft was already handled - the list has been refreshed';
 
 export const clientApprovalsKey =(clientId: string) => ['client-approvals', clientId] as const;
-export const clientApprovalsStatsKey = (clientId: string) => ['client-approvals-stats', clientId] as const;
 export const clientPendingCountKey = (clientId: string) => ['client-approvals-pending-count', clientId] as const;
-export const clientAwaitingProspectsKey = (clientId: string) => ['client-awaiting-prospects', clientId] as const;
-// includeHeld is a trailing element, so invalidating [key, clientId] matches both variants.
-export const clientApprovedKey = (clientId: string, includeHeld = false) =>
-  includeHeld ? (['client-approved-drafts', clientId, true] as const) : (['client-approved-drafts', clientId] as const);
+// The approved_queue RPC carries the tab counts, the stat tiles and one page of rows, so a
+// single prefix invalidates all of them. The request params are a trailing element.
+export const clientApprovedKey = (clientId: string) => ['client-approved-drafts', clientId] as const;
 
 function invalidateApprovalQueries(clientId: string) {
-  queryClient.invalidateQueries({ queryKey: campaignPendingProspectsPrefix });
   queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
-  queryClient.invalidateQueries({ queryKey: clientApprovalsStatsKey(clientId) });
   queryClient.invalidateQueries({ queryKey: clientPendingCountKey(clientId) });
   queryClient.invalidateQueries({ queryKey: approvalsScheduleKey(clientId) });
-  queryClient.invalidateQueries({ queryKey: ['client-approvals-held-approved-today', clientId] });
-  queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
   queryClient.invalidateQueries({ queryKey: clientApprovedKey(clientId) });
 }
 
-// How many of these messages were approved since `iso` (ids go in the URL, so in batches).
-async function countApprovedSince(client: SupabaseClient, ids: string[], iso: string): Promise<number> {
-  let total = 0;
-  for (let i = 0; i < ids.length; i += 150) {
-    const { count, error } = await client.from('messages').select('id', { count: 'exact', head: true })
-      .in('id', ids.slice(i, i + 150)).eq('approval_status', 'approved').gte('approved_at', iso);
-    if (error) throw new Error(error.message);
-    total += count ?? 0;
-  }
-  return total;
-}
-
-// Head count only - what the sidebar badge needs, without loading any drafts.
-// Drafts held by send rules are not the client's to act on, so they are left out.
+// Head count only - what the sidebar badge needs, without loading any drafts. It comes from
+// approved_queue, so it is the same number the Approvals page shows: drafts held by the send rules
+// are not counted for a client.
 export function usePendingApprovalCount(clientId: string): number {
-  const { schedule, scheduleReady } = useApprovalsSchedule(clientId);
-  const heldPending = heldRows(schedule).filter((r) => r.approval_status === 'pending').length;
   const { data = 0 } = useQuery({
     queryKey: clientPendingCountKey(clientId),
-    queryFn: async () => {
-      const { count, error } = await supabase.from('messages').select('id', { count: 'exact', head: true })
-        .eq('client_id', clientId).eq('approval_status', 'pending');
-      if (error) throw new Error(error.message);
-      return count ?? 0;
-    },
+    queryFn: async () => (await fetchApprovedQueue(clientId, supabase, PENDING_COUNT_ONLY)).counts.pending,
     enabled: !!clientId && clientId !== '__preview__',
     staleTime: 30 * 1000,
   });
-  // Until the schedule is known the held rows can't be told apart, so show nothing
-  // rather than a count that includes drafts the client must not see.
-  if (!scheduleReady && clientId !== '__preview__') return 0;
-  return Math.max(0, data - heldPending);
+  return data;
 }
 
-// Prospects still in play that have at least one drafted email waiting on
-// approval. Same exclusions as the approve_sequences RPC.
+// ── approved_queue RPC ───────────────────────────────────────────────────────
+// One call returns the tab counts, the stat tiles and one page of rows, all derived
+// server-side from the same rows. Who is asking (admin vs client) is decided inside
+// the RPC with is_admin(); drafts held by the generic-mailbox / freemail rules are
+// simply never returned to a client. Nothing here filters or adjusts the result.
 
-async function fetchAwaitingProspects(clientId: string, client: SupabaseClient): Promise<number> {
-  const { count, error } = await client
-    .from('prospects')
-    .select('id, messages!inner(id)', { count: 'exact', head: true })
-    .eq('client_id', clientId)
-    .not('pipeline_status', 'in', TERMINAL_PIPELINE_STATUSES)
-    .eq('messages.approval_status', 'pending')
-    .eq('messages.send_status', 'not_sent');
+export type ApprovedQueueTab = 'approved' | 'blocked' | 'pending';
+export type ApprovedQueueSort = 'approved_desc' | 'approved_asc' | 'prospect_asc' | 'prospect_desc';
+
+// What the server pages Approved and Blocked by. The scheduled-send and pending-since sorts only
+// exist on the Pending tab, which sorts in the browser.
+export const DEFAULT_QUEUE_SORT: ApprovedQueueSort = 'approved_desc';
+export const QUEUE_SORT_OPTIONS: { value: ApprovedQueueSort; label: string }[] = [
+  { value: 'approved_desc', label: 'Approved (newest first)' },
+  { value: 'approved_asc', label: 'Approved (oldest first)' },
+  { value: 'prospect_asc', label: 'Prospect A-Z' },
+  { value: 'prospect_desc', label: 'Prospect Z-A' },
+];
+
+export interface ApprovedQueueParams {
+  tab: ApprovedQueueTab;
+  /** 1-based. */
+  page: number;
+  pageSize: number;
+  sort: ApprovedQueueSort;
+  messageType: string | null;
+  /** Exact block reason, e.g. 'campaign_inactive'. */
+  reason: string | null;
+}
+
+export interface ApprovedQueueCounts {
+  /** Everything approved and not yet sent that this viewer may see. */
+  approved: number;
+  sendable: number;
+  /** Follow-ups waiting for their send date. */
+  scheduled: number;
+  blocked: number;
+  /** Held by the generic/freemail rules. Always 0 for a client. */
+  policyHeld: number;
+  /** Pending drafts this viewer may see (a client's count leaves out drafts held by the send rules). */
+  pending: number;
+  /** Pending drafts held by the send rules. Always 0 for a client. */
+  pendingPolicyHeld: number;
+  /** Distinct prospects with a visible pending draft that is still in play: the Dashboard's "awaiting approval". */
+  awaitingProspects: number;
+  /** campaign id -> distinct prospects with a visible pending draft. A missing key means 0. */
+  awaitingProspectsByCampaign: Record<string, number>;
+}
+
+export interface ClientApprovalStats {
+  pending: number;
+  approvedToday: number;
+  sentToday: number;
+  /** Rejected today by a signed-in user (system rejections are not counted). */
+  rejectedToday: number;
+  rejectedTotal: number;
+}
+
+export interface ApprovedQueue {
+  /** One page of the selected tab. */
+  items: ClientMessageItem[];
+  /** Rows matching the selected tab and filters, across all pages. */
+  total: number;
+  counts: ApprovedQueueCounts;
+  stats: ClientApprovalStats;
+  isAdmin: boolean;
+  timeZone: string;
+}
+
+export const EMPTY_STATS: ClientApprovalStats = {
+  pending: 0, approvedToday: 0, sentToday: 0, rejectedToday: 0, rejectedTotal: 0,
+};
+
+export const EMPTY_COUNTS: ApprovedQueueCounts = {
+  approved: 0, sendable: 0, scheduled: 0, blocked: 0, policyHeld: 0,
+  pending: 0, pendingPolicyHeld: 0, awaitingProspects: 0, awaitingProspectsByCampaign: {},
+};
+
+// Counts and stats only: one row is enough, the RPC returns them with every page.
+const COUNTS_ONLY: ApprovedQueueParams = {
+  tab: 'approved', page: 1, pageSize: 1, sort: 'approved_desc', messageType: null, reason: null,
+};
+const PENDING_COUNT_ONLY: ApprovedQueueParams = { ...COUNTS_ONLY, tab: 'pending' };
+// The Pending list is loaded whole (sorting by scheduled send and pending since needs the schedule,
+// which only the browser has) in pages of the RPC's maximum size, oldest first as the server orders it.
+const PENDING_PAGE_SIZE = 200;
+
+interface RawApprovedQueue {
+  ok?: boolean;
+  error?: string;
+  is_admin?: boolean;
+  time_zone?: string;
+  total?: number;
+  counts?: Record<string, number> & { awaiting_prospects_by_campaign?: unknown };
+  stats?: Record<string, number>;
+  rows?: Record<string, unknown>[];
+}
+
+function toCountMap(v: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    for (const [k, n] of Object.entries(v as Record<string, unknown>)) if (typeof n === 'number') out[k] = n;
+  }
+  return out;
+}
+
+/** Maps the RPC body straight to the UI shape. No arithmetic: the server already did it. */
+export function parseApprovedQueue(body: RawApprovedQueue | null): ApprovedQueue {
+  if (!body || body.ok === false) throw new Error(body?.error ?? 'not_permitted');
+  const c = body.counts ?? {};
+  const s = body.stats ?? {};
+  return {
+    items: normalizeRows(body.rows),
+    total: body.total ?? 0,
+    counts: {
+      approved: c.approved ?? 0,
+      sendable: c.sendable ?? 0,
+      scheduled: c.scheduled ?? 0,
+      blocked: c.blocked ?? 0,
+      policyHeld: c.policy_held ?? 0,
+      pending: c.pending ?? 0,
+      pendingPolicyHeld: c.pending_policy_held ?? 0,
+      awaitingProspects: c.awaiting_prospects ?? 0,
+      awaitingProspectsByCampaign: toCountMap(c.awaiting_prospects_by_campaign),
+    },
+    stats: {
+      pending: s.pending ?? 0,
+      approvedToday: s.approved_today ?? 0,
+      sentToday: s.sent_today ?? 0,
+      rejectedToday: s.rejected_today ?? 0,
+      rejectedTotal: s.rejected_total ?? 0,
+    },
+    isAdmin: body.is_admin ?? false,
+    timeZone: body.time_zone ?? browserTimeZone(),
+  };
+}
+
+export async function fetchApprovedQueue(clientId: string, client: SupabaseClient, p: ApprovedQueueParams): Promise<ApprovedQueue> {
+  const { data, error } = await client.rpc('approved_queue', {
+    p_client_id: clientId,
+    p_tab: p.tab,
+    p_reason: p.reason,
+    p_message_type: p.messageType,
+    p_sort: p.sort,
+    p_limit: p.pageSize,
+    p_offset: (Math.max(1, p.page) - 1) * p.pageSize,
+  });
   if (error) throw new Error(error.message);
-  return count ?? 0;
+  return parseApprovedQueue(data as RawApprovedQueue | null);
 }
-
-// Approved-but-not-sent drafts are capped per list so a big backlog can't make
-// the page (or the id lists sent back to PostgREST) unbounded.
-export const APPROVED_LIST_LIMIT = 200;
-
-export interface ApprovedDrafts {
-  /** Sendable or scheduled drafts, newest approval first (capped). */
-  sendable: ClientMessageItem[];
-  /** Drafts the send pipeline will skip, with block_reason set (capped). */
-  blocked: ClientMessageItem[];
-  /** True totals - the lists above may be shorter than these. */
-  counts: { sendable: number; blocked: number };
-}
-
-const MESSAGE_SELECT = `
-  id, prospect_id, campaign_id, channel, subject, body, message_type,
-  approval_status, created_at, pending_since, angle, observation, observation_source_url,
-  prospect:prospects ( id, business_name, contact_name, email, phone, category, location )
-`;
 
 function normalizeRows(data: unknown): ClientMessageItem[] {
   return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
@@ -113,141 +200,57 @@ function normalizeRows(data: unknown): ClientMessageItem[] {
   })) as ClientMessageItem[];
 }
 
-// Drafts held by policy (generic/freemail recipients) are left out of the blocked
-// list and count and out of the sendable list. Admins opt in with includeHeld.
-async function fetchApprovedDrafts(clientId: string, client: SupabaseClient, includeHeld = false): Promise<ApprovedDrafts> {
-  const heldReasons = [...POLICY_HELD_REASONS] as string[];
-  const blockedQuery = client.from('message_block_reasons').select('message_id, reason', { count: 'exact' })
-    .eq('client_id', clientId).neq('reason', 'waiting_followup_timing');
-  const [totalRes, blockedRes, recentRes, heldCountRes] = await Promise.all([
-    client.from('messages').select('id', { count: 'exact', head: true })
-      .eq('client_id', clientId).eq('approval_status', 'approved').eq('send_status', 'not_sent'),
-    (includeHeld ? blockedQuery : blockedQuery.not('reason', 'in', `(${heldReasons.join(',')})`))
-      .limit(APPROVED_LIST_LIMIT),
-    client.from('messages').select(MESSAGE_SELECT)
-      .eq('client_id', clientId).eq('approval_status', 'approved').eq('send_status', 'not_sent')
-      .order('approved_at', { ascending: false })
-      .limit(APPROVED_LIST_LIMIT),
-    // Hidden held drafts are in neither list, so they come out of the sendable total too.
-    includeHeld
-      ? Promise.resolve({ count: 0, error: null })
-      : client.from('message_block_reasons').select('message_id', { count: 'exact', head: true })
-          .eq('client_id', clientId).in('reason', heldReasons),
-  ]);
-  if (totalRes.error) throw new Error(totalRes.error.message);
-  if (blockedRes.error) throw new Error(blockedRes.error.message);
-  if (recentRes.error) throw new Error(recentRes.error.message);
-  if (heldCountRes.error) throw new Error(heldCountRes.error.message);
-
-  const reasonById = new Map<string, string>(
-    (blockedRes.data ?? []).map((r: { message_id: string; reason: string }) => [r.message_id, r.reason]),
-  );
-  const recent = normalizeRows(recentRes.data);
-
-  // Blocked drafts older than the recent window still need their rows.
-  const recentIds = new Set(recent.map((m) => m.id));
-  const missingBlockedIds = Array.from(reasonById.keys()).filter((id) => !recentIds.has(id));
-  let extraBlocked: ClientMessageItem[] = [];
-  if (missingBlockedIds.length > 0) {
-    const res = await client.from('messages').select(MESSAGE_SELECT).in('id', missingBlockedIds);
-    if (res.error) throw new Error(res.error.message);
-    extraBlocked = normalizeRows(res.data);
-  }
-
-  // Scheduled follow-ups only show up in the view under waiting_followup_timing.
-  const { data: scheduledRows, error: schedErr } = await client
-    .from('message_block_reasons').select('message_id')
-    .eq('reason', 'waiting_followup_timing')
-    .in('message_id', recent.map((m) => m.id));
-  if (schedErr) throw new Error(schedErr.message);
-  const scheduledIds = new Set((scheduledRows ?? []).map((r: { message_id: string }) => r.message_id));
-
-  // Hidden held drafts in the recent window must not fall through into "sendable".
-  let heldIds = new Set<string>();
-  if (!includeHeld && recent.length > 0) {
-    const { data: heldRows, error: heldErr } = await client
-      .from('message_block_reasons').select('message_id')
-      .in('reason', heldReasons)
-      .in('message_id', recent.map((m) => m.id));
-    if (heldErr) throw new Error(heldErr.message);
-    heldIds = new Set((heldRows ?? []).map((r: { message_id: string }) => r.message_id));
-  }
-
-  const blocked = [...recent, ...extraBlocked]
-    .filter((m) => reasonById.has(m.id))
-    .map((m) => ({ ...m, block_reason: reasonById.get(m.id)! }));
-  const sendable = recent
-    .filter((m) => !reasonById.has(m.id) && !heldIds.has(m.id))
-    .map((m) => ({ ...m, block_reason: scheduledIds.has(m.id) ? 'waiting_followup_timing' : null }));
-
-  const blockedCount = blockedRes.count ?? blocked.length;
-  const heldCount = heldCountRes.count ?? 0;
-  return {
-    sendable,
-    blocked,
-    counts: { blocked: blockedCount, sendable: Math.max(0, (totalRes.count ?? 0) - blockedCount - heldCount) },
-  };
-}
-
-interface ClientApprovalStats {
-  pending: number;
-  approvedToday: number;
-  sentToday: number;
-  rejected: number;
-}
-
-// Paged: a single select is silently capped at 1000 rows by PostgREST. The id
-// tiebreak keeps page boundaries stable. Callers compare the list length with
-// stats.pending (an exact count) to tell whether it is the whole queue.
+// Pages through approved_queue's pending tab. The server hides drafts held by the send rules from a
+// client and orders by created_at then id, so page boundaries are stable. Callers compare the list
+// length with stats.pending (an exact count) to tell whether it is the whole queue.
 async function fetchPendingMessages(clientId: string, client: SupabaseClient): Promise<ClientMessageItem[]> {
-  const { rows } = await fetchAllRows<Record<string, unknown>>((from, to) =>
-    client
-      .from('messages')
-      .select(MESSAGE_SELECT)
-      .eq('client_id', clientId)
-      .eq('approval_status', 'pending')
-      .order('created_at', { ascending: true })
-      .order('id', { ascending: true })
-      .range(from, to)
-  );
-  return normalizeRows(rows);
+  const rows: ClientMessageItem[] = [];
+  for (let page = 1; rows.length < MAX_LOADED_ROWS; page++) {
+    const q = await fetchApprovedQueue(clientId, client, { ...PENDING_COUNT_ONLY, page, pageSize: PENDING_PAGE_SIZE });
+    rows.push(...q.items);
+    if (q.items.length < PENDING_PAGE_SIZE || rows.length >= q.total) break;
+  }
+  return rows;
 }
 
-// "Today" starts at midnight in the business's send_timezone, not the browser's.
-async function fetchClientStats(clientId: string, client: SupabaseClient, timeZone: string): Promise<ClientApprovalStats> {
-  const iso = startOfDayInTz(timeZone).toISOString();
-
-  const [pending, approvedToday, sentToday, rejected] = await Promise.all([
-    client.from('messages').select('id', { count: 'exact', head: true })
-      .eq('client_id', clientId).eq('approval_status', 'pending'),
-    client.from('messages').select('id', { count: 'exact', head: true })
-      .eq('client_id', clientId).eq('approval_status', 'approved').gte('approved_at', iso),
-    client.from('messages').select('id', { count: 'exact', head: true })
-      .eq('client_id', clientId).eq('send_status', 'sent').gte('sent_at', iso),
-    client.from('messages').select('id', { count: 'exact', head: true })
-      .eq('client_id', clientId).eq('approval_status', 'rejected'),
-  ]);
-
+/**
+ * Counts and stats without any list: one approved_queue call with a page size of 1 (the RPC's
+ * minimum), so at most a single row comes back and it is ignored. It shares its cache entry with
+ * useClientApprovals' counts-only call, so every screen reads the same numbers from one fetch.
+ */
+export function useApprovedQueueCounts(clientId: string, client: SupabaseClient = supabase) {
+  const { data } = useQuery({
+    queryKey: [...clientApprovedKey(clientId), COUNTS_ONLY],
+    queryFn: () => fetchApprovedQueue(clientId, client, COUNTS_ONLY),
+    enabled: !!clientId && clientId !== '__preview__',
+    staleTime: 30 * 1000,
+    placeholderData: keepPreviousData,
+  });
   return {
-    pending: pending.count ?? 0,
-    approvedToday: approvedToday.count ?? 0,
-    sentToday: sentToday.count ?? 0,
-    rejected: rejected.count ?? 0,
+    counts: data?.counts ?? EMPTY_COUNTS,
+    stats: data?.stats ?? EMPTY_STATS,
+    awaitingProspects: data?.counts.awaitingProspects ?? 0,
   };
 }
 
-const EMPTY_STATS: ClientApprovalStats = { pending: 0, approvedToday: 0, sentToday: 0, rejected: 0 };
+/** Distinct prospects with a visible pending draft in one campaign; a campaign absent from the map has none. */
+export function awaitingInCampaign(counts: Pick<ApprovedQueueCounts, 'awaitingProspectsByCampaign'>, campaignId: string): number {
+  return counts.awaitingProspectsByCampaign[campaignId] ?? 0;
+}
 
-// hideSendRuleHeld: leave drafts held by send rules out of the lists, tabs and tiles (client view).
-export function useClientApprovals(clientId: string, client: SupabaseClient = supabase, includeHeld = false, hideSendRuleHeld = false) {
+/**
+ * `queue` selects the Approved/Blocked page to load; pass null while another tab is open
+ * (counts and stats still load, with a single row).
+ */
+export function useClientApprovals(clientId: string, client: SupabaseClient = supabase, queue: ApprovedQueueParams | null = null) {
   const { profile } = useAuth();
   const { profile: clientProfile } = useClientProfile(clientId);
-  const timeZone = clientProfile?.send_timezone ?? browserTimeZone();
 
   const isPreview = clientId === '__preview__';
+  const queueParams = queue ?? COUNTS_ONLY;
 
   const {
-    data: rawItems = [],
+    data: items = [],
     isLoading: itemsLoading,
     isFetching: itemsFetching,
     dataUpdatedAt,
@@ -261,56 +264,24 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
   });
 
   const {
-    data: rawStats = { pending: 0, approvedToday: 0, sentToday: 0, rejected: 0 },
-    isFetching: statsFetching,
-    refetch: refetchStats,
+    data: approvedQueue = null,
+    isFetching: queueFetching,
+    error: queueError,
+    refetch: refetchQueue,
   } = useQuery({
-    queryKey: [...clientApprovalsStatsKey(clientId), timeZone],
-    queryFn: () => fetchClientStats(clientId, client, timeZone),
-    enabled: !!clientId && !isPreview,
-    staleTime: 60 * 1000,
-  });
-
-  const { data: awaitingProspects = 0 } = useQuery({
-    queryKey: clientAwaitingProspectsKey(clientId),
-    queryFn: () => fetchAwaitingProspects(clientId, client),
+    queryKey: [...clientApprovedKey(clientId), queueParams],
+    queryFn: () => fetchApprovedQueue(clientId, client, queueParams),
     enabled: !!clientId && !isPreview,
     staleTime: 30 * 1000,
+    // Keep the old counts on screen while the next tab or page loads.
+    placeholderData: keepPreviousData,
   });
 
-  const { data: rawApproved = null, isFetching: approvedFetching, refetch: refetchApproved } = useQuery({
-    queryKey: clientApprovedKey(clientId, includeHeld),
-    queryFn: () => fetchApprovedDrafts(clientId, client, includeHeld),
-    enabled: !!clientId && !isPreview,
-    staleTime: 30 * 1000,
-  });
+  const awaitingProspects = approvedQueue?.counts.awaitingProspects ?? 0;
 
-  // Drafts held by send rules (from approvals_schedule), hidden from the client's view.
-  const { schedule, scheduleReady } = useApprovalsSchedule(clientId, client);
-  // Fail closed: when held rows must be hidden but the schedule is not loaded (or its fetch
-  // failed), show nothing instead of the unfiltered lists.
-  const gated = hideSendRuleHeld && !isPreview && !scheduleReady;
-  const loading = itemsLoading || gated;
-  const held = useMemo(() => (hideSendRuleHeld ? heldRows(schedule) : []), [schedule, hideSendRuleHeld]);
-  const heldIds = useMemo(() => new Set(held.map((r) => r.message_id)), [held]);
-  const heldApprovedIds = useMemo(
-    () => held.filter((r) => r.approval_status === 'approved').map((r) => r.message_id), [held]);
-
-  const { data: heldApprovedToday = 0 } = useQuery({
-    queryKey: ['client-approvals-held-approved-today', clientId, timeZone, heldApprovedIds.join(',')],
-    queryFn: () => countApprovedSince(client, heldApprovedIds, startOfDayInTz(timeZone).toISOString()),
-    enabled: heldApprovedIds.length > 0 && !isPreview,
-    staleTime: 60 * 1000,
-  });
-
-  const items = useMemo(
-    () => (gated ? [] : heldIds.size ? rawItems.filter((i) => !heldIds.has(i.id)) : rawItems), [rawItems, heldIds, gated]);
-  const stats = useMemo(
-    () => (gated ? EMPTY_STATS : adjustApprovalStats(rawStats, held, heldApprovedToday)),
-    [rawStats, held, heldApprovedToday, gated]);
-  const approvedDrafts = useMemo(
-    () => (gated ? null : rawApproved && held.length ? excludeHeldDrafts(rawApproved, held) : rawApproved),
-    [rawApproved, held, gated]);
+  // The day boundary behind the stat tiles is computed server-side in the client's
+  // send_timezone; this is only for formatting dates before the first response.
+  const timeZone = approvedQueue?.timeZone ?? clientProfile?.send_timezone ?? browserTimeZone();
 
   // Cancel in-flight list fetches first: one that started before the update
   // lands would otherwise write the old rows (incl. a just-rejected draft)
@@ -404,14 +375,15 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
 
   return {
     items,
-    stats,
+    stats: approvedQueue?.stats ?? EMPTY_STATS,
     awaitingProspects,
-    approvedDrafts,
+    /** null until the first response. */
+    approvedQueue,
     timeZone,
-    loading,
-    isFetching: itemsFetching || statsFetching || approvedFetching,
+    loading: itemsLoading,
+    isFetching: itemsFetching || queueFetching,
     dataUpdatedAt,
-    error: (error as Error)?.message ?? null,
+    error: ((error ?? queueError) as Error | null)?.message ?? null,
 
     approve,
     saveEdits,
@@ -420,13 +392,11 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     bulkReject,
 
     reload: async () => {
-      const [itemsRes, statsRes, approvedRes] = await Promise.all([refetchItems(), refetchStats(), refetchApproved()]);
+      const [itemsRes, queueRes] = await Promise.all([refetchItems(), refetchQueue()]);
       queryClient.invalidateQueries({ queryKey: approvalsScheduleKey(clientId) });
       queryClient.invalidateQueries({ queryKey: clientPendingCountKey(clientId) });
-      queryClient.invalidateQueries({ queryKey: clientAwaitingProspectsKey(clientId) });
       if (itemsRes.error) throw itemsRes.error;
-      if (statsRes.error) throw statsRes.error;
-      if (approvedRes.error) throw approvedRes.error;
+      if (queueRes.error) throw queueRes.error;
     },
   };
 }

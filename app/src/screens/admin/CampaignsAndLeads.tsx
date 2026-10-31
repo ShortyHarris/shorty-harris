@@ -35,6 +35,8 @@ import { useCountrySendHolds } from '../../hooks/useCountrySendHolds';
 import { CountryHoldBanner, EuBadge } from '../../components/CountryHoldBanner';
 import { COUNTRY_OPTIONS, countryName, defaultCampaignCountry, findCountryHold, isEuCountry } from '../../lib/countries';
 import { RequiredMark } from '../../components/RequiredMark';
+import { enqueueCampaign, queuedMessage } from '../../lib/scrapeEnqueue';
+import { useDiscoveryQueue, markCampaignQueued, type ActiveQueueState } from '../../hooks/useDiscoveryQueue';
 
 const HELP_CAMPAIGNS: HelpContent = {
   title: 'Campaigns',
@@ -44,7 +46,7 @@ const HELP_CAMPAIGNS: HelpContent = {
     { type: 'ul', items: [
       "Edit - update campaign settings, search terms, or locations",
       "Pause / Activate - stop or resume outreach for this campaign",
-      "Scrape - trigger a fresh prospect search right now",
+      "Queue scrape - add a fresh prospect search to the queue. It starts within a few minutes and counts as a launch (5 free a month, then a credit); a failed scrape is refunded",
     ]},
   ],
 };
@@ -277,7 +279,7 @@ function ScrapeSummaryModal({
         <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex gap-2.5">
           <button onClick={onClose} className={`${ghostCls} flex-1`}>Close</button>
           {d.retryable ? (
-            <button onClick={() => { onScrape(); onClose(); }} className={`${primaryCls} flex-1`}>Retry scrape</button>
+            <button onClick={() => { onScrape(); onClose(); }} className={`${primaryCls} flex-1`}>Queue a retry</button>
           ) : (
             <button onClick={() => { onEditCampaign(); onClose(); }} className={`${primaryCls} flex-1`}>Edit campaign</button>
           )}
@@ -329,25 +331,11 @@ function ScrapeSummaryModal({
 }
 
 /* ══════════════════════════════════════════════════════════════════ */
-// WF0 now responds immediately once the scrape is accepted (it can run for
-// 15-30 minutes in the background) - this only confirms acceptance, it
-// never waits on the scrape itself. Actual progress/completion is tracked
-// via scrape_status on the campaigns row (see the polling effect below).
-async function startDiscoverScrape(campaignId: string): Promise<{ ok: boolean; message?: string }> {
-  try {
-    const res = await fetch('https://n8n.shortyharris.com/webhook/wf0-discover', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_id: campaignId }),
-    });
-    if (!res.ok) return { ok: false, message: `Scrape service returned ${res.status}` };
-    const data = await res.json().catch(() => ({}));
-    if (data.status === 'started' || data.status === 'limit_reached') return { ok: true };
-    return { ok: false, message: data.message ?? 'Unexpected response from the scrape service' };
-  } catch {
-    return { ok: false, message: 'Could not reach the scrape service' };
-  }
-}
+// A scrape is launched by queueing it through the wf0-enqueue gate (see lib/scrapeEnqueue.ts), which
+// enforces the prospect limit, the free-launch limit and the credit charge. The worker (wf0-discover)
+// is only ever called by the dispatcher, never from here. Whether a campaign is queued is read from
+// discovery_queue (useDiscoveryQueue); progress and completion come from scrape_status on the
+// campaigns row (see the polling effect below).
 
 // How often to re-check scrape_status/last_scraped_at while any campaign is
 // actively scraping - stops the moment none are, rather than polling forever.
@@ -370,55 +358,60 @@ export function Campaigns() {
   const [scrapeDetailCampaign, setScrapeDetailCampaign] = useState<CampaignRow | null>(null);
   const [page, setPage]               = useState(1);
 
-  // Campaign IDs whose start-scrape request is still in flight. The poll
-  // below must not touch these: it reads straight from the DB, and the
-  // backend only writes scrape_status='running' once the request lands -
-  // a poll landing in the gap between the optimistic patch (below) and that
-  // write would read the stale pre-click row and stomp the optimistic
-  // 'running' state right back to idle/complete, flickering the button back
-  // and inviting a second click that fires a duplicate scrape.
-  const pendingStartRef = useRef<Set<string>>(new Set());
+  // Campaigns with a scrape job waiting or running, read from discovery_queue so a page refresh
+  // does not turn a queued campaign back into an idle one.
+  const { queue, ahead, error: queueError } = useDiscoveryQueue();
+  // Campaign IDs whose enqueue request is in flight. UX only (stops a double click); the real guard
+  // is the one-active-job-per-campaign unique index, which rejects a second launch server-side.
+  const [submitting, setSubmitting] = useState<ReadonlySet<string>>(new Set());
 
   async function handleScrape(campaignId: string) {
-    pendingStartRef.current.add(campaignId);
-    // Optimistic: the backend writes scrape_status='running' synchronously
-    // before it even responds, so reflect that immediately instead of
-    // waiting on the (now-fast, but still real) round trip.
-    patchCampaign(campaignId, {
-      scrape_status: 'running',
-      scrape_started_at: new Date().toISOString(),
-      scrape_error: null,
-      scrape_failure_reason: null,
-    });
+    if (submitting.has(campaignId) || queue[campaignId]) return;
+    const name = rows.find((r) => r.id === campaignId)?.name ?? 'Campaign';
+    setSubmitting((s) => new Set(s).add(campaignId));
     try {
-      const result = await startDiscoverScrape(campaignId);
-      if (!result.ok) {
-        // The request itself never got accepted - the backend never had a
-        // chance to flip its own status, so this is the one case the frontend
-        // has to report failure on its own rather than waiting for a poll.
-        // No scrape_failure_reason code applies here (WF0 never ran), so
-        // getScrapeStatusDisplay falls back to its generic 'unknown' copy.
-        patchCampaign(campaignId, { scrape_status: 'failed', scrape_error: result.message ?? 'Failed to start scrape', scrape_failure_reason: null });
+      const result = await enqueueCampaign(campaignId);
+      switch (result.kind) {
+        case 'queued':
+          markCampaignQueued(campaignId);
+          toast(queuedMessage(name, result.positionAhead));
+          break;
+        case 'already_queued':
+          markCampaignQueued(campaignId); // the refetch shows whether it is queued or already running
+          toast(`"${name}": ${result.message}`, 'warning');
+          break;
+        case 'limit_reached':
+        case 'launch_limit_reached':
+          toast(`"${name}": ${result.message}`, 'warning');
+          break;
+        case 'error':
+          toast(`Couldn't queue "${name}": ${result.message}`, 'error');
+          break;
       }
-      // On success, the poll below picks up real progress/completion.
+      // A refused or failed enqueue is not a failed scrape, so the campaign's own scrape_status is left alone.
     } finally {
-      pendingStartRef.current.delete(campaignId);
+      setSubmitting((s) => { const next = new Set(s); next.delete(campaignId); return next; });
     }
   }
 
-  // Always-current view of rows for the interval callback below, so it never
-  // closes over a stale list of "which campaigns are running".
+  // Always-current view of rows and the queue for the interval callback below, so it never
+  // closes over a stale list of "which campaigns are in flight".
   const rowsRef = useRef(rows);
   useEffect(() => { rowsRef.current = rows; }, [rows]);
+  const queueRef = useRef<ActiveQueueState>(queue);
+  useEffect(() => { queueRef.current = queue; }, [queue]);
 
-  const anyRunning = rows.some((r) => r.scrape_status === 'running' && !isStaleRun(r.scrape_status, r.scrape_started_at));
+  // In flight = scraping now, or waiting in the queue (it will start without any click).
+  const isInFlight = (r: CampaignRow, q: ActiveQueueState) =>
+    (r.scrape_status === 'running' && !isStaleRun(r.scrape_status, r.scrape_started_at)) || !!q[r.id];
+  const anyRunning = rows.some((r) => isInFlight(r, queue));
 
   useEffect(() => {
     if (!anyRunning) return;
 
     async function tick() {
       const runningIds = rowsRef.current
-        .filter((r) => r.scrape_status === 'running' && !isStaleRun(r.scrape_status, r.scrape_started_at) && !pendingStartRef.current.has(r.id))
+        .filter((r) => isInFlight(r, queueRef.current))
         .map((r) => r.id);
       if (runningIds.length === 0) return;
 
@@ -471,6 +464,11 @@ export function Campaigns() {
         <div>
           <h1 className="m-0 text-[26px] flex items-center gap-1 font-extrabold tracking-tight text-(--ad-ink)"><img src="https://cdn-icons-png.flaticon.com/128/6745/6745021.png" alt="Campaigns" className="w-10 h-10" />Campaigns</h1>
           <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">{rows.length} campaigns across all clients</p>
+          {queueError && (
+            <p className="m-0 mt-1 text-[12px] text-(--ad-clay)">
+              Couldn't read the scrape queue ({queueError}); queued scrapes may show as idle. Don't re-queue a campaign you just queued.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 md:gap-2.5 shrink-0">
           <HelpButton content={HELP_CAMPAIGNS} />
@@ -556,6 +554,9 @@ export function Campaigns() {
                       <td onClick={(e) => e.stopPropagation()}>
                         <ScrapeCell
                           campaign={c}
+                          queueState={queue[c.id]}
+                          ahead={ahead[c.id]}
+                          busy={submitting.has(c.id)}
                           onScrape={() => handleScrape(c.id)}
                           onOpenDetail={() => setScrapeDetailCampaign(c)}
                         />
@@ -667,6 +668,9 @@ export function Campaigns() {
                     )}
                     <ScrapeCell
                       campaign={c}
+                      queueState={queue[c.id]}
+                      ahead={ahead[c.id]}
+                      busy={submitting.has(c.id)}
                       onScrape={() => handleScrape(c.id)}
                       onOpenDetail={() => setScrapeDetailCampaign(c)}
                     />
@@ -756,16 +760,37 @@ export function Campaigns() {
 // the modal's actions, not duplicated here.
 function ScrapeCell({
   campaign,
+  queueState,
+  ahead,
+  busy = false,
   onScrape,
   onOpenDetail,
 }: {
   campaign: Pick<CampaignRow, 'scrape_status' | 'scrape_started_at' | 'scrape_error' | 'scrape_failure_reason' | 'scrape_attempt_count'>;
+  /** From discovery_queue: a job is waiting ('queued') or being worked ('running'). */
+  queueState?: 'queued' | 'running';
+  /** Queued jobs requested before this one; undefined until the queue has been read. */
+  ahead?: number;
+  /** The enqueue request is in flight. */
+  busy?: boolean;
   onScrape: () => void;
   onOpenDetail: () => void;
 }) {
   const stale = isStaleRun(campaign.scrape_status, campaign.scrape_started_at);
 
-  if (campaign.scrape_status === 'running' && !stale) {
+  if (queueState === 'queued' && campaign.scrape_status !== 'running') {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-semibold text-(--ad-ink-soft)"
+        title="Waiting in the queue. The scraper picks up one job at a time, every few minutes."
+      >
+        <Clock size={12} strokeWidth={2.5} />
+        Queued{ahead === undefined ? '' : ahead === 0 ? ' · next' : ` · ${ahead} ahead`}
+      </span>
+    );
+  }
+
+  if ((campaign.scrape_status === 'running' && !stale) || queueState === 'running') {
     return (
       <span className="inline-flex items-center gap-1.5 text-[12px] text-(--ad-ink-faint)">
         <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-(--ad-line-strong) border-t-(--ad-green)" />
@@ -799,9 +824,11 @@ function ScrapeCell({
   return (
     <button
       onClick={onScrape}
-      className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-2.5 py-1 text-[11px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green) whitespace-nowrap"
+      disabled={busy}
+      title="Adds this campaign to the scrape queue. Counts as a launch: 5 free a month, then a credit."
+      className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-2.5 py-1 text-[11px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green) whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
     >
-      ↻ Run scrape
+      {busy ? 'Queuing…' : '↻ Queue scrape'}
     </button>
   );
 }

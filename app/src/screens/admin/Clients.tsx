@@ -176,7 +176,7 @@ export function Clients() {
                         </span>
                       </td>
                       <td className="min-w-0 text-(--ad-ink-soft)">
-                        <div className="truncate" title={c.contact_name ?? undefined}>{c.contact_name ?? '-'}</div>
+                        <div className="truncate" title={c.representative_name ?? undefined}>{c.representative_name || '-'}</div>
                       </td>
                       <td className="text-[12px] text-(--ad-ink-faint) whitespace-nowrap">
                         {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -876,6 +876,7 @@ function EditClientModal({
   const [contactEmail, setContactEmail] = useState(client.contact_email ?? '');
   const [contactPhone, setContactPhone] = useState(client.contact_phone ?? '');
   const [contactName, setContactName]   = useState(client.contact_name ?? '');
+  const [representativeName, setRepresentativeName] = useState(client.representative_name ?? '');
   const [notifChannel, setNotifChannel] = useState<UpdateClientInput['notification_channel']>(
     (client.notification_channel as UpdateClientInput['notification_channel']) ?? 'whatsapp',
   );
@@ -908,6 +909,7 @@ function EditClientModal({
       business_name: businessName.trim(), business_type: businessType.trim(),
       location: location.trim(), website_url: websiteUrl.trim(), contact_email: contactEmail.trim(),
       contact_phone: normalizePhone(contactPhone), contact_name: contactName.trim(),
+      representative_name: representativeName,
       notification_channel: notifChannel, status,
       country, send_timezone: sendTimezone,
       monthly_prospect_limit: monthlyProspectLimit, max_campaigns: maxCampaigns,
@@ -952,9 +954,14 @@ function EditClientModal({
           <input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} style={FONT} className={inputCls} />
         </div>
         <div>
+          <label className={fieldLbl}>Contact name</label>
+          <input value={contactName} onChange={(e) => setContactName(e.target.value)} style={FONT} className={inputCls} />
+          <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Billing / account contact. Not used to sign emails.</p>
+        </div>
+        <div>
           <label className={fieldLbl}>Representative name</label>
-          <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="e.g. Yvonne" style={FONT} className={inputCls} />
-          <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Signs outreach emails on this client's behalf (e.g. "Have a wonderful day, Yvonne").</p>
+          <input value={representativeName} onChange={(e) => setRepresentativeName(e.target.value)} placeholder="e.g. Yvonne" style={FONT} className={inputCls} />
+          <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Signs outreach emails on this client's behalf (e.g. "Have a wonderful day, Yvonne"). Leave empty to sign with the business name.</p>
         </div>
         <div className="border-t border-(--ad-fill) pt-3 grid grid-cols-2 gap-3">
           <div>

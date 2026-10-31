@@ -4,7 +4,9 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
-import { useClientApprovals } from '../../hooks/useClientApprovals';
+import {
+  useClientApprovals, DEFAULT_QUEUE_SORT, QUEUE_SORT_OPTIONS, type ApprovedQueueSort,
+} from '../../hooks/useClientApprovals';
 import { useClientCampaignList } from '../../hooks/useClientCampaigns';
 import { isEuCountry } from '../../lib/countries';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
@@ -17,7 +19,7 @@ import { RefreshButton } from '../../components/RefreshButton';
 import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { previewSequenceApproval, approveSequences, type ApprovalPreview } from '../../hooks/useSequenceActions';
-import { blockInfo, type BlockTone } from '../../lib/blockReasons';
+import { BlockBadge } from '../../components/BlockBadge';
 import { partialFailureMessage } from '../../lib/chunkedBulk';
 import type { ClientMessageItem } from '../../types';
 import { approvalTypeLabel, APPROVAL_STEP_ORDER, APPROVAL_EXPLAINER } from '../../lib/approvalLabels';
@@ -51,6 +53,7 @@ const HELP: HelpContent = {
 };
 
 const PAGE_SIZE = 10;
+
 
 const TYPE_FILTER_OPTIONS: { value: ApprovalTypeFilter; label: string }[] = [
   { value: 'all', label: 'All types' },
@@ -101,18 +104,25 @@ function Detail({ label, value, children }: { label: string; value?: string | nu
 const READ_ONLY_MSG = 'You\'re viewing read-only. Turn on "Edit as admin" in the banner to approve or reject.';
 
 export function Approvals({
-  clientId, client = supabase, readOnly = false, basePath = '/app', isAdmin = false,
-}: { clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string; isAdmin?: boolean }) {
-  // Drafts held by policy (generic/freemail recipients) are hidden from clients;
-  // admins can reveal them. Not tied to readOnly: admin edit mode is still admin.
-  const [showHeld, setShowHeld] = useState(false);
-  const {
-    items, stats, approvedDrafts, timeZone, loading, isFetching, dataUpdatedAt, error,
-    approve: approveRaw, saveEdits, reject: rejectRaw, bulkReject: bulkRejectRaw, reload,
-  } = useClientApprovals(clientId, client, isAdmin && showHeld, !isAdmin);
+  clientId, client = supabase, readOnly = false, basePath = '/app',
+}: { clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string }) {
   const [tab, setTab] = useState<ApprovalTab>('pending');
   const [sort, setSort] = useState<ApprovalSort>(DEFAULT_APPROVAL_SORT);
+  const [queueSort, setQueueSort] = useState<ApprovedQueueSort>(DEFAULT_QUEUE_SORT);
   const [typeFilter, setTypeFilter] = useState<ApprovalTypeFilter>('all');
+  const [page, setPage] = useState(1);
+  // Approved and Blocked are paged on the server; Pending is still sorted and paged here.
+  const {
+    items, stats, approvedQueue, timeZone, loading, isFetching, dataUpdatedAt, error,
+    approve: approveRaw, saveEdits, reject: rejectRaw, bulkReject: bulkRejectRaw, reload,
+  } = useClientApprovals(clientId, client, tab === 'pending' ? null : {
+    tab, page, pageSize: PAGE_SIZE, sort: queueSort,
+    messageType: typeFilter === 'all' ? null : typeFilter, reason: null,
+  });
+  // One source of truth: the same is_admin() call that chose which rows to return. An impersonation
+  // token reads as non-admin there, so View-as-client renders exactly what the client sees. Until a
+  // response is loaded, render the non-admin view rather than guess.
+  const isAdmin = approvedQueue?.isAdmin ?? false;
   const { schedule } = useApprovalsSchedule(clientId, client);
   const { connection: gmailConnection } = useGmailConnection(clientId);
   const { rows: campaigns } = useClientCampaignList(clientId, client);
@@ -185,7 +195,6 @@ export function Approvals({
     setEditItem((cur) => (cur?.id === id ? { ...cur, body: body ?? cur.body, subject: subject ?? cur.subject } : cur));
   }
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [page, setPage] = useState(1);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [approvalPlan, setApprovalPlan] = useState<{ prospectIds: string[]; preview: ApprovalPreview; campaignsLabel: string } | null>(null);
   const [approving, setApproving] = useState(false);
@@ -202,15 +211,18 @@ export function Approvals({
   const euCampaignIds = new Set(campaigns.filter((c) => isEuCountry(c.country)).map((c) => c.id));
   const hasEuDrafts = items.some((i) => i.campaign_id != null && euCampaignIds.has(i.campaign_id));
 
-  const sendableDrafts = approvedDrafts?.sendable ?? [];
-  const blockedDrafts  = approvedDrafts?.blocked ?? [];
-  const sendableCount  = approvedDrafts?.counts.sendable ?? 0;
-  const blockedCount   = approvedDrafts?.counts.blocked ?? 0;
-  const baseList = tab === 'pending' ? items : tab === 'approved' ? sendableDrafts : blockedDrafts;
-  // Filter, then sort the whole loaded list before it is cut into pages.
-  const visible = applyApprovalView(baseList, { sort, type: typeFilter, schedule });
+  const approvedCount  = approvedQueue?.counts.approved ?? 0;
+  const blockedCount   = approvedQueue?.counts.blocked ?? 0;
+  // Sendable and scheduled follow-ups both go out on their own; blocked ones need action.
+  const sendableCount  = (approvedQueue?.counts.sendable ?? 0) + (approvedQueue?.counts.scheduled ?? 0);
   const now = new Date();
   const isPendingTab = tab === 'pending';
+  // Server tabs hold one page already filtered and sorted; the type filter is applied there.
+  const tabTotal = tab === 'approved' ? approvedCount : blockedCount;
+  const queueReady = isPendingTab || approvedQueue !== null;
+  const queueRows = approvedQueue?.items ?? [];
+  const pendingView = applyApprovalView(items, { sort, type: typeFilter, schedule });
+  const rowCount = isPendingTab ? pendingView.length : approvedQueue?.total ?? 0;
 
   // The pending list is paged up to a ceiling; stats.pending is the exact count.
   // When they differ, "all" would mean rows that aren't loaded, so bulk-by-scope is off.
@@ -229,7 +241,7 @@ export function Approvals({
     const parts = Array.from(counts, ([name, n]) => (counts.size === 1 ? name : `${name} (${n})`));
     return parts.join(', ');
   }
-  const draftById = new Map([...items, ...sendableDrafts, ...blockedDrafts].map((d) => [d.id, d]));
+  const draftById = new Map([...items, ...queueRows].map((d) => [d.id, d]));
 
   function switchTab(next: ApprovalTab) {
     setTab(next);
@@ -238,11 +250,16 @@ export function Approvals({
   }
 
   function changeSort(next: ApprovalSort) { setSort(next); setPage(1); }
+  function changeQueueSort(next: ApprovedQueueSort) { setQueueSort(next); setPage(1); }
+  const sortIsDefault = isPendingTab ? sort === DEFAULT_APPROVAL_SORT : queueSort === DEFAULT_QUEUE_SORT;
   function changeTypeFilter(next: ApprovalTypeFilter) { setTypeFilter(next); setPage(1); }
 
-  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(rowCount / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
-  const paged      = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const paged      = isPendingTab ? pendingView.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE) : queueRows;
+
+  // After rejecting the last row of a page, step back instead of showing an empty page.
+  if (!isPendingTab && approvedQueue && page > totalPages) setPage(totalPages);
 
   const allSelected = !pendingCapped && paged.length > 0 && paged.every((i) => selected.has(i.id));
   const selectedBlockedByGmail = Array.from(selected).some((id) => {
@@ -362,9 +379,9 @@ export function Approvals({
         <StatTile
           icon={Ban}
           iconColor="#0e0822"
-          label="Rejected (all time)"
-          value={stats.rejected}
-          sub="drafts discarded"
+          label="Rejected today"
+          value={stats.rejectedToday}
+          sub={`${stats.rejectedTotal} rejected all time`}
           subColor="#605978"
         />
       </div>
@@ -376,7 +393,7 @@ export function Approvals({
       )}
 
       {/* Approved summary - sendable and blocked are never lumped together */}
-      {approvedDrafts && (sendableCount > 0 || blockedCount > 0) && (
+      {approvedQueue && (sendableCount > 0 || blockedCount > 0) && (
         <p className="m-0 text-[13px] font-semibold text-[#0e0822]" data-testid="approved-summary">
           Approved: {sendableCount} sendable, {blockedCount} blocked
         </p>
@@ -387,7 +404,7 @@ export function Approvals({
         <div role="tablist" className="flex flex-wrap gap-1.5">
           {([
             ['pending', `Pending (${totalPending})`],
-            ['approved', `Approved (${sendableCount})`],
+            ['approved', `Approved (${approvedCount})`],
             ['blocked', `Blocked (${blockedCount})`],
           ] as const).map(([key, label]) => (
             <button
@@ -407,23 +424,14 @@ export function Approvals({
         </div>
       )}
 
-      {isAdmin && tab === 'blocked' && (
-        <label className="flex w-fit cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-[#605978]">
-          <input type="checkbox" checked={showHeld} onChange={(e) => setShowHeld(e.target.checked)} className="accent-[#7412ef]" />
-          Held by policy
-        </label>
-      )}
       {tab === 'blocked' && blockedCount > 0 && (
         <p className="m-0 text-[12.5px] text-[#605978]">
           These drafts are approved but won't send until the reason shown is cleared. You can reject any you don't want to keep.
         </p>
       )}
-      {tab !== 'pending' && approvedDrafts && (tab === 'approved' ? sendableCount : blockedCount) > baseList.length && (
-        <p className="m-0 text-[12px] text-[#605978]">Showing the latest {baseList.length} of {tab === 'approved' ? sendableCount : blockedCount}.</p>
-      )}
 
       {/* Sort + type filter */}
-      {!loading && baseList.length > 0 && (
+      {!loading && (isPendingTab ? items.length : tabTotal) > 0 && (
         <div className="flex flex-wrap items-center gap-2.5 md:flex-nowrap rounded-xl border border-[#e8e3f7] bg-white p-2.5">
           <FilterSelect
             label="Type"
@@ -437,13 +445,16 @@ export function Approvals({
             label="Sort"
             className="grow-3"
             ariaLabel="Sort drafts"
-            value={sort}
-            onChange={(v) => changeSort(v as ApprovalSort)}
-            options={APPROVAL_SORT_OPTIONS}
+            value={isPendingTab ? sort : queueSort}
+            onChange={(v) => (isPendingTab ? changeSort(v as ApprovalSort) : changeQueueSort(v as ApprovedQueueSort))}
+            options={isPendingTab ? APPROVAL_SORT_OPTIONS : QUEUE_SORT_OPTIONS}
           />
-          {(typeFilter !== 'all' || sort !== DEFAULT_APPROVAL_SORT) && (
+          {(typeFilter !== 'all' || !sortIsDefault) && (
             <button
-              onClick={() => { changeTypeFilter('all'); changeSort(DEFAULT_APPROVAL_SORT); }}
+              onClick={() => {
+                changeTypeFilter('all');
+                if (isPendingTab) changeSort(DEFAULT_APPROVAL_SORT); else changeQueueSort(DEFAULT_QUEUE_SORT);
+              }}
               className="cursor-pointer rounded-md border-0 bg-transparent px-2 py-1.5 text-[12.5px] font-semibold text-[#605978] underline-offset-2 transition-colors hover:text-[#0e0822] hover:underline"
             >
               Reset
@@ -453,15 +464,15 @@ export function Approvals({
       )}
 
       {/* Table / Cards */}
-      {loading ? (
+      {loading || !queueReady ? (
         <SkeletonTable rows={PAGE_SIZE} cols={5} />
-      ) : visible.length === 0 ? (
+      ) : rowCount === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#e8e3f7] bg-white p-10 text-center">
           <strong className="text-[15px] font-semibold text-[#0e0822]">
-            {baseList.length > 0 ? 'No drafts match this filter.' : isPendingTab ? "Queue's clear." : tab === 'approved' ? 'Nothing approved and waiting.' : 'Nothing blocked.'}
+            {(isPendingTab ? items.length : tabTotal) > 0 ? 'No drafts match this filter.' : isPendingTab ? "Queue's clear." : tab === 'approved' ? 'Nothing approved and waiting.' : 'Nothing blocked.'}
           </strong>
           <span className="text-[13px] text-[#605978]">
-            {baseList.length > 0 ? 'Choose "All types" to see everything on this tab.' : isPendingTab
+            {(isPendingTab ? items.length : tabTotal) > 0 ? 'Choose "All types" to see everything on this tab.' : isPendingTab
               ? 'No drafts waiting for review. New ones appear here as we write them for your prospects.'
               : tab === 'approved'
                 ? 'Approved drafts that are ready or scheduled to send show up here.'
@@ -568,7 +579,7 @@ export function Approvals({
                         )}
                         <AnglePill angle={item.angle} />
                       </div>
-                      <BlockBadge reason={item.block_reason} className="mt-1" />
+                      <BlockBadge reason={item.block_reason} campaignStatus={item.campaign_status} className="mt-1" />
                       {isAdmin && <HeldBadge row={schedule.get(item.id)} settingsPath={readOnly ? null : `${basePath}/settings`} className="mt-1" />}
                     </td>
                     <td className="whitespace-nowrap"><ScheduledCell schedule={schedule} id={item.id} tz={timeZone} now={now} /></td>
@@ -639,7 +650,7 @@ export function Approvals({
                 {item.subject && (
                   <div className="mt-1.5 truncate text-[12px] text-[#605978]">{item.subject}</div>
                 )}
-                <BlockBadge reason={item.block_reason} className="mt-1.5" />
+                <BlockBadge reason={item.block_reason} campaignStatus={item.campaign_status} className="mt-1.5" />
                 {isAdmin && <HeldBadge row={schedule.get(item.id)} settingsPath={readOnly ? null : `${basePath}/settings`} className="mt-1.5" />}
                 <div className="mt-2 grid grid-cols-2 gap-2 text-[11.5px]">
                   <div><div className="text-[10px] font-semibold uppercase tracking-[.06em] text-[#605978]">Scheduled</div><ScheduledCell schedule={schedule} id={item.id} tz={timeZone} now={now} /></div>
@@ -764,29 +775,6 @@ export function Approvals({
       </AnimatePresence>
 
       <ToastHost toasts={toasts} onDismiss={dismiss} />
-    </div>
-  );
-}
-
-const BLOCK_TONE_STYLE: Record<BlockTone, { bg: string; fg: string }> = {
-  blocked:   { bg: '#f9f6ff', fg: '#0e0822' },
-  paused:    { bg: '#f1e9ff', fg: '#5b0fc2' },
-  scheduled: { bg: '#f9f6ff', fg: '#605978' },
-};
-
-function BlockBadge({ reason, className = '' }: { reason: string | null | undefined; className?: string }) {
-  if (!reason) return null;
-  const info = blockInfo(reason);
-  const style = BLOCK_TONE_STYLE[info.tone];
-  return (
-    <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
-      <span
-        style={{ background: style.bg, color: style.fg }}
-        className="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.04em]"
-      >
-        {info.badge}
-      </span>
-      {info.text !== info.badge && <span className="text-[11px] leading-snug" style={{ color: style.fg }}>{info.text}</span>}
     </div>
   );
 }

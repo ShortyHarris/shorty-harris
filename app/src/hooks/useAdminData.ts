@@ -486,6 +486,8 @@ export interface ClientListRow {
   contact_email: string | null;
   contact_phone: string | null;
   contact_name: string | null;
+  /** The person outgoing emails are signed as. Distinct from contact_name; empty is intended. */
+  representative_name: string | null;
   notification_channel: string | null;
   status: string;
   created_at: string;
@@ -520,7 +522,7 @@ export function activationByClient(
 async function fetchClients(): Promise<ClientListRow[]> {
   const { data, error } = await supabase
     .from('clients')
-    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, notification_channel, status, created_at, monthly_prospect_limit, max_campaigns, auto_approve_campaigns, allow_generic_mailboxes, is_internal, country, send_timezone')
+    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, representative_name, notification_channel, status, created_at, monthly_prospect_limit, max_campaigns, auto_approve_campaigns, allow_generic_mailboxes, is_internal, country, send_timezone')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -736,7 +738,10 @@ export interface UpdateClientInput {
   website_url: string;
   contact_email: string;
   contact_phone: string;
+  /** Billing / account contact. Not used to sign emails. */
   contact_name: string;
+  /** Who outgoing emails are signed as. Empty is valid: the email workflows sign with the business name. */
+  representative_name: string;
   notification_channel: 'whatsapp' | 'sms';
   country: string;
   send_timezone: string;
@@ -756,6 +761,7 @@ export async function updateClient(id: string, input: UpdateClientInput) {
     contact_email: input.contact_email,
     contact_phone: input.contact_phone,
     contact_name: input.contact_name || null,
+    representative_name: input.representative_name.trim() || null,
     notification_channel: input.notification_channel,
     country: input.country || null,
     send_timezone: input.send_timezone,
