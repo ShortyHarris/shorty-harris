@@ -14,6 +14,7 @@ import type {
 import { SkeletonTable } from '../../components/Skeleton';
 import { MobileFab } from '../../components/MobileFab';
 import { RowMenu } from '../../components/RowMenu';
+import { SendingCard } from '../../components/SendingPanel';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { useToast, ToastHost } from '../../components/Toast';
 import { RefreshButton } from '../../components/RefreshButton';
@@ -77,6 +78,7 @@ export function Clients() {
   const [deleteTarget, setDeleteTarget] = useState<ClientListRow | null>(null);
   const [changeEmailTarget, setChangeEmailTarget] = useState<ClientListRow | null>(null);
   const [creditsTarget, setCreditsTarget] = useState<ClientListRow | null>(null);
+  const [sendingTarget, setSendingTarget] = useState<ClientListRow | null>(null);
   const [page, setPage]           = useState(1);
   const [invitePhase, setInvitePhase]   = useState<Record<string, InvitePhase>>({});
   const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
@@ -209,6 +211,7 @@ export function Clients() {
                         <RowMenu items={[
                           { type: 'action', label: 'View as client', onClick: () => navigate(`/admin/impersonate/${c.id}`) },
                           { type: 'action', label: 'Edit client', onClick: () => setEditClient(c) },
+                          { type: 'action', label: 'Sending', onClick: () => setSendingTarget(c) },
                           { type: 'action', label: 'Add credits', onClick: () => setCreditsTarget(c) },
                           {
                             type: 'action',
@@ -355,6 +358,13 @@ export function Clients() {
             client={deleteTarget}
             onClose={() => setDeleteTarget(null)}
             onDeleted={() => { toast(`${deleteTarget.business_name} deleted.`); setDeleteTarget(null); reload(); }}
+          />
+        )}
+        {sendingTarget && (
+          <SendingModal
+            key={`sending-${sendingTarget.id}`}
+            client={sendingTarget}
+            onClose={() => setSendingTarget(null)}
           />
         )}
         {changeEmailTarget && (
@@ -1264,6 +1274,26 @@ function DeleteClientModal({
         >
           {busy ? 'Deleting…' : `Delete ${client.business_name} and all related data`}
         </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+/* ── Sending Modal ─────────────────────────────────────────────────── */
+// Read-only on purpose: no inputs, no save. It is a separate modal from EditClientModal so nothing
+// here can ride along with the edit-client save path.
+function SendingModal({ client, onClose }: { client: ClientListRow; onClose: () => void }) {
+  return (
+    <ModalShell onClose={onClose}>
+      <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+        <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Sending · {client.business_name}</h2>
+        <button onClick={onClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-5 py-5">
+        <SendingCard clientId={client.id} />
+      </div>
+      <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end">
+        <button onClick={onClose} className={ghostCls}>Close</button>
       </div>
     </ModalShell>
   );

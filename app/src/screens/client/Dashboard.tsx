@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SendingCard } from '../../components/SendingPanel';
 import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -233,6 +234,9 @@ export function Dashboard({
           <ChevronRight size={16} className="appr-nudge-arrow" />
         </Link>
       )}
+
+      {/* ─── Sending: today's cap, warm-up, queue, follow-ups ─── */}
+      <SendingCard clientId={clientId} client={client} />
 
       {/* ─── Warm prospects: opened but never replied ─── */}
       <div>

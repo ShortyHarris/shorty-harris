@@ -1,4 +1,5 @@
 import { btn } from '../../lib/clientButtons';
+import { SendingLine } from '../../components/SendingPanel';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -348,6 +349,8 @@ export function Approvals({
           />
         </div>
       </header>
+
+      <SendingLine clientId={clientId} client={client} />
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

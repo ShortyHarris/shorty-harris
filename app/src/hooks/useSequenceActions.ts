@@ -3,6 +3,7 @@ import { queryClient } from '../lib/queryClient';
 import { clientApprovalsKey, clientApprovedKey } from './useClientApprovals';
 import { dashboardKey } from './useClientDashboard';
 import { approvalsScheduleKey } from './useApprovalsSchedule';
+import { sendPacingKey } from './useSendPacing';
 import { saveDraftEdits } from '../lib/draftEdits';
 
 // Every sequence write goes through a Supabase RPC on the real (non-impersonation)
@@ -38,6 +39,7 @@ export function refreshSequenceData(clientId: string | null) {
     queryClient.invalidateQueries({ queryKey: approvalsScheduleKey(clientId) });
     queryClient.invalidateQueries({ queryKey: ['client-approvals-pending-count', clientId] });
     queryClient.invalidateQueries({ queryKey: dashboardKey(clientId) });
+    queryClient.invalidateQueries({ queryKey: sendPacingKey(clientId) });
   }
 }
 

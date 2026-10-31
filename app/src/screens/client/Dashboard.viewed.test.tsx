@@ -7,11 +7,13 @@ import { Dashboard } from './Dashboard';
 import { useClientDashboard } from '../../hooks/useClientDashboard';
 import { useApprovedQueueCounts } from '../../hooks/useClientApprovals';
 import { useWarmProspects } from '../../hooks/useWarmProspects';
+import { useSendPacing } from '../../hooks/useSendPacing';
 import type { HotLead } from '../../types';
 
 vi.mock('../../hooks/useClientDashboard');
 vi.mock('../../hooks/useClientApprovals');
 vi.mock('../../hooks/useWarmProspects');
+vi.mock('../../hooks/useSendPacing');
 
 function render(ui: ReactElement, path = '/app') {
   return rtlRender(<MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>);
@@ -47,6 +49,7 @@ describe('Dashboard: opening a hot lead marks it viewed', () => {
 
   beforeEach(() => {
     setOutcome.mockClear();
+    (useSendPacing as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ pacing: null, loading: false, error: null });
     (useApprovedQueueCounts as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ awaitingProspects: 0 });
     (useWarmProspects as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       prospects: [], loading: false, logCallOutcome: vi.fn(),
@@ -102,6 +105,7 @@ describe('Dashboard: status filters', () => {
   });
 
   beforeEach(() => {
+    (useSendPacing as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ pacing: null, loading: false, error: null });
     setOutcome.mockClear();
     (useApprovedQueueCounts as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ awaitingProspects: 0 });
     (useWarmProspects as unknown as ReturnType<typeof vi.fn>).mockReturnValue({

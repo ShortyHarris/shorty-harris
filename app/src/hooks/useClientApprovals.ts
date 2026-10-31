@@ -10,6 +10,7 @@ import { runInChunks, type ChunkedResult } from '../lib/chunkedBulk';
 import { saveDraftEdits } from '../lib/draftEdits';
 import { browserTimeZone } from '../lib/approvalsView';
 import { approvalsScheduleKey } from './useApprovalsSchedule';
+import { sendPacingKey } from './useSendPacing';
 import { useClientProfile } from './useClientProfile';
 
 // Returned when an update matched no pending row (already approved or
@@ -27,6 +28,7 @@ function invalidateApprovalQueries(clientId: string) {
   queryClient.invalidateQueries({ queryKey: clientPendingCountKey(clientId) });
   queryClient.invalidateQueries({ queryKey: approvalsScheduleKey(clientId) });
   queryClient.invalidateQueries({ queryKey: clientApprovedKey(clientId) });
+  queryClient.invalidateQueries({ queryKey: sendPacingKey(clientId) });
 }
 
 // Head count only - what the sidebar badge needs, without loading any drafts. It comes from
@@ -395,6 +397,7 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
       const [itemsRes, queueRes] = await Promise.all([refetchItems(), refetchQueue()]);
       queryClient.invalidateQueries({ queryKey: approvalsScheduleKey(clientId) });
       queryClient.invalidateQueries({ queryKey: clientPendingCountKey(clientId) });
+      queryClient.invalidateQueries({ queryKey: sendPacingKey(clientId) });
       if (itemsRes.error) throw itemsRes.error;
       if (queueRes.error) throw queueRes.error;
     },
