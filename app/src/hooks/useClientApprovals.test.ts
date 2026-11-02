@@ -125,9 +125,21 @@ describe('awaiting prospects by campaign', () => {
 describe('parseApprovedQueue: shape', () => {
   it('maps stats to camelCase, including rejected today versus all time', () => {
     const q = parseApprovedQueue(body({
-      stats: { pending: 668, approved_today: 0, sent_today: 10, rejected_today: 3, rejected_total: 447 },
+      stats: {
+        pending: 668, approved_today: 0, sent_today: 10, rejected_today: 3, rejected_total: 9,
+        replaced_total: 237, auto_cancelled_total: 2,
+      },
     }));
-    expect(q.stats).toEqual({ pending: 668, approvedToday: 0, sentToday: 10, rejectedToday: 3, rejectedTotal: 447 });
+    expect(q.stats).toEqual({
+      pending: 668, approvedToday: 0, sentToday: 10, rejectedToday: 3, rejectedTotal: 9,
+      replacedTotal: 237, autoCancelledTotal: 2,
+    });
+  });
+
+  it('treats replaced and auto-cancelled totals as 0 when an older server omits them', () => {
+    const q = parseApprovedQueue(body({ stats: { rejected_total: 5 } }));
+    expect(q.stats.replacedTotal).toBe(0);
+    expect(q.stats.autoCancelledTotal).toBe(0);
   });
 
   it('flattens the prospect and keeps the block reason and campaign status', () => {

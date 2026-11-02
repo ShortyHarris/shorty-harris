@@ -99,7 +99,12 @@ export interface ClientApprovalStats {
   sentToday: number;
   /** Rejected today by a signed-in user (system rejections are not counted). */
   rejectedToday: number;
+  /** Drafts a person turned down (reject_reason manual or unknown). */
   rejectedTotal: number;
+  /** Older first-touch drafts replaced by a rewrite. Not rejections. */
+  replacedTotal: number;
+  /** Cancelled on their own: the prospect replied, follow-ups were stopped, etc. */
+  autoCancelledTotal: number;
 }
 
 export interface ApprovedQueue {
@@ -114,7 +119,7 @@ export interface ApprovedQueue {
 }
 
 export const EMPTY_STATS: ClientApprovalStats = {
-  pending: 0, approvedToday: 0, sentToday: 0, rejectedToday: 0, rejectedTotal: 0,
+  pending: 0, approvedToday: 0, sentToday: 0, rejectedToday: 0, rejectedTotal: 0, replacedTotal: 0, autoCancelledTotal: 0,
 };
 
 export const EMPTY_COUNTS: ApprovedQueueCounts = {
@@ -175,6 +180,8 @@ export function parseApprovedQueue(body: RawApprovedQueue | null): ApprovedQueue
       sentToday: s.sent_today ?? 0,
       rejectedToday: s.rejected_today ?? 0,
       rejectedTotal: s.rejected_total ?? 0,
+      replacedTotal: s.replaced_total ?? 0,
+      autoCancelledTotal: s.auto_cancelled_total ?? 0,
     },
     isAdmin: body.is_admin ?? false,
     timeZone: body.time_zone ?? browserTimeZone(),
@@ -342,7 +349,7 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     // Approved-but-blocked drafts can be rejected too, as long as nothing has gone out.
     const { data, error } = await supabase
       .from('messages')
-      .update({ approval_status: 'rejected', updated_at: new Date().toISOString() })
+      .update({ approval_status: 'rejected', reject_reason: 'manual', updated_at: new Date().toISOString() })
       .eq('id', id)
       .in('approval_status', ['pending', 'approved'])
       .eq('send_status', 'not_sent')
@@ -377,7 +384,7 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     await removeFromCache(ids);
     const res = await runInChunks(ids, (chunk) => supabase
       .from('messages')
-      .update({ approval_status: 'rejected', updated_at: new Date().toISOString() })
+      .update({ approval_status: 'rejected', reject_reason: 'manual', updated_at: new Date().toISOString() })
       .in('id', chunk)
       .eq('approval_status', 'pending')
       .eq('send_status', 'not_sent')

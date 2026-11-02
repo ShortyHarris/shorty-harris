@@ -7,6 +7,7 @@ import type { QueueItem } from '../types';
 import { fetchAllRows } from '../lib/fetchAllRows';
 import { runInChunks, type ChunkedResult } from '../lib/chunkedBulk';
 import { saveDraftEdits } from '../lib/draftEdits';
+import { REJECTED_BY_PERSON } from '../lib/approvalLabels';
 
 export const AQ_KEYS = {
   items: ['approval-queue', 'items'] as const,
@@ -113,7 +114,9 @@ async function fetchQueueStats(): Promise<Stats> {
     supabase
       .from('messages')
       .select('id', { count: 'exact', head: true })
-      .eq('approval_status', 'rejected'),
+      .eq('approval_status', 'rejected')
+      // Only drafts a person turned down; replaced drafts and automatic cancellations are not rejections.
+      .in('reject_reason', REJECTED_BY_PERSON),
 
     supabase
       .from('messages_with_sender')
@@ -247,6 +250,7 @@ export function useApprovalQueue() {
       .from('messages')
       .update({
         approval_status: 'rejected',
+        reject_reason: 'manual',
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)

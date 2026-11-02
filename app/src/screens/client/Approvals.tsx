@@ -23,7 +23,10 @@ import { previewSequenceApproval, approveSequences, type ApprovalPreview } from 
 import { BlockBadge } from '../../components/BlockBadge';
 import { partialFailureMessage } from '../../lib/chunkedBulk';
 import type { ClientMessageItem } from '../../types';
-import { approvalTypeLabel, APPROVAL_STEP_ORDER, APPROVAL_EXPLAINER } from '../../lib/approvalLabels';
+import {
+  approvalTypeLabel, APPROVAL_STEP_ORDER, APPROVAL_EXPLAINER, rejectedTotalsLine, REJECTED_TOTALS_HINT,
+  bulkApproveBlockedReason,
+} from '../../lib/approvalLabels';
 import {
   applyApprovalView, DEFAULT_APPROVAL_SORT, APPROVAL_SORT_OPTIONS,
   type ApprovalSort, type ApprovalTypeFilter,
@@ -37,7 +40,7 @@ import { formatPendingSince, pendingSinceOf, type ScheduleMap } from '../../lib/
 import { useApprovalsSchedule } from '../../hooks/useApprovalsSchedule';
 
 type ApprovalTab = 'pending' | 'approved' | 'blocked';
-import { Clock, CheckCircle2, Send, Ban, ClipboardCheck } from 'lucide-react';
+import { Clock, CheckCircle2, Send, Ban, ClipboardCheck, AlertCircle } from 'lucide-react';
 
 const GMAIL_REQUIRED_TITLE = "Connect your Gmail in Settings before approving - that's what actually sends this.";
 
@@ -267,6 +270,13 @@ export function Approvals({
     const item = items.find((i) => i.id === id);
     return item ? needsGmail(item) : false;
   });
+  const approveBlockedReason = bulkApproveBlockedReason({
+    selectedCount: selected.size,
+    gmailMissing: selected.size > 0 ? selectedBlockedByGmail : items.some(needsGmail),
+    capped: pendingCapped,
+    loaded: items.length,
+    totalPending,
+  });
 
   function toggleOne(id: string) {
     setSelected((prev) => {
@@ -384,8 +394,9 @@ export function Approvals({
           iconColor="var(--ad-ink)"
           label="Rejected today"
           value={stats.rejectedToday}
-          sub={`${stats.rejectedTotal} rejected all time`}
+          sub={rejectedTotalsLine(stats)}
           subColor="var(--ad-ink-soft)"
+          hint={REJECTED_TOTALS_HINT}
         />
       </div>
 
@@ -505,10 +516,8 @@ export function Approvals({
               {isPendingTab && (
               <button
                 onClick={handleBulkApprove}
-                disabled={bulkBusy || approving || (selected.size === 0 && pendingCapped) || (selected.size > 0 ? selectedBlockedByGmail : items.some(needsGmail))}
-                title={(selected.size > 0 ? selectedBlockedByGmail : items.some(needsGmail))
-                  ? GMAIL_REQUIRED_TITLE
-                  : (selected.size === 0 && pendingCapped) ? `Only ${items.length} of ${totalPending} drafts are loaded. Select rows to approve instead.` : undefined}
+                disabled={bulkBusy || approving || approveBlockedReason !== null}
+                aria-describedby={approveBlockedReason ? 'bulk-approve-blocked' : undefined}
                 className={btn('primary', 'md')}
               >
                 {bulkBusy ? 'Checking…' : selected.size > 0 ? 'Approve selected sequences' : 'Approve all pending'}
@@ -525,6 +534,23 @@ export function Approvals({
               )}
             </div>
           </div>
+          {/* Said out loud, not only on hover: a greyed-out Approve next to an active Reject is
+              how a whole batch got rejected instead of approved. */}
+          {isPendingTab && approveBlockedReason && (
+            <p
+              id="bulk-approve-blocked"
+              role="status"
+              className="m-0 mt-2 flex items-start gap-1.5 text-[12.5px] font-semibold leading-snug text-(--ad-ink)"
+            >
+              <AlertCircle size={14} strokeWidth={2} className="mt-px shrink-0 text-(--ad-green)" aria-hidden />
+              <span>
+                {approveBlockedReason.text}
+                {approveBlockedReason.kind === 'gmail' && !readOnly && (
+                  <> <Link to={`${basePath}/settings`} className="text-(--ad-green) underline underline-offset-2">Open Settings</Link></>
+                )}
+              </span>
+            </p>
+          )}
           <p className="m-0 mt-2 text-[12px] leading-relaxed text-(--ad-ink-soft)">{APPROVAL_EXPLAINER}</p>
           {hasEuDrafts && (
             <p className="m-0 mt-1.5 text-[12px] leading-relaxed text-(--ad-ink-soft)">{EU_RECIPIENT_NOTE}</p>
@@ -792,6 +818,7 @@ function StatTile({
   value,
   sub,
   subColor,
+  hint,
   accent,
 }: {
   icon: React.ElementType;
@@ -800,6 +827,8 @@ function StatTile({
   value: number;
   sub: string;
   subColor: string;
+  /** Hover text explaining the sub-line. */
+  hint?: string;
   accent?: boolean;
 }) {
   const bg   = accent ? 'var(--ad-green)' : 'var(--ad-surface)';
@@ -832,7 +861,8 @@ function StatTile({
 
       <span
         style={{ color: subColor }}
-        className="text-[11px] font-semibold leading-none"
+        className="text-[11px] font-semibold leading-snug"
+        title={hint}
       >
         {sub}
       </span>
