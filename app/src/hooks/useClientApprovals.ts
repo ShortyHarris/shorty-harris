@@ -215,6 +215,17 @@ async function fetchPendingMessages(clientId: string, client: SupabaseClient): P
   return rows;
 }
 
+// approved_queue answers differently per caller (an admin also sees drafts held by the send rules),
+// so the cache key must say which Supabase client asked. Without this, admin results cached while
+// viewing as a client were reused by the client-token view: a "Blocked (99)" tab with an empty list.
+const clientTags = new WeakMap<SupabaseClient, number>();
+let nextClientTag = 0;
+function clientTag(client: SupabaseClient): number {
+  let tag = clientTags.get(client);
+  if (tag === undefined) { tag = nextClientTag++; clientTags.set(client, tag); }
+  return tag;
+}
+
 /**
  * Counts and stats without any list: one approved_queue call with a page size of 1 (the RPC's
  * minimum), so at most a single row comes back and it is ignored. It shares its cache entry with
@@ -222,7 +233,7 @@ async function fetchPendingMessages(clientId: string, client: SupabaseClient): P
  */
 export function useApprovedQueueCounts(clientId: string, client: SupabaseClient = supabase) {
   const { data } = useQuery({
-    queryKey: [...clientApprovedKey(clientId), COUNTS_ONLY],
+    queryKey: [...clientApprovedKey(clientId), clientTag(client), COUNTS_ONLY],
     queryFn: () => fetchApprovedQueue(clientId, client, COUNTS_ONLY),
     enabled: !!clientId && clientId !== '__preview__',
     staleTime: 30 * 1000,
@@ -271,7 +282,7 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     error: queueError,
     refetch: refetchQueue,
   } = useQuery({
-    queryKey: [...clientApprovedKey(clientId), queueParams],
+    queryKey: [...clientApprovedKey(clientId), clientTag(client), queueParams],
     queryFn: () => fetchApprovedQueue(clientId, client, queueParams),
     enabled: !!clientId && !isPreview,
     staleTime: 30 * 1000,

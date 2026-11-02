@@ -40,6 +40,9 @@ export interface ClientPipelineResult {
   offset: number;
   counts_by_status: Record<string, number>;
   counts_by_sequence_status: Partial<Record<SequenceStatus, number>>;
+  // Absent until the 20261102072518 and 20261102073752 migrations; a chip hides until its count exists.
+  awaiting_approval_prospects?: number;
+  drafts_rejected_prospects?: number;
   rows: PipelineRow[];
 }
 
@@ -74,6 +77,8 @@ export function useClientPipeline(
         offset: result.offset ?? 0,
         counts_by_status: result.counts_by_status ?? {},
         counts_by_sequence_status: result.counts_by_sequence_status ?? {},
+        awaiting_approval_prospects: result.awaiting_approval_prospects,
+        drafts_rejected_prospects: result.drafts_rejected_prospects,
         rows: result.rows ?? [],
       } as ClientPipelineResult;
     },

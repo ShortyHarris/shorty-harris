@@ -1,48 +1,58 @@
-import { useState } from 'react';
-import { Sparkles, RefreshCw } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { RefreshCw, ChevronDown, Users, Megaphone, Search, type LucideIcon } from 'lucide-react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import {
   useClientIcp, saveClientIcp, buildClientIcp, useClientTargetingPerformance,
   type ClientIcpPatch,
 } from '../../hooks/useClientIcp';
-import { TagInput } from '../../components/TagInput';
+import { TagInput, CHIP_TONE, type ChipTone } from '../../components/TagInput';
 import { useToast, ToastHost } from '../../components/Toast';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { summarizeRebuild, type RebuildSummary } from '../../lib/rebuildSummary';
 import { btn } from '../../lib/clientButtons';
-
-const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em]';
-const inputCls = 'w-full rounded-lg border px-3.5 py-2.5 text-[13px] outline-none transition-colors';
-const inputStyle = { borderColor: 'var(--line)', background: 'var(--bg)', color: 'var(--ink)' };
+import { WhatsWorking } from './Results';
 
 const HELP: HelpContent = {
   title: 'Targeting profile',
   body: [
     { type: 'p', text: "This is what we know about who you target - built from your website and, over time, from which replies actually turn positive." },
-    { type: 'p', text: "Anything you edit here is kept exactly as you wrote it - rebuilding from your website never overwrites a field you've touched." },
+    { type: 'p', text: "Anything you edit here is kept exactly as you wrote it - refreshing from your website never overwrites a field you've touched." },
   ],
 };
 
+type ArrayKey = keyof Omit<ClientIcpPatch, 'notes'>;
+type FieldKey = ArrayKey | 'notes';
+
 interface FieldDef {
-  key: keyof Omit<ClientIcpPatch, 'notes'>;
+  key: ArrayKey;
   label: string;
   placeholder: string;
   splitOn: string;
+  // Each group gets its own chip style so the sections read apart within the brand palette.
+  tone: ChipTone;
   emptyHint?: string;
 }
 
-const ARRAY_FIELDS: FieldDef[] = [
-  { key: 'target_business_types', label: 'Target business types', placeholder: 'e.g. Dental practice, Gym', splitOn: ',' },
-  { key: 'target_locations', label: 'Target locations', placeholder: 'e.g. Bloomington, IL', splitOn: ';' },
+const WHO_FIELDS: FieldDef[] = [
+  { key: 'target_business_types', label: 'Business types', placeholder: 'e.g. Dental practice, Gym', splitOn: ',', tone: 'brand' },
+  { key: 'target_locations', label: 'Locations', placeholder: 'e.g. Bloomington, IL', splitOn: ';', tone: 'brand' },
   {
-    key: 'decision_maker_roles', label: 'Decision-maker roles', placeholder: 'e.g. Owner, Office manager', splitOn: ',',
-    emptyHint: "We don't derive this yet - add the roles who'd actually say yes.",
+    key: 'decision_maker_roles', label: 'Decision-makers', placeholder: 'e.g. Owner, Office manager', splitOn: ',', tone: 'brand',
+    emptyHint: "We don't fill this in for you yet. Add the roles who'd actually say yes.",
   },
-  { key: 'pain_points', label: 'Pain points', placeholder: 'e.g. Needs frequent hygienic cleaning', splitOn: ',' },
-  { key: 'value_props', label: 'What you offer', placeholder: 'e.g. Office cleaning, Window cleaning', splitOn: ',' },
-  { key: 'suggested_search_terms', label: 'Suggested search terms', placeholder: 'e.g. Dental Practice', splitOn: ',' },
 ];
+
+const PITCH_FIELDS: FieldDef[] = [
+  { key: 'value_props', label: 'What you offer', placeholder: 'e.g. Office cleaning, Window cleaning', splitOn: ',', tone: 'ink' },
+  { key: 'pain_points', label: 'Problems you solve', placeholder: 'e.g. Needs frequent hygienic cleaning', splitOn: ',', tone: 'ink' },
+];
+
+const SEARCH_FIELD: FieldDef = {
+  key: 'suggested_search_terms', label: 'Suggested search terms', placeholder: 'e.g. Dental Practice', splitOn: ',', tone: 'outline',
+};
+
+const ALL_FIELDS = [...WHO_FIELDS, ...PITCH_FIELDS, SEARCH_FIELD];
 
 export function TargetingProfile({ clientId, client = supabase, readOnly = false }: {
   clientId: string; client?: SupabaseClient; readOnly?: boolean;
@@ -52,39 +62,43 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
   const { toasts, toast, dismiss } = useToast();
   const [draft, setDraft] = useState<Record<string, string[]>>({});
   const [notesDraft, setNotesDraft] = useState<string | null>(null);
-  const [savingField, setSavingField] = useState<string | null>(null);
+  const [savingField, setSavingField] = useState<FieldKey | null>(null);
+  const [savedField, setSavedField] = useState<FieldKey | null>(null);
   const [rebuilding, setRebuilding] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [rebuildSummary, setRebuildSummary] = useState<RebuildSummary | null>(null);
 
-  const fieldLabel = (key: string) => ARRAY_FIELDS.find((f) => f.key === key)?.label ?? key;
+  const fieldLabel = (key: string) => ALL_FIELDS.find((f) => f.key === key)?.label ?? key;
 
-  function valuesFor(key: FieldDef['key']): string[] {
+  function valuesFor(key: ArrayKey): string[] {
     return draft[key] ?? icp[key] ?? [];
   }
 
-  async function commitArray(key: FieldDef['key'], values: string[]) {
+  // Saving is shown next to the field rather than as a toast: a toast per tag was noise.
+  async function commitArray(key: ArrayKey, values: string[]) {
     setDraft((prev) => ({ ...prev, [key]: values }));
     setSavingField(key);
+    setSavedField(null);
     setErr(null);
     const { error } = await saveClientIcp(clientId, { [key]: values } as ClientIcpPatch);
     setSavingField(null);
     if (error) { setErr(error); toast(error, 'error'); return; }
     await reload();
     setDraft((prev) => { const next = { ...prev }; delete next[key]; return next; });
-    toast('Targeting profile saved.');
+    setSavedField(key);
   }
 
   async function commitNotes() {
     if (notesDraft === null) return;
     setSavingField('notes');
+    setSavedField(null);
     setErr(null);
     const { error } = await saveClientIcp(clientId, { notes: notesDraft });
     setSavingField(null);
     if (error) { setErr(error); toast(error, 'error'); return; }
     await reload();
     setNotesDraft(null);
-    toast('Notes saved.');
+    setSavedField('notes');
   }
 
   async function handleRebuild() {
@@ -95,205 +109,209 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
     if (!ok) {
       setRebuilding(false);
       setErr(error);
-      toast(error ?? "Couldn't rebuild your targeting profile - please try again.", 'error');
+      toast(error ?? "Couldn't refresh your targeting profile - please try again.", 'error');
       return;
     }
     const after = await reload();
     setRebuilding(false);
-    const summary = after ? summarizeRebuild(before, after, ARRAY_FIELDS.map((f) => f.key)) : null;
+    const summary = after ? summarizeRebuild(before, after, ALL_FIELDS.map((f) => f.key)) : null;
     setRebuildSummary(summary);
-    toast(
-      'Rebuilt from your website.'
-        + (summary ? ` Filled: ${summary.filled.length}. Skipped (your edits): ${summary.skippedEdited.length}.` : '')
-        + (limitedData ? ' We could only read limited information from the website.' : ''),
+    toast('Refreshed from your website.' + (limitedData ? ' We could only read limited information from it.' : ''));
+  }
+
+  function fieldStatus(key: FieldKey): string | null {
+    if (savingField === key) return 'Saving…';
+    if (savedField === key) return 'Saved';
+    if (icp.edited_fields.includes(key)) return 'Edited by you';
+    return null;
+  }
+
+  function renderArrayField(f: FieldDef) {
+    const values = valuesFor(f.key);
+    const edited = icp.edited_fields.includes(f.key);
+    return (
+      <Field key={f.key} label={f.label} status={fieldStatus(f.key)}>
+        {readOnly ? (
+          <div className="flex flex-wrap gap-1.5">
+            {values.length === 0 ? (
+              <span className="text-[13px]" style={{ color: 'var(--ink-soft)' }}>-</span>
+            ) : values.map((v) => (
+              <span key={v} className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${CHIP_TONE[f.tone].chip}`}>{v}</span>
+            ))}
+          </div>
+        ) : (
+          <TagInput label="" placeholder={f.placeholder} values={values} onChange={(v) => commitArray(f.key, v)} splitOn={f.splitOn} tone={f.tone} />
+        )}
+        {!readOnly && values.length === 0 && (edited ? (
+          <Hint>Refreshing skips this field because you edited it. Add a value to fill it.</Hint>
+        ) : f.emptyHint && <Hint>{f.emptyHint}</Hint>)}
+      </Field>
     );
   }
 
   return (
-    <main className="content">
-      <div className="page-header flex items-start justify-between gap-4 mb-5">
+    <main className="content flex flex-col gap-6">
+      <div className="page-header flex items-start justify-between gap-4">
         <div>
-          <h1 className="m-0 text-[22px] font-extrabold tracking-tight" style={{ color: 'var(--ink)' }}>Targeting profile</h1>
-          <p className="m-0 mt-1 text-[13.5px]" style={{ color: 'var(--ink-soft)' }}>
-            Who we target on your behalf, and what's actually working.
+          <h1 className="m-0 text-[26px] font-extrabold tracking-tight" style={{ color: 'var(--ink)' }}>Targeting profile</h1>
+          <p className="m-0 mt-1 text-[13px]" style={{ color: 'var(--ink-soft)' }}>
+            Who we look for on your behalf, and how we pitch you.
           </p>
         </div>
         <HelpButton content={HELP} />
       </div>
 
-      {error && (
-        <div className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}>
-          Couldn't load your targeting profile: {error}
-        </div>
-      )}
-      {err && (
-        <div className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}>
-          {err}
+      {(error || err) && (
+        <div className="rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: 'var(--line)' }}>
+          {error ? `Couldn't load your targeting profile: ${error}` : err}
         </div>
       )}
 
+      {loading ? (
+        <div className="animate-pulse rounded-[10px] border p-5" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+          <div className="mb-3 h-4 w-40 rounded" style={{ background: 'var(--line)' }} />
+          <div className="h-9 w-full rounded-lg" style={{ background: 'var(--line)' }} />
+        </div>
+      ) : (
+        <>
+          <Section icon={Users} title="Who we look for" description="The businesses we find and email for you.">
+            {WHO_FIELDS.map(renderArrayField)}
+          </Section>
+
+          <Section icon={Megaphone} title="How we pitch you" description="What you offer and the problems you solve for them.">
+            {PITCH_FIELDS.map(renderArrayField)}
+            <Field label="Anything else we should know" status={fieldStatus('notes')}>
+              {readOnly ? (
+                <p className="m-0 text-[13px]" style={{ color: 'var(--ink-soft)' }}>{icp.notes || '-'}</p>
+              ) : (
+                <textarea
+                  value={notesDraft ?? icp.notes ?? ''}
+                  onChange={(e) => setNotesDraft(e.target.value)}
+                  onBlur={commitNotes}
+                  rows={3}
+                  aria-label="Anything else we should know"
+                  placeholder="Anything else about who you're trying to reach."
+                  className="w-full resize-y rounded-lg border px-3.5 py-2.5 text-[13px] outline-none transition-colors focus:border-(--leaf)"
+                  style={{ borderColor: 'var(--line)', background: 'var(--bg)', color: 'var(--ink)' }}
+                />
+              )}
+            </Field>
+          </Section>
+
+          <details className="group overflow-hidden rounded-[10px] border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+              <span className="flex min-w-0 items-center gap-3">
+              <IconBadge icon={Search} subtle />
+              <span>
+                <span className="block text-[14px] font-semibold" style={{ color: 'var(--ink)' }}>Advanced</span>
+                <span className="block text-[12.5px]" style={{ color: 'var(--ink-soft)' }}>
+                  Search terms ({valuesFor(SEARCH_FIELD.key).length})
+                </span>
+              </span>
+              </span>
+              <ChevronDown size={16} className="shrink-0 transition-transform group-open:rotate-180" style={{ color: 'var(--ink-soft)' }} aria-hidden />
+            </summary>
+            <div className="border-t" style={{ borderColor: 'var(--line)' }}>{renderArrayField(SEARCH_FIELD)}</div>
+          </details>
+        </>
+      )}
+
+      {perfLoading ? (
+        <div className="animate-pulse rounded-[10px] border p-5" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+          <div className="h-9 w-full rounded-lg" style={{ background: 'var(--line)' }} />
+        </div>
+      ) : perf.length === 0 ? (
+        <Section title="What's working" description="No results yet. This fills in once your first campaign has been sent." />
+      ) : (
+        <WhatsWorking rows={perf} />
+      )}
+
       {!readOnly && (
-        <div className="mb-6 flex items-start justify-between gap-4 rounded-2xl border px-5 py-4" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
-          <div>
-            <h2 className="m-0 text-[14px] font-semibold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
-              <Sparkles size={15} style={{ color: 'var(--leaf)' }} /> Rebuild from my website
-            </h2>
-            <p className="m-0 mt-1 text-[12.5px]" style={{ color: 'var(--ink-soft)' }}>
-              Re-reads your website and refreshes everything below - except any field you've already edited yourself.
+        <section className="flex flex-col gap-3 rounded-[10px] border px-4 py-4 sm:flex-row sm:items-start sm:justify-between" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+          <div className="min-w-0">
+            <h2 className="m-0 text-[14px] font-semibold" style={{ color: 'var(--ink)' }}>Refresh from your website</h2>
+            <p className="m-0 mt-0.5 text-[12.5px]" style={{ color: 'var(--ink-soft)' }}>
+              Re-reads your website and updates the fields above, except any you've edited yourself.
             </p>
+            {rebuilding && (
+              <p className="m-0 mt-1.5 text-[12.5px] font-semibold" style={{ color: 'var(--leaf)' }} role="status">
+                Reading your website. This can take up to a minute, so please keep this page open.
+              </p>
+            )}
             {rebuildSummary && !rebuilding && (
-              <div className="mt-2 text-[12.5px]" style={{ color: 'var(--ink-soft)' }} role="status">
+              <div className="mt-1.5 text-[12.5px]" style={{ color: 'var(--ink-soft)' }} role="status">
                 <div><strong>Filled:</strong> {rebuildSummary.filled.length ? rebuildSummary.filled.map(fieldLabel).join(', ') : 'nothing new'}</div>
                 {rebuildSummary.skippedEdited.length > 0 && (
-                  <div><strong>Skipped because you edited them:</strong> {rebuildSummary.skippedEdited.map(fieldLabel).join(', ')}</div>
+                  <div><strong>Kept your edits:</strong> {rebuildSummary.skippedEdited.map(fieldLabel).join(', ')}</div>
                 )}
                 {rebuildSummary.stillEmpty.length > 0 && (
                   <div><strong>Still empty:</strong> {rebuildSummary.stillEmpty.map(fieldLabel).join(', ')}</div>
                 )}
               </div>
             )}
-            {rebuilding && (
-              <p className="m-0 mt-1 text-[12.5px] font-semibold" style={{ color: 'var(--leaf)' }} role="status">
-                Reading your website - this can take up to a minute. Please keep this page open.
-              </p>
-            )}
           </div>
-          <button
-            onClick={handleRebuild}
-            disabled={rebuilding}
-            className={`${btn('primary', 'lg')} shrink-0`}
-          >
-            <RefreshCw size={14} className={rebuilding ? 'animate-spin' : ''} />
-            {rebuilding ? 'Rebuilding… up to a minute' : 'Rebuild'}
+          <button onClick={handleRebuild} disabled={rebuilding} className={`${btn('secondary', 'md')} shrink-0 self-start`}>
+            <RefreshCw size={14} className={rebuilding ? 'animate-spin' : ''} aria-hidden />
+            {rebuilding ? 'Refreshing…' : 'Refresh'}
           </button>
-        </div>
+        </section>
       )}
-
-      {loading ? (
-        <div className="animate-pulse mb-6 rounded-2xl border p-5" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
-          <div className="h-4 w-40 rounded mb-3" style={{ background: 'var(--line)' }} />
-          <div className="h-9 w-full rounded-lg" style={{ background: 'var(--line)' }} />
-        </div>
-      ) : (
-        <div className="mb-6 overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
-          {ARRAY_FIELDS.map((f, i) => {
-            const edited = icp.edited_fields.includes(f.key);
-            return (
-              <div key={f.key}>
-                {i > 0 && <div className="border-t" style={{ borderColor: 'var(--line)' }} />}
-                <div className="p-5">
-                  <div className="mb-1.5 flex items-center justify-between gap-2">
-                    <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>{f.label}</label>
-                    {edited && valuesFor(f.key).length > 0 && (
-                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide" style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)' }}>
-                        your edit - won't be overwritten
-                      </span>
-                    )}
-                  </div>
-                  {readOnly ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {valuesFor(f.key).length === 0 ? (
-                        <span className="text-[12.5px]" style={{ color: 'var(--ink-faint)' }}>-</span>
-                      ) : valuesFor(f.key).map((v) => (
-                        <span key={v} className="rounded-full border px-2.5 py-1 text-[12px]" style={{ borderColor: 'var(--line)', color: 'var(--ink-soft)' }}>{v}</span>
-                      ))}
-                    </div>
-                  ) : (
-                    <TagInput
-                      label=""
-                      placeholder={f.placeholder}
-                      values={valuesFor(f.key)}
-                      onChange={(v) => commitArray(f.key, v)}
-                      splitOn={f.splitOn}
-                    />
-                  )}
-                  {edited && valuesFor(f.key).length === 0 && (
-                    <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>Empty, and Rebuild skips this field because it was edited earlier. Add a value to fill it.</p>
-                  )}
-                  {valuesFor(f.key).length === 0 && f.emptyHint && (
-                    <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>{f.emptyHint}</p>
-                  )}
-                  {savingField === f.key && (
-                    <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>Saving…</p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          <div className="border-t" style={{ borderColor: 'var(--line)' }} />
-          <div className="p-5">
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Notes</label>
-              {icp.edited_fields.includes('notes') && (
-                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide" style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)' }}>
-                  your edit - won't be overwritten
-                </span>
-              )}
-            </div>
-            {readOnly ? (
-              <p className="m-0 text-[13px]" style={{ color: 'var(--ink-soft)' }}>{icp.notes || '-'}</p>
-            ) : (
-              <>
-                <textarea
-                  value={notesDraft ?? icp.notes ?? ''}
-                  onChange={(e) => setNotesDraft(e.target.value)}
-                  onBlur={commitNotes}
-                  rows={3}
-                  placeholder="Anything else we should know about who you're trying to reach."
-                  className={`${inputCls} resize-y`}
-                  style={inputStyle}
-                />
-                {savingField === 'notes' && (
-                  <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>Saving…</p>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="mb-2 px-0.5 text-[10.5px] font-semibold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
-        What's actually working
-      </div>
-      <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
-        {perfLoading ? (
-          <div className="animate-pulse p-5">
-            <div className="h-9 w-full rounded-lg" style={{ background: 'var(--line)' }} />
-          </div>
-        ) : perf.length === 0 ? (
-          <p className="m-0 p-5 text-[13px]" style={{ color: 'var(--ink-soft)' }}>
-            No results yet - this fills in once your first campaign has been sent.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr style={{ color: 'var(--ink-faint)' }} className="text-left text-[10.5px] font-semibold uppercase tracking-[.06em]">
-                  <th className="px-5 py-3">Category</th>
-                  <th className="px-3 py-3">Emailed</th>
-                  <th className="px-3 py-3">Replied</th>
-                  <th className="px-3 py-3">Positive</th>
-                  <th className="px-3 py-3">Bounce rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {perf.map((row, i) => (
-                  <tr key={row.category} style={i > 0 ? { borderTop: '1px solid var(--line)' } : undefined}>
-                    <td className="px-5 py-3 font-semibold" style={{ color: 'var(--ink)' }}>{row.category}</td>
-                    <td className="px-3 py-3" style={{ color: 'var(--ink-soft)' }}>{row.emailed}</td>
-                    <td className="px-3 py-3" style={{ color: 'var(--ink-soft)' }}>{row.replied}</td>
-                    <td className="px-3 py-3 font-semibold" style={{ color: 'var(--leaf)' }}>{row.positive}</td>
-                    <td className="px-3 py-3" style={{ color: 'var(--ink-soft)' }}>{Number(row.bounce_rate ?? 0).toFixed(1)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
 
       <ToastHost toasts={toasts} onDismiss={dismiss} />
     </main>
   );
+}
+
+function IconBadge({ icon: Icon, subtle = false }: { icon: LucideIcon; subtle?: boolean }) {
+  return (
+    <span
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+      style={subtle ? { background: 'var(--leaf-tint)', color: 'var(--leaf)' } : { background: 'var(--leaf)', color: 'var(--ad-surface)' }}
+    >
+      <Icon size={15} strokeWidth={2.2} aria-hidden />
+    </span>
+  );
+}
+
+function Section({ icon, title, description, children }: { icon?: LucideIcon; title: string; description: string; children?: ReactNode }) {
+  return (
+    <section className="overflow-hidden rounded-[10px] border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+      <div
+        className="flex items-center gap-3 px-4 py-3"
+        style={{ ...(icon ? { background: 'var(--leaf-tint)' } : {}), ...(children ? { borderBottom: '1px solid var(--line)' } : {}) }}
+      >
+        {icon && <IconBadge icon={icon} />}
+        <div className="min-w-0">
+          <h2 className="m-0 text-[14px] font-semibold" style={{ color: 'var(--ink)' }}>{title}</h2>
+          <p className="m-0 mt-0.5 text-[12.5px]" style={{ color: 'var(--ink-soft)' }}>{description}</p>
+        </div>
+      </div>
+      {children && <div className="divide-y divide-(--line)">{children}</div>}
+    </section>
+  );
+}
+
+function Field({ label, status, children }: { label: string; status: string | null; children: ReactNode }) {
+  return (
+    <div className="px-4 py-4">
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <span className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>{label}</span>
+        {status && (
+          <span
+            className="shrink-0 text-[11.5px]"
+            style={{ color: status === 'Saved' ? 'var(--leaf)' : 'var(--ink-soft)' }}
+            title={status === 'Edited by you' ? "Refreshing from your website won't overwrite this" : undefined}
+            role={status === 'Edited by you' ? undefined : 'status'}
+          >
+            {status}
+          </span>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Hint({ children }: { children: ReactNode }) {
+  return <p className="m-0 mt-1.5 text-[11.5px]" style={{ color: 'var(--ink-soft)' }}>{children}</p>;
 }

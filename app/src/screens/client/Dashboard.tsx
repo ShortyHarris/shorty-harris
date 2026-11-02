@@ -1,20 +1,19 @@
 import { useEffect, useState } from 'react';
-import { SendingCard } from '../../components/SendingPanel';
 import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { useClientDashboard } from '../../hooks/useClientDashboard';
-import { useApprovedQueueCounts } from '../../hooks/useClientApprovals';
 import { useWarmProspects, useProspectMessages, type WarmProspect, type CallOutcome } from '../../hooks/useWarmProspects';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import type { HotLead, HotLeadStatus, CallOutcomeValue } from '../../types';
-import { RefreshCw, ChevronRight, Zap, MessageSquare, Trophy, XCircle, TrendingUp, Minus, ClipboardCheck, Flame, Phone, PhoneCall, Mail, PauseCircle, X, Sparkles, ArrowRight, BellRing, Search, ChevronLeft } from 'lucide-react';
+import { RefreshCw, ChevronRight, MessageSquare, Flame, Phone, PhoneCall, Mail, PauseCircle, X, Sparkles, ArrowRight, BellRing, Search, ChevronLeft } from 'lucide-react';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { useToast, ToastHost } from '../../components/Toast';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { describeReplyMatch, WEAK_MATCH_WARNING } from '../../lib/replyMatch';
+import { realSummary, listExcerpt } from '../../lib/hotLeadText';
 import './Dashboard.css';
 
 const HELP: HelpContent = {
@@ -116,14 +115,13 @@ function formatClosedDate(iso: string | null): string {
 }
 
 export function Dashboard({
-  clientId, client = supabase, readOnly = false, basePath = '/app', markViewedOnOpen = true,
+  clientId, client = supabase, readOnly = false, markViewedOnOpen = true,
 }: {
   clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string;
   /** False when an admin is acting for the client - their look shouldn't clear the client's "New". */
   markViewedOnOpen?: boolean;
 }) {
   const { summary, leads, loading, error, setOutcome: setOutcomeRaw, reload, isFetching, dataUpdatedAt } = useClientDashboard(clientId, client);
-  const { awaitingProspects } = useApprovedQueueCounts(clientId, client);
   const { prospects: warmProspects, loading: warmLoading, logCallOutcome: logCallOutcomeRaw } = useWarmProspects(clientId, client);
   const { toasts, toast, dismiss } = useToast();
   // Toast every real action. The automatic new -> viewed flip on open stays
@@ -166,8 +164,6 @@ export function Dashboard({
   const contactedCount = leads.filter((l) => l.status === 'contacted').length;
   const wonCount = leads.filter((l) => l.status === 'won').length;
   const lostCount = leads.filter((l) => l.status === 'lost').length;
-  const closedTotal = wonCount + lostCount;
-  const closeRate = closedTotal > 0 ? Math.round((wonCount / closedTotal) * 100) : null;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -210,10 +206,7 @@ export function Dashboard({
       <div className="dash-head">
         <div className="dash-head-row">
           <div>
-            <h1 className="dash-title">
-              
-              Hot Leads
-            </h1>
+            <h1 className="dash-title">Hot Leads</h1>
             <p className="dash-sub">
               {newCount > 0
                 ? `${newCount} ${newCount === 1 ? 'business' : 'businesses'} replied - ready for your call`
@@ -224,20 +217,6 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* ─── Pending approvals banner ─── */}
-      {awaitingProspects > 0 && (
-        <Link to={`${basePath}/approvals`} className="appr-nudge">
-          <span className="appr-nudge-icon"><ClipboardCheck size={16} strokeWidth={2} /></span>
-          <span className="appr-nudge-text">
-            <strong>{awaitingProspects} prospect{awaitingProspects === 1 ? '' : 's'}</strong> awaiting approval
-          </span>
-          <ChevronRight size={16} className="appr-nudge-arrow" />
-        </Link>
-      )}
-
-      {/* ─── Sending: today's cap, warm-up, queue, follow-ups ─── */}
-      <SendingCard clientId={clientId} client={client} />
-
       {/* ─── Warm prospects: opened but never replied ─── */}
       <div>
         {!warmLoading && warmProspects.length > 0 && (
@@ -245,13 +224,12 @@ export function Dashboard({
         )}
       </div>
 
-      {/* ─── Stat cards ─── */}
+      {/* ─── Stat row ─── */}
       <StatGrid
         openCount={openCount}
         contactedCount={contactedCount}
         wonCount={wonCount}
         lostCount={lostCount}
-        closeRate={closeRate}
         onFilter={selectFilter}
       />
 
@@ -362,7 +340,7 @@ function LeadsTable({ leads, onOpen }: { leads: HotLead[]; onOpen: (lead: HotLea
               </td>
               <td className="align-top max-w-105">
                 <p className="m-0 text-[13px] text-(--ink-soft) line-clamp-1">
-                  {closed ? (lead.outcome_note || '-') : (lead.ai_summary ?? '-')}
+                  {closed ? (lead.outcome_note || '-') : (listExcerpt(lead) ?? '-')}
                 </p>
               </td>
               <td className="align-top">
@@ -490,8 +468,8 @@ function LeadRow({ lead, onOpen }: { lead: HotLead; onOpen: () => void }) {
         ) : (
           <>
             {waiting && <StatusPill pill={WAITING_PILL[waiting.tone]} className="mt-1">{waiting.text}</StatusPill>}
-            {lead.ai_summary && (
-              <p className="lead-row-excerpt">{lead.ai_summary}</p>
+            {listExcerpt(lead) && (
+              <p className="lead-row-excerpt">{listExcerpt(lead)}</p>
             )}
           </>
         )}
@@ -509,17 +487,21 @@ type OutcomeFn = (
 
 /* Collapses anything over ~6 lines behind "show more" - the single most
    useful thing on the card (what the prospect actually said), so it
-   shouldn't dominate the panel on long replies. */
+   shouldn't dominate the panel on long replies. The last lines fade out
+   so it reads as "there's more", not as text cut off mid-sentence. */
 function ReplyQuote({ body, receivedAt }: { body: string; receivedAt: string | null }) {
   const [expanded, setExpanded] = useState(false);
   const isLong = body.length > 320 || body.split('\n').length > 6;
+  const clamped = isLong && !expanded;
   return (
     <>
-      <blockquote
-        className="lp-quote"
-        style={!expanded && isLong ? { display: '-webkit-box', WebkitLineClamp: 6, WebkitBoxOrient: 'vertical', overflow: 'hidden' } : undefined}
-      >
-        {body}
+      <blockquote className="lp-quote">
+        <span
+          className={`lp-quote-text${clamped ? ' is-clamped' : ''}`}
+          onClick={clamped ? () => setExpanded(true) : undefined}
+        >
+          {body}
+        </span>
       </blockquote>
       <div className="lp-quote-meta">
         {receivedAt && (
@@ -561,6 +543,9 @@ function LeadPanel({
   const closed = isClosed(lead);
   const waiting = waitingInfo(lead);
   const reply = lead.reply ?? lead.latest_reply;
+  const summary = realSummary(lead);
+  // Without the reply on record, a pasted-email "summary" is still the best copy of what they said.
+  const quoteBody = reply?.body ?? (summary ? null : listExcerpt(lead));
   const replyIsFallback = !lead.reply && !!lead.latest_reply;
   const match = replyIsFallback ? null : describeReplyMatch(lead.reply_match, timeZone);
   const followUpsPaused = lead.status === 'new' || lead.status === 'viewed' || lead.status === 'contacted';
@@ -654,25 +639,28 @@ function LeadPanel({
             <div className="lp-body">
               {/* ─── Left: what happened ─── */}
               <div className="lp-main">
-                <section className="lp-section">
-                  <div className="lp-eyebrow"><Sparkles size={13} strokeWidth={2.2} /> What they want</div>
-                  <p className="lp-summary">{lead.ai_summary ?? 'They replied expressing interest.'}</p>
-                  {lead.suggested_action && (
-                    <div className="lp-next">
-                      <span className="lp-next-icon"><ArrowRight size={15} strokeWidth={2.4} /></span>
-                      <div>
-                        <div className="lp-next-label">Suggested next step</div>
-                        <p className="lp-next-text">{lead.suggested_action}</p>
-                      </div>
+                {lead.suggested_action && (
+                  <div className="lp-next lp-next-first">
+                    <span className="lp-next-icon"><ArrowRight size={15} strokeWidth={2.4} /></span>
+                    <div>
+                      <div className="lp-next-label">Suggested next step</div>
+                      <p className="lp-next-text">{lead.suggested_action}</p>
                     </div>
-                  )}
-                </section>
+                  </div>
+                )}
+
+                {summary && (
+                  <section className="lp-section">
+                    <div className="lp-eyebrow"><Sparkles size={13} strokeWidth={2.2} /> What they want</div>
+                    <p className="lp-summary">{summary}</p>
+                  </section>
+                )}
 
                 <section className="lp-section">
                   <div className="lp-eyebrow"><MessageSquare size={13} strokeWidth={2.2} /> What they said</div>
-                  {reply?.body ? (
+                  {quoteBody ? (
                     <>
-                      <ReplyQuote body={reply.body} receivedAt={reply.received_at} />
+                      <ReplyQuote body={quoteBody} receivedAt={reply?.received_at ?? null} />
                       {replyIsFallback && (
                         <p className="lp-muted lp-tight">Showing their most recent reply - the original isn't on record.</p>
                       )}
@@ -697,13 +685,15 @@ function LeadPanel({
                 {followUpsPaused && (
                   <p className="lp-footnote">
                     <PauseCircle size={15} strokeWidth={2} />
-                    <span>Automated follow-ups to this person are paused - the conversation is yours now.</span>
+                    <span>Follow-ups are paused. The conversation is yours now.</span>
                   </p>
                 )}
               </div>
 
               {/* ─── Right: who + what to do ─── */}
               <aside className="lp-rail">
+                {/* Sticky on desktop so the actions stay in reach while a long reply scrolls. */}
+                <div className="lp-rail-inner">
                 {(lead.email || lead.phone) && (
                   <div className="lp-contact">
                     <div className="lp-eyebrow">Contact</div>
@@ -731,7 +721,7 @@ function LeadPanel({
                   {lead.phone && (
                     <div className="lp-btn-row">
                       <a className="lp-btn lp-btn-secondary" href={`tel:${lead.phone}`}>
-                        <PhoneIcon /> Call
+                        <span className="lp-btn-ico lp-btn-ico-call"><Phone size={13} strokeWidth={2.4} aria-hidden /></span> Call
                       </a>
                       <a
                         className="lp-btn lp-btn-secondary"
@@ -739,7 +729,7 @@ function LeadPanel({
                         target="_blank"
                         rel="noreferrer"
                       >
-                        <span className="lp-wa"><WhatsAppIcon /></span> WhatsApp
+                        <span className="lp-btn-ico lp-btn-ico-wa"><WhatsAppIcon /></span> WhatsApp
                       </a>
                     </div>
                   )}
@@ -800,6 +790,7 @@ function LeadPanel({
                     </div>
                   </div>
                 )}
+                </div>
               </aside>
             </div>
           )}
@@ -821,16 +812,16 @@ function LeadsSkeleton() {
             className="flex items-center gap-3 border border-(--line) bg-(--surface)"
             style={{ borderRadius: 14, padding: '16px 18px', margin: '0 16px 10px', width: 'calc(100% - 32px)', minHeight: 72 }}
           >
-            <div className="h-2.25 w-2.25 shrink-0 rounded-full bg-[#cfc9e8] animate-pulse" />
+            <div className="h-2.25 w-2.25 shrink-0 rounded-full bg-(--ad-line-mid) animate-pulse" />
             <div className="flex-1 min-w-0 flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2">
-                <div className="h-4 w-2/5 rounded bg-[#cfc9e8] animate-pulse" />
-                <div className="h-5 w-14 rounded-full bg-[#cfc9e8] animate-pulse" />
+                <div className="h-4 w-2/5 rounded bg-(--ad-line-mid) animate-pulse" />
+                <div className="h-5 w-14 rounded-full bg-(--ad-line-mid) animate-pulse" />
               </div>
-              <div className="h-3 w-1/3 rounded bg-[#e8e3f7] animate-pulse" />
-              <div className="h-3 w-5/6 rounded bg-[#e8e3f7] animate-pulse" />
+              <div className="h-3 w-1/3 rounded bg-(--ad-line) animate-pulse" />
+              <div className="h-3 w-5/6 rounded bg-(--ad-line) animate-pulse" />
             </div>
-            <div className="w-2 h-3 shrink-0 rounded bg-[#e8e3f7] animate-pulse" />
+            <div className="w-2 h-3 shrink-0 rounded bg-(--ad-line) animate-pulse" />
           </div>
         ))}
       </div>
@@ -842,14 +833,14 @@ function LeadsSkeleton() {
             {[...Array(6)].map((_, i) => (
               <tr key={i}>
                 <td>
-                  <div className="h-4 w-40 rounded bg-[#cfc9e8] animate-pulse" />
-                  <div className="mt-1.5 h-3 w-24 rounded bg-[#e8e3f7] animate-pulse" />
+                  <div className="h-4 w-40 rounded bg-(--ad-line-mid) animate-pulse" />
+                  <div className="mt-1.5 h-3 w-24 rounded bg-(--ad-line) animate-pulse" />
                 </td>
                 <td className="max-w-105">
-                  <div className="h-3 w-4/5 rounded bg-[#e8e3f7] animate-pulse" />
+                  <div className="h-3 w-4/5 rounded bg-(--ad-line) animate-pulse" />
                 </td>
                 <td>
-                  <div className="h-5 w-16 rounded-full bg-[#cfc9e8] animate-pulse" />
+                  <div className="h-5 w-16 rounded-full bg-(--ad-line-mid) animate-pulse" />
                 </td>
                 <td className="w-10" />
               </tr>
@@ -880,6 +871,9 @@ function timeAgo(iso: string | null): string {
   return `${weeks}w ago`;
 }
 
+/* A single banner, not an inline list - the leads table below is the point
+   of this page, so "Worth a call" gets one line and a tap for the rest.
+   The modal it opens already has search/sort/filter and the full list. */
 function WarmProspectsPanel({
   prospects, onSelect,
 }: {
@@ -887,31 +881,21 @@ function WarmProspectsPanel({
   onSelect: (prospect: WarmProspect) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
-  const visible = prospects.slice(0, 3);
 
   return (
-    <div className="dash-leads" data-tour="warm-prospects">
-      <div className="warm-panel-head">
-        <span className="warm-panel-icon"><Flame size={16} strokeWidth={2} /></span>
-        <div>
-          <h2 className="warm-panel-title">Worth a call</h2>
-          <p className="warm-panel-sub">
-            {prospects.length} {prospects.length === 1 ? 'business has' : 'businesses have'} opened your emails multiple times without replying
-          </p>
-        </div>
-      </div>
-
-      <div className="warm-list">
-        {visible.map((p) => (
-          <WarmRow key={p.prospect_id} p={p} onSelect={onSelect} />
-        ))}
-      </div>
-
-      {prospects.length > 3 && (
-        <button className="warm-toggle" onClick={() => setShowAll(true)}>
-          View all {prospects.length}
+    <>
+      <div className="warm-nudge-wrap">
+        <button className="warm-nudge" data-tour="warm-prospects" onClick={() => setShowAll(true)}>
+          <span className="warm-nudge-icon"><Flame size={14} strokeWidth={2.3} aria-hidden /></span>
+          <span className="warm-nudge-text">
+            <span className="warm-nudge-headline">
+              {prospects.length} {prospects.length === 1 ? 'business keeps' : 'businesses keep'} opening your emails and haven't replied
+            </span>
+            <span className="warm-nudge-sub">They're reading - a quick call right now could turn this into a deal.</span>
+          </span>
+          <ChevronRight size={16} className="warm-nudge-arrow" aria-hidden />
         </button>
-      )}
+      </div>
 
       <AnimatePresence>
         {showAll && (
@@ -923,7 +907,7 @@ function WarmProspectsPanel({
           />
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
 
@@ -1028,7 +1012,7 @@ function WarmProspectsModal({
             </button>
           </div>
           <p className="warm-all-sub">
-            {prospects.length} {prospects.length === 1 ? 'business has' : 'businesses have'} opened your emails multiple times without replying. A quick call usually lands well.
+            {prospects.length} {prospects.length === 1 ? 'business has' : 'businesses have'} opened your emails several times but haven't replied.
           </p>
 
           <div className="warm-all-tools">
@@ -1191,7 +1175,7 @@ function WarmProspectHistoryModal({
 
               <p className="lp-footnote">
                 <Flame size={15} strokeWidth={2} />
-                <span>They keep opening but haven't replied - a short, friendly call often turns this into a conversation.</span>
+                <span>They keep opening but haven't replied. A short call often starts a conversation.</span>
               </p>
             </div>
 
@@ -1254,87 +1238,38 @@ function WarmProspectHistoryModal({
 }
 
 
-/* ───── stat cards ───── */
+/* ───── stat row - plain label-over-count, no cards. Same filters as the
+   tabs below; this is just a faster glance before you get to the table. ───── */
 function StatGrid({
-  openCount, contactedCount, wonCount, lostCount, closeRate, onFilter,
+  openCount, contactedCount, wonCount, lostCount, onFilter,
 }: {
   openCount: number; contactedCount: number;
   wonCount: number; lostCount: number;
-  closeRate: number | null;
   onFilter: (f: Filter) => void;
 }) {
   const cards = [
-    {
-      icon: Zap,
-      iconColor: 'var(--amber)',
-      label: 'Open',
-      value: openCount,
-      TrendIcon: openCount > 0 ? TrendingUp : Minus,
-      trendText: openCount > 0 ? 'needs your call' : 'all caught up',
-      trendColor: openCount > 0 ? 'var(--amber)' : 'var(--ink-faint)',
-      filter: 'open' as Filter,
-    },
-    {
-      icon: MessageSquare,
-      iconColor: 'var(--leaf)',
-      label: 'Contacted',
-      value: contactedCount,
-      TrendIcon: Minus,
-      trendText: 'active conversations',
-      trendColor: 'var(--ink-faint)',
-      filter: 'contacted' as Filter,
-    },
-    {
-      icon: Trophy,
-      iconColor: 'var(--leaf)',
-      label: 'Won',
-      value: wonCount,
-      TrendIcon: closeRate !== null ? TrendingUp : Minus,
-      trendText: closeRate !== null ? `${closeRate}% close rate` : '-',
-      trendColor: closeRate !== null && closeRate > 0 ? 'var(--leaf)' : 'var(--ink-faint)',
-      filter: 'won' as Filter,
-    },
-    {
-      icon: XCircle,
-      iconColor: 'var(--clay)',
-      label: 'Lost',
-      value: lostCount,
-      TrendIcon: Minus,
-      trendText: lostCount > 0 ? 'closed without deal' : '-',
-      trendColor: 'var(--ink-faint)',
-      filter: 'lost' as Filter,
-    },
+    { label: 'Open', value: openCount, filter: 'open' as Filter },
+    { label: 'Contacted', value: contactedCount, filter: 'contacted' as Filter },
+    { label: 'Won', value: wonCount, filter: 'won' as Filter },
+    { label: 'Lost', value: lostCount, filter: 'lost' as Filter },
   ];
 
   return (
-    <div className="stat-grid" data-tour="dashboard-stats">
-      {cards.map((c) => {
-        return (
-          <button key={c.label} className="stat-card" onClick={() => onFilter(c.filter)}>
-            <div className="stat-card-header">
-             
-              <span className="stat-label">{c.label}</span>
-            </div>
-            <div className="stat-value">{c.value}</div>
-            
-          </button>
-        );
-      })}
+    <div className="stat-row" data-tour="dashboard-stats">
+      {cards.map((c) => (
+        <button key={c.label} className="stat-item" onClick={() => onFilter(c.filter)}>
+          <span className="stat-label">{c.label}</span>
+          <span className="stat-value">{c.value}</span>
+        </button>
+      ))}
     </div>
   );
 }
 
-/* ───── reach-row icons - real Font Awesome glyphs ───── */
-function PhoneIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 512 512" fill="currentColor">
-      <path d="M164.9 24.6c-7.7-18.6-28-28.5-47.4-23.2l-88 24C12.1 30.2 0 46 0 64C0 311.4 200.6 512 448 512c18 0 33.8-12.1 38.6-29.5l24-88c5.3-19.4-4.6-39.7-23.2-47.4l-96-40c-16.3-6.8-35.2-2-46.3 11.6l-40.4 49.3c-72.2-37.7-130.6-96.2-168.3-168.3l49.3-40.4c13.6-11.2 18.4-30 11.6-46.3l-40-96z" />
-    </svg>
-  );
-}
+/* ───── reach-row icons - real Font Awesome brand glyphs ───── */
 function WhatsAppIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 448 512" fill="currentColor">
+    <svg width="14" height="14" viewBox="0 0 448 512" fill="currentColor" aria-hidden>
       <path d="M380.9 97.1C339 55.1 283.2 32 224.1 32c-122.4 0-222 99.6-222 222 0 39.2 10.4 77.7 30 111.4L4.5 480l117.8-31.2c32.5 17.7 69.1 27 106.6 27 122.4 0 222-99.6 222-222 0-59.1-23.1-114.9-65.1-156.7zM224.1 437.6c-32.5 0-64.4-8.7-92.1-25.2l-6.6-3.9-68.5 18.1 18.3-66.7-4.3-6.9c-18.9-30-28.9-64.6-28.9-100.1 0-103.5 84.2-187.7 187.7-187.7 50.2 0 97.4 19.6 132.9 55.1 35.5 35.5 56.6 82.7 56.5 132.9 0 103.5-84.2 187.7-187.7 187.7zm104.4-138.2c-5.6-2.8-33.4-16.5-38.6-18.4-5.2-1.9-9-2.8-12.8 2.8-3.8 5.6-14.7 18.4-18 22.2-3.3 3.8-6.6 4.2-12.2 1.4-32.9-16.4-54.5-29.3-76.1-66.4-5.8-9.9-1.4-9.9 4.1-19.3 1.6-2.8 4.1-7.4 6.2-11.1 2.1-3.8 1-6.6-.6-9.4-1.6-2.8-13.6-32.7-18.6-44.8-4.9-11.8-9.9-10.2-13.6-10.4-3.5-.2-7.5-.2-11.5-.2-4.1 0-10.6 1.5-16.2 7.5-5.6 6-21.4 20.9-21.4 51 0 30.1 21.9 59.2 24.9 63.3 3 4.1 41.6 63.5 100.9 86.5 50.4 19.7 60.7 15.8 71.7 14.8 11-1 35.4-14.5 40.4-28.5 5-14 5-26 3.5-28.5-1.4-2.5-5.2-4-10.8-6.8z" />
     </svg>
   );

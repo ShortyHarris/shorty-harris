@@ -158,7 +158,7 @@ export function SearchableSelect({
                     onMouseEnter={() => setActive(i)}
                     className={cn(
                       'flex w-full cursor-pointer items-center gap-2 rounded-sm border-0 bg-transparent px-2 py-1.5 text-left text-[13px] text-inherit',
-                      i === active && 'bg-black/5',
+                      i === active && 'bg-(--ad-fill)',
                     )}
                   >
                     <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">

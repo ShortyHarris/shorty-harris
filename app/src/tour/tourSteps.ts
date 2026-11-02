@@ -23,6 +23,7 @@ export const TOUR_STEPS: TourStep[] = [
     selector: 'dashboard-stats',
     title: 'Your key numbers',
     body: 'A quick look at new, in-progress, won, and lost leads.',
+    fallbackBody: 'On a phone, your open, contacted, won and lost counts are on the filter tabs further down this page.',
   },
   {
     id: 'warm-prospects',

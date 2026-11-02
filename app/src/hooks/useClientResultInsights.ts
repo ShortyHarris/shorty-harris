@@ -34,6 +34,10 @@ export interface ResultFunnel {
   hot_leads: number;
   hot_leads_open: number;
   won: number;
+  // Per-prospect counts; absent until the 20261102072518 migration is applied.
+  prospects_written?: number;
+  prospects_awaiting?: number;
+  prospects_emailed?: number;
 }
 
 export interface ResultCategoryRow {

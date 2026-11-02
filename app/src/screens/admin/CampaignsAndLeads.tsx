@@ -208,7 +208,9 @@ function ScrapeResultChip({ campaign, onOpenDetail }: { campaign: CampaignRow; o
   }
   return (
     <button
-      onClick={onOpenDetail}
+      // Rows/cards open Edit campaign on click - don't let this bubble up
+      // and stack that modal under the scrape breakdown.
+      onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
       title="View full scrape breakdown"
       className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-semibold transition-opacity hover:opacity-75 ${toneCls}`}
     >

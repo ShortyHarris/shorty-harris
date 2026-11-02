@@ -189,15 +189,13 @@ export function Clients() {
                         </StatusPill>
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-(--ad-ink)">{c.credits_remaining}</span>
-                          <button
-                            onClick={() => setCreditsTarget(c)}
-                            className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-2 py-1 text-[11px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
-                          >
-                            Add credits
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => setCreditsTarget(c)}
+                          title="Add credits"
+                          className="cursor-pointer rounded-lg border border-transparent px-1.5 py-0.5 -mx-1.5 font-semibold text-(--ad-ink) transition-colors hover:border-(--ad-line) hover:text-(--ad-green)"
+                        >
+                          {c.credits_remaining}
+                        </button>
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <InviteCell

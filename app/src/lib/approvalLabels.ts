@@ -14,4 +14,4 @@ export function approvalTypeLabel(messageType: string): string {
 }
 
 export const APPROVAL_EXPLAINER =
-  'Approving schedules every email. Follow-ups send 3, 5 and 7 business days after the previous email, and only if the prospect has not replied or unsubscribed.';
+  'Approving schedules the send. Follow-ups go 3, 5 and 7 business days after the previous email, unless the prospect replies or unsubscribes.';

@@ -3,6 +3,8 @@ import { RequiredMark } from './RequiredMark';
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+// Client screens use sentence-case labels; the admin keeps the caps style.
+const fieldLblSentence = 'mb-1.5 block text-[13px] font-semibold text-(--ad-ink)';
 const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
 /* Tag input - type + Enter (or the separator key, or clicking away) adds
@@ -10,9 +12,19 @@ const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2
    "restaurants, cafes, hotels" become three chips at once. Each chip is
    its own array entry - this is what keeps a multi-value field (locations,
    search terms) from ever collapsing into one joined string on save. */
+export type ChipTone = 'brand' | 'ink' | 'outline';
+
+export const CHIP_TONE: Record<ChipTone, { chip: string; remove: string }> = {
+  brand: { chip: 'bg-(--ad-green-tint) text-(--ad-green)', remove: 'text-(--ad-green)/60 hover:text-(--ad-green)' },
+  ink: { chip: 'bg-(--ad-ink) text-(--ad-surface)', remove: 'text-(--ad-surface)/60 hover:text-(--ad-surface)' },
+  outline: { chip: 'border border-(--ad-ink-soft) bg-transparent text-(--ad-ink)', remove: 'text-(--ad-ink-soft) hover:text-(--ad-ink)' },
+};
+
 export function TagInput({
-  label, placeholder, helper, values, onChange, splitOn = ',', maxItems, capLabel, required,
+  label, placeholder, helper, values, onChange, splitOn = ',', maxItems, capLabel, required, tone = 'brand', sentenceLabel = false,
 }: {
+  tone?: ChipTone;
+  sentenceLabel?: boolean;
   label: string;
   required?: boolean;
   placeholder: string;
@@ -49,13 +61,13 @@ export function TagInput({
 
   return (
     <div>
-      <label className={fieldLbl}>{label}{required && <RequiredMark />}</label>
+      {label && <label className={sentenceLabel ? fieldLblSentence : fieldLbl}>{label}{required && <RequiredMark />}</label>}
       <input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={() => commitDraft(draft)}
-        placeholder={atCap ? `Limit reached — remove one to add another` : placeholder}
+        placeholder={atCap ? `Limit reached. Remove one to add another` : placeholder}
         disabled={atCap}
         style={FONT}
         className={inputCls}
@@ -63,13 +75,13 @@ export function TagInput({
       {values.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {values.map((v, i) => (
-            <span key={`${v}-${i}`} className="inline-flex items-center gap-1.5 rounded-full bg-(--ad-green-tint) px-2.5 py-1 text-[12px] font-semibold text-(--ad-green)">
+            <span key={`${v}-${i}`} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${CHIP_TONE[tone].chip}`}>
               {v}
               <button
                 type="button"
                 onClick={() => onChange(values.filter((_, idx) => idx !== i))}
                 aria-label={`Remove ${v}`}
-                className="cursor-pointer border-0 bg-transparent p-0 text-[13px] leading-none text-(--ad-green)/60 hover:text-(--ad-green)"
+                className={`cursor-pointer border-0 bg-transparent p-0 text-[13px] leading-none ${CHIP_TONE[tone].remove}`}
               >
                 ×
               </button>

@@ -11,15 +11,20 @@ import { useToast, ToastHost } from '../../components/Toast';
 import { RefreshButton } from '../../components/RefreshButton';
 import { useRefreshHandler } from '../../hooks/useRefreshHandler';
 import { PACKS } from '../../lib/pricing';
-import { CreditCard } from 'lucide-react';
 import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
 
+// A paid invoice is done, not something waiting on the client, so it uses the calm "sent" look.
 const PAY_PILL: Record<string, StatusPillStyle> = {
-  succeeded: { ...PILL.waiting, icon: 'check' },
+  succeeded: { ...PILL.sent,    icon: 'check' },
   failed:    { ...PILL.problem, icon: 'alert' },
   pending:   { ...PILL.ahead,   icon: 'clock' },
   refunded:  { ...PILL.closed,  icon: 'minus' },
 };
+const PAY_LABEL: Record<string, string> = { succeeded: 'Paid', failed: 'Failed', pending: 'Pending', refunded: 'Refunded' };
+
+function payLabel(status: string): string {
+  return PAY_LABEL[status] ?? status.charAt(0).toUpperCase() + status.slice(1);
+}
 import './Billing.css';
 
 const HELP: HelpContent = {
@@ -31,14 +36,14 @@ const HELP: HelpContent = {
   ],
 };
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 
 type DateFilter = 'all' | '30' | '90' | '365';
 const DATE_FILTERS: { key: DateFilter; label: string }[] = [
   { key: 'all', label: 'All time' },
   { key: '30',  label: 'Last 30 days' },
   { key: '90',  label: 'Last 90 days' },
-  { key: '365', label: 'This year' },
+  { key: '365', label: 'Last 12 months' },
 ];
 
 function withinDateFilter(iso: string, filter: DateFilter): boolean {
@@ -141,21 +146,20 @@ export function Billing({
       {/* Top: balance + buy credits side by side on desktop */}
       <div className="lg:grid  lg:gap-6 lg:items-start">
 
-          <div className="bill-section-head">
-             <h1 className='m-0 text-2xl font-semibold flex items-center gap-2' style={{ color: 'var(--ink)', letterSpacing: '-0.01em' }}>
-               <CreditCard size={24} strokeWidth={2} style={{ color: 'var(--leaf)' }} aria-hidden />
-               Billing & Activity
-             </h1>
-             <HelpButton content={HELP} />
+          <div className="page-header mb-5 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="m-0 text-[26px] font-extrabold tracking-tight" style={{ color: 'var(--ink)' }}>Billing</h1>
+              <p className="m-0 mt-1 text-[13px]" style={{ color: 'var(--ink-soft)' }}>Your credits, buying more, and where they went.</p>
+            </div>
+            <HelpButton content={HELP} />
           </div>
 
         <div className="credit-hero mb-4 rounded-lg" data-tour="credit-balance">
-          <div className="credit-hero-top justify-end">
-            
-            {!loading && data?.smsCredits != null && (
-              <span className="credit-hero-sms-chip">+{data.smsCredits} SMS credits</span>
-            )}
-          </div>
+          {!loading && (data?.smsCredits ?? 0) > 0 && (
+            <div className="credit-hero-top justify-end">
+              <span className="credit-hero-sms-chip">+{data?.smsCredits} SMS credits</span>
+            </div>
+          )}
           <div className="credit-hero-num">{loading ? '-' : data?.credits}</div>
           <div className="credit-hero-label">credits remaining</div>
           <div className="credit-hero-note">
@@ -183,7 +187,7 @@ export function Billing({
                     {p.credits} credits
                     {p.tag && <span className="pack-tag">{p.tag}</span>}
                   </div>
-                  
+                  <div className="pack-row-per">${(p.priceUsd / p.credits).toFixed(2)} per lead</div>
                 </div>
                 <div className="pack-row-price">${p.priceUsd}</div>
               </button>
@@ -196,6 +200,9 @@ export function Billing({
               ? 'Starting secure checkout…'
               : `Buy ${selected} credits - $${pack.priceUsd}`}
           </button>
+          {readOnly && (
+            <p className="checkout-note">You're viewing this account. Credits can only be bought from the client's own login.</p>
+          )}
           {checkoutError && (
             <p className="checkout-note checkout-note-error">{checkoutError}</p>
           )}
@@ -220,26 +227,26 @@ export function Billing({
             {[...Array(3)].map((_, i) => (
               <div key={i} className="payment-item rounded-lg">
                 <div className="flex flex-col gap-2">
-                  <div className="h-4 w-28 rounded animate-pulse bg-[#cfc9e8]" />
-                  <div className="h-3 w-20 rounded animate-pulse bg-[#e8e3f7]" />
+                  <div className="h-4 w-28 rounded animate-pulse bg-(--ad-line-mid)" />
+                  <div className="h-3 w-20 rounded animate-pulse bg-(--ad-line)" />
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <div className="h-4 w-16 rounded animate-pulse bg-[#cfc9e8]" />
-                  <div className="h-5 w-14 rounded-full animate-pulse bg-[#e8e3f7]" />
+                  <div className="h-4 w-16 rounded animate-pulse bg-(--ad-line-mid)" />
+                  <div className="h-5 w-14 rounded-full animate-pulse bg-(--ad-line)" />
                 </div>
               </div>
             ))}
           </div>
           {/* Desktop: skeleton table */}
-          <div className="hidden lg:block lg:bg-white lg:border lg:border-[#e8e3f7] lg:rounded-[10px] lg:p-4" aria-hidden>
+          <div className="hidden lg:block lg:bg-(--ad-surface) lg:border lg:border-(--ad-line) lg:rounded-[10px] lg:p-4" aria-hidden>
             <table className="w-full">
               <tbody>
                 {[...Array(4)].map((_, i) => (
                   <tr key={i} className="border-b border-[var(--line)]">
-                    <td className="py-3.5 px-2"><div className="h-4 w-10 rounded animate-pulse bg-[#cfc9e8]" /></td>
-                    <td className="py-3.5 px-2"><div className="h-3 w-24 rounded animate-pulse bg-[#e8e3f7]" /></td>
-                    <td className="py-3.5 px-2"><div className="h-4 w-16 rounded animate-pulse bg-[#cfc9e8]" /></td>
-                    <td className="py-3.5 px-2"><div className="h-5 w-14 rounded-full animate-pulse bg-[#e8e3f7]" /></td>
+                    <td className="py-3.5 px-2"><div className="h-4 w-10 rounded animate-pulse bg-(--ad-line-mid)" /></td>
+                    <td className="py-3.5 px-2"><div className="h-3 w-24 rounded animate-pulse bg-(--ad-line)" /></td>
+                    <td className="py-3.5 px-2"><div className="h-4 w-16 rounded animate-pulse bg-(--ad-line-mid)" /></td>
+                    <td className="py-3.5 px-2"><div className="h-5 w-14 rounded-full animate-pulse bg-(--ad-line)" /></td>
                   </tr>
                 ))}
               </tbody>
@@ -252,56 +259,38 @@ export function Billing({
           <span>Your purchases will appear here.</span>
         </div>
       ) : (
-        <>
-          {/* Mobile: card list (unchanged) */}
-          <div className="payment-list lg:hidden">
-            {data!.payments.map((p) => (
-              <div className="payment-item rounded-lg" key={p.id}>
-                <div className="payment-item-left">
-                  <span className="payment-item-credits">
-                    {p.credits_purchased > 0 ? `+${p.credits_purchased} credits` : '-'}
-                  </span>
-                  <span className="payment-item-date">{date(p.created_at)}</span>
-                </div>
-                <div className="payment-item-right">
-                  <span className="payment-item-amount">
-                    {money(p.amount_cents, p.currency)}
-                  </span>
-                  <StatusPill pill={PAY_PILL[p.status] ?? PAY_PILL.pending}>{p.status.charAt(0).toUpperCase() + p.status.slice(1)}</StatusPill>
-                </div>
+        // Phones get the same filter and pages as desktop; only the row layout differs.
+        <div className="lg:rounded-[10px] lg:border lg:border-(--ad-line) lg:bg-(--ad-surface) lg:p-4">
+          <HistoryToolbar
+            count={`${filteredPayments.length} payment${filteredPayments.length !== 1 ? 's' : ''}`}
+            filter={paymentsFilter}
+            onFilter={(f) => { setPaymentsFilter(f); setPaymentsPage(1); }}
+          />
+          {pagedPayments.length === 0 ? (
+            <div className="bill-empty"><span>No payments in this range.</span></div>
+          ) : (
+            <>
+              <div className="payment-list lg:hidden">
+                {pagedPayments.map((p) => (
+                  <div className="payment-item rounded-lg" key={p.id}>
+                    <div className="payment-item-left">
+                      <span className="payment-item-credits">
+                        {p.credits_purchased > 0 ? `+${p.credits_purchased} credits` : '-'}
+                      </span>
+                      <span className="payment-item-date">{date(p.created_at)}</span>
+                    </div>
+                    <div className="payment-item-right">
+                      <span className="payment-item-amount">{money(p.amount_cents, p.currency)}</span>
+                      <StatusPill pill={PAY_PILL[p.status] ?? PAY_PILL.pending}>{payLabel(p.status)}</StatusPill>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-
-          {/* Desktop: real table, full width, contained in one bordered card */}
-          <div className="hidden lg:block lg:bg-white lg:border lg:border-[#e8e3f7] lg:rounded-[10px] lg:p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[13px] text-[var(--ink-faint)]">
-                {filteredPayments.length} payment{filteredPayments.length !== 1 ? 's' : ''}
-              </span>
-              <Select
-                value={paymentsFilter}
-                onValueChange={(v) => { setPaymentsFilter(v as DateFilter); setPaymentsPage(1); }}
-              >
-                <SelectTrigger className="h-8 w-[160px] text-[13px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DATE_FILTERS.map((f) => (
-                    <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {pagedPayments.length === 0 ? (
-              <div className="bill-empty"><span>No payments in this range.</span></div>
-            ) : (
-              <PaymentsTable payments={pagedPayments} />
-            )}
-            <Pagination page={paymentsSafePage} totalPages={paymentsTotalPages} onChange={setPaymentsPage} />
-          </div>
-        </>
+              <div className="hidden lg:block"><PaymentsTable payments={pagedPayments} /></div>
+            </>
+          )}
+          <Pagination page={paymentsSafePage} totalPages={paymentsTotalPages} onChange={setPaymentsPage} />
+        </div>
       )}
 
       {!loading && (data?.ledger.length ?? 0) > 0 && (
@@ -310,48 +299,31 @@ export function Billing({
             <h2>Credit activity</h2>
           </div>
 
-          {/* Mobile: card list (unchanged) */}
-          <div className="activity-list lg:hidden">
-            {data!.ledger.map((l) => (
-              <div className="activity-item rounded-lg" key={l.id}>
-                <div className="activity-item-info">
-                  <span className="activity-desc">
-                    {l.description ?? l.type.replace(/_/g, ' ')}
-                  </span>
-                  <span className="activity-date">{date(l.created_at)}</span>
-                </div>
-                <span className={`activity-amt ${l.amount < 0 ? 'neg' : 'pos'}`}>
-                  {l.amount > 0 ? `+${l.amount}` : l.amount}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Desktop: real table, full width, contained in one bordered card */}
-          <div className="hidden lg:block lg:bg-white lg:border lg:border-[#e8e3f7] lg:rounded-[10px] lg:p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[13px] text-[var(--ink-faint)]">
-                {filteredLedger.length} entr{filteredLedger.length !== 1 ? 'ies' : 'y'}
-              </span>
-              <Select
-                value={ledgerFilter}
-                onValueChange={(v) => { setLedgerFilter(v as DateFilter); setLedgerPage(1); }}
-              >
-                <SelectTrigger className="h-8 w-[160px] text-[13px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DATE_FILTERS.map((f) => (
-                    <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
+          <div className="lg:rounded-[10px] lg:border lg:border-(--ad-line) lg:bg-(--ad-surface) lg:p-4">
+            <HistoryToolbar
+              count={`${filteredLedger.length} entr${filteredLedger.length !== 1 ? 'ies' : 'y'}`}
+              filter={ledgerFilter}
+              onFilter={(f) => { setLedgerFilter(f); setLedgerPage(1); }}
+            />
             {pagedLedger.length === 0 ? (
               <div className="bill-empty"><span>No activity in this range.</span></div>
             ) : (
-              <ActivityTable ledger={pagedLedger} />
+              <>
+                <div className="activity-list lg:hidden">
+                  {pagedLedger.map((l) => (
+                    <div className="activity-item rounded-lg" key={l.id}>
+                      <div className="activity-item-info">
+                        <span className="activity-desc">{l.description ?? l.type.replace(/_/g, ' ')}</span>
+                        <span className="activity-date">{date(l.created_at)}</span>
+                      </div>
+                      <span className={`activity-amt ${l.amount < 0 ? 'neg' : 'pos'}`}>
+                        {l.amount > 0 ? `+${l.amount}` : l.amount}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden lg:block"><ActivityTable ledger={pagedLedger} /></div>
+              </>
             )}
             <Pagination page={ledgerSafePage} totalPages={ledgerTotalPages} onChange={setLedgerPage} />
           </div>
@@ -363,27 +335,45 @@ export function Billing({
   );
 }
 
+function HistoryToolbar({ count, filter, onFilter }: { count: string; filter: DateFilter; onFilter: (f: DateFilter) => void }) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-3">
+      <span className="text-[13px] text-[var(--ink-faint)]">{count}</span>
+      <Select value={filter} onValueChange={(v) => onFilter(v as DateFilter)}>
+        <SelectTrigger aria-label="Date range" className="h-8 w-[160px] bg-(--ad-surface) text-[13px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {DATE_FILTERS.map((f) => (
+            <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 /* ───── payment history table ───── */
 function PaymentsTable({ payments }: { payments: PaymentRow[] }) {
   return (
     <table className="w-full text-left">
       <thead>
         <tr className="border-b border-[var(--line)]">
-          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8]">Credits</th>
-          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8]">Date</th>
-          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8]">Amount</th>
-          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8]">Status</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-(--ad-ink-ghost)">Credits</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-(--ad-ink-ghost)">Date</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-(--ad-ink-ghost)">Amount</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-(--ad-ink-ghost)">Status</th>
         </tr>
       </thead>
       <tbody>
         {payments.map((p) => (
-          <tr key={p.id} className="border-b border-[var(--line)] last:border-0 transition-colors hover:bg-[#f9f6ff]">
+          <tr key={p.id} className="border-b border-[var(--line)] last:border-0 transition-colors hover:bg-(--ad-surface-2)">
             <td className="py-3 px-2 font-semibold text-[14px] text-[var(--ink)]">
               {p.credits_purchased > 0 ? `+${p.credits_purchased}` : '-'}
             </td>
             <td className="py-3 px-2 text-[13.5px] text-[var(--ink-faint)]">{date(p.created_at)}</td>
             <td className="py-3 px-2 text-[14px] text-[var(--ink)] font-medium">{money(p.amount_cents, p.currency)}</td>
-            <td className="py-3 px-2"><StatusPill pill={PAY_PILL[p.status] ?? PAY_PILL.pending}>{p.status.charAt(0).toUpperCase() + p.status.slice(1)}</StatusPill></td>
+            <td className="py-3 px-2"><StatusPill pill={PAY_PILL[p.status] ?? PAY_PILL.pending}>{payLabel(p.status)}</StatusPill></td>
           </tr>
         ))}
       </tbody>
@@ -397,14 +387,14 @@ function ActivityTable({ ledger }: { ledger: LedgerRow[] }) {
     <table className="w-full text-left">
       <thead>
         <tr className="border-b border-[var(--line)]">
-          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8]">Description</th>
-          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8]">Date</th>
-          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-[#8f8aa8] text-right">Amount</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-(--ad-ink-ghost)">Description</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-(--ad-ink-ghost)">Date</th>
+          <th className="py-2.5 px-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-(--ad-ink-ghost) text-right">Amount</th>
         </tr>
       </thead>
       <tbody>
         {ledger.map((l) => (
-          <tr key={l.id} className="border-b border-[var(--line)] last:border-0 transition-colors hover:bg-[#f9f6ff]">
+          <tr key={l.id} className="border-b border-[var(--line)] last:border-0 transition-colors hover:bg-(--ad-surface-2)">
             <td className="py-3 px-2 text-[14px] text-[var(--ink)] capitalize">
               {l.description ?? l.type.replace(/_/g, ' ')}
             </td>

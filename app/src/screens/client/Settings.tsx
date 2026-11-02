@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ModalClose } from '../../components/ModalClose';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { queryClient } from '../../lib/queryClient';
@@ -27,7 +28,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { confirmDiscard } from '../../lib/confirmDiscard';
 import { btn } from '../../lib/clientButtons';
 
-const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em]';
+const fieldLbl = 'mb-1.5 block text-[13px] font-semibold';
 const inputCls = 'w-full rounded-lg border px-3.5 py-2.5 text-[13px] outline-none transition-colors';
 const inputStyle = { borderColor: 'var(--line)', background: 'var(--bg)', color: 'var(--ink)' };
 
@@ -155,7 +156,10 @@ function ProfileEditModal({
       {...useOverlayClose(requestClose, { escape: true })}
     >
       <motion.div
-        className="modal-card flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:border md:border-[#e8e3f7]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit business profile"
+        className="modal-card flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[600px] md:rounded-md md:border md:border-(--ad-line)"
         style={{ background: 'var(--surface)' }}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
@@ -165,10 +169,10 @@ function ProfileEditModal({
       >
         <div className="flex shrink-0 items-center justify-between border-b px-5 py-4" style={{ borderColor: 'var(--line)' }}>
           <h2 className="m-0 text-[18px] font-semibold" style={{ color: 'var(--ink)' }}>Edit business profile</h2>
-          <button onClick={requestClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none" style={{ color: 'var(--ink-faint)' }}>×</button>
+          <ModalClose onClick={requestClose} />
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-5">
+        <div className="modal-scroll flex-1 overflow-y-auto px-5 py-5">
           <div className="mb-4">
             <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Signs emails as</label>
             <input value={form.representative_name} onChange={(e) => set('representative_name', e.target.value)} placeholder="e.g. Yvonne" style={inputStyle} className={inputCls} />
@@ -268,7 +272,7 @@ function ProfileEditModal({
           </div>
 
           {err && (
-            <div className="mb-4 rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}>
+            <div className="mb-4 rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: 'var(--ad-line)' }}>
               {err}
             </div>
           )}
@@ -355,7 +359,7 @@ function AutoApproveSection({ clientId }: { clientId: string }) {
           style={{ background: enabled ? 'var(--leaf)' : 'var(--line-strong)', cursor: isAdmin ? 'pointer' : 'not-allowed', opacity: isAdmin ? 1 : 0.6 }}
         >
           <span
-            className="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all"
+            className="absolute top-0.5 h-5 w-5 rounded-full bg-(--ad-surface) transition-all"
             style={{ left: enabled ? 22 : 2 }}
           />
         </button>
@@ -421,12 +425,12 @@ function PasswordSection() {
         We'll email a reset link to <strong>{email}</strong>.
       </p>
       {err && (
-        <div className="mb-3 rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}>
+        <div className="mb-3 rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: 'var(--ad-line)' }}>
           {err}
         </div>
       )}
       {sent && !err ? (
-        <div className="rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)', borderColor: '#e8dafd' }}>
+        <div className="rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--leaf-tint)', color: 'var(--leaf)', borderColor: 'var(--ad-green-line)' }}>
           Check your inbox for a link to set a new password.
         </div>
       ) : (
@@ -493,21 +497,21 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
         <div
           className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px] font-medium"
           style={banner.kind === 'success'
-            ? { background: 'var(--leaf-tint)', color: 'var(--leaf)', borderColor: '#e8dafd' }
-            : { background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}
+            ? { background: 'var(--leaf-tint)', color: 'var(--leaf)', borderColor: 'var(--ad-green-line)' }
+            : { background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: 'var(--ad-line)' }}
         >
           {banner.text}
         </div>
       )}
 
       {error && (
-        <div className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}>
+        <div className="mb-5 rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: 'var(--ad-line)' }}>
           Couldn't check your Gmail connection: {error}
         </div>
       )}
 
       {/* ─── Business profile ─── */}
-      <div className="mb-2 px-0.5 text-[10.5px] font-semibold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
+      <div className="mb-2 px-0.5 text-[13px] font-semibold" style={{ color: 'var(--ink-faint)' }}>
         Business profile
       </div>
       <div className="mb-6 overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
@@ -531,7 +535,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
       </div>
 
       {/* ─── Outreach ─── */}
-      <div className="mb-2 px-0.5 text-[10.5px] font-semibold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
+      <div className="mb-2 px-0.5 text-[13px] font-semibold" style={{ color: 'var(--ink-faint)' }}>
         Outreach
       </div>
       <div className="mb-6 overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
@@ -571,7 +575,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
               onClick={() => setConfirmDisconnect(true)}
               disabled={disconnecting}
               className="cursor-pointer rounded-lg border px-4 py-2 text-[13px] font-semibold transition-colors disabled:opacity-50"
-              style={{ borderColor: '#e8e3f7', color: 'var(--clay)', background: 'transparent' }}
+              style={{ borderColor: 'var(--ad-line)', color: 'var(--clay)', background: 'transparent' }}
             >
               {disconnecting ? 'Disconnecting…' : 'Disconnect'}
             </button>
@@ -703,7 +707,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
       )}
 
       {/* ─── Account ─── */}
-      <div className="mb-2 px-0.5 text-[10.5px] font-semibold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
+      <div className="mb-2 px-0.5 text-[13px] font-semibold" style={{ color: 'var(--ink-faint)' }}>
         Account
       </div>
       <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
@@ -732,7 +736,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
           <button
             onClick={onSignOut}
             className="cursor-pointer inline-flex shrink-0 items-center gap-2 rounded-lg border px-4 py-2 text-[13px] font-semibold transition-colors"
-            style={{ borderColor: '#e8e3f7', color: 'var(--clay)', background: 'transparent' }}
+            style={{ borderColor: 'var(--ad-line)', color: 'var(--clay)', background: 'transparent' }}
           >
             <LogOut size={14} />
             Sign out

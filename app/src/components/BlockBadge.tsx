@@ -1,9 +1,9 @@
 import { blockInfo, type BlockTone } from '../lib/blockReasons';
 
 const BLOCK_TONE_STYLE: Record<BlockTone, { bg: string; fg: string }> = {
-  blocked:   { bg: '#f9f6ff', fg: '#0e0822' },
-  paused:    { bg: '#f1e9ff', fg: '#5b0fc2' },
-  scheduled: { bg: '#f9f6ff', fg: '#605978' },
+  blocked:   { bg: 'var(--ad-surface-2)', fg: 'var(--ad-ink)' },
+  paused:    { bg: 'var(--ad-green-tint)', fg: 'var(--ad-green-hover)' },
+  scheduled: { bg: 'var(--ad-surface-2)', fg: 'var(--ad-ink-soft)' },
 };
 
 /** Why an approved draft isn't going out. campaignStatus splits "campaign inactive" into not launched / paused / cancelled. */

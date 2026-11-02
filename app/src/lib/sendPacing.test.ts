@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parseSendPacing, sendingCopy, compactSendingLine, formatClock, formatDays, formatDay,
+  parseSendPacing, sendingCopy, compactSendingLine, formatClock, formatDays, formatDay, parseSendDays,
   FOLLOW_UP_EXPLAINER, QUEUE_TOOLTIP,
 } from './sendPacing';
 
@@ -98,9 +98,37 @@ describe('Today and the sending window', () => {
     expect(copy().today).toBe('12 of 40 emails sent today.');
   });
 
-  it('outside the window: adds when sending happens, in the client zone', () => {
-    const c = copy({ today: { cap: 40, sent: 12, remaining: 28, in_window_now: false } });
-    expect(c.today).toBe('12 of 40 emails sent today. Sends Mon to Fri, 9:00 AM to 5:00 PM (America/Chicago).');
+  const outside = { today: { cap: 40, sent: 0, remaining: 40, in_window_now: false } };
+  const SCHEDULE = 'Sends Mon to Fri, 9:00 AM to 5:00 PM (America/Chicago).';
+  const at = (iso: string) => sendingCopy(parseSendPacing(body(outside)), new Date(iso)).today;
+
+  it('before the window on a send day: says sending starts today', () => {
+    // NOW is Wed 7:00 AM in Chicago.
+    expect(copy(outside).today).toBe(`0 of 40 emails sent today, sending starts at 9:00 AM. ${SCHEDULE}`);
+  });
+
+  it('after the window: says sending resumes tomorrow', () => {
+    // Wed 6:00 PM Chicago.
+    expect(at('2026-10-28T23:00:00Z')).toBe(`0 of 40 emails sent today, sending resumes tomorrow at 9:00 AM. ${SCHEDULE}`);
+  });
+
+  it('Friday evening and the weekend: names Monday', () => {
+    expect(at('2026-10-30T23:00:00Z')).toBe(`0 of 40 emails sent today, sending resumes Mon at 9:00 AM. ${SCHEDULE}`);
+    expect(at('2026-11-01T16:00:00Z')).toBe(`0 of 40 emails sent today, sending resumes tomorrow at 9:00 AM. ${SCHEDULE}`);
+  });
+
+  it('falls back to the schedule alone when the days cannot be read', () => {
+    const c = copy({ ...outside, window: { start: '09:00', end: '17:00', days: 'weekdays' } });
+    expect(c.today).toBe('0 of 40 emails sent today. Sends weekdays, 9:00 AM to 5:00 PM (America/Chicago).');
+  });
+});
+
+describe('parseSendDays', () => {
+  it('reads ranges, lists and wrap-around ranges', () => {
+    expect([...parseSendDays('Mon-Fri')!].sort()).toEqual([1, 2, 3, 4, 5]);
+    expect([...parseSendDays('Mon,Wed,Fri')!].sort()).toEqual([1, 3, 5]);
+    expect([...parseSendDays('Sat-Mon')!].sort()).toEqual([0, 1, 6]);
+    expect(parseSendDays('weekdays')).toBeNull();
   });
 });
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ModalClose } from '../../components/ModalClose';
 import { motion } from 'framer-motion';
 import { Globe, Lock, Trash2 } from 'lucide-react';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -7,7 +8,7 @@ import { useClientBlacklist } from '../../hooks/useBlacklistedDomains';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { btn } from '../../lib/clientButtons';
 
-const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em]';
+const fieldLbl = 'mb-1.5 block text-[13px] font-semibold';
 const inputCls = 'w-full rounded-lg border px-3.5 py-2.5 text-[13px] outline-none transition-colors';
 const inputStyle = { borderColor: 'var(--line)', background: 'var(--bg)', color: 'var(--ink)' };
 
@@ -70,7 +71,10 @@ export function BlockedDomainsModal({
       {...useOverlayClose(onClose, { escape: true })}
     >
       <motion.div
-        className="modal-card flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[560px] md:rounded-md md:border md:border-[#e8e3f7]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Blocked domains"
+        className="modal-card flex w-full flex-col overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[600px] md:rounded-md md:border md:border-(--ad-line)"
         style={{ background: 'var(--surface)' }}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
@@ -85,10 +89,10 @@ export function BlockedDomainsModal({
               We'll never send outreach to an address at a domain on this list.
             </p>
           </div>
-          <button onClick={onClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none" style={{ color: 'var(--ink-faint)' }}>×</button>
+          <ModalClose onClick={onClose} />
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-5">
+        <div className="modal-scroll flex-1 overflow-y-auto px-5 py-5">
           {/* Add form */}
           <div className="mb-5">
             <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Add a domain</label>
@@ -125,7 +129,7 @@ export function BlockedDomainsModal({
           </div>
 
           {error && (
-            <div className="mb-4 rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: '#e8e3f7' }}>
+            <div className="mb-4 rounded-xl border px-4 py-3 text-[13px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: 'var(--ad-line)' }}>
               Couldn't load your blocked domains: {error}
             </div>
           )}
@@ -138,12 +142,12 @@ export function BlockedDomainsModal({
           ) : (
             <>
               {/* Own rows */}
-              <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
+              <div className="mb-2 text-[12px] font-semibold" style={{ color: 'var(--ink-faint)' }}>
                 Your blocked domains
               </div>
               {ownRows.length === 0 ? (
                 <div className="mb-5 rounded-xl border border-dashed px-4 py-4 text-[12.5px]" style={{ borderColor: 'var(--line)', color: 'var(--ink-soft)' }}>
-                  You haven't blocked any domains yet. Add one above to stop outreach from ever going to an address there.
+                  No blocked domains yet.
                 </div>
               ) : (
                 <div className="mb-5 overflow-hidden rounded-xl border" style={{ borderColor: 'var(--line)' }}>
@@ -172,7 +176,7 @@ export function BlockedDomainsModal({
               )}
 
               {/* Global rows - read-only, visually distinct group */}
-              <div className="mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[.08em]" style={{ color: 'var(--ink-faint)' }}>
+              <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: 'var(--ink-faint)' }}>
                 <Lock size={11} />
                 Blocked for every client
               </div>

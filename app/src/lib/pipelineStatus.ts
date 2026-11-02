@@ -10,7 +10,7 @@ export const TERMINAL_PIPELINE_STATUSES = '(replied,hot_lead,won,lost,called,bou
 
 export const PIPELINE_STATUS_LABEL: Record<string, string> = {
   new: 'Not contacted yet',
-  message_pending: 'Email not written yet',
+  message_pending: 'Not emailed yet',
   generating: 'Writing their email',
   generation_failed: "We couldn't write their email",
   contacted: 'Emailed',
@@ -49,6 +49,20 @@ export const SEQUENCE_STATUS_LABEL: Record<SequenceStatus, string> = {
   automated_reply: 'Automated Reply, Sequence Continuing',
   human_reply: 'Human Reply, Sequence Stopped',
   needs_review: 'Needs Your Review',
+};
+
+// Compact wording for table rows, which keep the full label as a tooltip.
+export const SEQUENCE_STATUS_SHORT_LABEL: Record<SequenceStatus, string> = {
+  unsubscribed: 'Unsubscribed',
+  hard_bounce: 'Bounced',
+  automated_reply: 'Auto-reply',
+  human_reply: 'Replied',
+  needs_review: 'Needs your review',
+};
+
+export const PIPELINE_STATUS_SHORT_LABEL: Record<string, string> = {
+  message_pending: 'Not emailed yet',
+  generation_failed: "Couldn't write email",
 };
 
 // Wording for the badge at the top of a prospect's sequence panel.

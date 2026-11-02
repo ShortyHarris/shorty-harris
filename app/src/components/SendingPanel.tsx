@@ -82,20 +82,31 @@ export function SendingCardView({ pacing }: { pacing: SendPacing }) {
   );
 }
 
-/** The one-line version for the top of Approvals. Pure. */
+/** The one-line version for the top of Approvals. Pure.
+ *  compactSendingLine hands back one run-on string (several sentences joined
+ *  with spaces, each already ending in a period) so the lib and its tests
+ *  stay about the words, not the layout. Here we split it back into
+ *  sentences and give the first one - the actual "X of Y sent today" fact -
+ *  more visual weight than the warm-up/queue detail trailing it, so the one
+ *  number someone actually needs doesn't read as equal to everything else. */
 export function SendingLineView({ pacing }: { pacing: SendPacing }) {
   const { text, warning } = compactSendingLine(pacing);
+  const sentences = text.split(/(?<=\.)\s+/).filter(Boolean);
+  const [headline, ...rest] = sentences;
   return (
     <div
       role="status"
-      className={`flex items-start gap-2 rounded-xl border px-3.5 py-2.5 text-[13px] leading-snug text-(--ad-ink) ${
-        warning ? 'border-(--ad-green-line) bg-(--ad-green-tint) font-semibold' : 'border-(--ad-line) bg-(--ad-surface)'
-      }`}
+      className="flex items-start gap-3 rounded-r-lg border-l-2 border-l-accent-foreground border border-(--ad-green-line) bg-(--ad-green-tint)/40 px-4 py-3.5"
     >
-      {warning
-        ? <AlertCircle size={15} strokeWidth={2} className="mt-px shrink-0 text-(--ad-green)" aria-hidden />
-        : <Send size={15} strokeWidth={2} className="mt-px shrink-0 text-(--ad-green)" aria-hidden />}
-      <span>{text}</span>
+      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--ad-green) text-white">
+        {warning
+          ? <AlertCircle size={15} strokeWidth={2.3} aria-hidden />
+          : <Send size={14} strokeWidth={2.3} aria-hidden />}
+      </span>
+      <span className="flex flex-col gap-0.5 pt-0.5">
+        <span className="text-[14.5px] font-bold leading-snug text-(--ad-ink)">{headline}</span>
+        {rest.length > 0 && <span className="text-[12.5px] leading-snug text-(--ad-ink-soft)">{rest.join(' ')}</span>}
+      </span>
     </div>
   );
 }

@@ -28,7 +28,8 @@ import {
   applyApprovalView, DEFAULT_APPROVAL_SORT, APPROVAL_SORT_OPTIONS,
   type ApprovalSort, type ApprovalTypeFilter,
 } from '../../lib/approvalsView';
-import { ScheduledCell, PendingCell, WaitingCell, HeldBadge, AnglePill, ObservationDetails } from '../../components/ApprovalCells';
+import { ModalClose } from '../../components/ModalClose';
+import { ScheduledCell, HeldBadge, AnglePill, ObservationDetails } from '../../components/ApprovalCells';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
@@ -81,12 +82,12 @@ function FilterSelect({ label, ariaLabel, value, onChange, options, className = 
       <SelectTrigger
         style={FONT}
         aria-label={ariaLabel}
-        className={`h-10 min-w-0 max-w-full basis-0 shrink max-md:basis-full gap-2 rounded-lg border-[#e8e3f7] bg-[#f9f6ff] px-3 text-[13px] font-semibold text-[#0e0822] focus:border-[#7412ef] focus:ring-0 focus:ring-offset-0 ${className}`}
+        className={`h-10 min-w-0 max-w-full basis-0 shrink max-md:basis-full gap-2 rounded-lg border-(--ad-line) bg-(--ad-surface-2) px-3 text-[13px] font-semibold text-(--ad-ink) focus:border-(--ad-green) focus:ring-0 focus:ring-offset-0 ${className}`}
       >
-        <span className="w-14 shrink-0 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-[#605978]">{label}</span>
+        <span className="w-14 shrink-0 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-soft)">{label}</span>
         <span className="min-w-0 flex-1 truncate text-left"><SelectValue /></span>
       </SelectTrigger>
-      <SelectContent style={FONT} className="bg-white text-[13px] text-[#0e0822]">
+      <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
         {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
       </SelectContent>
     </Select>
@@ -96,8 +97,8 @@ function FilterSelect({ label, ariaLabel, value, onChange, options, className = 
 function Detail({ label, value, children }: { label: string; value?: string | null; children?: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-semibold uppercase tracking-[.06em] text-[#605978]">{label}</dt>
-      <dd className="m-0 mt-0.5 wrap-break-word text-[#0e0822]">{children ?? (value || '-')}</dd>
+      <dt className="text-[12px] font-semibold text-(--ad-ink-soft)">{label}</dt>
+      <dd className="m-0 mt-0.5 wrap-break-word text-(--ad-ink)">{children ?? (value || '-')}</dd>
     </div>
   );
 }
@@ -216,7 +217,6 @@ export function Approvals({
   const blockedCount   = approvedQueue?.counts.blocked ?? 0;
   // Sendable and scheduled follow-ups both go out on their own; blocked ones need action.
   const sendableCount  = (approvedQueue?.counts.sendable ?? 0) + (approvedQueue?.counts.scheduled ?? 0);
-  const now = new Date();
   const isPendingTab = tab === 'pending';
   // Server tabs hold one page already filtered and sorted; the type filter is applied there.
   const tabTotal = tab === 'approved' ? approvedCount : blockedCount;
@@ -331,11 +331,11 @@ export function Approvals({
       {/* Header */}
       <header className="page-header flex items-start justify-between gap-4">
         <div>
-          <h1 className="m-0 text-[26px] flex items-center gap-2 font-extrabold tracking-tight text-[#0e0822]">
-            <ClipboardCheck size={24} strokeWidth={2} className="text-[#7412ef]" aria-hidden />
+          <h1 className="m-0 text-[26px] flex items-center gap-2 font-extrabold tracking-tight text-(--ad-ink)">
+            <ClipboardCheck size={24} strokeWidth={2} className="text-(--ad-green)" aria-hidden />
             Approvals
           </h1>
-          <p className="m-0 mt-1 text-[13px] text-[#605978]">
+          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">
             Nothing sends until you approve it. Review each draft, edit if needed, then approve or reject.
           </p>
         </div>
@@ -356,48 +356,48 @@ export function Approvals({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile
           icon={Clock}
-          iconColor="#7412ef"
+          iconColor="var(--ad-green)"
           label="Awaiting Review"
           value={stats.pending}
           sub={stats.pending > 0 ? 'needs your decision' : 'queue is clear'}
-          subColor={stats.pending > 0 ? '#7412ef' : '#605978'}
+          subColor={stats.pending > 0 ? 'var(--ad-green)' : 'var(--ad-ink-soft)'}
         />
         <StatTile
           icon={CheckCircle2}
-          iconColor="#7412ef"
+          iconColor="var(--ad-green)"
           label="Approved today"
           value={stats.approvedToday}
           sub="includes any already sent"
-          subColor="#605978"
+          subColor="var(--ad-ink-soft)"
         />
         <StatTile
           icon={Send}
-          iconColor="#7412ef"
+          iconColor="var(--ad-green)"
           label="Sent Today"
           value={stats.sentToday}
           sub="emails delivered"
-          subColor="rgba(255,255,255,0.55)"
+          subColor="color-mix(in srgb, var(--ad-on-accent) 55%, transparent)"
           accent
         />
         <StatTile
           icon={Ban}
-          iconColor="#0e0822"
+          iconColor="var(--ad-ink)"
           label="Rejected today"
           value={stats.rejectedToday}
           sub={`${stats.rejectedTotal} rejected all time`}
-          subColor="#605978"
+          subColor="var(--ad-ink-soft)"
         />
       </div>
 
       {error && (
-        <div className="rounded-xl border border-[#0e0822]/20 bg-[#f9f6ff] px-4 py-3 text-[13px] text-[#0e0822]">
+        <div className="rounded-xl border border-(--ad-ink)/20 bg-(--ad-surface-2) px-4 py-3 text-[13px] text-(--ad-ink)">
           Couldn't load your approvals: {error}
         </div>
       )}
 
       {/* Approved summary - sendable and blocked are never lumped together */}
       {approvedQueue && (sendableCount > 0 || blockedCount > 0) && (
-        <p className="m-0 text-[13px] font-semibold text-[#0e0822]" data-testid="approved-summary">
+        <p className="m-0 text-[13px] font-semibold text-(--ad-ink)" data-testid="approved-summary">
           Approved: {sendableCount} sendable, {blockedCount} blocked
         </p>
       )}
@@ -417,8 +417,8 @@ export function Approvals({
               onClick={() => switchTab(key)}
               className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors ${
                 tab === key
-                  ? key === 'blocked' ? 'border-[#0e0822] bg-[#0e0822] text-white' : 'border-[#7412ef] bg-[#7412ef] text-white'
-                  : 'border-[#e8e3f7] bg-white text-[#605978] hover:bg-[#f9f6ff]'
+                  ? key === 'blocked' ? 'border-(--ad-ink) bg-(--ad-ink) text-(--ad-on-accent)' : 'border-(--ad-green) bg-(--ad-green) text-(--ad-on-accent)'
+                  : 'border-(--ad-line) bg-(--ad-surface) text-(--ad-ink-soft) hover:bg-(--ad-surface-2)'
               }`}
             >
               {label}
@@ -428,14 +428,14 @@ export function Approvals({
       )}
 
       {tab === 'blocked' && blockedCount > 0 && (
-        <p className="m-0 text-[12.5px] text-[#605978]">
+        <p className="m-0 text-[12.5px] text-(--ad-ink-soft)">
           These drafts are approved but won't send until the reason shown is cleared. You can reject any you don't want to keep.
         </p>
       )}
 
       {/* Sort + type filter */}
       {!loading && (isPendingTab ? items.length : tabTotal) > 0 && (
-        <div className="flex flex-wrap items-center gap-2.5 md:flex-nowrap rounded-xl border border-[#e8e3f7] bg-white p-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 md:flex-nowrap rounded-xl border border-(--ad-line) bg-(--ad-surface) p-2.5">
           <FilterSelect
             label="Type"
             className="grow-2"
@@ -458,7 +458,7 @@ export function Approvals({
                 changeTypeFilter('all');
                 if (isPendingTab) changeSort(DEFAULT_APPROVAL_SORT); else changeQueueSort(DEFAULT_QUEUE_SORT);
               }}
-              className="cursor-pointer rounded-md border-0 bg-transparent px-2 py-1.5 text-[12.5px] font-semibold text-[#605978] underline-offset-2 transition-colors hover:text-[#0e0822] hover:underline"
+              className="cursor-pointer rounded-md border-0 bg-transparent px-2 py-1.5 text-[12.5px] font-semibold text-(--ad-ink-soft) underline-offset-2 transition-colors hover:text-(--ad-ink) hover:underline"
             >
               Reset
             </button>
@@ -470,11 +470,11 @@ export function Approvals({
       {loading || !queueReady ? (
         <SkeletonTable rows={PAGE_SIZE} cols={5} />
       ) : rowCount === 0 ? (
-        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-[#e8e3f7] bg-white p-10 text-center">
-          <strong className="text-[15px] font-semibold text-[#0e0822]">
+        <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
+          <strong className="text-[15px] font-semibold text-(--ad-ink)">
             {(isPendingTab ? items.length : tabTotal) > 0 ? 'No drafts match this filter.' : isPendingTab ? "Queue's clear." : tab === 'approved' ? 'Nothing approved and waiting.' : 'Nothing blocked.'}
           </strong>
-          <span className="text-[13px] text-[#605978]">
+          <span className="text-[13px] text-(--ad-ink-soft)">
             {(isPendingTab ? items.length : tabTotal) > 0 ? 'Choose "All types" to see everything on this tab.' : isPendingTab
               ? 'No drafts waiting for review. New ones appear here as we write them for your prospects.'
               : tab === 'approved'
@@ -485,20 +485,20 @@ export function Approvals({
       ) : (
         <>
           {/* Selection bar */}
-          <div className="rounded-lg border border-[#e8e3f7] bg-white px-4 py-3">
+          <div className="rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             {isPendingTab ? (
               <label
-                className={`flex items-center gap-2 text-[12.5px] font-semibold text-[#605978] ${pendingCapped ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                className={`flex items-center gap-2 text-[12.5px] font-semibold text-(--ad-ink-soft) ${pendingCapped ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                 title={pendingCapped ? `Only ${items.length} of ${totalPending} pending drafts are loaded, so select-all is off. Tick rows individually, or work through the queue to bring it under the limit.` : undefined}
               >
-                <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={pendingCapped} className="accent-[#7412ef]" />
+                <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={pendingCapped} className="accent-(--ad-green)" />
                 Select all
               </label>
             ) : <span />}
             <div className="flex flex-wrap items-center justify-end gap-2">
               {isPendingTab && (selected.size > 0 || pendingCapped) && (
-                <span className="text-[12.5px] text-[#605978]">
+                <span className="text-[12.5px] text-(--ad-ink-soft)">
                   {pendingCapped ? `${selected.size} of ${totalPending} selected (${items.length} loaded)` : `${selected.size} selected`}
                 </span>
               )}
@@ -525,9 +525,9 @@ export function Approvals({
               )}
             </div>
           </div>
-          <p className="m-0 mt-2 text-[12px] leading-relaxed text-[#605978]">{APPROVAL_EXPLAINER}</p>
+          <p className="m-0 mt-2 text-[12px] leading-relaxed text-(--ad-ink-soft)">{APPROVAL_EXPLAINER}</p>
           {hasEuDrafts && (
-            <p className="m-0 mt-1.5 text-[12px] leading-relaxed text-[#605978]">{EU_RECIPIENT_NOTE}</p>
+            <p className="m-0 mt-1.5 text-[12px] leading-relaxed text-(--ad-ink-soft)">{EU_RECIPIENT_NOTE}</p>
           )}
           </div>
 
@@ -536,16 +536,14 @@ export function Approvals({
             <table className="table-fixed">
               <colgroup>
                 <col className="w-9" />
-                <col className="w-[19%]" />
-                <col className="w-[25%]" />
-                <col className="w-[17%]" />
-                <col className="w-[8%]" />
-                <col className="w-[27%]" />
+                <col className="w-[30%]" />
+                <col className="w-[40%]" />
+                <col className="w-[30%]" />
               </colgroup>
               <thead>
                 <tr>
                   <th className="w-9" />
-                  {['Prospect', 'Subject', 'Scheduled send', 'Waiting', ''].map((h, i) => (
+                  {['Prospect', 'Subject', ''].map((h, i) => (
                     <th key={i}>{h}</th>
                   ))}
                 </tr>
@@ -558,25 +556,25 @@ export function Approvals({
                     className={isPendingTab ? 'cursor-pointer' : undefined}
                   >
                     <td className="px-3" onClick={(e) => e.stopPropagation()}>
-                      {isPendingTab && <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleOne(item.id)} className="accent-[#7412ef]" />}
+                      {isPendingTab && <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleOne(item.id)} className="accent-(--ad-green)" />}
                     </td>
                     <td className="min-w-0">
-                      <div className="line-clamp-2 font-semibold text-[#0e0822]" title={item.prospect?.business_name ?? undefined}>
+                      <div className="line-clamp-2 font-semibold text-(--ad-ink)" title={item.prospect?.business_name ?? undefined}>
                         {item.prospect?.business_name ?? 'Unknown'}
                       </div>
                       {(item.prospect?.contact_name || item.prospect?.location) && (
-                        <div className="mt-0.5 truncate text-[11px] text-[#605978]">
+                        <div className="mt-0.5 truncate text-[11px] text-(--ad-ink-soft)">
                           {[item.prospect?.contact_name, item.prospect?.location].filter(Boolean).join(' · ')}
                         </div>
                       )}
                     </td>
-                    <td className="min-w-0 text-[#605978]">
+                    <td className="min-w-0 text-(--ad-ink-soft)">
                       <div className="line-clamp-2" title={item.subject ?? undefined}>
-                        {item.subject ?? <span className="italic text-[#8f8aa8]">No subject</span>}
+                        {item.subject ?? <span className="italic text-(--ad-ink-ghost)">No subject</span>}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1">
                         {item.message_type !== 'initial' && (
-                          <span className="atbl-pill" style={{ background: '#f1e9ff', color: '#7412ef' }}>
+                          <span className="atbl-pill" style={{ background: 'var(--ad-green-tint)', color: 'var(--ad-green)' }}>
                             {approvalTypeLabel(item.message_type)}
                           </span>
                         )}
@@ -584,10 +582,6 @@ export function Approvals({
                       </div>
                       <BlockBadge reason={item.block_reason} campaignStatus={item.campaign_status} className="mt-1" />
                       {isAdmin && <HeldBadge row={schedule.get(item.id)} settingsPath={readOnly ? null : `${basePath}/settings`} className="mt-1" />}
-                    </td>
-                    <td className="whitespace-nowrap"><ScheduledCell schedule={schedule} id={item.id} tz={timeZone} now={now} /></td>
-                    <td className="whitespace-nowrap text-[12px] text-[#605978]">
-                      <WaitingCell item={item} schedule={schedule} tz={timeZone} now={now} staleClassName="font-semibold text-[#7412ef]" />
                     </td>
                     <td className="px-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-nowrap items-center justify-end gap-1.5">
@@ -624,7 +618,7 @@ export function Approvals({
           {/* Mobile cards */}
           <div className="md:hidden flex flex-col gap-3">
             {paged.map((item) => (
-              <div key={item.id} className="rounded-xl border border-[#e8e3f7] bg-white p-4">
+              <div key={item.id} className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-2 min-w-0">
                     {isPendingTab && (
@@ -632,34 +626,30 @@ export function Approvals({
                         type="checkbox"
                         checked={selected.has(item.id)}
                         onChange={() => toggleOne(item.id)}
-                        className="mt-1 accent-[#7412ef] shrink-0"
+                        className="mt-1 accent-(--ad-green) shrink-0"
                       />
                     )}
                     <div className="min-w-0">
-                      <div className="font-semibold text-[#0e0822] truncate">{item.prospect?.business_name ?? 'Unknown'}</div>
+                      <div className="font-semibold text-(--ad-ink) truncate">{item.prospect?.business_name ?? 'Unknown'}</div>
                       {item.prospect?.contact_name && (
-                        <div className="mt-0.5 truncate text-[11px] text-[#605978]">{item.prospect.contact_name}</div>
+                        <div className="mt-0.5 truncate text-[11px] text-(--ad-ink-soft)">{item.prospect.contact_name}</div>
                       )}
                       <ProspectMeta item={item} className="mt-0.5" />
                     </div>
                   </div>
                   <span className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="inline-flex items-center whitespace-nowrap rounded-full bg-[#f1e9ff] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.04em] text-[#7412ef]">
+                    <span className="inline-flex items-center whitespace-nowrap rounded-full bg-(--ad-green-tint) px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.04em] text-(--ad-green)">
                       {approvalTypeLabel(item.message_type)}
                     </span>
                     <AnglePill angle={item.angle} />
                   </span>
                 </div>
                 {item.subject && (
-                  <div className="mt-1.5 truncate text-[12px] text-[#605978]">{item.subject}</div>
+                  <div className="mt-1.5 truncate text-[12px] text-(--ad-ink-soft)">{item.subject}</div>
                 )}
                 <BlockBadge reason={item.block_reason} campaignStatus={item.campaign_status} className="mt-1.5" />
                 {isAdmin && <HeldBadge row={schedule.get(item.id)} settingsPath={readOnly ? null : `${basePath}/settings`} className="mt-1.5" />}
-                <div className="mt-2 grid grid-cols-2 gap-2 text-[11.5px]">
-                  <div><div className="text-[10px] font-semibold uppercase tracking-[.06em] text-[#605978]">Scheduled</div><ScheduledCell schedule={schedule} id={item.id} tz={timeZone} now={now} /></div>
-                  <div><div className="text-[10px] font-semibold uppercase tracking-[.06em] text-[#605978]">Pending since</div><PendingCell item={item} schedule={schedule} tz={timeZone} now={now} /></div>
-                </div>
-                <div className="mt-3 flex items-center gap-2 border-t border-[#f9f6ff] pt-3">
+                <div className="mt-3 flex items-center gap-2 border-t border-(--ad-surface-2) pt-3">
                   {isPendingTab && (<>
                   <button
                     onClick={() => doApprove(item.id)}
@@ -689,7 +679,7 @@ export function Approvals({
 
           {/* Shared pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between rounded-lg border border-[#e8e3f7] bg-white px-4 py-3 text-[12.5px] text-[#605978]">
+            <div className="flex items-center justify-between rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3 text-[12.5px] text-(--ad-ink-soft)">
               <span>Page {safePage} of {totalPages}</span>
               <div className="flex gap-2">
                 <button
@@ -745,7 +735,7 @@ export function Approvals({
             onConfirm={confirmReject}
             onCancel={() => setRejectIds(null)}
           >
-            <p className="m-0 mb-2 font-semibold text-[#0e0822]">
+            <p className="m-0 mb-2 font-semibold text-(--ad-ink)">
               {rejectIds.length} draft{rejectIds.length === 1 ? '' : 's'} in {campaignBreakdown(rejectIds.map((id) => draftById.get(id) ?? { campaign_id: null }))}
             </p>
             {rejectIds.length === 1 ? 'It' : 'They'} won't be sent, and any follow-ups still planned for {rejectIds.length === 1 ? 'that prospect' : 'those prospects'} are cancelled too. This can't be undone.
@@ -763,12 +753,12 @@ export function Approvals({
             onConfirm={confirmBulkApprove}
             onCancel={() => setApprovalPlan(null)}
           >
-            <p className="m-0 mb-2 font-semibold text-[#0e0822]">Campaign: {approvalPlan.campaignsLabel}</p>
+            <p className="m-0 mb-2 font-semibold text-(--ad-ink)">Campaign: {approvalPlan.campaignsLabel}</p>
             <ul className="m-0 mb-3 list-none p-0">
               {APPROVAL_STEP_ORDER.filter((k) => (approvalPlan.preview.by_step[k] ?? 0) > 0).map((k) => (
-                <li key={k} className="flex justify-between border-b border-[#f9f6ff] py-1 last:border-0">
+                <li key={k} className="flex justify-between border-b border-(--ad-surface-2) py-1 last:border-0">
                   <span>{approvalTypeLabel(k)}</span>
-                  <span className="font-semibold text-[#0e0822]">{approvalPlan.preview.by_step[k]}</span>
+                  <span className="font-semibold text-(--ad-ink)">{approvalPlan.preview.by_step[k]}</span>
                 </li>
               ))}
             </ul>
@@ -787,9 +777,9 @@ function ProspectMeta({ item, className = '' }: { item: ClientMessageItem; class
   const phone    = item.prospect?.phone;
   if (!location && !phone) return null;
   return (
-    <div className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#605978] ${className}`}>
+    <div className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-(--ad-ink-soft) ${className}`}>
       {location && <span>{location}</span>}
-      {location && phone && <span className="text-[#8f8aa8]">·</span>}
+      {location && phone && <span className="text-(--ad-ink-ghost)">·</span>}
       {phone && <span className="font-mono">{formatPhone(phone)}</span>}
     </div>
   );
@@ -812,11 +802,11 @@ function StatTile({
   subColor: string;
   accent?: boolean;
 }) {
-  const bg   = accent ? '#7412ef' : '#ffffff';
-  const bdr  = accent ? '#7412ef' : '#e8e3f7';
-  const inkC = accent ? '#ffffff' : '#0e0822';
-  const lblC = accent ? 'rgba(255,255,255,0.65)' : '#605978';
-  const icnC = accent ? 'rgba(255,255,255,0.7)' : iconColor;
+  const bg   = accent ? 'var(--ad-green)' : 'var(--ad-surface)';
+  const bdr  = accent ? 'var(--ad-green)' : 'var(--ad-line)';
+  const inkC = accent ? 'var(--ad-on-accent)' : 'var(--ad-ink)';
+  const lblC = accent ? 'color-mix(in srgb, var(--ad-on-accent) 65%, transparent)' : 'var(--ad-ink-soft)';
+  const icnC = accent ? 'color-mix(in srgb, var(--ad-on-accent) 70%, transparent)' : iconColor;
 
   return (
     <div
@@ -886,7 +876,7 @@ function EditModal({
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
+      className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-[rgba(14,8,34,0.45)] md:p-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -895,7 +885,10 @@ function EditModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-white overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[600px] md:rounded-md md:border md:border-[#e8e3f7]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Review draft"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[600px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -903,42 +896,42 @@ function EditModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#e8e3f7] px-5 py-4">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-(--ad-line) px-5 py-4">
           <div>
-            <h2 className="m-0 text-[18px] font-semibold text-[#0e0822]">Review draft</h2>
-            <p className="m-0 mt-0.5 text-[12px] text-[#605978]">
+            <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Review draft</h2>
+            <p className="m-0 mt-0.5 text-[12px] text-(--ad-ink-soft)">
               {item.prospect?.business_name ?? 'Unknown'}
-              <span className="mx-1.5 text-[#8f8aa8]">·</span>
+              <span className="mx-1.5 text-(--ad-ink-ghost)">·</span>
               {approvalTypeLabel(item.message_type)}
             </p>
           </div>
-          <button onClick={requestClose} aria-label="Close" className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-[#605978] transition-colors hover:text-[#0e0822]">×</button>
+          <ModalClose onClick={requestClose} />
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+        <div className="modal-scroll flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
           {item.subject !== null && (
             <div>
-              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[.06em] text-[#605978]">Subject</div>
+              <div className="mb-1.5 block text-[13px] font-semibold text-(--ad-ink)">Subject</div>
               <input
                 value={subjectDraft}
                 onChange={(e) => setSubjectDraft(e.target.value)}
                 style={{ ...FONT, boxShadow: '0 0 0 3px rgba(116, 18, 239, 0.14)' }}
-                className="w-full rounded-xl border border-[#7412ef] bg-white px-3.5 py-2.5 text-[13px] font-semibold text-[#0e0822] outline-none"
+                className="w-full rounded-xl border border-(--ad-green) bg-(--ad-surface) px-3.5 py-2.5 text-[13px] font-semibold text-(--ad-ink) outline-none"
               />
             </div>
           )}
           <div>
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[.06em] text-[#605978]">Message body</div>
+            <div className="mb-1.5 block text-[13px] font-semibold text-(--ad-ink)">Message body</div>
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               rows={Math.max(6, draft.split('\n').length + 1)}
               style={{ ...FONT, boxShadow: '0 0 0 3px rgba(116, 18, 239, 0.14)' }}
-              className="w-full resize-y rounded-xl border border-[#7412ef] bg-white px-4 py-3 text-[13px] leading-relaxed text-[#0e0822] outline-none"
+              className="w-full resize-y rounded-xl border border-(--ad-green) bg-(--ad-surface) px-4 py-3 text-[13px] leading-relaxed text-(--ad-ink) outline-none"
             />
           </div>
-          <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-[#e8e3f7] bg-[#f9f6ff] px-3.5 py-3 text-[12px] text-[#605978]">
+          <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-3 text-[12px] text-(--ad-ink-soft)">
             <Detail label="Prospect" value={[item.prospect?.category, item.prospect?.location].filter(Boolean).join(' · ')} />
             <Detail label="Phone" value={item.prospect?.phone ? formatPhone(item.prospect.phone) : null} />
             <Detail label="Scheduled send">
@@ -948,7 +941,7 @@ function EditModal({
             <ObservationDetails observation={item.observation} sourceUrl={item.observation_source_url} Detail={Detail} />
           </dl>
           {blockedByGmail && (
-            <div className="rounded-xl border border-[#e8dafd] bg-[#f1e9ff] px-3.5 py-2.5 text-[12px] text-[#5b0fc2]">
+            <div className="rounded-xl border border-(--ad-green-line) bg-(--ad-green-tint) px-3.5 py-2.5 text-[12px] text-(--ad-green-hover)">
               {settingsPath
                 ? <Link to={settingsPath} className="font-semibold underline">Connect your Gmail</Link>
                 : <strong className="font-semibold">Connect your Gmail</strong>} in Settings before approving - that's what actually sends this.
@@ -957,7 +950,7 @@ function EditModal({
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-[#e8e3f7] px-5 py-4 flex justify-end gap-2.5">
+        <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
           <button onClick={onClose} className={btn('secondary', 'lg')}>
             Cancel
           </button>
@@ -967,8 +960,8 @@ function EditModal({
             title={dirty ? undefined : 'Change the subject or message to save a draft'}
             className={`cursor-pointer rounded-xl border px-4 py-2 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed ${
               dirty
-                ? 'border-[#7412ef] bg-[#f1e9ff] text-[#5b0fc2] hover:bg-[#e8dafd]'
-                : 'border-[#cfc9e8] bg-transparent text-[#605978]'
+                ? 'border-(--ad-green) bg-(--ad-green-tint) text-(--ad-green-hover) hover:bg-(--ad-green-line)'
+                : 'border-(--ad-line-mid) bg-transparent text-(--ad-ink-soft)'
             }`}
           >
             {saving ? 'Saving…' : 'Save draft'}

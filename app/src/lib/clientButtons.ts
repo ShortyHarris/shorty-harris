@@ -12,14 +12,14 @@ const BASE =
 
 const VARIANT: Record<BtnVariant, string> = {
   // The one thing to do on a screen.
-  primary: 'border border-transparent bg-(--leaf) font-bold text-white hover:bg-(--leaf-hover)',
+  primary: 'border border-transparent bg-(--leaf) font-bold text-(--ad-on-accent) hover:bg-(--leaf-hover)',
   // Everything else: Edit, Cancel, Back, Refresh, pagination.
-  secondary: 'border border-(--line-strong) bg-white text-(--ink) hover:bg-(--bg)',
+  secondary: 'border border-(--line-strong) bg-(--surface) text-(--ink) hover:bg-(--bg)',
   // Reject, delete, stop: outlined until hovered so it never competes with primary.
-  danger: 'border border-(--clay) bg-transparent font-bold text-(--clay) hover:bg-(--clay) hover:text-white',
+  danger: 'border border-(--clay) bg-transparent font-bold text-(--clay) hover:bg-(--clay) hover:text-(--ad-on-accent)',
   // The action inside a red warning banner: solid in the banner's own colour
   // instead of green on red.
-  alert: 'border border-transparent bg-(--clay) font-bold text-white hover:bg-[#2a2147]',
+  alert: 'border border-transparent bg-(--clay) font-bold text-(--ad-on-accent) hover:bg-(--ad-clay-hover)',
   // Low-emphasis text actions.
   quiet: 'border border-transparent bg-transparent text-(--ink-soft) hover:bg-(--bg) hover:text-(--ink)',
 };

@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { NavLink, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, LogOut, Bell, Sun, Moon,
+  X, LogOut, Bell, ChevronDown,
   ClipboardCheck, Flame, Newspaper,
   Building2, Users, Megaphone, BarChart2, Activity, BookOpen, ShieldAlert, Filter, Ban,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { BrandLockup } from '../../components/BrandLockup';
+import { ThemeToggle } from '../../components/ThemeToggle';
+import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { useAdminTheme } from '../../hooks/useAdminTheme';
 import { useApprovalQueue } from '../../hooks/useApprovalQueue';
@@ -93,16 +95,7 @@ export function AdminLayout() {
         <div className="atopbar-right">
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
           <AdminNotificationBell items={NOTIF_ITEMS} />
-          <div className="atopbar-user">
-            <div className="atopbar-user-avatar">{initial}</div>
-            <div className="atopbar-user-info">
-              <div className="atopbar-user-name">{name}</div>
-              <div className="atopbar-user-role">Super Admin</div>
-            </div>
-            <button className="atopbar-signout" onClick={signOut} title="Sign out">
-              <LogOut size={14} />
-            </button>
-          </div>
+          <AdminAccountMenu initial={initial} name={name} onSignOut={signOut} />
         </div>
       </header>
 
@@ -377,28 +370,37 @@ function AdminNotificationBell({ items }: { items: NotifItem[] }) {
   );
 }
 
-/* ── Light / dark toggle ─────────────────────────────────────────── */
-function ThemeToggle({ theme, onToggle }: { theme: 'light' | 'dark'; onToggle: () => void }) {
-  const dark = theme === 'dark';
+/* Top-bar account button. Sign out is a labelled menu item rather than a bare icon that was easy to misread. */
+function AdminAccountMenu({ initial, name, onSignOut }: { initial: string; name: string; onSignOut: () => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <button
-      onClick={onToggle}
-      aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-      title={dark ? 'Light mode' : 'Dark mode'}
-      className="relative flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-(--ad-ink-soft) transition-colors hover:bg-(--ad-fill) hover:text-(--ad-ink)"
-    >
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.span
-          key={theme}
-          initial={{ opacity: 0, rotate: -60, scale: 0.7 }}
-          animate={{ opacity: 1, rotate: 0, scale: 1 }}
-          exit={{ opacity: 0, rotate: 60, scale: 0.7 }}
-          transition={{ duration: 0.18 }}
-          className="flex"
-        >
-          {dark ? <Sun size={16} strokeWidth={2} /> : <Moon size={16} strokeWidth={2} />}
-        </motion.span>
-      </AnimatePresence>
-    </button>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" className="aaccount-trigger" aria-label={`Account menu for ${name}`}>
+          <span className="atopbar-user-avatar" aria-hidden>{initial}</span>
+          <span className="aaccount-name">{name}</span>
+          <ChevronDown size={15} className="shrink-0 text-(--ad-ink-faint)" aria-hidden />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={8} className="w-60 p-1.5">
+        <div className="flex items-center gap-3 border-b border-(--ad-line) px-3 pb-3 pt-2">
+          <span className="atopbar-user-avatar" aria-hidden>{initial}</span>
+          <span className="min-w-0">
+            <span className="block truncate text-[14px] font-semibold text-(--ad-ink)">{name}</span>
+            <span className="block text-[12.5px] text-(--ad-ink-soft)">Super Admin</span>
+          </span>
+        </div>
+        <div className="pt-1.5">
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onSignOut(); }}
+            className="flex w-full cursor-pointer items-center gap-3 rounded-md border-0 bg-transparent px-3 py-2.5 text-left text-[13.5px] font-medium text-(--ad-ink) transition-colors hover:bg-(--ad-fill)"
+          >
+            <LogOut size={16} strokeWidth={1.9} className="text-(--ad-ink-soft)" aria-hidden />
+            Sign out
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

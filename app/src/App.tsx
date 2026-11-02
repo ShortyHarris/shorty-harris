@@ -10,7 +10,7 @@ import { supabase } from './lib/supabase';
 import { useClientHeader, clientHeaderKey } from './hooks/useClientHeader';
 import { useClientDashboard, dashboardKey } from './hooks/useClientDashboard';
 import { billingKey } from './hooks/useBilling';
-import { usePendingApprovalCount } from './hooks/useClientApprovals';
+import { usePendingApprovalCount, useApprovedQueueCounts } from './hooks/useClientApprovals';
 import { useGmailConnection } from './hooks/useGmailConnection';
 import { useClientNotifications } from './hooks/useClientNotifications';
 import { useClientRealtimeSync } from './hooks/useClientRealtimeSync';
@@ -126,6 +126,7 @@ function ClientZone() {
   const { businessName, credits } = useClientHeader(clientId);
   // Head count only - the badge must not load the whole queue on every page.
   const pendingApprovals = usePendingApprovalCount(clientId);
+  const { awaitingProspects } = useApprovedQueueCounts(clientId);
   const { connection: gmailConnection } = useGmailConnection(clientId);
   const { leads } = useClientDashboard(clientId);
   const newHotLeads = leads.filter((l) => l.status === 'new').length;
@@ -171,6 +172,7 @@ function ClientZone() {
           credits={credits}
           displayName={profile!.full_name ?? 'Account'}
           pendingApprovals={pendingApprovals}
+          awaitingProspects={awaitingProspects}
           newHotLeads={newHotLeads}
           gmailConnected={gmailConnection.connected}
           notifications={notifications}
@@ -228,6 +230,9 @@ function ImpersonateZone() {
   const [confirmEdit, setConfirmEdit] = useState(false);
   // The client's real balance, so the sidebar and header match what they see.
   const { credits } = useClientHeader(clientId ?? '', session?.client ?? supabase);
+  // Wait for the impersonation session: falling back to the admin's own client here would count
+  // drafts only an admin can see.
+  const { awaitingProspects } = useApprovedQueueCounts(session ? clientId ?? '' : '', session?.client ?? supabase);
 
   useEffect(() => {
     if (!clientId) return;
@@ -289,6 +294,7 @@ function ImpersonateZone() {
         businessName={session.businessName}
         credits={credits}
         displayName={session.businessName}
+        awaitingProspects={awaitingProspects}
         hideSettings
         signOutLabel="Exit impersonation"
         onSignOut={exit}
@@ -333,7 +339,7 @@ function Spinner() {
     <div style={{
       position: 'fixed', inset: 0,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      background: '#f9f6ff',
+      background: 'var(--ad-surface-2, #f9f6ff)',
       fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
     }}>
       <style>{`@keyframes sh-spin { to { transform: rotate(360deg); } }`}</style>
@@ -345,7 +351,7 @@ function Spinner() {
           fontWeight: 700,
           letterSpacing: '0.26em',
           textTransform: 'uppercase',
-          color: '#7412ef',
+          color: 'var(--ad-green, #7412ef)',
         }}>
           Shorty
         </span>
@@ -354,7 +360,7 @@ function Spinner() {
           fontWeight: 800,
           letterSpacing: '-0.045em',
           lineHeight: 1,
-          color: '#0e0822',
+          color: 'var(--ad-ink, #0e0822)',
         }}>
           Harris
         </span>
@@ -366,8 +372,8 @@ function Spinner() {
         width: 18,
         height: 18,
         borderRadius: '50%',
-        border: '2px solid #cfc9e8',
-        borderTopColor: '#7412ef',
+        border: '2px solid var(--ad-line-mid, #cfc9e8)',
+        borderTopColor: 'var(--ad-green, #7412ef)',
         animation: 'sh-spin 0.7s linear infinite',
       }} />
     </div>

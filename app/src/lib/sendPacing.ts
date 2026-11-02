@@ -149,11 +149,68 @@ export function sendingWarnings(p: SendPacing, now?: Date): string[] {
   return out;
 }
 
-function todayLine(p: SendPacing): string {
-  const base = `${p.today.sent} of ${p.today.cap} emails sent today.`;
-  if (p.today.in_window_now) return base;
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** 'Mon-Fri' / 'Mon,Wed,Fri' / 'Sat-Mon' → weekday indexes (0 = Sun). null when it can't be read. */
+export function parseSendDays(days: string): Set<number> | null {
+  const idx = (s: string) => WEEKDAYS.findIndex((d) => d.toLowerCase() === s.trim().slice(0, 3).toLowerCase());
+  const out = new Set<number>();
+  for (const part of days.split(',')) {
+    const [a, b] = part.split('-').map(idx);
+    if (a < 0 || (b !== undefined && b < 0)) return null;
+    if (b === undefined) { out.add(a); continue; }
+    for (let i = a; ; i = (i + 1) % 7) { out.add(i); if (i === b) break; }
+  }
+  return out.size ? out : null;
+}
+
+/** Weekday index and minutes past midnight of `now` on the client's wall clock. */
+function wallClock(now: Date, timeZone: string): { day: number; minutes: number } | null {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(now);
+    const get = (t: string) => parts.find((x) => x.type === t)?.value ?? '';
+    const day = WEEKDAYS.indexOf(get('weekday'));
+    const minutes = Number(get('hour')) * 60 + Number(get('minute'));
+    return day < 0 || Number.isNaN(minutes) ? null : { day, minutes };
+  } catch {
+    return null;
+  }
+}
+
+const clockMinutes = (hhmm: string): number | null => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+
+/**
+ * Outside the send window, when sending next starts: "starts at 9:00 AM" before the window on a
+ * send day, otherwise "resumes Mon at 9:00 AM". null when the window or clock can't be read, so the
+ * caller falls back to the generic schedule sentence.
+ */
+export function nextSendStart(p: SendPacing, now: Date = new Date()): string | null {
+  const days = parseSendDays(p.window.days);
+  const start = clockMinutes(p.window.start);
+  const clock = wallClock(now, p.time_zone);
+  if (!days || start === null || !clock) return null;
+  const at = formatClock(p.window.start);
+  if (days.has(clock.day) && clock.minutes < start) return `sending starts at ${at}`;
+  for (let i = 1; i <= 7; i++) {
+    const d = (clock.day + i) % 7;
+    if (days.has(d)) return `sending resumes ${i === 1 ? 'tomorrow' : WEEKDAYS[d]} at ${at}`;
+  }
+  return null;
+}
+
+function todayLine(p: SendPacing, now?: Date): string {
+  const counts = `${p.today.sent} of ${p.today.cap} emails sent today`;
+  if (p.today.in_window_now) return `${counts}.`;
   const w = p.window;
-  return `${base} Sends ${formatDays(w.days)}, ${formatClock(w.start)} to ${formatClock(w.end)} (${p.time_zone}).`;
+  const schedule = `Sends ${formatDays(w.days)}, ${formatClock(w.start)} to ${formatClock(w.end)} (${p.time_zone}).`;
+  // Outside the window a bare "0 of 5 sent" reads like a fault, so say when the next sends go out.
+  const next = nextSendStart(p, now);
+  return next ? `${counts}, ${next}. ${schedule}` : `${counts}. ${schedule}`;
 }
 
 function queueLine(p: SendPacing, now?: Date): SendingCopy['queue'] {
@@ -191,7 +248,7 @@ export function sendingCopy(p: SendPacing, now?: Date): SendingCopy {
   return {
     warnings: sendingWarnings(p, now),
     // With no mailbox nothing can send, so a "0 of 40 sent" line and a warm-up plan would mislead.
-    today: noMailbox ? null : todayLine(p),
+    today: noMailbox ? null : todayLine(p, now),
     warmup: noMailbox
       ? null
       : p.warmup.active
@@ -210,7 +267,7 @@ export function sendingCopy(p: SendPacing, now?: Date): SendingCopy {
 export function compactSendingLine(p: SendPacing, now?: Date): { text: string; warning: boolean } {
   const warnings = sendingWarnings(p, now);
   if (warnings.length) return { text: warnings.join(' '), warning: true };
-  const parts = [todayLine(p)];
+  const parts = [todayLine(p, now)];
   if (p.warmup.active) parts.push(`Warming up, today's limit is ${p.today.cap} a day.`);
   const q = queueLine(p, now);
   if (q) parts.push(q.text);

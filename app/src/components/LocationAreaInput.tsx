@@ -20,15 +20,18 @@ class MapBoundary extends Component<{ onError: () => void; children: ReactNode }
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+// Client screens use sentence-case labels; the admin keeps the caps style.
+const fieldLblSentence = 'mb-1.5 block text-[13px] font-semibold text-(--ad-ink)';
 const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
 /* Target locations - either a plain place name, or a radius around a
    geocoded point. The 3-location cap counts both kinds together, so this
    takes a single `maxItems` the same way TagInput does. */
 export function LocationAreaInput({
-  label, helper, values, onChange, maxItems, capLabel, required,
+  label, helper, values, onChange, maxItems, capLabel, required, sentenceLabel = false,
 }: {
   label: string;
+  sentenceLabel?: boolean;
   required?: boolean;
   helper?: string;
   values: TargetArea[];
@@ -155,7 +158,7 @@ export function LocationAreaInput({
 
   return (
     <div>
-      <label className={fieldLbl}>{label}{required && <RequiredMark />}</label>
+      <label className={sentenceLabel ? fieldLblSentence : fieldLbl}>{label}{required && <RequiredMark />}</label>
 
       {values.length > 0 && (
         <div className="mb-2 flex flex-col gap-1.5">

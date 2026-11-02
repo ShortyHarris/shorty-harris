@@ -18,7 +18,7 @@ export function ConfirmDialog({
   return (
     <motion.div
       className="fixed inset-0 z-[100] flex items-center justify-center p-5"
-      style={{ background: 'rgba(28, 30, 25, 0.45)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+      style={{ background: 'rgba(14, 8, 34, 0.45)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -42,14 +42,14 @@ export function ConfirmDialog({
           <button
             onClick={onCancel}
             disabled={busy}
-            className="cursor-pointer rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:bg-(--ad-surface-2) disabled:opacity-50"
+            className="cursor-pointer rounded-lg border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:bg-(--ad-surface-2) disabled:opacity-50"
           >
             {cancelLabel}
           </button>
           <button
             onClick={onConfirm}
             disabled={busy}
-            className={`cursor-pointer rounded-xl px-4 py-2 text-[13px] font-bold transition-colors disabled:opacity-50 ${
+            className={`cursor-pointer rounded-lg px-4 py-2 text-[13px] font-bold transition-colors disabled:opacity-50 ${
               danger
                 ? 'border border-(--ad-clay) bg-(--ad-clay) text-white hover:bg-(--ad-clay-hover)'
                 : 'border-0 bg-(--ad-green) text-white hover:bg-(--ad-green-hover)'

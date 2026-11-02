@@ -7,12 +7,11 @@ import { scheduledDisplay, formatPendingSince, calendarDaysBetween, pendingSince
 export function ScheduledCell({ schedule, id, tz, now }: { schedule: ScheduleMap; id: string; tz: string; now: Date }) {
   const d = scheduledDisplay(schedule.get(id), tz, now);
   return (
-    <span
-      title={d.title ?? undefined}
-      className={d.overdue ? 'font-semibold text-[#0e0822]' : d.hasDate ? '' : 'italic opacity-70'}
-    >
-      {d.text}
-      {d.overdue && <span className="ml-1 rounded-full bg-[#f9f6ff] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[.04em]">Overdue</span>}
+    <span title={d.title ?? undefined} className="inline-flex flex-wrap items-center gap-1">
+      <span className={d.overdue ? 'font-semibold text-(--ad-ink)' : d.hasDate ? '' : 'italic opacity-70'}>
+        {d.text}
+      </span>
+      {d.overdue && <span className="shrink-0 rounded-full bg-(--ad-surface-2) px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[.04em]">Overdue</span>}
     </span>
   );
 }
@@ -28,11 +27,11 @@ export function HeldBadge({ row, settingsPath, className = '' }: {
   if (!row || row.basis !== 'held_by_send_rules') return null;
   return (
     <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
-      <span className="inline-flex items-center whitespace-nowrap rounded-full bg-[#f1e9ff] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.04em] text-[#5b0fc2]">
+      <span className="inline-flex items-center whitespace-nowrap rounded-full bg-(--ad-green-tint) px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.04em] text-(--ad-green-hover)">
         Held by send rules
       </span>
       {settingsPath !== undefined && (
-        <span className="text-[11px] leading-snug text-[#5b0fc2]">
+        <span className="text-[11px] leading-snug text-(--ad-green-hover)">
           {settingsPath ? <Link to={settingsPath} className="font-semibold underline">See Settings</Link> : 'See Settings'}
         </span>
       )}
@@ -71,7 +70,7 @@ export function AnglePill({ angle, className = '' }: { angle: string | null | un
     <span
       title="Personalization angle"
       className={`atbl-pill ${className}`}
-      style={{ background: '#f1e9ff', color: '#7412ef' }}
+      style={{ background: 'var(--ad-green-tint)', color: 'var(--ad-green)' }}
     >
       {text.toUpperCase()}
     </span>

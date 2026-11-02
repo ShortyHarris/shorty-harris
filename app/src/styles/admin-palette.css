@@ -5,7 +5,7 @@
    comes from these tokens, so dark mode is just a second set of values.
    Light values live on :root so shared components look unchanged wherever
    they're used (client app, public pages). Dark values only apply while the
-   admin layout has set <html data-admin-theme="dark"> - it's on <html>, not
+   admin or client layout has set <html data-theme="dark"> - it's on <html>, not
    the admin wrapper, so portalled UI (toasts, dropdowns, modals) follows.
    ──────────────────────────────────────────────────────────────────────────── */
 
@@ -53,72 +53,98 @@
   --ad-purple-tint:  #f1e9ff;
   --ad-blue:         #605978;
   --ad-blue-tint:    #f9f6ff;
+
+  /* text on a solid purple or ink fill, and a mid-weight line used for chip
+     borders and loading skeletons */
+  --ad-on-accent:    #ffffff;
+  --ad-line-mid:     #cfc9e8;
 }
 
-html[data-admin-theme="dark"] {
+/* Admin light mode: white page and neutral grey fills/lines. Purple is kept for accents only
+   (buttons, active nav, badges), not as the page colour. Scoped to the admin so the client
+   app's own look is unchanged. */
+html[data-theme-scope="admin"][data-theme="light"] {
+  --ad-page:         #ffffff;
+  --ad-page-sunken:  #f4f4f5;
+  --ad-surface-2:    #fafafa;
+  --ad-fill:         #f4f4f5;
+  --ad-line:         #e4e4e7;
+  --ad-line-strong:  #a1a1aa;
+  --ad-clay-tint:    #f4f4f5;
+  --ad-clay-line:    #e4e4e7;
+  --ad-amber-wash:   #fafafa;
+  --ad-blue-tint:    #fafafa;
+}
+
+/* Admin dark mode: true black and neutral greys, not purple-tinted surfaces. Purple stays
+   as the accent colour only. */
+html[data-theme="dark"] {
   color-scheme: dark;
 
-  --ad-ink:          #f4f1ff;
+  --ad-ink:          #f5f5f5;
   --ad-black:        #ffffff;
-  --ad-ink-2:        #dcd5f2;
-  --ad-ink-soft:     #b0a8cc;
-  --ad-ink-faint:    #8f89ad;
-  --ad-ink-ghost:    #5e5680;
+  --ad-ink-2:        #e5e5e5;
+  --ad-ink-soft:     #a3a3a3;
+  --ad-ink-faint:    #8a8a8a;
+  --ad-ink-ghost:    #5c5c5c;
 
-  --ad-page:         #0e0822;
-  --ad-page-sunken:  #090518;
-  --ad-surface:      #17102e;
-  --ad-surface-2:    #1d1538;
-  --ad-fill:         #241a45;
-  --ad-line:         #2c2250;
-  --ad-line-strong:  #463a73;
+  --ad-page:         #0a0a0a;
+  --ad-page-sunken:  #050505;
+  --ad-surface:      #141414;
+  --ad-surface-2:    #1a1a1a;
+  --ad-fill:         #222222;
+  --ad-line:         #2a2a2a;
+  --ad-line-strong:  #404040;
 
   --ad-green:        #a875ff;
   --ad-green-hover:  #bd96ff;
   --ad-green-tint:   #261845;
   --ad-green-line:   #3b2a6b;
 
-  --ad-clay:         #f4f1ff;
+  --ad-clay:         #f5f5f5;
   --ad-clay-hover:   #ffffff;
-  --ad-clay-tint:    #241a45;
-  --ad-clay-line:    #463a73;
-  --ad-red:          #f4f1ff;
+  --ad-clay-tint:    #222222;
+  --ad-clay-line:    #404040;
+  --ad-red:          #f5f5f5;
 
   --ad-amber:        #a875ff;
   --ad-orange:       #a875ff;
   --ad-amber-ink:    #c4a3ff;
   --ad-amber-tint:   #261845;
-  --ad-amber-wash:   #1d1538;
+  --ad-amber-wash:   #1a1a1a;
   --ad-amber-line:   #3b2a6b;
 
   --ad-purple:       #a875ff;
   --ad-purple-tint:  #261845;
-  --ad-blue:         #b0a8cc;
-  --ad-blue-tint:    #1d1538;
+  --ad-blue:         #a3a3a3;
+  --ad-blue-tint:    #1a1a1a;
+
+  --ad-on-accent:    #0a0a0a;
+  --ad-line-mid:     #333333;
 
   /* page background behind the admin shell */
-  background: #0e0822;
+  background: #0a0a0a;
 }
 
 /* Inverted buttons: near-black background + white text in light mode
    becomes a light background in dark mode, so the white label has to flip
    to the dark surface colour to stay readable. */
-html[data-admin-theme="dark"] :is(.bg-\(--ad-black\), .bg-\(--ad-ink\)).text-white:not(:hover),
-html[data-admin-theme="dark"] :is(.hover\:bg-\(--ad-black\), .hover\:bg-\(--ad-ink\)).hover\:text-white:hover,
-html[data-admin-theme="dark"] :is(.bg-\(--ad-black\), .bg-\(--ad-ink\)):not(:hover) > .text-white,
-html[data-admin-theme="dark"] .primary-btn,
-html[data-admin-theme="dark"] .pill.green,
-html[data-admin-theme="dark"] .pill.green-solid,
-html[data-admin-theme="dark"] .resolve-btn:hover {
+html[data-theme="dark"] :is(.bg-\(--ad-black\), .bg-\(--ad-ink\)).text-white:not(:hover),
+html[data-theme="dark"] :is(.hover\:bg-\(--ad-black\), .hover\:bg-\(--ad-ink\)).hover\:text-white:hover,
+html[data-theme="dark"] :is(.bg-\(--ad-black\), .bg-\(--ad-ink\)):not(:hover) > .text-white,
+html[data-theme="dark"] .primary-btn,
+html[data-theme="dark"] .pill.green,
+html[data-theme="dark"] .pill.green-solid,
+html[data-theme="dark"] .resolve-btn:hover {
   color: var(--ad-surface);
 }
 
 /* Native form controls + scrollbars follow the scheme. */
-html[data-admin-theme="dark"] .theme-admin input,
-html[data-admin-theme="dark"] .theme-admin textarea,
-html[data-admin-theme="dark"] .theme-admin select {
+html[data-theme="dark"] :is(.theme-admin, .theme-client) input,
+html[data-theme="dark"] :is(.theme-admin, .theme-client) textarea,
+html[data-theme="dark"] :is(.theme-admin, .theme-client) select {
   color: var(--ad-ink);
 }
-html[data-admin-theme="dark"] .theme-admin ::placeholder {
+html[data-theme="dark"] :is(.theme-admin, .theme-client) ::placeholder {
   color: var(--ad-ink-ghost);
 }

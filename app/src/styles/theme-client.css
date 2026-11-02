@@ -2,21 +2,24 @@
    carried by words and icons, so amber and clay map onto purple and ink
    rather than adding colours. */
 .theme-client {
+  /* Aliases of the shared --ad-* tokens (styles/admin-palette.css), whose
+     light values are exactly this palette. Dark mode flips the --ad-* tokens,
+     so the client follows the same dark theme as the admin. */
   --bg: #ffffff;
-  --surface: #ffffff;
-  --ink: #0e0822;
-  --ink-soft: #605978;
-  --ink-faint: #605978;
-  --line: #e8e3f7;
-  --line-strong: #8f8aa8;
+  --surface: var(--ad-surface);
+  --ink: var(--ad-ink);
+  --ink-soft: var(--ad-ink-soft);
+  --ink-faint: var(--ad-ink-faint);
+  --line: var(--ad-line);
+  --line-strong: var(--ad-line-strong);
 
-  --leaf: #7412ef;
-  --leaf-hover: #5b0fc2;
-  --leaf-tint: #f1e9ff;
-  --amber: #7412ef;
-  --amber-tint: #f1e9ff;
-  --clay: #0e0822;
-  --clay-tint: #f9f6ff;
+  --leaf: var(--ad-green);
+  --leaf-hover: var(--ad-green-hover);
+  --leaf-tint: var(--ad-green-tint);
+  --amber: var(--ad-amber);
+  --amber-tint: var(--ad-amber-tint);
+  --clay: var(--ad-clay);
+  --clay-tint: var(--ad-clay-tint);
 
   --radius: 16px;
   --radius-sm: 10px;
@@ -28,6 +31,8 @@
   text-rendering: optimizeLegibility;
   font-feature-settings: "tnum";
 }
+
+html[data-theme="dark"] .theme-client { --bg: var(--ad-page); }
 
 .theme-client * { box-sizing: border-box; }
 /* In @layer base so Tailwind's utility classes (layered, and therefore weaker
@@ -83,4 +88,19 @@
   .content {
     max-width: 1100px;
   }
+}
+
+/* Scrollable pop-up body. A shadow fades in at the top or bottom edge only while there's more to
+   scroll that way, so it's clear the panel scrolls even with a pinned footer below it. Global (not
+   scoped to .theme-client) because the Help pop-up is shared with the admin app. */
+.modal-scroll {
+  background:
+    linear-gradient(var(--ad-surface, #ffffff) 30%, transparent) center top,
+    linear-gradient(transparent, var(--ad-surface, #ffffff) 70%) center bottom,
+    radial-gradient(farthest-side at 50% 0, rgba(14, 8, 34, 0.18), transparent) center top,
+    radial-gradient(farthest-side at 50% 100%, rgba(14, 8, 34, 0.18), transparent) center bottom;
+  background-repeat: no-repeat;
+  background-color: var(--ad-surface, #ffffff);
+  background-size: 100% 24px, 100% 24px, 100% 10px, 100% 10px;
+  background-attachment: local, local, scroll, scroll;
 }
