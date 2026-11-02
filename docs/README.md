@@ -10,6 +10,7 @@ This documentation set covers the whole system. Start here, then follow the link
 | `DATABASE.md` | All 24 tables, relationships, RLS security model |
 | `WORKFLOWS.md` | The 6 n8n workflows + the pre-send gate, step by step |
 | `DEPLOYMENT.md` | How to set up Supabase, n8n, and the two frontends |
+| `FOLLOW_UP_APPROVALS.md` | When follow-ups reach Approvals, "Write follow-ups now", Pending vs Blocked |
 | `KNOWN_ISSUES.md` | Current limitations and what's deliberately deferred |
 | `ROADMAP_PHASE2.md` | Apify scraping, live payments, SMS/WhatsApp, and more |
 

@@ -23,7 +23,7 @@ export const clientPendingCountKey = (clientId: string) => ['client-approvals-pe
 // single prefix invalidates all of them. The request params are a trailing element.
 export const clientApprovedKey = (clientId: string) => ['client-approved-drafts', clientId] as const;
 
-function invalidateApprovalQueries(clientId: string) {
+export function invalidateApprovalQueries(clientId: string) {
   queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
   queryClient.invalidateQueries({ queryKey: clientPendingCountKey(clientId) });
   queryClient.invalidateQueries({ queryKey: approvalsScheduleKey(clientId) });
@@ -91,6 +91,15 @@ export interface ApprovedQueueCounts {
   awaitingProspects: number;
   /** campaign id -> distinct prospects with a visible pending draft. A missing key means 0. */
   awaitingProspectsByCampaign: Record<string, number>;
+  /** Approved first emails queued to send. Their follow-ups are only written once each one sends. */
+  approvedInitialsWaiting: number;
+  /** Follow-up drafts waiting for approval. */
+  pendingFollowups: number;
+  /** Block reason -> count, with the same visibility as the Blocked tab. */
+  blockedByReason: Record<string, number>;
+  /** Active campaigns with "write follow-ups now" (upfront_sequence) on. */
+  upfrontCampaigns: number;
+  activeCampaigns: number;
 }
 
 export interface ClientApprovalStats {
@@ -125,6 +134,7 @@ export const EMPTY_STATS: ClientApprovalStats = {
 export const EMPTY_COUNTS: ApprovedQueueCounts = {
   approved: 0, sendable: 0, scheduled: 0, blocked: 0, policyHeld: 0,
   pending: 0, pendingPolicyHeld: 0, awaitingProspects: 0, awaitingProspectsByCampaign: {},
+  approvedInitialsWaiting: 0, pendingFollowups: 0, blockedByReason: {}, upfrontCampaigns: 0, activeCampaigns: 0,
 };
 
 // Counts and stats only: one row is enough, the RPC returns them with every page.
@@ -142,7 +152,7 @@ interface RawApprovedQueue {
   is_admin?: boolean;
   time_zone?: string;
   total?: number;
-  counts?: Record<string, number> & { awaiting_prospects_by_campaign?: unknown };
+  counts?: Record<string, number> & { awaiting_prospects_by_campaign?: unknown; blocked_by_reason?: unknown };
   stats?: Record<string, number>;
   rows?: Record<string, unknown>[];
 }
@@ -173,6 +183,11 @@ export function parseApprovedQueue(body: RawApprovedQueue | null): ApprovedQueue
       pendingPolicyHeld: c.pending_policy_held ?? 0,
       awaitingProspects: c.awaiting_prospects ?? 0,
       awaitingProspectsByCampaign: toCountMap(c.awaiting_prospects_by_campaign),
+      approvedInitialsWaiting: c.approved_initials_waiting ?? 0,
+      pendingFollowups: c.pending_followups ?? 0,
+      blockedByReason: toCountMap(c.blocked_by_reason),
+      upfrontCampaigns: c.upfront_campaigns ?? 0,
+      activeCampaigns: c.active_campaigns ?? 0,
     },
     stats: {
       pending: s.pending ?? 0,

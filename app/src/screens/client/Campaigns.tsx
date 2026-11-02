@@ -34,6 +34,7 @@ import { validateCampaignLimits } from '../../lib/campaignLimits';
 import { LimitCounter, LimitMessages } from '../../components/LimitCounter';
 import { PIPELINE_STATUS_LABEL, PIPELINE_STATUS_PILL } from '../../lib/pipelineStatus';
 import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
+import { FollowUpsNowToggle } from '../../components/FollowUpsNowToggle';
 import { Sparkles } from 'lucide-react';
 import { useClientProfile } from '../../hooks/useClientProfile';
 import { useCountrySendHolds } from '../../hooks/useCountrySendHolds';
@@ -1140,6 +1141,17 @@ function CampaignDetailModal({
                 This can take a little while - check back here, or we'll flag it once there's something for you to review.
               </p>
             </div>
+          )}
+
+          {campaign.status !== 'cancelled' && (
+            <FollowUpsNowToggle
+              campaignId={campaign.id}
+              clientId={clientId}
+              on={campaign.upfrontSequence}
+              campaignActive={campaign.status === 'active'}
+              readOnly={readOnly}
+              client={client}
+            />
           )}
 
           {pendingApproval > 0 && (

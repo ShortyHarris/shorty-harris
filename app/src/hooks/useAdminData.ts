@@ -221,6 +221,8 @@ export interface CampaignRow {
   // True when a client (not an admin) submitted this campaign and it's still
   // sitting in draft - i.e. it needs an admin to review and activate it.
   needsReview: boolean;
+  /** "Write follow-ups now": all three follow-ups are drafted for approval upfront. */
+  upfront_sequence: boolean;
 }
 
 async function fetchCampaigns(): Promise<CampaignRow[]> {
@@ -232,7 +234,7 @@ async function fetchCampaigns(): Promise<CampaignRow[]> {
     // also used by the client-side campaign list. Reading it straight off
     // the campaigns row (instead of a separate per-campaign count query)
     // means this number can never drift from what the client UI shows.
-    .select(`id, name, description, status, channel, language, country, scrape_enabled, last_scraped_at, scrape_status, scrape_started_at, scrape_error, scrape_failure_reason, scrape_attempt_count, scrape_finished_at, last_scrape_summary, search_queries, target_locations, target_areas, max_results, created_at, client_id, prospect_count, client:clients ( business_name )`)
+    .select(`id, name, description, status, channel, language, country, scrape_enabled, last_scraped_at, scrape_status, scrape_started_at, scrape_error, scrape_failure_reason, scrape_attempt_count, scrape_finished_at, last_scrape_summary, search_queries, target_locations, target_areas, max_results, created_at, client_id, prospect_count, upfront_sequence, client:clients ( business_name )`)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -264,6 +266,7 @@ async function fetchCampaigns(): Promise<CampaignRow[]> {
       client,
       prospectCount: (r.prospect_count as number | null) ?? 0,
       needsReview: r.status === 'pending_review',
+      upfront_sequence: r.upfront_sequence === true,
     };
   }) as CampaignRow[];
 }

@@ -24,6 +24,8 @@ export interface ClientCampaignRow {
   last_scraped_at: string | null;
   scrape_status: string | null;
   prospectCount: number;
+  /** "Write follow-ups now": all three follow-ups are drafted for approval upfront. */
+  upfrontSequence: boolean;
 }
 
 async function fetchClientCampaigns(clientId: string, client: SupabaseClient): Promise<ClientCampaignRow[]> {
@@ -34,7 +36,7 @@ async function fetchClientCampaigns(clientId: string, client: SupabaseClient): P
     // single shared definition instead of each side running its own
     // `prospects` count query, which is what let the two numbers drift
     // apart after a scrape.
-    .select('id, name, description, status, language, country, search_queries, target_locations, target_areas, max_results, created_at, last_scraped_at, scrape_status, prospect_count')
+    .select('id, name, description, status, language, country, search_queries, target_locations, target_areas, max_results, created_at, last_scraped_at, scrape_status, prospect_count, upfront_sequence')
     .eq('client_id', clientId)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
@@ -50,6 +52,7 @@ async function fetchClientCampaigns(clientId: string, client: SupabaseClient): P
     last_scraped_at: (r.last_scraped_at as string | null) ?? null,
     scrape_status: (r.scrape_status as string | null) ?? null,
     prospectCount: (r.prospect_count as number | null) ?? 0,
+    upfrontSequence: r.upfront_sequence === true,
   })) as ClientCampaignRow[];
 }
 

@@ -6,9 +6,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import {
-  useClientApprovals, DEFAULT_QUEUE_SORT, QUEUE_SORT_OPTIONS, type ApprovedQueueSort,
+  useClientApprovals, DEFAULT_QUEUE_SORT, QUEUE_SORT_OPTIONS, type ApprovedQueueSort, invalidateApprovalQueries,
 } from '../../hooks/useClientApprovals';
-import { useClientCampaignList } from '../../hooks/useClientCampaigns';
+import { useClientCampaignList, myCampaignsKey } from '../../hooks/useClientCampaigns';
+import { queryClient } from '../../lib/queryClient';
+import { followUpBar, blockedBreakdown, setFollowUpsNow, writingEta } from '../../lib/followUpsNow';
 import { isEuCountry } from '../../lib/countries';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
@@ -40,7 +42,7 @@ import { formatPendingSince, pendingSinceOf, type ScheduleMap } from '../../lib/
 import { useApprovalsSchedule } from '../../hooks/useApprovalsSchedule';
 
 type ApprovalTab = 'pending' | 'approved' | 'blocked';
-import { Clock, CheckCircle2, Send, Ban, ClipboardCheck, AlertCircle } from 'lucide-react';
+import { Clock, CheckCircle2, Send, Ban, ClipboardCheck, AlertCircle, Layers } from 'lucide-react';
 
 const GMAIL_REQUIRED_TITLE = "Connect your Gmail in Settings before approving - that's what actually sends this.";
 
@@ -215,6 +217,28 @@ export function Approvals({
   // campaign that targets an EU country.
   const euCampaignIds = new Set(campaigns.filter((c) => isEuCountry(c.country)).map((c) => c.id));
   const hasEuDrafts = items.some((i) => i.campaign_id != null && euCampaignIds.has(i.campaign_id));
+
+  // Why Pending has no follow-ups yet, and what the Blocked tab holds.
+  const followUps = approvedQueue ? followUpBar(approvedQueue.counts) : null;
+  const blockedLines = approvedQueue ? blockedBreakdown(approvedQueue.counts.blockedByReason) : [];
+  const [switchingFollowUps, setSwitchingFollowUps] = useState(false);
+
+  // "Write follow-ups now" for every live campaign: on for the ones without it, or off for all.
+  async function switchFollowUps(on: boolean) {
+    if (readOnly) { toast(READ_ONLY_MSG, 'warning'); return; }
+    const targets = campaigns.filter((c) => c.status === 'active' && c.upfrontSequence !== on);
+    if (targets.length === 0) return;
+    setSwitchingFollowUps(true);
+    const results = await Promise.all(targets.map((c) => setFollowUpsNow(client, c.id, on)));
+    setSwitchingFollowUps(false);
+    const failed = results.filter((r) => r.error);
+    const toWrite = results.reduce((n, r) => n + (r.data?.followUpsToWrite ?? 0), 0);
+    queryClient.invalidateQueries({ queryKey: myCampaignsKey(clientId) });
+    invalidateApprovalQueries(clientId);
+    if (failed.length > 0) toast(`Couldn't change it for ${failed.length} campaign${failed.length === 1 ? '' : 's'}: ${failed[0].error}`, 'error');
+    else if (on) toast(writingEta(toWrite));
+    else toast('Turned off. Follow-ups already drafted stay here; new ones are written after each email sends.');
+  }
 
   const approvedCount  = approvedQueue?.counts.approved ?? 0;
   const blockedCount   = approvedQueue?.counts.blocked ?? 0;
@@ -406,6 +430,31 @@ export function Approvals({
         </div>
       )}
 
+      {/* Follow-ups switch, above the tabs so it is visible whichever tab is open. */}
+      {!loading && followUps && (
+        <div
+          role="status"
+          data-testid="follow-up-bar"
+          className={`flex flex-col gap-2.5 rounded-xl border px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between ${
+            followUps.on ? 'border-(--ad-green-line) bg-(--ad-green-tint)/40' : 'border-(--ad-line) bg-(--ad-surface)'
+          }`}
+        >
+          <p className="m-0 flex items-start gap-2 text-[13px] leading-relaxed text-(--ad-ink)">
+            <Layers size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
+            <span>{followUps.text}</span>
+          </p>
+          {!readOnly && (
+            <button
+              onClick={() => switchFollowUps(followUps.action === 'on')}
+              disabled={switchingFollowUps}
+              className={`${btn(followUps.action === 'on' ? 'primary' : 'secondary', 'md')} shrink-0`}
+            >
+              {switchingFollowUps ? 'Saving…' : followUps.actionLabel}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Approved summary - sendable and blocked are never lumped together */}
       {approvedQueue && (sendableCount > 0 || blockedCount > 0) && (
         <p className="m-0 text-[13px] font-semibold text-(--ad-ink)" data-testid="approved-summary">
@@ -439,9 +488,19 @@ export function Approvals({
       )}
 
       {tab === 'blocked' && blockedCount > 0 && (
-        <p className="m-0 text-[12.5px] text-(--ad-ink-soft)">
-          These drafts are approved but won't send until the reason shown is cleared. You can reject any you don't want to keep.
-        </p>
+        <div className="flex flex-col gap-1.5" data-testid="blocked-breakdown">
+          <p className="m-0 text-[12.5px] text-(--ad-ink-soft)">
+            These drafts are approved but won't send until the reason shown is cleared. You can reject any you don't want to keep.
+            {' '}Blocked is different from Pending: Pending drafts are waiting for your approval, Blocked ones are approved but held back.
+          </p>
+          {blockedLines.length > 0 && (
+            <ul className="m-0 flex list-none flex-col gap-0.5 p-0 text-[12.5px] text-(--ad-ink)">
+              {blockedLines.map((l) => (
+                <li key={l.reason}><span className="font-semibold tabular-nums">{l.count}</span> · {l.text}</li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {/* Sort + type filter */}

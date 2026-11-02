@@ -7,7 +7,7 @@ import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import {
   useCampaigns, useAdminHotLeads, useClientsList,
   createCampaign, updateCampaign, getCampaignDeleteCounts, deleteCampaign,
-  fetchScrapeSnapshots, fetchProspectCount,
+  fetchScrapeSnapshots, fetchProspectCount, QK,
 } from '../../hooks/useAdminData';
 import type { AdminHotLead, CampaignRow, CampaignDeleteCounts } from '../../hooks/useAdminData';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
@@ -35,6 +35,8 @@ import { useCountrySendHolds } from '../../hooks/useCountrySendHolds';
 import { CountryHoldBanner, EuBadge } from '../../components/CountryHoldBanner';
 import { COUNTRY_OPTIONS, countryName, defaultCampaignCountry, findCountryHold, isEuCountry } from '../../lib/countries';
 import { RequiredMark } from '../../components/RequiredMark';
+import { FollowUpsNowToggle } from '../../components/FollowUpsNowToggle';
+import { queryClient } from '../../lib/queryClient';
 import { enqueueCampaign, queuedMessage } from '../../lib/scrapeEnqueue';
 import { useDiscoveryQueue, markCampaignQueued, type ActiveQueueState } from '../../hooks/useDiscoveryQueue';
 
@@ -1115,6 +1117,15 @@ function EditCampaignModal({
         </div>
 
         <LanguageField value={language} onChange={setLanguage} listId="edit-campaign-languages" />
+
+        {/* Saves on its own, separately from the form below. */}
+        <FollowUpsNowToggle
+          campaignId={campaign.id}
+          clientId={campaign.client_id}
+          on={campaign.upfront_sequence}
+          campaignActive={campaign.status === 'active'}
+          onChanged={() => queryClient.invalidateQueries({ queryKey: QK.campaigns })}
+        />
 
         {/* Country is set on creation only - shown read-only here. */}
         <div>

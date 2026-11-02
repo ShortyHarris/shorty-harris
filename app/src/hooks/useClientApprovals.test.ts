@@ -122,6 +122,28 @@ describe('awaiting prospects by campaign', () => {
   });
 });
 
+describe('follow-up and blocked explainer counts', () => {
+  it('maps the counts the Pending and Blocked notes need', () => {
+    const q = parseApprovedQueue(body({
+      counts: {
+        approved_initials_waiting: 231, pending_followups: 0, upfront_campaigns: 1, active_campaigns: 3,
+        blocked_by_reason: { generic_mailbox: 99, do_not_contact: 1 },
+      },
+    }));
+    expect(q.counts).toMatchObject({
+      approvedInitialsWaiting: 231, pendingFollowups: 0, upfrontCampaigns: 1, activeCampaigns: 3,
+      blockedByReason: { generic_mailbox: 99, do_not_contact: 1 },
+    });
+  });
+
+  it('defaults to zeros and an empty map when an older server omits them', () => {
+    const q = parseApprovedQueue(body({ counts: { approved: 5 } }));
+    expect(q.counts).toMatchObject({
+      approvedInitialsWaiting: 0, pendingFollowups: 0, upfrontCampaigns: 0, activeCampaigns: 0, blockedByReason: {},
+    });
+  });
+});
+
 describe('parseApprovedQueue: shape', () => {
   it('maps stats to camelCase, including rejected today versus all time', () => {
     const q = parseApprovedQueue(body({
@@ -165,6 +187,7 @@ describe('parseApprovedQueue: shape', () => {
     expect(q.counts).toEqual({
       approved: 0, sendable: 0, scheduled: 0, blocked: 0, policyHeld: 0, pending: 0, pendingPolicyHeld: 0, awaitingProspects: 0,
       awaitingProspectsByCampaign: {},
+      approvedInitialsWaiting: 0, pendingFollowups: 0, blockedByReason: {}, upfrontCampaigns: 0, activeCampaigns: 0,
     });
     expect(q.isAdmin).toBe(false);
   });
