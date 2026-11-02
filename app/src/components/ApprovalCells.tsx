@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { scheduledDisplay, formatPendingSince, calendarDaysBetween, pendingSinceOf, type ScheduleMap, type SortableApproval } from '../lib/approvalsView';
+import { SIGN_OFF_MISSING_BADGE, SIGN_OFF_MISSING_TITLE } from '../lib/approvalLabels';
 
 // Shared by the client Approvals page and the admin queue.
 
@@ -106,5 +107,17 @@ export function ObservationDetails({ observation, sourceUrl, Detail }: {
         </div>
       )}
     </>
+  );
+}
+
+/** Marks a draft whose sign-off is missing the sender's first name. */
+export function SignOffWarning({ className = '' }: { className?: string }) {
+  return (
+    <span
+      title={SIGN_OFF_MISSING_TITLE}
+      className={`inline-flex w-fit items-center whitespace-nowrap rounded-full bg-(--ad-surface-2) px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.04em] text-(--ad-ink) ${className}`}
+    >
+      {SIGN_OFF_MISSING_BADGE}
+    </span>
   );
 }

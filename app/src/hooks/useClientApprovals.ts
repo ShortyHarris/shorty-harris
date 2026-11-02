@@ -100,6 +100,8 @@ export interface ApprovedQueueCounts {
   /** Active campaigns with "write follow-ups now" (upfront_sequence) on. */
   upfrontCampaigns: number;
   activeCampaigns: number;
+  /** Pending + approved drafts whose sign-off is missing the sender's first name. */
+  signOffMissingName: number;
 }
 
 export interface ClientApprovalStats {
@@ -135,6 +137,7 @@ export const EMPTY_COUNTS: ApprovedQueueCounts = {
   approved: 0, sendable: 0, scheduled: 0, blocked: 0, policyHeld: 0,
   pending: 0, pendingPolicyHeld: 0, awaitingProspects: 0, awaitingProspectsByCampaign: {},
   approvedInitialsWaiting: 0, pendingFollowups: 0, blockedByReason: {}, upfrontCampaigns: 0, activeCampaigns: 0,
+  signOffMissingName: 0,
 };
 
 // Counts and stats only: one row is enough, the RPC returns them with every page.
@@ -188,6 +191,7 @@ export function parseApprovedQueue(body: RawApprovedQueue | null): ApprovedQueue
       blockedByReason: toCountMap(c.blocked_by_reason),
       upfrontCampaigns: c.upfront_campaigns ?? 0,
       activeCampaigns: c.active_campaigns ?? 0,
+      signOffMissingName: c.sign_off_missing_name ?? 0,
     },
     stats: {
       pending: s.pending ?? 0,

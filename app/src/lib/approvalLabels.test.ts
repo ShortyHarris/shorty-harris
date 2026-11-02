@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   APPROVAL_TYPE_LABEL, APPROVAL_STEP_ORDER, approvalTypeLabel, APPROVAL_EXPLAINER,
-  rejectedTotalsLine, bulkApproveBlockedReason, REJECTED_BY_PERSON,
+  rejectedTotalsLine, bulkApproveBlockedReason, REJECTED_BY_PERSON, signOffMissingLine, SIGN_OFF_MISSING_BADGE,
 } from './approvalLabels';
 
 describe('approval type labels', () => {
@@ -60,5 +60,17 @@ describe('why bulk Approve is off', () => {
     const r = bulkApproveBlockedReason({ ...base, capped: true, loaded: 200, totalPending: 340 });
     expect(r?.kind).toBe('capped');
     expect(r?.text).toContain('Only 200 of 340 drafts are loaded');
+  });
+});
+
+describe('sign-off without the sender name', () => {
+  it('says nothing when every draft is signed with the name', () => {
+    expect(signOffMissingLine(0)).toBeNull();
+  });
+
+  it('counts the drafts and points at the row badge', () => {
+    expect(signOffMissingLine(9)).toContain("9 drafts don't end with your name");
+    expect(signOffMissingLine(9)).toContain(SIGN_OFF_MISSING_BADGE);
+    expect(signOffMissingLine(1)).toContain("1 draft doesn't");
   });
 });

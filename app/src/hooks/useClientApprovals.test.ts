@@ -188,6 +188,7 @@ describe('parseApprovedQueue: shape', () => {
       approved: 0, sendable: 0, scheduled: 0, blocked: 0, policyHeld: 0, pending: 0, pendingPolicyHeld: 0, awaitingProspects: 0,
       awaitingProspectsByCampaign: {},
       approvedInitialsWaiting: 0, pendingFollowups: 0, blockedByReason: {}, upfrontCampaigns: 0, activeCampaigns: 0,
+      signOffMissingName: 0,
     });
     expect(q.isAdmin).toBe(false);
   });
@@ -207,5 +208,19 @@ describe('Approved and Blocked sort options', () => {
   it('defaults to newest approval first', () => {
     expect(DEFAULT_QUEUE_SORT).toBe('approved_desc');
     expect(QUEUE_SORT_OPTIONS.some((o) => o.value === DEFAULT_QUEUE_SORT)).toBe(true);
+  });
+});
+
+describe('drafts without the sender name in the sign-off', () => {
+  it('keeps the per-row flag and the count, so Approvals can mark them', () => {
+    const q = parseApprovedQueue(body({
+      counts: { sign_off_missing_name: 9 },
+      rows: [
+        { id: 'm1', prospect_id: 'p1', body: 'S přáním krásného dne,\nTUTEL s.r.o.', sign_off_missing_name: true, prospect: { id: 'p1', business_name: 'A' } },
+        { id: 'm2', prospect_id: 'p2', body: 'S přáním krásného dne,\nMartin\nTUTEL s.r.o.', sign_off_missing_name: false, prospect: { id: 'p2', business_name: 'B' } },
+      ],
+    }));
+    expect(q.counts.signOffMissingName).toBe(9);
+    expect(q.items.map((i) => i.sign_off_missing_name)).toEqual([true, false]);
   });
 });

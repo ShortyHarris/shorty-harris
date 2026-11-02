@@ -123,6 +123,8 @@ export interface ClientMessageItem {
   campaign_status?: string | null;
   /** From approved_queue: held by the generic/freemail send rules. Only ever true for admins. */
   policy_held?: boolean;
+  /** From approved_queue: the client has a sender name but this draft's sign-off doesn't include it. */
+  sign_off_missing_name?: boolean;
   approved_at?: string | null;
   prospect: {
     id: string;

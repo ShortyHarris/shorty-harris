@@ -27,14 +27,14 @@ import { partialFailureMessage } from '../../lib/chunkedBulk';
 import type { ClientMessageItem } from '../../types';
 import {
   approvalTypeLabel, APPROVAL_STEP_ORDER, APPROVAL_EXPLAINER, rejectedTotalsLine, REJECTED_TOTALS_HINT,
-  bulkApproveBlockedReason,
+  bulkApproveBlockedReason, signOffMissingLine,
 } from '../../lib/approvalLabels';
 import {
   applyApprovalView, DEFAULT_APPROVAL_SORT, APPROVAL_SORT_OPTIONS,
   type ApprovalSort, type ApprovalTypeFilter,
 } from '../../lib/approvalsView';
 import { ModalClose } from '../../components/ModalClose';
-import { ScheduledCell, HeldBadge, AnglePill, ObservationDetails } from '../../components/ApprovalCells';
+import { ScheduledCell, HeldBadge, AnglePill, ObservationDetails, SignOffWarning } from '../../components/ApprovalCells';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
@@ -430,6 +430,18 @@ export function Approvals({
         </div>
       )}
 
+      {/* Drafts whose sign-off is missing the sender's name: caught here before anyone approves them. */}
+      {!loading && approvedQueue && signOffMissingLine(approvedQueue.counts.signOffMissingName) && (
+        <p
+          role="status"
+          data-testid="sign-off-missing"
+          className="m-0 flex items-start gap-2 rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3 text-[13px] leading-relaxed text-(--ad-ink)"
+        >
+          <AlertCircle size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
+          <span>{signOffMissingLine(approvedQueue.counts.signOffMissingName)}</span>
+        </p>
+      )}
+
       {/* Follow-ups switch, above the tabs so it is visible whichever tab is open. */}
       {!loading && followUps && (
         <div
@@ -666,6 +678,7 @@ export function Approvals({
                         <AnglePill angle={item.angle} />
                       </div>
                       <BlockBadge reason={item.block_reason} campaignStatus={item.campaign_status} className="mt-1" />
+                      {item.sign_off_missing_name && <SignOffWarning className="mt-1" />}
                       {isAdmin && <HeldBadge row={schedule.get(item.id)} settingsPath={readOnly ? null : `${basePath}/settings`} className="mt-1" />}
                     </td>
                     <td className="px-3" onClick={(e) => e.stopPropagation()}>
@@ -733,6 +746,7 @@ export function Approvals({
                   <div className="mt-1.5 truncate text-[12px] text-(--ad-ink-soft)">{item.subject}</div>
                 )}
                 <BlockBadge reason={item.block_reason} campaignStatus={item.campaign_status} className="mt-1.5" />
+                {item.sign_off_missing_name && <SignOffWarning className="mt-1.5" />}
                 {isAdmin && <HeldBadge row={schedule.get(item.id)} settingsPath={readOnly ? null : `${basePath}/settings`} className="mt-1.5" />}
                 <div className="mt-3 flex items-center gap-2 border-t border-(--ad-surface-2) pt-3">
                   {isPendingTab && (<>

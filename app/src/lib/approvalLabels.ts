@@ -57,3 +57,16 @@ export function bulkApproveBlockedReason(s: {
   }
   return null;
 }
+
+// A draft whose sign-off is missing the sender's first name (flagged by approved_queue when the
+// client has a representative name). New drafts get the name added automatically; this catches any
+// that still slip through, e.g. a draft cut off before its sign-off.
+export const SIGN_OFF_MISSING_BADGE = 'No name in sign-off';
+export const SIGN_OFF_MISSING_TITLE =
+  "This draft doesn't end with your name. Edit it to add your name above the company name, or reject it.";
+
+/** The note above the tabs, or null when every draft is signed with the name. */
+export function signOffMissingLine(n: number): string | null {
+  if (n <= 0) return null;
+  return `${n} draft${n === 1 ? " doesn't" : "s don't"} end with your name in the sign-off. They're marked "${SIGN_OFF_MISSING_BADGE}" below: edit to add it, or reject.`;
+}
