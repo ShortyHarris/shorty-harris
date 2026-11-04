@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { nextStepLabel, nextStepBlock, hasSent, sentCount, describeResult, type SandboxProspect, type SandboxMessage } from './useSandbox';
+import {
+  nextStepLabel, nextStepBlock, hasSent, sentCount, describeResult, clockAheadLabel, sandboxTimeLabel,
+  type SandboxProspect, type SandboxMessage,
+} from './useSandbox';
 
 const msg = (approval_status: string, send_status: string): SandboxMessage => ({
   approval_status, send_status, message_type: 'initial', created_at: '2026-11-04T00:00:00Z',
@@ -87,5 +90,27 @@ describe('describeResult', () => {
     expect(describeResult({ ok: false, error: 'nothing_to_do' })).toBe('Nothing to do for this prospect right now.');
     expect(describeResult({ ok: false, error: 'not_a_sandbox_client' })).toBe('This only works on a sandbox account.');
     expect(describeResult({ ok: false, error: 'weird' })).toBe('Could not do that (weird).');
+  });
+});
+
+describe('clockAheadLabel', () => {
+  it('reads days and hours', () => {
+    expect(clockAheadLabel(0)).toBe('today');
+    expect(clockAheadLabel(60)).toBe('1 hour ahead');
+    expect(clockAheadLabel(1440)).toBe('1 day ahead');
+    expect(clockAheadLabel(2 * 1440 + 180)).toBe('2 days 3 hours ahead');
+    expect(clockAheadLabel(25)).toBe('25 min ahead');
+  });
+});
+
+describe('sandboxTimeLabel', () => {
+  const now = new Date('2026-11-05T21:00:00Z'); // Thu 15:00 in Chicago
+  it('shows the sandbox clock in the account time zone', () => {
+    expect(sandboxTimeLabel(0, 'America/Chicago', now)).toBe('Thu 5 Nov, 15:00');
+    expect(sandboxTimeLabel(180, 'America/Chicago', now)).toBe('Thu 5 Nov, 18:00');
+    expect(sandboxTimeLabel(18 * 60, 'America/Chicago', now)).toBe('Fri 6 Nov, 09:00');
+  });
+  it('falls back to Chicago for an unknown time zone', () => {
+    expect(sandboxTimeLabel(0, 'Not/AZone', now)).toBe('Thu 5 Nov, 15:00');
   });
 });

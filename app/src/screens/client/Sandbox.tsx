@@ -8,7 +8,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useToast, ToastHost } from '../../components/Toast';
 import { useSendPacing } from '../../hooks/useSendPacing';
 import {
-  useSandbox, nextStepLabel, nextStepBlock, hasSent, sentCount, describeResult,
+  useSandbox, nextStepLabel, nextStepBlock, hasSent, sentCount, describeResult, clockAheadLabel, sandboxTimeLabel,
   type ReplyKind, type SandboxResult,
 } from '../../hooks/useSandbox';
 
@@ -47,7 +47,10 @@ export function Sandbox({
   readOnly?: boolean;
   basePath?: string;
 }) {
-  const { prospects, daysAdvanced, warmupOn, loading, error, reset, advanceTime, setWarmup, nextStep, simulateReply } = useSandbox(clientId, true, client);
+  const {
+    prospects, minutesAdvanced, warmupOn, loading, error, reset, advanceTime, advanceHours, jumpToSendWindow,
+    setWarmup, nextStep, simulateReply,
+  } = useSandbox(clientId, true, client);
   // Today's warm-up limit and day, from the same send_pacing the Approvals Sending panel uses.
   const { pacing } = useSendPacing(clientId, client);
   const { toasts, toast, dismiss } = useToast();
@@ -89,44 +92,57 @@ export function Sandbox({
         </button>
       </header>
 
-      {/* Clock and warm-up side by side on wide screens, stacked on phones. */}
+      {/* Clock and sending rules side by side on wide screens, stacked on phones. */}
       <div className="grid gap-4 xl:grid-cols-2">
       {/* Time travel: shifts the account's whole timeline, so production's own rules
-          (3/5/7 business days, approval reminders, recalculation) run unmodified. */}
+          (3/5/7 business days, approval reminders, recalculation) run unmodified. The
+          sandbox also keeps its own time of day, which the 9-5 send window follows. */}
       <section className="flex flex-col justify-between gap-3 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3.5">
         <div className="flex min-w-0 items-start gap-3">
           <Clock size={18} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
           <div className="min-w-0">
             <div className="text-[14px] font-semibold text-(--ad-ink)">
-              Sandbox clock: {daysAdvanced === 0 ? 'today' : `${daysAdvanced} day${daysAdvanced === 1 ? '' : 's'} ahead`}
+              Sandbox time: {sandboxTimeLabel(minutesAdvanced, pacing?.time_zone ?? 'America/Chicago')}
+              <span className="font-normal text-(--ad-ink-soft)">
+                {' '}· {clockAheadLabel(minutesAdvanced)}
+                {pacing && warmupOn ? (pacing.today.in_window_now ? ' · sending hours' : ' · outside sending hours') : ''}
+              </span>
             </div>
             <p className="m-0 mt-0.5 text-[12.5px] leading-relaxed text-(--ad-ink-soft)">
-              Moves every send, draft and schedule on this account back in time. The real follow-up rules then apply:
-              leave a draft unapproved and advance 10 days to test an overdue approval. Reset puts the clock back.
+              Moves every send, draft and schedule on this account back in time, so the real follow-up rules apply:
+              leave a draft unapproved and advance 10 days to test an overdue approval. With real sending rules,
+              emails only go 9am to 5pm Mon-Fri on this clock. Reset puts the clock back to now.
             </p>
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          {[1, 3, 7].map((d) => (
+          {[
+            { key: 'h1', label: '+1 hour', action: () => advanceHours(1) },
+            { key: 'h4', label: '+4 hours', action: () => advanceHours(4) },
+            { key: 'd1', label: '+1 day', action: () => advanceTime(1) },
+            { key: 'd3', label: '+3 days', action: () => advanceTime(3) },
+            { key: 'd7', label: '+7 days', action: () => advanceTime(7) },
+            { key: 'nine', label: 'Next 9am', action: () => jumpToSendWindow() },
+          ].map((b) => (
             <button
-              key={d}
-              onClick={() => run(`advance-${d}`, () => advanceTime(d))}
+              key={b.key}
+              onClick={() => run(`advance-${b.key}`, b.action)}
               disabled={readOnly || busy !== null}
               className={`${btn} border border-(--ad-line) bg-transparent whitespace-nowrap text-(--ad-ink) hover:bg-(--ad-surface-2)`}
             >
-              {busy === `advance-${d}` ? 'Working…' : `+${d} day${d === 1 ? '' : 's'}`}
+              {busy === `advance-${b.key}` ? 'Working…' : b.label}
             </button>
           ))}
         </div>
       </section>
 
-      {/* Warm-up: real daily limits that step up with the sandbox clock, or fast mode. */}
+      {/* Sending rules: the real warm-up and send hours, or fast mode with neither. */}
       <section className="flex flex-col justify-between gap-3 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3.5">
         <div className="flex min-w-0 items-start gap-3">
           <Gauge size={18} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
           <div className="min-w-0">
             <div className="text-[14px] font-semibold text-(--ad-ink)">
-              Mailbox warm-up: {warmupOn ? 'on' : 'off (fast testing)'}
+              Sending rules: {warmupOn ? 'real' : 'fast testing'}
               {pacing && (
                 <span className="font-normal text-(--ad-ink-soft)">
                   {' '}· {pacing.today.sent} of {pacing.today.cap} sent today
@@ -136,8 +152,8 @@ export function Sandbox({
             </div>
             <p className="m-0 mt-0.5 text-[12.5px] leading-relaxed text-(--ad-ink-soft)">
               {warmupOn
-                ? 'Real limits, as for a new customer mailbox: 5 a day in week 1, then 10, 20, 30 and 40, spaced out through the day. Advance the clock to watch it step up.'
-                : 'Up to 100 emails a day with no spacing, for quick testing. Switch warm-up on to test the real limits.'}
+                ? 'As for a new customer: warm-up of 5 a day in week 1, then 10, 20, 30 and 40, spaced through the day, and only 9am to 5pm Mon-Fri on the sandbox clock. Advance the clock to watch it work.'
+                : 'Up to 100 emails a day at any hour, with no spacing, for quick testing. Switch to real rules to test warm-up and sending hours.'}
             </p>
           </div>
         </div>
@@ -146,7 +162,7 @@ export function Sandbox({
           disabled={readOnly || busy !== null}
           className={`${btn} shrink-0 self-start border border-(--ad-line) bg-transparent whitespace-nowrap text-(--ad-ink) hover:bg-(--ad-surface-2)`}
         >
-          {busy === 'warmup' ? 'Working…' : warmupOn ? 'Switch to fast mode' : 'Switch warm-up on'}
+          {busy === 'warmup' ? 'Working…' : warmupOn ? 'Switch to fast mode' : 'Switch to real rules'}
         </button>
       </section>
       </div>

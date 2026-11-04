@@ -138,6 +138,30 @@ export function describeResult(r: SandboxResult): string {
   }
 }
 
+/** "today" or "2 days 3 hours ahead" for a clock offset in minutes. */
+export function clockAheadLabel(minutes: number): string {
+  const m = Math.max(0, Math.round(minutes));
+  if (m === 0) return 'today';
+  const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
+  const parts: string[] = [];
+  if (d) parts.push(`${d} day${d === 1 ? '' : 's'}`);
+  if (h) parts.push(`${h} hour${h === 1 ? '' : 's'}`);
+  if (!d && !h) parts.push(`${mm} min`);
+  return `${parts.join(' ')} ahead`;
+}
+
+/** The sandbox's own date and time ("Thu 6 Nov, 17:40") in the account's send time zone. */
+export function sandboxTimeLabel(minutes: number, timeZone: string, now: Date = new Date()): string {
+  const t = new Date(now.getTime() + minutes * 60000);
+  const fmt = (tz: string) => new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(t);
+  let parts: Intl.DateTimeFormatPart[];
+  try { parts = fmt(timeZone); } catch { parts = fmt('America/Chicago'); }
+  const g = (type: string) => parts.find((x) => x.type === type)?.value ?? '';
+  return `${g('weekday')} ${g('day')} ${g('month')}, ${g('hour')}:${g('minute')}`;
+}
+
 export function useSandbox(clientId: string, enabled: boolean, client: SupabaseClient = supabase) {
   const { data, isLoading, error } = useQuery({
     queryKey: sandboxProspectsKey(clientId),
@@ -148,13 +172,18 @@ export function useSandbox(clientId: string, enabled: boolean, client: SupabaseC
     refetchInterval: 4000,
   });
 
-  // How far the sandbox clock has been moved forward (sandbox_advance_time).
+  // How far the sandbox clock has been moved forward, in minutes (sandbox_shift_clock).
   const { data: clock } = useQuery({
     queryKey: ['sandbox-clock', clientId],
     queryFn: async () => {
-      const { data: row } = await client.from('clients').select('sandbox_days_advanced, sandbox_warmup').eq('id', clientId).maybeSingle();
-      const r = row as { sandbox_days_advanced?: number; sandbox_warmup?: boolean } | null;
-      return { days: Number(r?.sandbox_days_advanced ?? 0), warmup: r?.sandbox_warmup !== false };
+      const { data: row } = await client
+        .from('clients')
+        .select('sandbox_days_advanced, sandbox_minutes_advanced, sandbox_warmup')
+        .eq('id', clientId)
+        .maybeSingle();
+      const r = row as { sandbox_days_advanced?: number; sandbox_minutes_advanced?: number; sandbox_warmup?: boolean } | null;
+      const minutes = Number(r?.sandbox_minutes_advanced ?? 0) || Number(r?.sandbox_days_advanced ?? 0) * 1440;
+      return { minutes, warmup: r?.sandbox_warmup !== false };
     },
     enabled: enabled && !!clientId,
     refetchInterval: 4000,
@@ -175,12 +204,14 @@ export function useSandbox(clientId: string, enabled: boolean, client: SupabaseC
 
   return {
     prospects: data ?? [],
-    daysAdvanced: clock?.days ?? 0,
+    minutesAdvanced: clock?.minutes ?? 0,
     warmupOn: clock?.warmup ?? true,
     loading: isLoading,
     error: error ? (error as Error).message : null,
     reset: () => call('sandbox_reset', { p_client_id: clientId }),
     advanceTime: (days: number) => call('sandbox_advance_time', { p_client_id: clientId, p_days: days }),
+    advanceHours: (hours: number) => call('sandbox_advance_hours', { p_client_id: clientId, p_hours: hours }),
+    jumpToSendWindow: () => call('sandbox_jump_to_send_window', { p_client_id: clientId }),
     setWarmup: (on: boolean) => call('sandbox_set_warmup', { p_client_id: clientId, p_on: on }),
     nextStep: (prospectId: string) => call('sandbox_next_step', { p_prospect_id: prospectId }),
     simulateReply: (prospectId: string, kind: ReplyKind) =>
