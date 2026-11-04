@@ -258,7 +258,7 @@ function ScrapeSummaryModal({
               {d.repeatedlyFailing && (
                 <span
                   title={`Failed ${campaign.scrape_attempt_count} times in a row`}
-                  className="inline-flex items-center rounded-full bg-(--ad-clay) px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[.04em] text-white"
+                  className="inline-flex items-center rounded-full bg-(--ad-clay) px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[.04em] text-(--ad-surface)"
                 >
                   Repeated
                 </span>
@@ -1275,7 +1275,7 @@ function DeleteCampaignModal({
         <button
           onClick={confirm}
           disabled={busy || !counts}
-          className="cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
+          className="cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-(--ad-surface) transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
         >
           {busy ? 'Deleting…' : `Delete campaign and all prospects`}
         </button>

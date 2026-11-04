@@ -840,7 +840,7 @@ function ReviewModal({
               <button
                 onClick={onReject}
                 disabled={busy}
-                className="cursor-pointer rounded-xl border border-(--ad-clay) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-clay) transition-colors hover:bg-(--ad-clay) hover:text-white disabled:opacity-50"
+                className="cursor-pointer rounded-xl border border-(--ad-clay) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-clay) transition-colors hover:bg-(--ad-clay) hover:text-(--ad-surface) disabled:opacity-50"
               >
                 Reject
               </button>
@@ -942,7 +942,7 @@ function RejectModal({
           <button
             onClick={() => onConfirm(reason.trim())}
             disabled={busy || !reason.trim()}
-            className="cursor-pointer rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
+            className="cursor-pointer rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-(--ad-surface) transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
           >
             {busy ? 'Rejecting…' : 'Reject post'}
           </button>
@@ -990,7 +990,7 @@ function DeleteModal({
           <button
             onClick={onConfirm}
             disabled={busy}
-            className="cursor-pointer rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
+            className="cursor-pointer rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-(--ad-surface) transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50"
           >
             {busy ? 'Deleting…' : isPublished ? 'Delete post' : 'Delete draft'}
           </button>
