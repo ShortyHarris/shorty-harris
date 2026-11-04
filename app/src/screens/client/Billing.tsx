@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { useBilling, type PaymentRow, type LedgerRow } from '../../hooks/useBilling';
+import { useClientHeader } from '../../hooks/useClientHeader';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
@@ -69,6 +70,8 @@ export function Billing({
 }: { clientId: string; onCreditsChanged?: () => void; client?: SupabaseClient; readOnly?: boolean }) {
   const { data, loading, isFetching, dataUpdatedAt, error, reload } = useBilling(clientId, client);
   const { toasts, toast, dismiss } = useToast();
+  // A sandbox account never opens Stripe: Buy records a no-charge purchase instead.
+  const { isSandbox } = useClientHeader(clientId, client);
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh billing.');
   const [selected, setSelected]           = useState<number>(5);
   const [checkoutBusy, setCheckoutBusy]   = useState(false);
@@ -111,6 +114,23 @@ export function Billing({
     if (readOnly) return;
     setCheckoutBusy(true);
     setCheckoutError(null);
+    if (isSandbox) {
+      // Same end state as coming back from a paid Stripe checkout (see the
+      // status=success effect above), without leaving the app or charging a card.
+      const { data: res, error: err } = await supabase.rpc('sandbox_simulate_purchase', {
+        p_client_id: clientId, p_credits: pack.credits,
+      });
+      setCheckoutBusy(false);
+      const r = res as { ok?: boolean; error?: string } | null;
+      if (err || !r?.ok) {
+        setCheckoutError(`Could not record the sandbox purchase (${err?.message ?? r?.error ?? 'unknown error'}).`);
+        return;
+      }
+      setBanner({ kind: 'success', text: 'Payment received - your credits have been added. (Sandbox: no card was charged.)' });
+      reload();
+      onCreditsChanged?.();
+      return;
+    }
     try {
  const endpoint = 'https://n8n.shortyharris.com/webhook/wf7-create-checkout';
       const res = await fetch(endpoint, {
@@ -197,7 +217,7 @@ export function Billing({
           <button className="checkout-btn rounded-lg" onClick={startCheckout} disabled={checkoutBusy || readOnly}>
             {!checkoutBusy && <LockIcon />}
             {checkoutBusy
-              ? 'Starting secure checkout…'
+              ? (isSandbox ? 'Recording sandbox purchase…' : 'Starting secure checkout…')
               : `Buy ${selected} credits - $${pack.priceUsd}`}
           </button>
           {readOnly && (
@@ -207,7 +227,9 @@ export function Billing({
             <p className="checkout-note checkout-note-error">{checkoutError}</p>
           )}
           <p className="checkout-note">
-            Secure checkout via Stripe. Credits are added immediately on success.
+            {isSandbox
+              ? 'Sandbox account: buying skips Stripe and no card is charged. The credits and the receipt are added exactly as after a real payment.'
+              : 'Secure checkout via Stripe. Credits are added immediately on success.'}
           </p>
         </div>
       </div>

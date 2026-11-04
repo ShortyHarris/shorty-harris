@@ -16,6 +16,7 @@ const FONT = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 const REPLY_OPTIONS: { kind: ReplyKind; label: string }[] = [
   { kind: 'interested', label: 'Interested' },
   { kind: 'not_interested', label: 'Not interested' },
+  { kind: 'unsubscribe', label: 'Unsubscribe' },
   { kind: 'auto_reply', label: 'Out of office' },
   { kind: 'bounce', label: 'Bounce' },
 ];

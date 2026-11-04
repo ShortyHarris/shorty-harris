@@ -8,7 +8,7 @@ import { queryClient } from '../lib/queryClient';
    a live client does nothing. See
    supabase/migrations/20261104142603_sandbox_simulate_and_next_step.sql. */
 
-export type ReplyKind = 'interested' | 'not_interested' | 'auto_reply' | 'bounce';
+export type ReplyKind = 'interested' | 'not_interested' | 'unsubscribe' | 'auto_reply' | 'bounce';
 
 export interface SandboxMessage {
   approval_status: string;
