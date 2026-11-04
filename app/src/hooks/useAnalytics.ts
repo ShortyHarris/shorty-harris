@@ -18,14 +18,23 @@ export interface ABTestView {
 }
 
 async function fetchAnalytics(): Promise<Analytics> {
+  // Sandbox accounts (clients.is_sandbox) are test activity: they stay visible in the
+  // admin lists but must not count towards platform reporting.
+  const { data: sandboxRows } = await supabase.from('clients').select('id').eq('is_sandbox', true);
+  const sandboxIds = (sandboxRows ?? []).map((r: { id: string }) => r.id);
+  const notSandbox = sandboxIds.length ? `(${sandboxIds.join(',')})` : null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const real = <Q extends { not: (col: string, op: string, val: string) => any }>(q: Q): Q =>
+    (notSandbox ? q.not('client_id', 'in', notSandbox) : q);
+
   const [sentR, repliesR, hotR, wonR, clientsR, intentsR, testsR, variantsR, metricsR] = await Promise.all([
-    supabase.from('messages').select('id', { count: 'exact', head: true }).eq('send_status', 'sent'),
-    supabase.from('replies').select('id', { count: 'exact', head: true }),
-    supabase.from('hot_leads').select('id', { count: 'exact', head: true }),
-    supabase.from('hot_leads').select('id', { count: 'exact', head: true }).eq('status', 'won'),
-    supabase.from('clients').select('id, business_name'),
-    supabase.from('replies')
-      .select('id, intent, body, received_at, created_at, prospect:prospects ( business_name, contact_name )')
+    real(supabase.from('messages').select('id', { count: 'exact', head: true }).eq('send_status', 'sent')),
+    real(supabase.from('replies').select('id', { count: 'exact', head: true })),
+    real(supabase.from('hot_leads').select('id', { count: 'exact', head: true })),
+    real(supabase.from('hot_leads').select('id', { count: 'exact', head: true }).eq('status', 'won')),
+    supabase.from('clients').select('id, business_name').eq('is_sandbox', false),
+    real(supabase.from('replies')
+      .select('id, intent, body, received_at, created_at, prospect:prospects ( business_name, contact_name )'))
       .order('received_at', { ascending: false }),
     supabase.from('ab_tests').select('id, name, status'),
     supabase.from('ab_variants').select('id, test_id, variant_key'),
