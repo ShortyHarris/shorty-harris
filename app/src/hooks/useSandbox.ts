@@ -22,6 +22,7 @@ export interface SandboxProspect {
   business_name: string;
   email: string;
   pipeline_status: string;
+  followups_stopped?: boolean;
   messages: SandboxMessage[];
 }
 
@@ -40,19 +41,45 @@ export const sandboxProspectsKey = (clientId: string) => ['sandbox-prospects', c
 async function fetchSandboxProspects(clientId: string, client: SupabaseClient): Promise<SandboxProspect[]> {
   const { data, error } = await client
     .from('prospects')
-    .select('id, business_name, email, pipeline_status, messages(approval_status, send_status, message_type, created_at)')
+    .select('id, business_name, email, pipeline_status, followups_stopped, messages(approval_status, send_status, message_type, created_at)')
     .eq('client_id', clientId)
     .order('email', { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []) as SandboxProspect[];
 }
 
-const FINISHED = new Set(['bounced', 'won', 'lost']);
+export interface StepBlock { label: string; reason: string }
+
+/* When Run next step can do nothing for this prospect, and why. Matches the checks
+   at the top of sandbox_next_step, which refuses with the same reasons. */
+export function nextStepBlock(p: SandboxProspect): StepBlock | null {
+  switch (p.pipeline_status) {
+    case 'bounced':
+      return { label: 'Bounced', reason: 'The email bounced, so nothing more is sent to this address. Press Reset to start again.' };
+    case 'won':
+    case 'lost':
+      return { label: p.pipeline_status === 'won' ? 'Won' : 'Lost', reason: 'This prospect is closed, so the sequence is over.' };
+    case 'hot_lead':
+      return {
+        label: 'Hot lead: no more follow-ups',
+        reason: 'They replied with interest, so follow-ups stop automatically. In real use the client replies to them personally.',
+      };
+    case 'called':
+      return { label: 'Called: no more follow-ups', reason: 'This prospect was marked as called, so follow-ups stop.' };
+  }
+  if (p.followups_stopped && hasSent(p)) {
+    return {
+      label: 'Follow-ups stopped',
+      reason: 'Follow-ups are stopped for this prospect, for example after a not-interested reply or when stopped by hand.',
+    };
+  }
+  return null;
+}
 
 /* Mirrors the branch order in sandbox_next_step, so the button says what the
    next press will actually do. The RPC stays the source of truth. */
 export function nextStepLabel(p: SandboxProspect): string | null {
-  if (FINISHED.has(p.pipeline_status)) return null;
+  if (nextStepBlock(p)) return null;
   const msgs = p.messages ?? [];
   if (msgs.length === 0) return 'Write first email';
   if (msgs.some((m) => m.approval_status === 'pending' && m.send_status === 'not_sent')) return 'Approve draft';
@@ -79,6 +106,7 @@ export function describeResult(r: SandboxResult): string {
   if (r.detail) return r.detail;
   switch (r.error) {
     case 'nothing_to_do': return 'Nothing to do for this prospect right now.';
+    case 'followups_stopped': return 'Follow-ups are stopped for this prospect, so there is no next step.';
     case 'not_a_sandbox_prospect_or_not_permitted':
     case 'not_a_sandbox_client':
     case 'not_permitted': return 'This only works on a sandbox account.';

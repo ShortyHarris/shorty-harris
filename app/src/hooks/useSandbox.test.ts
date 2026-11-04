@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextStepLabel, hasSent, sentCount, describeResult, type SandboxProspect, type SandboxMessage } from './useSandbox';
+import { nextStepLabel, nextStepBlock, hasSent, sentCount, describeResult, type SandboxProspect, type SandboxMessage } from './useSandbox';
 
 const msg = (approval_status: string, send_status: string): SandboxMessage => ({
   approval_status, send_status, message_type: 'initial', created_at: '2026-11-04T00:00:00Z',
@@ -22,6 +22,29 @@ describe('nextStepLabel', () => {
 
   it('has nothing to offer once a prospect is finished', () => {
     for (const s of ['bounced', 'won', 'lost']) expect(nextStepLabel(prospect(s, [msg('approved', 'sent')]))).toBeNull();
+  });
+});
+
+describe('nextStepBlock', () => {
+  it('explains that a hot lead gets no more follow-ups', () => {
+    const p = prospect('hot_lead', [msg('approved', 'sent')]);
+    expect(nextStepBlock(p)?.label).toBe('Hot lead: no more follow-ups');
+    expect(nextStepLabel(p)).toBeNull();
+  });
+
+  it('blocks once follow-ups are stopped and something was sent', () => {
+    const p = { ...prospect('replied', [msg('approved', 'sent')]), followups_stopped: true };
+    expect(nextStepBlock(p)?.label).toBe('Follow-ups stopped');
+  });
+
+  it('lets an out-of-office reply carry on with the sequence', () => {
+    const p = { ...prospect('replied', [msg('approved', 'sent')]), followups_stopped: false };
+    expect(nextStepBlock(p)).toBeNull();
+    expect(nextStepLabel(p)).toBe('Make follow-up due');
+  });
+
+  it('does not block before anything was sent', () => {
+    expect(nextStepBlock({ ...prospect('new', []), followups_stopped: true })).toBeNull();
   });
 });
 

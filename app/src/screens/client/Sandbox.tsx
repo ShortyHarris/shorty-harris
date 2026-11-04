@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { FlaskConical, Play, RotateCcw, MessageSquareReply } from 'lucide-react';
+import { FlaskConical, Play, RotateCcw, MessageSquareReply, Ban } from 'lucide-react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useToast, ToastHost } from '../../components/Toast';
 import {
-  useSandbox, nextStepLabel, hasSent, sentCount, describeResult,
+  useSandbox, nextStepLabel, nextStepBlock, hasSent, sentCount, describeResult,
   type ReplyKind, type SandboxResult,
 } from '../../hooks/useSandbox';
 
@@ -113,6 +113,7 @@ export function Sandbox({
             <tbody>
               {prospects.map((p) => {
                 const label = nextStepLabel(p);
+                const block = nextStepBlock(p);
                 const kind = replyKind[p.id] ?? 'interested';
                 const canReply = hasSent(p);
                 return (
@@ -126,14 +127,25 @@ export function Sandbox({
                     </td>
                     <td className="px-4 py-2.5 text-(--ad-ink)">{sentCount(p)}</td>
                     <td className="px-4 py-2.5">
-                      <button
-                        onClick={() => run(`next-${p.id}`, () => nextStep(p.id))}
-                        disabled={readOnly || busy !== null || label === null}
-                        className={`${btn} border-0 bg-(--ad-green) whitespace-nowrap text-white hover:bg-(--ad-green-hover)`}
-                      >
-                        <Play size={12} aria-hidden />
-                        {busy === `next-${p.id}` ? 'Working…' : (label ?? 'Finished')}
-                      </button>
+                      {block ? (
+                        // Not a disabled button: a greyed button reads as "try again later",
+                        // while this is a rule. Say what it is, with the reason on hover.
+                        <span title={block.reason} className="inline-flex max-w-[220px] cursor-help flex-col gap-0.5">
+                          <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-(--ad-ink)">
+                            <Ban size={12} aria-hidden /> {block.label}
+                          </span>
+                          <span className="text-[11.5px] leading-snug text-(--ad-ink-soft)">{block.reason}</span>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => run(`next-${p.id}`, () => nextStep(p.id))}
+                          disabled={readOnly || busy !== null || label === null}
+                          className={`${btn} border-0 bg-(--ad-green) whitespace-nowrap text-white hover:bg-(--ad-green-hover)`}
+                        >
+                          <Play size={12} aria-hidden />
+                          {busy === `next-${p.id}` ? 'Working…' : (label ?? 'Run next step')}
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
