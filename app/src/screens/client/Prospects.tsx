@@ -24,6 +24,7 @@ import { useGmailConnection } from '../../hooks/useGmailConnection';
 import { useToast, ToastHost } from '../../components/Toast';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { intentStyle } from '../../lib/replyIntents';
+import { panelBadgeSource, unwrittenFollowUpsText } from '../../lib/sequenceCopy';
 import {
   approveSequences, approveOneEmail, saveStepEdit, setSequencePaused, cancelUnsentSequence, resolveUncertainReply, stopFollowups,
 } from '../../hooks/useSequenceActions';
@@ -535,11 +536,14 @@ const GMAIL_REQUIRED_TITLE = "Connect your Gmail in Settings before approving - 
 function PanelStatusBadge({
   sequenceStatus, pipelineStatus,
 }: { sequenceStatus: string | null | undefined; pipelineStatus: string }) {
-  const seq = isSequenceStatus(sequenceStatus) ? sequenceStatus : null;
-  const pill = seq ? SEQUENCE_STATUS_PILL[seq] : STATUS_PILL[pipelineStatus] ?? { bg: 'var(--ad-surface-2)', text: 'var(--ad-ink-soft)' };
-  return (
-    <StatusPill pill={pill}>{seq ? SEQUENCE_STATUS_PANEL_LABEL[seq] : STATUS_LABEL[pipelineStatus] ?? pipelineStatus}</StatusPill>
-  );
+  // A hot lead (or another outcome) says more than "Replied, sequence stopped", so it wins,
+  // except over hard stops like unsubscribed or bounced. See lib/sequenceCopy.ts.
+  const src = panelBadgeSource(isSequenceStatus(sequenceStatus) ? sequenceStatus : null, pipelineStatus);
+  if (src.kind === 'sequence') {
+    return <StatusPill pill={SEQUENCE_STATUS_PILL[src.status]}>{SEQUENCE_STATUS_PANEL_LABEL[src.status]}</StatusPill>;
+  }
+  const pill = STATUS_PILL[src.status] ?? { bg: 'var(--ad-surface-2)', text: 'var(--ad-ink-soft)' };
+  return <StatusPill pill={pill}>{STATUS_LABEL[src.status] ?? src.status}</StatusPill>;
 }
 
 const STOPPED_BECAUSE_LABEL: Record<NonNullable<StoppedBecause>, string> = {
@@ -780,7 +784,11 @@ function SequencePanel({
                           <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-(--ad-ink-soft)" />
                         </div>
                         <p className="m-0 text-[13px] leading-relaxed" style={{ color: 'var(--ink-faint)' }}>
-                          {unwrittenSteps.length} follow-up{unwrittenSteps.length === 1 ? '' : 's'} will be written after the first email sends.
+                          {unwrittenFollowUpsText(unwrittenSteps.length, {
+                            stopped: !!sequence.stopped_because || !!sequence.followups_stopped,
+                            stoppedBecause: sequence.stopped_because,
+                            firstEmailSent: !!steps[0]?.sent_at,
+                          })}
                         </p>
                       </div>
                     )}
