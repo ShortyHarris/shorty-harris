@@ -499,6 +499,8 @@ export interface ClientListRow {
   auto_approve_campaigns: boolean;
   allow_generic_mailboxes: boolean;
   is_internal: boolean;
+  /** Test account: emails only reach the tester's own mailbox. */
+  is_sandbox: boolean;
   country: string | null;
   send_timezone: string;
   has_profile: boolean;
@@ -525,7 +527,7 @@ export function activationByClient(
 async function fetchClients(): Promise<ClientListRow[]> {
   const { data, error } = await supabase
     .from('clients')
-    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, representative_name, notification_channel, status, created_at, monthly_prospect_limit, max_campaigns, auto_approve_campaigns, allow_generic_mailboxes, is_internal, country, send_timezone')
+    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, representative_name, notification_channel, status, created_at, monthly_prospect_limit, max_campaigns, auto_approve_campaigns, allow_generic_mailboxes, is_internal, is_sandbox, country, send_timezone')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -692,6 +694,19 @@ export async function createClient(input: NewClientInput) {
   if (campaignError) return { error: campaignError };
 
   return { error: null, clientId };
+}
+
+/** Creates a sandbox customer for one tester (admin only); see admin_create_sandbox_client. */
+export async function createSandboxClient(
+  testerName: string, email: string,
+): Promise<{ error: string | null; clientId?: string; businessName?: string }> {
+  const { data, error } = await supabase.rpc('admin_create_sandbox_client', {
+    p_tester_name: testerName, p_contact_email: email,
+  });
+  if (error) return { error: error.message };
+  const r = data as { ok?: boolean; error?: string; detail?: string; client_id?: string; business_name?: string } | null;
+  if (!r?.ok) return { error: r?.detail ?? r?.error ?? 'Could not create the sandbox.' };
+  return { error: null, clientId: r.client_id, businessName: r.business_name };
 }
 
 export async function sendClientInvite(
