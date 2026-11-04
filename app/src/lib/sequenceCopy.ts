@@ -4,7 +4,8 @@
 
 import type { SequenceStatus } from './pipelineStatus';
 
-type StoppedBecause = 'they_replied_with_interest' | 'unsubscribed_or_bounced' | null | undefined;
+type StoppedBecause =
+  | 'they_replied_with_interest' | 'unsubscribed_or_bounced' | 'they_said_not_interested' | 'stopped' | null | undefined;
 
 // Pipeline outcomes that say more than "Replied, sequence stopped". A hot lead is the
 // reason follow-ups stopped, so the badge should say that.
@@ -31,11 +32,12 @@ export function unwrittenFollowUpsText(
 ): string {
   const s = count === 1 ? '' : 's';
   if (opts.stopped) {
-    const why = opts.stoppedBecause === 'they_replied_with_interest'
-      ? 'they replied with interest'
-      : opts.stoppedBecause === 'unsubscribed_or_bounced'
-        ? 'they unsubscribed or the email bounced'
-        : 'follow-ups were stopped';
+    const reasons: Partial<Record<NonNullable<StoppedBecause>, string>> = {
+      they_replied_with_interest: 'they replied with interest',
+      they_said_not_interested: 'they said they are not interested',
+      unsubscribed_or_bounced: 'they unsubscribed or the email bounced',
+    };
+    const why = (opts.stoppedBecause && reasons[opts.stoppedBecause]) || 'follow-ups were stopped';
     return `No more follow-ups will be written, because ${why}.`;
   }
   if (opts.firstEmailSent) {

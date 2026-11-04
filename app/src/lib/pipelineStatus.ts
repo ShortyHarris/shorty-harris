@@ -39,14 +39,15 @@ export const PIPELINE_STATUS_PILL: Record<string, StatusPillStyle> = {
 // Sequence status: what is happening to the outreach sequence, derived in the
 // database (see migration 20261008120000). When present it replaces the plain
 // pipeline status label. "Unsubscribed" and "Not interested" stay separate.
-export type SequenceStatus = 'unsubscribed' | 'hard_bounce' | 'automated_reply' | 'human_reply' | 'needs_review';
+export type SequenceStatus = 'unsubscribed' | 'hard_bounce' | 'automated_reply' | 'not_interested' | 'human_reply' | 'needs_review';
 
-export const SEQUENCE_STATUS_ORDER: SequenceStatus[] = ['needs_review', 'human_reply', 'automated_reply', 'unsubscribed', 'hard_bounce'];
+export const SEQUENCE_STATUS_ORDER: SequenceStatus[] = ['needs_review', 'human_reply', 'not_interested', 'automated_reply', 'unsubscribed', 'hard_bounce'];
 
 export const SEQUENCE_STATUS_LABEL: Record<SequenceStatus, string> = {
   unsubscribed: 'Unsubscribed, Outreach Suppressed',
   hard_bounce: 'Hard Bounce, Sending Stopped',
   automated_reply: 'Automated Reply, Sequence Continuing',
+  not_interested: 'Not Interested, Sequence Stopped',
   human_reply: 'Human Reply, Sequence Stopped',
   needs_review: 'Needs Your Review',
 };
@@ -56,6 +57,7 @@ export const SEQUENCE_STATUS_SHORT_LABEL: Record<SequenceStatus, string> = {
   unsubscribed: 'Unsubscribed',
   hard_bounce: 'Bounced',
   automated_reply: 'Auto-reply',
+  not_interested: 'Not interested',
   human_reply: 'Replied',
   needs_review: 'Needs your review',
 };
@@ -70,6 +72,7 @@ export const SEQUENCE_STATUS_PANEL_LABEL: Record<SequenceStatus, string> = {
   unsubscribed: 'Unsubscribed',
   hard_bounce: 'Bounced',
   automated_reply: 'Automated reply, sequence continues',
+  not_interested: 'Not interested, sequence stopped',
   human_reply: 'Replied, sequence stopped',
   needs_review: 'Needs your review',
 };
@@ -78,6 +81,7 @@ export const SEQUENCE_STATUS_PILL: Record<SequenceStatus, StatusPillStyle> = {
   unsubscribed:    { ...PILL.closed,  icon: 'minus' },
   hard_bounce:     { ...PILL.problem, icon: 'alert' },
   automated_reply: { ...PILL.ahead,   icon: 'refresh' },
+  not_interested:  { ...PILL.closed,  icon: 'minus' },
   human_reply:     { ...PILL.waiting, icon: 'reply' },
   needs_review:    { ...PILL.waiting, icon: 'clock' },
 };

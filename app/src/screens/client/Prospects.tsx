@@ -63,6 +63,7 @@ const FILTER_LABEL: Record<string, string> = {
   [DRAFTS_REJECTED_FILTER]: 'Drafts rejected',
   [`${SEQUENCE_FILTER_PREFIX}needs_review`]: 'Needs review',
   [`${SEQUENCE_FILTER_PREFIX}human_reply`]: 'Replied: real person',
+  [`${SEQUENCE_FILTER_PREFIX}not_interested`]: 'Replied: not interested',
   [`${SEQUENCE_FILTER_PREFIX}automated_reply`]: 'Replied: auto-reply',
   [`${SEQUENCE_FILTER_PREFIX}unsubscribed`]: 'Unsubscribed',
   [`${SEQUENCE_FILTER_PREFIX}hard_bounce`]: 'Bounced: sending stopped',
@@ -71,7 +72,7 @@ const FILTER_LABEL: Record<string, string> = {
 const PRIMARY_FILTERS = [AWAITING_APPROVAL_FILTER, `${SEQUENCE_FILTER_PREFIX}needs_review`, 'replied', 'contacted', 'message_pending'];
 const MORE_FILTERS = [
   'hot_lead', DRAFTS_REJECTED_FILTER, 'new', 'won', 'lost', 'bounced', 'generation_failed',
-  `${SEQUENCE_FILTER_PREFIX}human_reply`, `${SEQUENCE_FILTER_PREFIX}automated_reply`,
+  `${SEQUENCE_FILTER_PREFIX}human_reply`, `${SEQUENCE_FILTER_PREFIX}not_interested`, `${SEQUENCE_FILTER_PREFIX}automated_reply`,
   `${SEQUENCE_FILTER_PREFIX}unsubscribed`, `${SEQUENCE_FILTER_PREFIX}hard_bounce`,
 ];
 
@@ -549,6 +550,8 @@ function PanelStatusBadge({
 const STOPPED_BECAUSE_LABEL: Record<NonNullable<StoppedBecause>, string> = {
   they_replied_with_interest: 'Follow-ups stopped: they replied with interest',
   unsubscribed_or_bounced: 'Follow-ups stopped: unsubscribed or bounced',
+  they_said_not_interested: 'Follow-ups stopped: they said they are not interested',
+  stopped: 'Follow-ups stopped for this prospect',
 };
 
 function stepDateLabel(step: SequenceStep): string | null {

@@ -12,6 +12,10 @@ describe('panelBadgeSource', () => {
     expect(panelBadgeSource('needs_review', 'hot_lead')).toEqual({ kind: 'sequence', status: 'needs_review' });
   });
 
+  it('shows Not interested for a not-interested reply', () => {
+    expect(panelBadgeSource('not_interested', 'replied')).toEqual({ kind: 'sequence', status: 'not_interested' });
+  });
+
   it('uses the sequence status when there is no outcome, and the pipeline status otherwise', () => {
     expect(panelBadgeSource('automated_reply', 'contacted')).toEqual({ kind: 'sequence', status: 'automated_reply' });
     expect(panelBadgeSource(null, 'contacted')).toEqual({ kind: 'pipeline', status: 'contacted' });
@@ -25,6 +29,8 @@ describe('unwrittenFollowUpsText', () => {
       .toBe('No more follow-ups will be written, because they replied with interest.');
     expect(unwrittenFollowUpsText(2, { stopped: true, stoppedBecause: 'unsubscribed_or_bounced', firstEmailSent: true }))
       .toBe('No more follow-ups will be written, because they unsubscribed or the email bounced.');
+    expect(unwrittenFollowUpsText(2, { stopped: true, stoppedBecause: 'they_said_not_interested', firstEmailSent: true }))
+      .toBe('No more follow-ups will be written, because they said they are not interested.');
     expect(unwrittenFollowUpsText(1, { stopped: true, stoppedBecause: null, firstEmailSent: true }))
       .toBe('No more follow-ups will be written, because follow-ups were stopped.');
   });
