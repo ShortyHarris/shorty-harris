@@ -4,6 +4,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { useBilling, type PaymentRow, type LedgerRow } from '../../hooks/useBilling';
 import { useClientHeader } from '../../hooks/useClientHeader';
+import { AnimatePresence } from 'framer-motion';
+import { PurchaseSuccess } from '../../components/PurchaseSuccess';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
@@ -78,6 +80,9 @@ export function Billing({
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [searchParams, setSearchParams]   = useSearchParams();
   const [banner, setBanner]               = useState<{ kind: 'success' | 'cancel'; text: string } | null>(null);
+  // The success card after buying credits. balance is set for a sandbox purchase (the RPC
+  // returns it); after Stripe the live balance is used, as the webhook may land a moment later.
+  const [celebrate, setCelebrate] = useState<{ credits: number | null; balance: number | null; sandbox: boolean } | null>(null);
 
   const [paymentsFilter, setPaymentsFilter] = useState<DateFilter>('all');
   const [paymentsPage, setPaymentsPage]     = useState(1);
@@ -99,7 +104,8 @@ export function Billing({
   useEffect(() => {
     const status = searchParams.get('status');
     if (status === 'success') {
-      setBanner({ kind: 'success', text: 'Payment received - your credits have been added.' });
+      const bought = Number(searchParams.get('credits'));
+      setCelebrate({ credits: Number.isFinite(bought) && bought > 0 ? bought : null, balance: null, sandbox: false });
       const t = setTimeout(() => { reload(); onCreditsChanged?.(); }, 2500);
       setSearchParams({}, { replace: true });
       return () => clearTimeout(t);
@@ -121,12 +127,12 @@ export function Billing({
         p_client_id: clientId, p_credits: pack.credits,
       });
       setCheckoutBusy(false);
-      const r = res as { ok?: boolean; error?: string } | null;
+      const r = res as { ok?: boolean; error?: string; balance?: number } | null;
       if (err || !r?.ok) {
         setCheckoutError(`Could not record the sandbox purchase (${err?.message ?? r?.error ?? 'unknown error'}).`);
         return;
       }
-      setBanner({ kind: 'success', text: 'Payment received - your credits have been added. (Sandbox: no card was charged.)' });
+      setCelebrate({ credits: pack.credits, balance: typeof r.balance === 'number' ? r.balance : null, sandbox: true });
       reload();
       onCreditsChanged?.();
       return;
@@ -351,6 +357,19 @@ export function Billing({
           </div>
         </>
       )}
+
+      <AnimatePresence>
+        {celebrate && (
+          <PurchaseSuccess
+            key="purchase-success"
+            creditsAdded={celebrate.credits}
+            balance={celebrate.balance ?? (loading ? null : data?.credits ?? null)}
+            sandbox={celebrate.sandbox}
+            leadsHref="/app"
+            onClose={() => setCelebrate(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <ToastHost toasts={toasts} onDismiss={dismiss} />
     </main>
