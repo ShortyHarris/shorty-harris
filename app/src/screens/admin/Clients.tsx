@@ -14,6 +14,8 @@ import type {
 import { SkeletonTable } from '../../components/Skeleton';
 import { MobileFab } from '../../components/MobileFab';
 import { RowMenu } from '../../components/RowMenu';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { supabase } from '../../lib/supabase';
 import { SendingCard } from '../../components/SendingPanel';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { useToast, ToastHost } from '../../components/Toast';
@@ -79,6 +81,8 @@ export function Clients() {
   const [changeEmailTarget, setChangeEmailTarget] = useState<ClientListRow | null>(null);
   const [creditsTarget, setCreditsTarget] = useState<ClientListRow | null>(null);
   const [sendingTarget, setSendingTarget] = useState<ClientListRow | null>(null);
+  const [pauseTarget, setPauseTarget] = useState<ClientListRow | null>(null);
+  const [pauseBusy, setPauseBusy]     = useState(false);
   const [page, setPage]           = useState(1);
   const [invitePhase, setInvitePhase]   = useState<Record<string, InvitePhase>>({});
   const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
@@ -113,7 +117,30 @@ export function Clients() {
     }
   }
 
-  const pagBtnCls = 'cursor-pointer rounded-lg border border-(--ad-line-strong) bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-(--ad-ink) transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-40';
+  async function handlePauseToggle(c: ClientListRow) {
+    const pausing = c.status === 'active';
+    const next = pausing ? 'paused' : 'active';
+    setPauseBusy(true);
+    const { error: updErr } = await supabase.from('clients').update({ status: next }).eq('id', c.id);
+    if (updErr) {
+      setPauseBusy(false);
+      toast(`Couldn't ${pausing ? 'pause' : 'resume'} ${c.business_name}: ${updErr.message}`, 'error');
+      return;
+    }
+    // protect_client_admin_fields silently reverts status for non-admins, so a
+    // clean update isn't proof it stuck. Re-read the row to confirm.
+    const { data, error: readErr } = await supabase.from('clients').select('status').eq('id', c.id).single();
+    setPauseBusy(false);
+    setPauseTarget(null);
+    if (readErr || data?.status !== next) {
+      toast(`${c.business_name} was not ${pausing ? 'paused' : 'resumed'} - the change was not saved.`, 'error');
+    } else {
+      toast(`${c.business_name} ${pausing ? 'paused' : 'resumed'}.`);
+    }
+    reload();
+  }
+
+  const pagBtnCls ='cursor-pointer rounded-lg border border-(--ad-line-strong) bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-(--ad-ink) transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <div style={FONT} className="flex flex-col gap-6">
@@ -209,7 +236,18 @@ export function Clients() {
                         <RowMenu items={[
                           { type: 'action', label: 'View as client', onClick: () => navigate(`/admin/impersonate/${c.id}`) },
                           { type: 'action', label: 'Edit client', onClick: () => setEditClient(c) },
-                          { type: 'action', label: 'Sending', onClick: () => setSendingTarget(c) },
+                          { type: 'action', label: 'Sending schedule', onClick: () => setSendingTarget(c) },
+                          {
+                            type: 'action',
+                            label: c.status === 'paused' ? 'Resume client' : 'Pause client',
+                            onClick: () => setPauseTarget(c),
+                            disabled: c.status === 'draft' || c.status === 'churned',
+                            title: c.status === 'draft'
+                              ? 'Draft clients cannot be paused or resumed. Set the status to Active in Edit client first.'
+                              : c.status === 'churned'
+                              ? 'Churned clients cannot be paused or resumed. Change the status in Edit client first.'
+                              : undefined,
+                          },
                           { type: 'action', label: 'Add credits', onClick: () => setCreditsTarget(c) },
                           {
                             type: 'action',
@@ -364,6 +402,20 @@ export function Clients() {
             client={sendingTarget}
             onClose={() => setSendingTarget(null)}
           />
+        )}
+        {pauseTarget && (
+          <ConfirmDialog
+            key={`pause-${pauseTarget.id}`}
+            title={pauseTarget.status === 'active' ? `Pause ${pauseTarget.business_name}?` : `Resume ${pauseTarget.business_name}?`}
+            confirmLabel={pauseTarget.status === 'active' ? 'Pause client' : 'Resume client'}
+            busy={pauseBusy}
+            onConfirm={() => handlePauseToggle(pauseTarget)}
+            onCancel={() => setPauseTarget(null)}
+          >
+            {pauseTarget.status === 'active'
+              ? 'No new emails will be sent for this client until you resume. Replies and hot leads still come in, and nothing already sent is affected.'
+              : 'Sending starts again from the next scheduled run.'}
+          </ConfirmDialog>
         )}
         {changeEmailTarget && (
           <ChangeLoginEmailModal

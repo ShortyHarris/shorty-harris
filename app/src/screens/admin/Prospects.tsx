@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
-import { PIPELINE_STATUS_PILL } from '../../lib/pipelineStatus';
+import {
+  PIPELINE_STATUS_PILL, SEQUENCE_STATUS_PILL, SEQUENCE_STATUS_SHORT_LABEL, SEQUENCE_STATUS_LABEL, isSequenceStatus,
+} from '../../lib/pipelineStatus';
+import { messageStepLabel } from '../../lib/sequenceStatus';
 import { StatusPill, type StatusPillStyle } from '../../components/StatusPill';
-import { Search, ChevronRight, X } from 'lucide-react';
+import { Search, ChevronRight, X, MapPin, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  useProspects, useProspectCategories, useProspectDetail, useClientsList, useClientCampaigns,
-  updateProspect, getProspectDeleteCounts, deleteProspect,
+  useProspects, useProspectCategories, useProspectDetail, useProspectSendHistory, useClientsList, useClientCampaigns,
+  updateProspect, getProspectDeleteCounts, deleteProspect, UNSUBSCRIBED_FILTER,
 } from '../../hooks/useAdminData';
 import { clampPage, rangeLabel, totalPages } from '../../lib/prospectQuery';
 import { extraFields, safeWebsiteHref } from '../../lib/prospectDetail';
+import type { DetailValue } from '../../lib/prospectDetail';
 import type { ProspectListRow, UpdateProspectInput, ProspectDeleteCounts } from '../../hooks/useAdminData';
 import { SkeletonTable } from '../../components/Skeleton';
 import { MobileFab } from '../../components/MobileFab';
@@ -32,7 +36,11 @@ const HELP: HelpContent = {
       "Replied - they responded",
       "Hot Lead - showed buying interest",
       "Won / Lost - deal resolved",
+      "Unsubscribed - asked not to be contacted; nothing more is sent to that address from any client",
+      "Bounced - the address doesn't exist; sending stopped",
+      "Auto-reply - an out-of-office or automatic answer; the sequence carries on",
     ]},
+    { type: 'p', text: "Open a prospect to see its send history: every email with when it was approved and sent, every reply, and when the address was suppressed." },
   ],
 };
 import {
@@ -41,15 +49,31 @@ import {
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
-const STATUS_OPTIONS = ['all', 'new', 'contacted', 'replied', 'hot_lead', 'won', 'lost', 'generation_failed', 'message_pending'] as const;
+const STATUS_OPTIONS = [
+  'all', 'new', 'contacted', 'replied', 'hot_lead', 'called', 'won', 'lost', 'bounced',
+  UNSUBSCRIBED_FILTER, 'generation_failed', 'message_pending',
+] as const;
 
 const STATUS_LABEL: Record<string, string> = {
   all: 'All statuses', new: 'New', contacted: 'Contacted',
-  replied: 'Replied', hot_lead: 'Hot lead', won: 'Won', lost: 'Lost',
+  replied: 'Replied', hot_lead: 'Hot lead', called: 'Called', won: 'Won', lost: 'Lost',
+  bounced: 'Bounced', [UNSUBSCRIBED_FILTER]: 'Unsubscribed',
   generation_failed: 'Gen. failed', message_pending: 'Msg. pending',
 };
 
 const STATUS_PILL: Record<string, StatusPillStyle> = PIPELINE_STATUS_PILL;
+
+/** The pill for a row: the sequence status when one applies, otherwise the pipeline status. */
+function rowPill(r: ProspectListRow): { pill: StatusPillStyle; label: string; title?: string } {
+  if (isSequenceStatus(r.sequence_status)) {
+    return {
+      pill: SEQUENCE_STATUS_PILL[r.sequence_status],
+      label: SEQUENCE_STATUS_SHORT_LABEL[r.sequence_status],
+      title: SEQUENCE_STATUS_LABEL[r.sequence_status],
+    };
+  }
+  return { pill: STATUS_PILL[r.pipeline_status] ?? STATUS_PILL.new, label: r.pipeline_status.replace(/_/g, ' ') };
+}
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -191,7 +215,7 @@ export function Prospects() {
               </thead>
               <tbody>
                 {paged.map((r) => {
-                  const pill = STATUS_PILL[r.pipeline_status] ?? STATUS_PILL.new;
+                  const shown = rowPill(r);
                   const statusMenuItems = (
                     [
                       { type: 'header' as const, label: 'Set status' },
@@ -239,9 +263,9 @@ export function Prospects() {
                       <td className="min-w-0 text-(--ad-ink-soft)">
                         <div className="truncate" title={r.location ?? undefined}>{r.location ?? '-'}</div>
                       </td>
-                      <td className="pr-3">
-                        <StatusPill pill={pill}>
-                          {r.pipeline_status.replace(/_/g, ' ')}
+                      <td className="pr-3" title={shown.title}>
+                        <StatusPill pill={shown.pill}>
+                          {shown.label}
                         </StatusPill>
                       </td>
                       <td className="px-3 text-right">
@@ -267,7 +291,7 @@ export function Prospects() {
           {/* Mobile cards */}
           <div className="md:hidden flex flex-col gap-3">
             {paged.map((r) => {
-              const pill = STATUS_PILL[r.pipeline_status] ?? STATUS_PILL.new;
+              const { pill, label, title } = rowPill(r);
               return (
                 <div key={r.id} className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -284,9 +308,10 @@ export function Prospects() {
                         color: pill.text,
                         border: pill.border ?? 'none',
                       }}
+                      title={title}
                       className="shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.04em]"
                     >
-                      {r.pipeline_status.replace('_', ' ')}
+                      {label}
                     </span>
                   </div>
                   {(r.contact_name || r.email) && (
@@ -429,20 +454,23 @@ function ProspectDetailModal({
   // The list row renders instantly; the full row fills in the rest.
   const row: Record<string, unknown> = { ...prospect, ...(full ?? {}) };
   const str = (k: string) => (typeof row[k] === 'string' && (row[k] as string).trim() ? (row[k] as string) : null);
-  const pill = STATUS_PILL[prospect.pipeline_status] ?? STATUS_PILL.new;
+  const { pill, label: statusLabel, title: statusTitle } = rowPill(prospect);
+  const followupsStopped = row.followups_stopped === true;
   const clientName = (one(row.client)?.business_name as string | undefined) ?? null;
   const campaignName = (one(row.campaign)?.name as string | undefined) ?? null;
   const href = safeWebsiteHref(str('website'));
   const extras = extraFields(row);
 
   const lbl = 'mb-1 text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
-  const val = 'm-0 wrap-break-word text-[13px] text-(--ad-ink)';
+  const val = 'm-0 wrap-break-word text-[13.5px] text-(--ad-ink)';
+  const eyebrow = 'mb-3 text-[11.5px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
   const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div className="min-w-0">
       <div className={lbl}>{label}</div>
       <div className={val}>{children ?? '-'}</div>
     </div>
   );
+  const meta = [str('category'), str('location')].filter(Boolean).join(' · ');
 
   return (
     <motion.div
@@ -455,27 +483,63 @@ function ProspectDetailModal({
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:border md:border-(--ad-line)"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pd-title"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-[calc(100vh-48px)] md:max-h-[860px] md:max-w-[1040px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-(--ad-line) px-5 py-4">
-          <div className="min-w-0">
-            <h2 className="m-0 wrap-break-word text-[18px] font-semibold text-(--ad-ink)">{prospect.business_name}</h2>
-            <span
-              className="atbl-pill mt-2 inline-flex"
-              style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
+        {/* ─── Header: status, who, for whom ─── */}
+        <div className="shrink-0 border-b border-(--ad-line) px-6 pt-5 pb-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className="atbl-pill inline-flex"
+                title={statusTitle}
+                style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
+              >
+                {statusLabel}
+              </span>
+              {followupsStopped && (
+                <span className="inline-flex items-center rounded-full bg-(--ad-fill) px-2.5 py-1 text-[11.5px] font-medium text-(--ad-ink-soft)">Follow-ups stopped</span>
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-(--ad-fill) text-(--ad-ink-soft) transition-colors hover:bg-(--ad-line) hover:text-(--ad-ink)"
             >
-              {prospect.pipeline_status.replace(/_/g, ' ')}
-            </span>
+              <X size={17} strokeWidth={2} />
+            </button>
           </div>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
+          <h2 id="pd-title" className="m-0 mt-4 wrap-break-word text-[24px] font-extrabold leading-[1.15] tracking-[-0.02em] text-(--ad-ink)">
+            {prospect.business_name}
+          </h2>
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13.5px] text-(--ad-ink-soft)">
+            {meta && (
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin size={14} strokeWidth={2} className="text-(--ad-ink-faint)" /> {meta}
+              </span>
+            )}
+            {clientName && (
+              <span className="inline-flex items-center gap-1.5">
+                <Building2 size={14} strokeWidth={2} className="text-(--ad-ink-faint)" />
+                For <span className="font-semibold text-(--ad-ink)">{clientName}</span>
+                {campaignName && <span className="text-(--ad-ink-faint)">· {campaignName}</span>}
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
+        {/* ─── Body: contact + history on the left, research on the right ─── */}
+        <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden md:grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+          <div className="flex flex-col gap-6 px-6 py-6 md:overflow-y-auto md:border-r md:border-(--ad-line)">
+          <section>
+          <div className={eyebrow}>Contact</div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Contact name">{str('contact_name')}</Field>
             <Field label="Email">
@@ -497,29 +561,42 @@ function ProspectDetailModal({
                 ? <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-(--ad-green) hover:underline">{str('website')}</a>
                 : <span className="break-all">{str('website')}</span>)}
             </Field>
-            <Field label="Category">{str('category')}</Field>
-            <Field label="Location">{str('location')}</Field>
-            <Field label="Client">{clientName}</Field>
-            <Field label="Campaign">{campaignName}</Field>
             <Field label="Added">{fmtDate(row.created_at)}</Field>
             <Field label="Updated">{fmtDate(row.updated_at)}</Field>
           </div>
+          </section>
 
-          {isLoading && <div className="text-[12px] text-(--ad-ink-faint)">Loading all details…</div>}
-          {error && (
-            <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">
-              Couldn't load the full record: {(error as Error).message}
-            </div>
-          )}
+          <SendHistory prospectId={prospect.id} email={prospect.email} />
+          </div>
 
-          {extras.length > 0 && (
-            <div className="border-t border-(--ad-line) pt-4">
-              <div className="mb-3 text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)">More details</div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {extras.map((x) => <Field key={x.label} label={x.label}>{x.value}</Field>)}
+          <div className="flex flex-col gap-5 border-t border-(--ad-line) bg-(--ad-surface-2) px-6 py-6 md:overflow-y-auto md:border-t-0">
+            <div className={eyebrow + ' mb-0'}>Research &amp; details</div>
+            {isLoading && <div className="text-[12px] text-(--ad-ink-faint)">Loading all details…</div>}
+            {error && (
+              <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">
+                Couldn't load the full record: {(error as Error).message}
               </div>
-            </div>
-          )}
+            )}
+            {!isLoading && !error && extras.length === 0 && (
+              <div className="rounded-lg border border-dashed border-(--ad-line-strong) px-4 py-3.5 text-[13.5px] text-(--ad-ink-faint)">
+                No research or extra details on record yet.
+              </div>
+            )}
+            {/* Simple values grouped in one card; each structured block gets its own. */}
+            {extras.some((x) => typeof x.value === 'string') && (
+              <div className="grid grid-cols-1 gap-4 rounded-lg border border-(--ad-line) bg-(--ad-surface) p-4 sm:grid-cols-2">
+                {extras.filter((x) => typeof x.value === 'string').map((x) => (
+                  <Field key={x.label} label={x.label}><DetailValueView value={x.value} /></Field>
+                ))}
+              </div>
+            )}
+            {extras.filter((x) => typeof x.value !== 'string').map((x) => (
+              <section key={x.label} className="rounded-lg border border-(--ad-line) bg-(--ad-surface) p-4">
+                <div className="mb-3 text-[13px] font-semibold text-(--ad-ink)">{x.label}</div>
+                <div className={val}><DetailValueView value={x.value} /></div>
+              </section>
+            ))}
+          </div>
         </div>
 
         <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
@@ -528,6 +605,149 @@ function ProspectDetailModal({
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+/* ── Structured value (nested jsonb such as enrichment research) ─────── */
+function DetailValueView({ value }: { value: DetailValue }) {
+  if (typeof value === 'string') {
+    const href = /^https?:\/\//i.test(value) ? safeWebsiteHref(value) : null;
+    return href
+      ? <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-(--ad-green) hover:underline">{value.replace(/^https?:\/\/(www\.)?/i, '')}</a>
+      : <span className="whitespace-pre-line">{value}</span>;
+  }
+  if (Array.isArray(value)) {
+    if (value.every((v) => typeof v === 'string')) {
+      return (
+        <span className="flex flex-wrap gap-1.5">
+          {value.map((v, i) => (
+            <span key={i} className="rounded border border-(--ad-line) px-1.5 py-0.5 text-[12px]"><DetailValueView value={v} /></span>
+          ))}
+        </span>
+      );
+    }
+    return (
+      <div className="flex flex-col gap-2">
+        {value.map((v, i) => (
+          <div key={i} className="rounded-md border border-(--ad-line) px-3 py-2"><DetailValueView value={v} /></div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <dl className="m-0 flex flex-col gap-2">
+      {Object.entries(value).map(([k, v]) => (
+        typeof v === 'string' ? (
+          <div key={k} className="grid grid-cols-[110px_1fr] gap-3">
+            <dt className="text-[12px] text-(--ad-ink-faint)">{k}</dt>
+            <dd className="m-0 min-w-0 wrap-break-word"><DetailValueView value={v} /></dd>
+          </div>
+        ) : (
+          <div key={k}>
+            <dt className="mb-1 text-[12px] font-semibold text-(--ad-ink)">{k}</dt>
+            <dd className="m-0 border-l-2 border-(--ad-line) pl-3"><DetailValueView value={v} /></dd>
+          </div>
+        )
+      ))}
+    </dl>
+  );
+}
+
+/* ── Send history (per-prospect log) ───────────────────────────────── */
+const REJECT_REASON_LABEL: Record<string, string> = {
+  manual: 'rejected by a person',
+  superseded: 'replaced by a rewrite',
+  prospect_closed: 'cancelled: prospect closed or suppressed',
+  followups_stopped: 'cancelled: follow-ups stopped',
+  sequence_cancelled: 'cancelled: sequence cancelled',
+  system: 'cancelled by the system',
+  unknown: 'rejected (reason not recorded)',
+};
+
+const SUPPRESS_REASON_LABEL: Record<string, string> = {
+  opt_out: 'Unsubscribed',
+  stop_request: 'Asked to stop',
+  bounce: 'Bounced',
+};
+
+function messageOutcome(m: { approval_status: string; send_status: string; reject_reason: string | null }): string {
+  if (m.send_status === 'sent') return 'Sent';
+  if (m.approval_status === 'rejected') return `Not sent, ${REJECT_REASON_LABEL[m.reject_reason ?? 'unknown'] ?? m.reject_reason}`;
+  if (m.send_status === 'blocked_dnc') return 'Not sent, blocked: do not contact';
+  if (m.send_status === 'failed') return 'Not sent, send failed or blocked';
+  if (m.approval_status === 'approved') return 'Approved, waiting to send';
+  if (m.approval_status === 'pending') return 'Waiting for approval';
+  return `${m.approval_status} / ${m.send_status}`;
+}
+
+function SendHistory({ prospectId, email }: { prospectId: string; email: string | null }) {
+  const { data, isLoading, error } = useProspectSendHistory(prospectId, email);
+  const head = 'mb-3 text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
+  const meta = 'text-[12px] text-(--ad-ink-soft)';
+
+  return (
+    <div className="border-t border-(--ad-line) pt-4">
+      <div className={head}>Send history</div>
+      {isLoading && <div className="text-[12px] text-(--ad-ink-faint)">Loading send history…</div>}
+      {error && <div className="text-[12px] text-(--ad-clay)">Couldn't load send history: {(error as Error).message}</div>}
+      {data && (
+        <div className="flex flex-col gap-3">
+          {data.messages.length === 0 && <div className={meta}>No emails written for this prospect yet.</div>}
+          {data.messages.length > 0 && (
+            <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
+              {data.messages.map((m) => (
+                <li key={m.id} className="rounded-lg border border-(--ad-line) px-3 py-2.5">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                    <span className="text-[13px] font-semibold text-(--ad-ink)">{messageStepLabel(m.message_type)}</span>
+                    <span className={m.send_status === 'sent' ? 'text-[12px] font-semibold text-(--ad-green)' : meta}>
+                      {messageOutcome(m)}
+                    </span>
+                  </div>
+                  {m.subject && <div className="mt-0.5 wrap-break-word text-[12px] text-(--ad-ink-soft)">{m.subject}</div>}
+                  <dl className="m-0 mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11.5px] text-(--ad-ink-faint)">
+                    <dt>Written</dt><dd className="m-0">{fmtDate(m.created_at) ?? '-'}</dd>
+                    {m.approved_at && (<><dt>Approved</dt><dd className="m-0">{fmtDate(m.approved_at)}</dd></>)}
+                    {m.sent_at && (<><dt>Sent</dt><dd className="m-0">{fmtDate(m.sent_at)}</dd></>)}
+                    {m.rejected_at && (<><dt>Closed</dt><dd className="m-0">{fmtDate(m.rejected_at)}</dd></>)}
+                    {m.gmail_message_id && (<><dt>Gmail ID</dt><dd className="m-0 break-all font-mono">{m.gmail_message_id}</dd></>)}
+                    {(m.open_count ?? 0) > 0 && (<><dt>Opens</dt><dd className="m-0">{m.open_count} (estimate)</dd></>)}
+                  </dl>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {data.replies.length > 0 && (
+            <div>
+              <div className="mb-1.5 text-[12px] font-semibold text-(--ad-ink)">Replies</div>
+              <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                {data.replies.map((r) => (
+                  <li key={r.id} className={meta}>
+                    {fmtDate(r.received_at) ?? '-'}: {(r.intent ?? 'not classified').replace(/_/g, ' ')}
+                    {r.match_method === 'domain' && ' (matched by company domain only)'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {data.suppressed.length > 0 && (
+            <div className="rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3 py-2 text-[12px] text-(--ad-ink)">
+              {data.suppressed.map((s, i) => (
+                <div key={i}>
+                  <strong>{SUPPRESS_REASON_LABEL[s.reason ?? ''] ?? 'On do-not-contact'}</strong>
+                  {' '}on {fmtDate(s.created_at) ?? '-'}. Nothing more is sent to this address from any client.
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p className="m-0 text-[11px] text-(--ad-ink-faint)">
+            One row per email the system recorded. A copy that left Gmail without being recorded would not appear here; the client's Gmail Sent folder is the final word.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -225,6 +225,33 @@ export function useCampaignPendingProspects(clientId: string, campaignId: string
   return campaignId ? awaitingInCampaign(counts, campaignId) : 0;
 }
 
+/**
+ * Counts for the campaign progress strip: prospects with a first email written
+ * (a live draft, approved, or sent; replaced and rejected drafts excluded) and
+ * first emails sent. Head counts only, so it stays cheap on large campaigns.
+ */
+export function useCampaignProgressCounts(campaignId: string | null, client: SupabaseClient = supabase) {
+  const { data } = useQuery({
+    queryKey: ['campaign-progress', campaignId ?? ''] as const,
+    queryFn: async () => {
+      const id = campaignId as string;
+      const [written, sent] = await Promise.all([
+        client.from('messages').select('id', { count: 'exact', head: true })
+          .eq('campaign_id', id).eq('message_type', 'initial')
+          .or('approval_status.in.(pending,approved),send_status.eq.sent'),
+        client.from('messages').select('id', { count: 'exact', head: true })
+          .eq('campaign_id', id).eq('message_type', 'initial').eq('send_status', 'sent'),
+      ]);
+      const err = written.error ?? sent.error;
+      if (err) throw new Error(err.message);
+      return { written: written.count ?? 0, sent: sent.count ?? 0 };
+    },
+    enabled: !!campaignId,
+    staleTime: 60 * 1000,
+  });
+  return data ?? null;
+}
+
 export interface ClientUsage {
   monthly_prospect_limit: number;
   max_campaigns: number;

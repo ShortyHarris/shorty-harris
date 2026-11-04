@@ -1,3 +1,4 @@
+import { UpcomingEmails } from '../../components/UpcomingEmails';
 import { useEffect, useState } from 'react';
 import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
 import { useSearchParams } from 'react-router-dom';
@@ -115,7 +116,7 @@ function formatClosedDate(iso: string | null): string {
 }
 
 export function Dashboard({
-  clientId, client = supabase, readOnly = false, markViewedOnOpen = true,
+  clientId, client = supabase, readOnly = false, markViewedOnOpen = true, basePath,
 }: {
   clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string;
   /** False when an admin is acting for the client - their look shouldn't clear the client's "New". */
@@ -223,6 +224,14 @@ export function Dashboard({
           <WarmProspectsPanel prospects={warmProspects} onSelect={setHistoryProspect} />
         )}
       </div>
+
+      {/* ─── Upcoming emails: what goes out when, and what is waiting ─── */}
+      <UpcomingEmails
+        clientId={clientId}
+        client={client}
+        timeZone={summary?.send_timezone}
+        approvalsHref={basePath ? `${basePath}/approvals` : 'approvals'}
+      />
 
       {/* ─── Stat row ─── */}
       <StatGrid

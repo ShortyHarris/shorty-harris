@@ -10,8 +10,9 @@ import { useAuth } from '../../auth/AuthProvider';
 import {
   useClientCampaignList, createClientCampaign, updateClientCampaign,
   getClientCampaignDeleteCounts, deleteClientCampaign, useClientCampaignProspects, useClientUsage,
-  useClientLaunchUsage, useCampaignPendingProspects, MONTHLY_LAUNCH_LIMIT,
+  useClientLaunchUsage, useCampaignPendingProspects, useCampaignProgressCounts, MONTHLY_LAUNCH_LIMIT,
 } from '../../hooks/useClientCampaigns';
+import { campaignStage, progressSteps } from '../../lib/campaignProgress';
 import type { ClientCampaignRow, ClientCampaignDeleteCounts } from '../../hooks/useClientCampaigns';
 import { queryClient } from '../../lib/queryClient';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
@@ -339,8 +340,8 @@ export function Campaigns({
               setShowNew(false); reload();
               toast(
                 autoApproved
-                  ? "Campaign created and running - we're finding businesses now."
-                  : "Campaign created - it'll be reviewed and activated shortly."
+                  ? "Your campaign has been created! Shorty Harris is now researching prospects and writing personalized emails. This can take a few days - we'll email you when they're ready for review."
+                  : "Your campaign has been created. Our team will review it, then Shorty Harris researches prospects and writes personalized emails. This can take a few days - we'll email you when they're ready for review."
               );
               queryClient.invalidateQueries({ queryKey: ['client-usage', clientId] });
             }}
@@ -1132,16 +1133,8 @@ function CampaignDetailModal({
             <p className="m-0 text-[13px] leading-relaxed text-(--ad-ink-soft)">{description}</p>
           )}
 
-          {!loading && campaign.prospectCount === 0 && (
-            <div className="rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3.5">
-              <p className="m-0 text-[13px] font-semibold text-(--ad-ink)">What happens next</p>
-              <p className="m-0 mt-1.5 text-[12.5px] leading-relaxed text-(--ad-ink-soft)">
-                We'll find matching businesses, write personalized outreach for each one, and
-                {' '}{campaign.status === 'active' ? "get them approved and sent" : "have them ready once your campaign is approved"}.
-                This can take a little while - check back here, or we'll flag it once there's something for you to review.
-              </p>
-            </div>
-          )}
+          <CampaignProgress campaign={campaign} awaiting={pendingApproval} client={client} />
+
 
           {campaign.status !== 'cancelled' && (
             <FollowUpsNowToggle
@@ -1372,5 +1365,59 @@ function DeleteCampaignModal({
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+/* ── Campaign progress (stage + counts) ────────────────────────────── */
+const STAGE_PILL: Record<string, StatusPillStyle> = {
+  in_review:         { ...PILL.ahead,   icon: 'clock' },
+  researching:       { ...PILL.ahead,   icon: 'refresh' },
+  writing:           { ...PILL.ahead,   icon: 'refresh' },
+  awaiting_approval: { ...PILL.waiting, icon: 'clock' },
+  ready:             { ...PILL.waiting, icon: 'check' },
+  sending:           { ...PILL.sent,    icon: 'send' },
+  paused:            { ...PILL.closed,  icon: 'minus' },
+  finished:          { ...PILL.closed,  icon: 'minus' },
+  needs_attention:   { ...PILL.problem, icon: 'alert' },
+};
+
+function CampaignProgress({
+  campaign, awaiting, client,
+}: { campaign: ClientCampaignRow; awaiting: number; client: SupabaseClient }) {
+  const counts = useCampaignProgressCounts(campaign.id, client);
+  const input = {
+    status: campaign.status,
+    scrapeStatus: campaign.scrape_status,
+    prospects: campaign.prospectCount,
+    written: counts?.written ?? 0,
+    awaiting,
+    sent: counts?.sent ?? 0,
+  };
+  const stage = campaignStage(input);
+  const steps = progressSteps(input);
+
+  return (
+    <section aria-label="Campaign progress" className="rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[13px] font-semibold text-(--ad-ink)">Where it's at</span>
+        <StatusPill pill={STAGE_PILL[stage.key] ?? PILL.ahead}>{stage.label}</StatusPill>
+      </div>
+      <p className="m-0 mt-1.5 text-[12.5px] leading-relaxed text-(--ad-ink-soft)">{stage.detail}</p>
+      {counts && (
+        <ol className="m-0 mt-3 grid list-none grid-cols-2 gap-2 p-0 sm:grid-cols-4">
+          {steps.map((s) => (
+            <li key={s.label} className="rounded-lg border border-(--ad-line) bg-(--ad-surface) px-2.5 py-2">
+              <div className={`text-[16px] font-extrabold ${s.done ? 'text-(--ad-ink)' : 'text-(--ad-ink-soft)'}`}>{s.count.toLocaleString()}</div>
+              <div className="text-[11px] leading-snug text-(--ad-ink-soft)">{s.label}</div>
+            </li>
+          ))}
+        </ol>
+      )}
+      {stage.slow && (
+        <p className="m-0 mt-3 text-[12px] leading-relaxed text-(--ad-ink-soft)">
+          Researching prospects and writing personalized emails can take a few days. We'll email you when emails are ready for your review, so there's no need to keep checking.
+        </p>
+      )}
+    </section>
   );
 }

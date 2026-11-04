@@ -7,9 +7,17 @@ const SHOWN_KEYS = new Set([
   'website', 'pipeline_status', 'created_at', 'updated_at',
 ]);
 
-export interface ExtraField { label: string; value: string }
+/**
+ * A display-ready value: primitives become strings (booleans as Yes/No),
+ * empties are dropped, and nested objects/arrays keep their shape so the UI
+ * can lay them out instead of dumping raw JSON.
+ */
+export type DetailValue = string | DetailValue[] | DetailObject;
+export interface DetailObject { [label: string]: DetailValue }
 
-function humanize(key: string): string {
+export interface ExtraField { label: string; value: DetailValue }
+
+export function humanize(key: string): string {
   const s = key.replace(/_/g, ' ').trim();
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -20,24 +28,39 @@ function isEmpty(v: unknown): boolean {
     || (typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0);
 }
 
-function show(v: unknown): string {
+/** Normalise any value for display; returns null when nothing is left to show. */
+export function toDetailValue(v: unknown): DetailValue | null {
+  if (isEmpty(v)) return null;
   if (typeof v === 'string') return v;
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
-  if (typeof v === 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) {
+    const items = v.map(toDetailValue).filter((x): x is DetailValue => x !== null);
+    return items.length ? items : null;
+  }
+  if (typeof v === 'object') {
+    const out: DetailObject = {};
+    for (const [k, v2] of Object.entries(v as Record<string, unknown>)) {
+      const d = toDetailValue(v2);
+      if (d !== null) out[humanize(k)] = d;
+    }
+    return Object.keys(out).length ? out : null;
+  }
   return String(v);
 }
 
-/** Remaining non-empty columns; a jsonb object (e.g. enrichment) is flattened one level. */
+/** Remaining non-empty columns; a jsonb object (e.g. enrichment) is split one level into fields. */
 export function extraFields(row: Record<string, unknown>): ExtraField[] {
   const out: ExtraField[] = [];
   for (const [key, v] of Object.entries(row)) {
     if (SHOWN_KEYS.has(key) || isEmpty(v)) continue;
     if (typeof v === 'object' && !Array.isArray(v)) {
       for (const [k2, v2] of Object.entries(v as Record<string, unknown>)) {
-        if (!isEmpty(v2)) out.push({ label: `${humanize(key)}: ${humanize(k2)}`, value: show(v2) });
+        const d = toDetailValue(v2);
+        if (d !== null) out.push({ label: `${humanize(key)}: ${humanize(k2)}`, value: d });
       }
     } else {
-      out.push({ label: humanize(key), value: show(v) });
+      const d = toDetailValue(v);
+      if (d !== null) out.push({ label: humanize(key), value: d });
     }
   }
   return out;

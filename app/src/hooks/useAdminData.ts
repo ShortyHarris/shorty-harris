@@ -6,6 +6,10 @@ import { applyProspectFilters, mapCategoryRows, pageRange } from '../lib/prospec
 import { buildAreaColumns, type TargetArea } from '../lib/targetAreas';
 import { CAMPAIGN_LIMITS, campaignLimitsError } from '../lib/campaignLimits';
 import { toReplyMatch, type ReplyMatch } from '../lib/replyMatch';
+import type { SequenceStatus } from '../lib/pipelineStatus';
+import {
+  deriveSequenceStatus, dncReasonsByEmail, UNSUBSCRIBE_REASONS, type ReplyIntentRow,
+} from '../lib/sequenceStatus';
 
 // ─── Query keys ──────────────────────────────────────────────────────────────
 export const QK = {
@@ -29,7 +33,12 @@ export interface ProspectListRow {
   location: string | null;
   pipeline_status: string;
   client: { business_name: string } | null;
+  /** Derived like the prospect_sequence_status() SQL function; null when nothing applies. */
+  sequence_status?: SequenceStatus | null;
 }
+
+/** Status filter value that lists prospects whose address is on do_not_contact as an opt-out. */
+export const UNSUBSCRIBED_FILTER = 'seq:unsubscribed';
 
 export interface ProspectsParams {
   q: string;
@@ -42,11 +51,22 @@ interface ProspectsPage { rows: ProspectListRow[]; total: number }
 
 async function fetchProspectsPage(p: ProspectsParams): Promise<ProspectsPage> {
   const { from, to } = pageRange(p.page);
-  const query = supabase
+  let query = supabase
     .from('prospects')
     .select(`id, business_name, contact_name, email, phone, category, location, pipeline_status,
              client:clients ( business_name )`, { count: 'exact' });
-  const { data, error, count } = await applyProspectFilters(query, p)
+  let filters: ProspectsParams = p;
+  if (p.status === UNSUBSCRIBED_FILTER) {
+    // do_not_contact stores lower-cased addresses; match those and the prospect's own spelling.
+    const { data: dnc, error: dncErr } = await supabase
+      .from('do_not_contact').select('email').in('reason', [...UNSUBSCRIBE_REASONS]);
+    if (dncErr) throw new Error(dncErr.message);
+    const emails = [...new Set((dnc ?? []).map((d) => d.email as string | null).filter((e): e is string => !!e))];
+    if (emails.length === 0) return { rows: [], total: 0 };
+    query = query.in('email', emails);
+    filters = { ...p, status: 'all' };
+  }
+  const { data, error, count } = await applyProspectFilters(query, filters)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .range(from, to);
@@ -55,7 +75,98 @@ async function fetchProspectsPage(p: ProspectsParams): Promise<ProspectsPage> {
     ...r,
     client: Array.isArray(r.client) ? r.client[0] ?? null : r.client ?? null,
   })) as ProspectListRow[];
-  return { rows, total: count ?? rows.length };
+  return { rows: await withSequenceStatus(rows), total: count ?? rows.length };
+}
+
+/**
+ * Adds sequence_status (Unsubscribed, Bounced, Auto-reply, Replied, Needs review)
+ * to one page of rows. A failure here leaves the plain pipeline status showing
+ * rather than failing the whole list.
+ */
+async function withSequenceStatus(rows: ProspectListRow[]): Promise<ProspectListRow[]> {
+  if (rows.length === 0) return rows;
+  const emails = [...new Set(rows.map((r) => r.email?.toLowerCase()).filter((e): e is string => !!e))];
+  const [dnc, reps] = await Promise.all([
+    emails.length
+      ? supabase.from('do_not_contact').select('email, reason').in('email', emails)
+      : Promise.resolve({ data: [], error: null }),
+    supabase.from('replies').select('prospect_id, intent, received_at, created_at').in('prospect_id', rows.map((r) => r.id)),
+  ]);
+  if (dnc.error || reps.error) return rows;
+  const reasons = dncReasonsByEmail((dnc.data ?? []) as Array<{ email: string | null; reason: string | null }>);
+  const byProspect = new Map<string, ReplyIntentRow[]>();
+  for (const r of (reps.data ?? []) as ReplyIntentRow[]) {
+    const list = byProspect.get(r.prospect_id) ?? [];
+    list.push(r);
+    byProspect.set(r.prospect_id, list);
+  }
+  return rows.map((r) => ({
+    ...r,
+    sequence_status: deriveSequenceStatus(
+      r.pipeline_status,
+      (r.email && reasons.get(r.email.toLowerCase())) || [],
+      byProspect.get(r.id) ?? [],
+    ),
+  }));
+}
+
+// ─── Per-prospect send history (admin detail modal) ─────────────────────────
+export interface ProspectMessageLog {
+  id: string;
+  message_type: string | null;
+  subject: string | null;
+  approval_status: string;
+  send_status: string;
+  created_at: string | null;
+  approved_at: string | null;
+  sent_at: string | null;
+  rejected_at: string | null;
+  reject_reason: string | null;
+  gmail_message_id: string | null;
+  open_count: number | null;
+}
+
+export interface ProspectReplyLog {
+  id: string;
+  intent: string | null;
+  received_at: string | null;
+  match_method: string | null;
+}
+
+export interface ProspectSendHistory {
+  messages: ProspectMessageLog[];
+  replies: ProspectReplyLog[];
+  suppressed: { reason: string | null; created_at: string | null }[];
+}
+
+/** Every email row, reply and do-not-contact entry for one prospect, oldest first. */
+export function useProspectSendHistory(prospectId: string, email: string | null) {
+  return useQuery({
+    queryKey: [...QK.prospects, 'send-history', prospectId] as const,
+    queryFn: async (): Promise<ProspectSendHistory> => {
+      const [msgs, reps, dnc] = await Promise.all([
+        supabase.from('messages')
+          .select('id, message_type, subject, approval_status, send_status, created_at, approved_at, sent_at, rejected_at, reject_reason, gmail_message_id, open_count')
+          .eq('prospect_id', prospectId)
+          .order('created_at', { ascending: true }),
+        supabase.from('replies')
+          .select('id, intent, received_at, match_method')
+          .eq('prospect_id', prospectId)
+          .order('received_at', { ascending: true }),
+        email
+          ? supabase.from('do_not_contact').select('reason, created_at').eq('email', email.toLowerCase())
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+      const err = msgs.error ?? reps.error ?? dnc.error;
+      if (err) throw new Error(err.message);
+      return {
+        messages: (msgs.data ?? []) as ProspectMessageLog[],
+        replies: (reps.data ?? []) as ProspectReplyLog[],
+        suppressed: (dnc.data ?? []) as { reason: string | null; created_at: string | null }[],
+      };
+    },
+    staleTime: 30 * 1000,
+  });
 }
 
 /** Distinct categories with counts, from the admin-only admin_prospect_categories() RPC. */

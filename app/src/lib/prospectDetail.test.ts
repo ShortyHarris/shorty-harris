@@ -14,8 +14,16 @@ describe('extraFields', () => {
       { label: 'Enrichment: Rating', value: '4.5' },
     ]);
   });
-  it('stringifies arrays', () => {
-    expect(extraFields({ tags: ['a', 'b'] })).toEqual([{ label: 'Tags', value: '["a","b"]' }]);
+  it('keeps arrays as arrays', () => {
+    expect(extraFields({ tags: ['a', 'b'] })).toEqual([{ label: 'Tags', value: ['a', 'b'] }]);
+  });
+  it('keeps nested objects structured, humanized and without empties', () => {
+    expect(extraFields({
+      enrichment: { research: { usable: false, angle: null, social: { profiles: [{ platform: 'github', last_post: '2026-09' }] } } },
+    })).toEqual([{
+      label: 'Enrichment: Research',
+      value: { Usable: 'No', Social: { Profiles: [{ Platform: 'github', 'Last post': '2026-09' }] } },
+    }]);
   });
 });
 
