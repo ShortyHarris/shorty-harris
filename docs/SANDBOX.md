@@ -34,6 +34,7 @@ open any sandbox with Clients > View as client > Edit mode.
 | **Run next step** | Moves one prospect forward: write first email > approve > send > skip to next follow-up. The button names the next action; when nothing can happen (hot lead, replied, unsubscribed) it says why instead. |
 | **Simulate reply** | Interested (hot lead + credit charge), Question, Not interested, Unsubscribe (do-not-contact, all future email blocked), Out of office (sequence continues), Bounce. Status rules match production's WF4. You can also reply for real from Gmail; WF4 picks it up within a few minutes. |
 | **Advance time** | +1 / +3 / +7 days. Moves the account's whole timeline back, so production's own rules apply unchanged: the 3/5/7 business-day follow-up gaps, approval reminders, and the recalculation after a late approval. |
+| **Mailbox warm-up** | On (default): the real warm-up, 5 a day in week 1 then 10, 20, 30, 40, spaced through the day; advance the clock to watch it step up. Off: fast testing, up to 100 a day with no spacing. The send-hours window is always off for sandboxes. |
 | **Reset sandbox** | Deletes the account's test data and reseeds; clock back to today. |
 
 Scenarios:

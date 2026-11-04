@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { FlaskConical, Play, RotateCcw, MessageSquareReply, Ban, Clock } from 'lucide-react';
+import { FlaskConical, Play, RotateCcw, MessageSquareReply, Ban, Clock, Gauge } from 'lucide-react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useToast, ToastHost } from '../../components/Toast';
+import { useSendPacing } from '../../hooks/useSendPacing';
 import {
   useSandbox, nextStepLabel, nextStepBlock, hasSent, sentCount, describeResult,
   type ReplyKind, type SandboxResult,
@@ -46,7 +47,9 @@ export function Sandbox({
   readOnly?: boolean;
   basePath?: string;
 }) {
-  const { prospects, daysAdvanced, loading, error, reset, advanceTime, nextStep, simulateReply } = useSandbox(clientId, true, client);
+  const { prospects, daysAdvanced, warmupOn, loading, error, reset, advanceTime, setWarmup, nextStep, simulateReply } = useSandbox(clientId, true, client);
+  // Today's warm-up limit and day, from the same send_pacing the Approvals Sending panel uses.
+  const { pacing } = useSendPacing(clientId, client);
   const { toasts, toast, dismiss } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -113,6 +116,36 @@ export function Sandbox({
             </button>
           ))}
         </div>
+      </section>
+
+      {/* Warm-up: real daily limits that step up with the sandbox clock, or fast mode. */}
+      <section className="flex flex-col gap-3 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3.5 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <Gauge size={18} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
+          <div className="min-w-0">
+            <div className="text-[14px] font-semibold text-(--ad-ink)">
+              Mailbox warm-up: {warmupOn ? 'on' : 'off (fast testing)'}
+              {pacing && (
+                <span className="font-normal text-(--ad-ink-soft)">
+                  {' '}· {pacing.today.sent} of {pacing.today.cap} sent today
+                  {warmupOn && pacing.warmup.active ? ` · warm-up day ${pacing.warmup.day}` : ''}
+                </span>
+              )}
+            </div>
+            <p className="m-0 mt-0.5 text-[12.5px] leading-relaxed text-(--ad-ink-soft)">
+              {warmupOn
+                ? 'Real limits, as for a new customer mailbox: 5 a day in week 1, then 10, 20, 30 and 40, spaced out through the day. Advance the clock to watch it step up.'
+                : 'Up to 100 emails a day with no spacing, for quick testing. Switch warm-up on to test the real limits.'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => run('warmup', () => setWarmup(!warmupOn))}
+          disabled={readOnly || busy !== null}
+          className={`${btn} shrink-0 border border-(--ad-line) bg-transparent whitespace-nowrap text-(--ad-ink) hover:bg-(--ad-surface-2)`}
+        >
+          {busy === 'warmup' ? 'Working…' : warmupOn ? 'Switch to fast mode' : 'Switch warm-up on'}
+        </button>
       </section>
 
       {readOnly && (

@@ -149,11 +149,12 @@ export function useSandbox(clientId: string, enabled: boolean, client: SupabaseC
   });
 
   // How far the sandbox clock has been moved forward (sandbox_advance_time).
-  const { data: daysAdvanced } = useQuery({
+  const { data: clock } = useQuery({
     queryKey: ['sandbox-clock', clientId],
     queryFn: async () => {
-      const { data: row } = await client.from('clients').select('sandbox_days_advanced').eq('id', clientId).maybeSingle();
-      return Number((row as { sandbox_days_advanced?: number } | null)?.sandbox_days_advanced ?? 0);
+      const { data: row } = await client.from('clients').select('sandbox_days_advanced, sandbox_warmup').eq('id', clientId).maybeSingle();
+      const r = row as { sandbox_days_advanced?: number; sandbox_warmup?: boolean } | null;
+      return { days: Number(r?.sandbox_days_advanced ?? 0), warmup: r?.sandbox_warmup !== false };
     },
     enabled: enabled && !!clientId,
     refetchInterval: 4000,
@@ -174,11 +175,13 @@ export function useSandbox(clientId: string, enabled: boolean, client: SupabaseC
 
   return {
     prospects: data ?? [],
-    daysAdvanced: daysAdvanced ?? 0,
+    daysAdvanced: clock?.days ?? 0,
+    warmupOn: clock?.warmup ?? true,
     loading: isLoading,
     error: error ? (error as Error).message : null,
     reset: () => call('sandbox_reset', { p_client_id: clientId }),
     advanceTime: (days: number) => call('sandbox_advance_time', { p_client_id: clientId, p_days: days }),
+    setWarmup: (on: boolean) => call('sandbox_set_warmup', { p_client_id: clientId, p_on: on }),
     nextStep: (prospectId: string) => call('sandbox_next_step', { p_prospect_id: prospectId }),
     simulateReply: (prospectId: string, kind: ReplyKind) =>
       call('sandbox_simulate_reply', { p_prospect_id: prospectId, p_kind: kind }),
