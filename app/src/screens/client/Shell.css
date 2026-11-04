@@ -82,8 +82,10 @@
   }
   @media (min-width: 768px) {
     .capproval-banner-note { display: inline; }
-    /* The banner sits above the sticky sidebar, so the sidebar must give up its height to stay on screen. */
-    .cpage:has(> .capproval-banner) .cside { height: calc(100vh - var(--ctopbar-h) - var(--csbx-h, 0px) - 47px); }
+    /* Desktop: pinned under the sandbox banner, like the top bar, so the sticky sidebar
+       never ends up shortened by a banner that has scrolled away. Its measured height is
+       published as --cappr-h by Shell.tsx. Phones keep it scrolling (no sidebar there). */
+    .capproval-banner { position: sticky; top: var(--csbx-h, 0px); z-index: 35; }
   }
 
   /* Desktop top bar hidden on mobile in favor of .ctopbar below */
@@ -258,7 +260,7 @@
       background: var(--ad-surface);
       border-bottom: 1px solid var(--line);
       position: sticky;
-      top: var(--csbx-h, 0px);
+      top: calc(var(--csbx-h, 0px) + var(--cappr-h, 0px));
       z-index: 30;
     }
     .ctopbar-desktop-right {
@@ -287,9 +289,9 @@
       flex-shrink: 0;
       background: var(--ad-surface);
       border-right: 1px solid var(--line);
-      height: calc(100vh - var(--ctopbar-h) - var(--csbx-h, 0px));
+      height: calc(100vh - var(--ctopbar-h) - var(--csbx-h, 0px) - var(--cappr-h, 0px));
       position: sticky;
-      top: calc(var(--ctopbar-h) + var(--csbx-h, 0px));
+      top: calc(var(--ctopbar-h) + var(--csbx-h, 0px) + var(--cappr-h, 0px));
       overflow: hidden;
       padding: 18px 12px 16px;
     }

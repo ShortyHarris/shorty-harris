@@ -117,6 +117,18 @@ export function Shell({
     return () => { ro.disconnect(); root.style.removeProperty('--csbx-h'); };
   }, [isSandbox]);
 
+  // Same for the approvals banner, which is pinned on desktop only; on phones it
+  // scrolls away and nothing reads --cappr-h.
+  const approvalsBannerRef = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    const el = approvalsBannerRef.current;
+    if (!showApprovalsBanner || !el) return;
+    const root = document.documentElement;
+    const ro = new ResizeObserver(() => root.style.setProperty('--cappr-h', `${el.offsetHeight}px`));
+    ro.observe(el);
+    return () => { ro.disconnect(); root.style.removeProperty('--cappr-h'); };
+  }, [showApprovalsBanner]);
+
   return (
     <div className="cpage">
 
@@ -142,7 +154,7 @@ export function Shell({
            both, same slot the impersonation "Viewing as…" bar uses. Shown
            on every page except Approvals itself. ═══ */}
       {showApprovalsBanner && (
-        <Link to={`${basePath}/approvals`} className="capproval-banner">
+        <Link ref={approvalsBannerRef} to={`${basePath}/approvals`} className="capproval-banner">
           <ClipboardCheck size={16} strokeWidth={2} className="shrink-0" aria-hidden />
           <span className="capproval-banner-text">
             <strong className="font-bold">{awaitingProspects} prospect{awaitingProspects === 1 ? '' : 's'}</strong> waiting for your approval.
