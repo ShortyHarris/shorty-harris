@@ -1,0 +1,1042 @@
+{
+  "id": "ZYpReg1R5vdExWux",
+  "name": "WF5 - Follow-up Engine (Supabase)",
+  "active": true,
+  "versionId": "9d24bd5c-daab-426a-83a0-3e84226c05d3",
+  "activeVersionId": "9d24bd5c-daab-426a-83a0-3e84226c05d3",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "AREZb2BtNxt2LBMx",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "768638f9-ffe1-4b6b-bcfa-e03b8e180153",
+      "name": "Daily at 8AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1120,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "holidays",
+        "limit": 1,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "holiday_date",
+              "condition": "eq",
+              "keyValue": "={{ $now.toFormat(\"yyyy-MM-dd\") }}"
+            }
+          ]
+        }
+      },
+      "id": "e88ccca7-a956-4771-bd75-130da0f055e0",
+      "name": "Check Holiday Today",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -896,
+        368
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $now.weekday }}",
+              "operator": {
+                "operation": "lt",
+                "type": "number"
+              },
+              "rightValue": 6
+            },
+            {
+              "leftValue": "={{ $(\"Check Holiday Today\").item.json.id ?? \"\" }}",
+              "operator": {
+                "operation": "empty",
+                "type": "string"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8b233591-88ea-4644-94c8-497d4c7e788e",
+      "name": "Is Business Day?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -672,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "prospects",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "pipeline_status",
+              "keyValue": "contacted"
+            },
+            {
+              "condition": "eq",
+              "keyName": "sequence_paused",
+              "keyValue": "false"
+            },
+            {
+              "condition": "eq",
+              "keyName": "followups_stopped",
+              "keyValue": "false"
+            }
+          ]
+        }
+      },
+      "id": "f1735741-54ac-4244-b332-483110ab0295",
+      "name": "Get Contacted No Reply",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        272
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "executeOnce": true
+    },
+    {
+      "parameters": {},
+      "id": "46d776a5-64be-4bca-84fc-ca300fcfa8d8",
+      "name": "Loop Done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "follow_up_schedules",
+        "limit": 1,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "prospect_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Follow Up Loop\").item.json.id }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "pending"
+            }
+          ]
+        }
+      },
+      "id": "503158f7-0b1b-4c74-ac13-02ccd35d7c6c",
+      "name": "Get Due Schedule",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id ?? \"\" }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "leftValue": "={{ $json.due_at ?? \"2999-01-01\" }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "before"
+              },
+              "rightValue": "={{ $now.toISO() }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "695a99c8-cccb-4be8-aa65-e9bec399d295",
+      "name": "Is Due Now?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "builtInTools": {
+          "codeExecution": false,
+          "googleSearch": false,
+          "urlContext": false
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Write a short, polite follow-up email body to {{ $(\"Follow Up Loop\").item.json.business_name }}, a {{ $(\"Follow Up Loop\").item.json.category }} business. Recipient contact name: {{ $(\"Follow Up Loop\").item.json.contact_name || \"(not known)\" }}. Sender business: {{ $(\"Get Client Info\").item.json.business_name }}. Sender representative name: {{ $(\"Get Client Info\").item.json.representative_name || \"(none provided, sign off with business name only)\" }}. This is a follow-up {{ $(\"Get Due Schedule\").item.json.follow_up_day }} days after first contact. They have not replied yet. Keep the body under 70 words, friendly, no pressure.{{ $(\"Get Client Info\").item.json.website_url ? '\\n\\nInclude a link to the sender\\'s website (' + $(\"Get Client Info\").item.json.website_url + ') naturally in the email.' : '' }}{{ $(\"Get Campaign Language\").item.json.language && $(\"Get Campaign Language\").item.json.language !== 'English' ? '\\n\\nIMPORTANT: Write this email entirely in ' + $(\"Get Campaign Language\").item.json.language + ', including the greeting and the sign-off. Do not use any English words. For Czech, open with \"Dobrý den,\" and close with \"S přáním krásného dne,\" followed by the sender name.' : '' }}"
+            }
+          ]
+        },
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "models/gemini-2.5-flash"
+        },
+        "options": {
+          "maxOutputTokens": 8192,
+          "systemMessage": "You write brief, warm B2B follow-up emails that sound like they come from a real person, not an AI. Plain text, no subject line, no markdown.\n\nOpening (strict):\n- Always open with a greeting on its own line, followed by a blank line.\n- Use \"Hello\" or \"Good day\" only. Never use time-specific greetings such as \"Good morning\" or \"Good afternoon\", because the email may be delivered at a different time of day than it is written.\n- If a recipient contact name is provided, address them by first name, for example \"Hello Sarah,\". If the contact name is not known, use \"Hello,\" on its own.\n\nBody formatting (strict):\n- Break the body into 2 short paragraphs, never one dense block.\n- Each paragraph should be 1-2 sentences maximum.\n- Put a blank line (double line break) between paragraphs.\n\nSign-off (strict):\n- Leave a blank line, then write a warm closing line on its own line, such as \"Have a wonderful day,\".\n- On the next line, write the sender's name.\n- If a sender representative name is provided, use that person's name, then put the sender's business name on the line below it.\n- If no representative name is provided, use the sender's business name alone.\n- Never invent a person's name. Only ever use a representative name that has been explicitly given to you.\n\nContent rules:\n- Never use bracketed placeholder text such as [Your Name] or [Company].\n- Avoid generic AI-sounding phrases: \"I hope this email finds you well\", \"I wanted to follow up\", \"just circling back\", \"touching base\", \"in today's fast-paced world\".\n- Reference one concrete detail about their business or category rather than generic friendliness.\n- Vary sentence length naturally rather than uniform short sentences.\n- Keep it genuinely low-pressure, acknowledge they're busy, no guilt, no urgency tactics.\n- If a website URL is provided for the sender, include it as a clickable link naturally in the body. Do not force it if it doesn't fit.",
+          "temperature": 0.8
+        }
+      },
+      "id": "7afcd238-d64f-4d4c-a93b-ba92b5e2dc85",
+      "name": "Generate Follow Up",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        192
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst text = (raw.content && raw.content.parts && raw.content.parts[0] && raw.content.parts[0].text) || raw.text || '';\nconst prospect = $('Follow Up Loop').item.json;\nconst sched = $('Get Due Schedule').item.json;\nconst client = $('Get Client Info').item.json;\nconst day = sched.follow_up_day || 3;\n\nlet settings = {};\ntry { settings = $('Get Platform Settings').first().json || {}; } catch (e) { settings = {}; }\n\nlet language = 'English';\ntry { language = $('Get Campaign Language').first().json.language || 'English'; } catch (e) {}\n\n// ---------------------------------------------------------------------------\n// Deliberately identical to WF2's footer: a follow-up is just as much a\n// commercial email as the first one. This used to print client.location (a city\n// and state) rather than a valid physical postal address, and 22 follow-ups had\n// gone out with no opt-out line at all.\n//\n// The literal word \"unsubscribe\" stays untranslated: WF4 matches replies on it\n// and the pre-send compliance check searches the body for it, so a fully\n// translated footer would silently block every send.\n// ---------------------------------------------------------------------------\nconst COPY = {\n  English: {\n    onBehalf: function (c, a) { return 'Sent on behalf of ' + c + (a ? ' by ' + a : ''); },\n    why: 'You received this because we believe it may be relevant to your business.',\n    unsub: function (url) { return 'To stop receiving these emails, unsubscribe here: ' + url; },\n    reply: 'You can also simply reply \"unsubscribe\" and we will remove you immediately.',\n    replyOnly: 'If you would rather not hear from us, reply \"unsubscribe\" and we will remove you immediately.'\n  },\n  Czech: {\n    onBehalf: function (c, a) { return 'Zasláno jménem ' + c + (a ? ' společností ' + a : ''); },\n    why: 'Tento e-mail jste obdrželi, protože věříme, že by mohl být pro vaši firmu relevantní.',\n    unsub: function (url) { return 'Pokud již tyto e-maily nechcete dostávat, odhlaste se zde: ' + url; },\n    reply: 'Můžete také odpovědět slovem \"unsubscribe\" a okamžitě vás ze seznamu odstraníme.',\n    replyOnly: 'Pokud již tyto e-maily nechcete dostávat, odpovězte slovem \"unsubscribe\" a okamžitě vás odstraníme.'\n  }\n};\nconst t = COPY[language] || COPY.English;\n\nconst senderName = client.business_name || 'our team';\nconst clientAddress = String(client.postal_address || '').trim();\nconst agencyAddress = String(settings.agency_postal_address || '').trim();\nconst agencyName = String(settings.agency_name || '').trim();\nconst allowAgency = settings.allow_agency_address_fallback === true;\n\nlet identityLines;\nif (clientAddress) {\n  identityLines = senderName + '\\n' + clientAddress;\n} else if (allowAgency && agencyAddress) {\n  identityLines = senderName + '\\n' + t.onBehalf(senderName, agencyName) + '\\n' + agencyAddress;\n} else {\n  identityLines = senderName + (client.location ? ', ' + client.location : '');\n}\n\nconst senderSite = String(client.website_url || '').trim();\n\n// Feature switch, same as WF2: the link is only emitted when\n// platform_settings.unsubscribe_base_url is set, so a one-click link cannot go\n// out before the /unsubscribe page is live.\nconst unsubBase = String(settings.unsubscribe_base_url || '').trim();\nconst token = String(prospect.unsubscribe_token || '').trim();\nconst useLink = unsubBase.length > 0 && token.length > 0;\n\nconst footerParts = ['\\n\\n--', identityLines];\nif (senderSite) footerParts.push(senderSite);\nfooterParts.push(t.why);\nif (useLink) {\n  footerParts.push(t.unsub(unsubBase + '?t=' + token));\n  footerParts.push(t.reply);\n} else {\n  footerParts.push(t.replyOnly);\n}\nconst footer = footerParts.join('\\n');\n\nconst finishReason = String(\n  raw.finishReason || (raw.candidates && raw.candidates[0] && raw.candidates[0].finishReason) || ''\n).toUpperCase();\n\nreturn [{ json: {\n  prospect_id: prospect.id,\n  campaign_id: prospect.campaign_id,\n  client_id: prospect.client_id,\n  subject: 'Following up - ' + (prospect.business_name || ''),\n  body: String(text).trim() + footer,\n  message_type: 'follow_up_d' + day,\n  schedule_id: sched.id,\n  _truncated: finishReason === 'MAX_TOKENS',\n  _language: language,\n  _used_unsub_link: useLink\n} }];"
+      },
+      "id": "c8029595-28db-4e90-944b-cdc515b2d044",
+      "name": "Build Follow Up Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "messages",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "prospect_id",
+              "fieldValue": "={{ $json.prospect_id }}"
+            },
+            {
+              "fieldId": "campaign_id",
+              "fieldValue": "={{ $json.campaign_id }}"
+            },
+            {
+              "fieldId": "client_id",
+              "fieldValue": "={{ $json.client_id }}"
+            },
+            {
+              "fieldId": "channel",
+              "fieldValue": "email"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $json.subject }}"
+            },
+            {
+              "fieldId": "body",
+              "fieldValue": "={{ $json.body }}"
+            },
+            {
+              "fieldId": "message_type",
+              "fieldValue": "={{ $json.message_type }}"
+            },
+            {
+              "fieldId": "approval_status",
+              "fieldValue": "pending"
+            },
+            {
+              "fieldId": "send_status",
+              "fieldValue": "not_sent"
+            }
+          ]
+        }
+      },
+      "id": "57637d11-c9a1-4160-afd6-b3d56465def4",
+      "name": "Queue Follow Up Message",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        896,
+        192
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "follow_up_schedules",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Build Follow Up Row\").item.json.schedule_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "generated"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "id": "2c70b37e-125e-4b83-93d0-fb2dc08196c7",
+      "name": "Mark Schedule Generated",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        240
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "5230c463-472a-48ea-9f6e-527f8d37adce",
+      "name": "Follow Up Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -224,
+        272
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "16a751be-225d-47ea-922f-f810d5577bcb",
+      "name": "Weekend Or Holiday Skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        464
+      ]
+    },
+    {
+      "id": "8473a209-1f0b-4a46-9bd2-20517ab32829",
+      "name": "Claim Schedule",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        336,
+        192
+      ],
+      "parameters": {
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "generating"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "id",
+              "keyValue": "={{ $json.id }}"
+            },
+            {
+              "condition": "eq",
+              "keyName": "status",
+              "keyValue": "pending"
+            }
+          ]
+        },
+        "matchType": "allFilters",
+        "operation": "update",
+        "resource": "row",
+        "tableId": "follow_up_schedules"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "da14fe54-5605-4b47-bb96-acbbeca69726",
+      "name": "Normalize Claim Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        192
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst claimed = items.length > 0 ? items[0].json : {};\nreturn [{ json: { id: claimed.id || '' } }];",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "2883a3f9-cf26-4ded-af95-b85f93be7e4e",
+      "name": "Was Claimed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        336,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id ?? \"\" }}",
+              "operator": {
+                "operation": "notEmpty",
+                "singleValue": true,
+                "type": "string"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a202496a-1342-4dd9-acab-6cce944c0d16",
+      "name": "Get Client Info",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        560,
+        96
+      ],
+      "parameters": {
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "id",
+              "keyValue": "={{ $(\"Follow Up Loop\").item.json.client_id }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "returnAll": false,
+        "tableId": "clients"
+      },
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "8b724580-73ea-47d5-a121-f2926a9d1269",
+      "name": "Get Campaign Language",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "id",
+              "keyValue": "={{ $(\"Follow Up Loop\").item.json.campaign_id }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "tableId": "campaigns"
+      },
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "fc6ad056-ce20-4286-876d-eb9c443d4681",
+      "name": "Mark Schedule Duplicate Skipped",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        896,
+        400
+      ],
+      "parameters": {
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "generated"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "id",
+              "keyValue": "={{ $(\"Build Follow Up Row\").item.json.schedule_id }}"
+            }
+          ]
+        },
+        "matchType": "allFilters",
+        "operation": "update",
+        "tableId": "follow_up_schedules"
+      }
+    },
+    {
+      "id": "509c3eca-6d8e-410e-bef0-5b57f73e6c24",
+      "name": "Get Platform Settings",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        560,
+        0
+      ],
+      "parameters": {
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "id",
+              "keyValue": "1"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "resource": "row",
+        "tableId": "platform_settings"
+      },
+      "notes": "Supplies the agency fallback postal address and the unsubscribe base URL, so follow-ups carry the same compliance footer as the initial email."
+    },
+    {
+      "id": "74a22ada-662d-41ee-8e0e-82165afb752f",
+      "name": "Follow Up Content OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        784,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.replace(/\\n\\n--[\\s\\S]*/, '').trim().length }}",
+              "operator": {
+                "operation": "gt",
+                "type": "number"
+              },
+              "rightValue": 10
+            },
+            {
+              "leftValue": "={{ $json._truncated }}",
+              "operator": {
+                "operation": "false",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "notes": "Blocks a truncated or empty follow-up from reaching the approval queue, the same guard WF2 has."
+    },
+    {
+      "id": "799b0173-c79a-4f4b-97ca-267a0b051071",
+      "name": "Log Follow Up Failure",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        784,
+        432
+      ],
+      "parameters": {
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "source",
+              "fieldValue": "wf5_follow_up"
+            },
+            {
+              "fieldId": "error_type",
+              "fieldValue": "generation_failed"
+            },
+            {
+              "fieldId": "message",
+              "fieldValue": "={{ $json._truncated ? 'Follow-up was truncated by the model (finishReason MAX_TOKENS) and was not queued.' : 'Follow-up generation produced no usable content.' }}"
+            },
+            {
+              "fieldId": "context",
+              "fieldValue": "={{ { prospect_id: $json.prospect_id, client_id: $json.client_id, campaign_id: $json.campaign_id, schedule_id: $json.schedule_id, language: $json._language } }}"
+            },
+            {
+              "fieldId": "severity",
+              "fieldValue": "error"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "error_logs"
+      },
+      "notes": "Surfaces follow-up generation failures on the admin Monitoring screen instead of silently cancelling the schedule.",
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "326992ca-21ae-46fb-a3fc-7b1abe94d12c",
+      "name": "Reset Stale Claims",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        272
+      ],
+      "parameters": {
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "status",
+              "keyValue": "generating"
+            },
+            {
+              "condition": "lt",
+              "keyName": "updated_at",
+              "keyValue": "={{ $now.minus({ minutes: 30 }).toISO() }}"
+            }
+          ]
+        },
+        "matchType": "allFilters",
+        "operation": "update",
+        "tableId": "follow_up_schedules"
+      },
+      "notes": "Claims left in generating for over 30 minutes (failed generation) go back to pending so the follow-up is retried instead of stuck forever.",
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "c7becd01-d6f2-47e2-abfd-f65f4dce0483",
+      "name": "Localize Copy",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        728,
+        112
+      ],
+      "parameters": {
+        "jsCode": "const j = $input.item.json;\nconst lang = j._language || 'English';\nconst cz = lang === 'Czech';\nlet subject = String(j.subject || '');\nconst body = String(j.body || '');\nconst idx = body.indexOf('\\n\\n--');\nlet main = idx >= 0 ? body.slice(0, idx) : body;\nlet foot = idx >= 0 ? body.slice(idx) : '';\nlet leak = false;\n\n// Per-language footer wording. {u} is the unsubscribe URL.\nconst D = {\n  English: { label: 'This is a commercial message from ', via: ', sent via ', unsub: 'Unsubscribe: {u} or reply \"unsubscribe\".', unsubReply: 'To unsubscribe, reply \"unsubscribe\".', source: 'We found your contact details from publicly available sources (company website).', priv: 'Privacy notice: ', s1: 'Quick question about ', s2: 'A quick idea for ', s3: 'Following up - ' },\n  Czech: { label: 'Obchodní sdělení od ', via: ', zasláno prostřednictvím ', unsub: 'Odhlásit se: {u} nebo odpovězte \"unsubscribe\".', unsubReply: 'Pro odhlášení odpovězte \"unsubscribe\".', source: 'Váš kontakt jsme získali z veřejně dostupných zdrojů (web společnosti).', priv: 'Ochrana osobních údajů: ', s1: 'Krátká otázka ohledně ', s2: 'Nápad pro ', s3: 'Navazujeme na náš e-mail - ' },\n  German: { label: 'Werbliche Nachricht von ', via: ', versendet über ', unsub: 'Abmelden: {u} oder antworten Sie \"unsubscribe\".', unsubReply: 'Zum Abmelden antworten Sie \"unsubscribe\".', source: 'Ihre Kontaktdaten stammen aus öffentlich zugänglichen Quellen (Unternehmenswebsite).', priv: 'Datenschutzhinweis: ', s1: 'Kurze Frage zu ', s2: 'Eine Idee für ', s3: 'Nachfrage - ' },\n  Slovak: { label: 'Obchodné oznámenie od ', via: ', zaslané prostredníctvom ', unsub: 'Odhlásiť sa: {u} alebo odpovedzte \"unsubscribe\".', unsubReply: 'Na odhlásenie odpovedzte \"unsubscribe\".', source: 'Váš kontakt sme získali z verejne dostupných zdrojov (web spoločnosti).', priv: 'Ochrana osobných údajov: ', s1: 'Krátka otázka ohľadom ', s2: 'Nápad pre ', s3: 'Nadväzujeme na náš e-mail - ' },\n  Polish: { label: 'Wiadomość handlowa od ', via: ', wysłana za pośrednictwem ', unsub: 'Wypisz się: {u} lub odpowiedz \"unsubscribe\".', unsubReply: 'Aby się wypisać, odpowiedz \"unsubscribe\".', source: 'Twoje dane kontaktowe pozyskaliśmy z publicznie dostępnych źródeł (strona internetowa firmy).', priv: 'Informacja o ochronie danych: ', s1: 'Krótkie pytanie dotyczące ', s2: 'Pomysł dla ', s3: 'Nawiązujemy do naszego e-maila - ' },\n  French: { label: 'Message commercial de ', via: ', envoyé via ', unsub: 'Se désabonner : {u} ou répondez \"unsubscribe\".', unsubReply: 'Pour vous désabonner, répondez \"unsubscribe\".', source: 'Nous avons obtenu vos coordonnées à partir de sources publiques (site web de l\\'entreprise).', priv: 'Protection des données : ', s1: 'Petite question au sujet de ', s2: 'Une idée pour ', s3: 'Suite à notre e-mail - ' },\n  Spanish: { label: 'Mensaje comercial de ', via: ', enviado a través de ', unsub: 'Darse de baja: {u} o responda \"unsubscribe\".', unsubReply: 'Para darse de baja, responda \"unsubscribe\".', source: 'Obtuvimos sus datos de contacto de fuentes de acceso público (sitio web de la empresa).', priv: 'Protección de datos: ', s1: 'Una breve pregunta sobre ', s2: 'Una idea para ', s3: 'Seguimiento de nuestro correo - ' },\n  Italian: { label: 'Comunicazione commerciale di ', via: ', inviata tramite ', unsub: 'Annulla l\\'iscrizione: {u} oppure rispondi \"unsubscribe\".', unsubReply: 'Per annullare l\\'iscrizione, rispondi \"unsubscribe\".', source: 'Abbiamo ottenuto i tuoi dati di contatto da fonti pubblicamente accessibili (sito web dell\\'azienda).', priv: 'Informativa sulla privacy: ', s1: 'Una breve domanda su ', s2: 'Un\\'idea per ', s3: 'Facendo seguito alla nostra e-mail - ' },\n  Dutch: { label: 'Commercieel bericht van ', via: ', verzonden via ', unsub: 'Uitschrijven: {u} of antwoord met \"unsubscribe\".', unsubReply: 'Om u uit te schrijven, antwoordt u met \"unsubscribe\".', source: 'Wij hebben uw contactgegevens verkregen uit openbare bronnen (website van het bedrijf).', priv: 'Privacyverklaring: ', s1: 'Korte vraag over ', s2: 'Een idee voor ', s3: 'Naar aanleiding van onze e-mail - ' }\n};\nconst known = !!D[lang];\nconst L = D[lang] || D.English;\n\n// EU detection: campaign country, falling back to the client's country.\nconst EU = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE'];\nlet campaign = {};\nfor (const n of ['Get Campaign', 'Get Sequence Campaign', 'Get Campaign Info']) {\n  try { const c = $(n).item.json; if (c) { campaign = c; break; } } catch (e) {}\n}\nlet client = {};\nfor (const n of ['Get Client', 'Get Client Info', 'Get Sequence Client']) {\n  try { const c = $(n).item.json; if (c) { client = c; break; } } catch (e) {}\n}\nconst country = String(campaign.country || client.country || '').toUpperCase();\nconst eu = cz || EU.indexOf(country) >= 0;\n\nlet m = subject.match(/^Quick question about (.*)$/);\nif (m && lang !== 'English') subject = L.s1 + m[1];\nm = subject.match(/^A quick idea for (.*)$/);\nif (m && lang !== 'English') subject = L.s2 + m[1];\nm = subject.match(/^Following up - (.*)$/);\nif (m && lang !== 'English') subject = L.s3 + m[1];\n\nif (cz) {\n  main = main.replace(/^[ \\t]*(Hello|Good day|Hi|Dear)\\b[^\\n]*,[ \\t]*$/im, 'Dobrý den,');\n  main = main.replace(/^[ \\t]*(Have a wonderful day|Have a great day|Best regards|Kind regards|Warm regards|Sincerely|Best)[ \\t]*,?[ \\t]*$/gim, 'S přáním krásného dne,');\n}\nif (lang !== 'English') {\n  const stop = main.toLowerCase().match(/\\b(the|and|your|with|our|would|could|please|thank|hello|regards)\\b/g) || [];\n  leak = stop.length >= 3;\n}\n\n// Compact footer: label + sender + address, then the unsubscribe line.\nfunction compact(f) {\n  const lines = f.replace(/^\\n+--\\n?/, '').split('\\n').map(function (s) { return s.trim(); }).filter(Boolean);\n  const urlM = f.match(/https?:\\/\\/\\S*unsubscribe\\?t=\\S+/);\n  const url = urlM ? urlM[0] : '';\n  const ident = [];\n  let site = '';\n  for (const l of lines) {\n    if (/^(Toto je obchodní sdělení\\.|This is a commercial message\\.)$/.test(l)) continue;\n    if (/^(You received this because|Tento e-mail jste obdrželi)/.test(l)) continue;\n    if (/unsubscribe\\?t=/.test(l)) continue;\n    if (/(reply \"unsubscribe\"|odpov(ědět|ězte) slovem|If you would rather not hear|Pokud již tyto e-maily nechcete dostávat, odpov)/i.test(l)) continue;\n    if (/^https?:\\/\\//.test(l)) { site = l; continue; }\n    ident.push(l);\n  }\n  if (!ident.length) return f;\n  const name = ident[0];\n  const bi = ident.findIndex(function (l) { return /^(Sent on behalf of|Zasláno jménem)/.test(l); });\n  const sd = site.replace(/^https?:\\/\\//, '').replace(/\\/$/, '');\n  let tail = null;\n  if (bi >= 0) {\n    const am = ident[bi].match(/(?:\\sby|společností)\\s+(.+)$/);\n    tail = (am ? am[1] : '') + (ident[bi + 1] ? ', ' + ident[bi + 1] : '');\n  }\n  let first = L.label + name + (sd ? ' (' + sd + ')' : '');\n  if (tail) first += L.via + tail;\n  else if (ident.length > 1) first += ', ' + ident.slice(1).join(', ');\n  if (!/\\.$/.test(first)) first += '.';\n  const unsub = url ? L.unsub.replace('{u}', url) : L.unsubReply;\n  return '\\n\\n' + first + '\\n' + unsub;\n}\nif (foot) foot = compact(foot);\n\n// EU extras: where we got the contact, and the client's privacy notice link.\nconst priv = String(client.privacy_url || '').trim();\nif (foot && eu && foot.indexOf(L.source) < 0) foot += '\\n' + L.source;\nif (foot && priv && foot.indexOf(priv) < 0) foot += '\\n' + L.priv + priv;\n\n// A language with no footer wording yet gets the English footer; flag it for review.\nconst untranslated = lang !== 'English' && !known;\n\nreturn { json: Object.assign({}, j, { subject, body: main + foot, _truncated: j._truncated || leak || (eu && untranslated), _english_leak: leak, _eu: eu, _footer_untranslated: untranslated }) };\n",
+        "language": "javaScript",
+        "mode": "runOnceForEachItem"
+      }
+    }
+  ],
+  "connections": {
+    "Daily at 8AM": {
+      "main": [
+        [
+          {
+            "node": "Check Holiday Today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Holiday Today": {
+      "main": [
+        [
+          {
+            "node": "Is Business Day?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Business Day?": {
+      "main": [
+        [
+          {
+            "node": "Reset Stale Claims",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Weekend Or Holiday Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Contacted No Reply": {
+      "main": [
+        [
+          {
+            "node": "Follow Up Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Due Schedule": {
+      "main": [
+        [
+          {
+            "node": "Is Due Now?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Due Now?": {
+      "main": [
+        [
+          {
+            "node": "Claim Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Follow Up Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Follow Up": {
+      "main": [
+        [
+          {
+            "node": "Build Follow Up Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Follow Up Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue Follow Up Message": {
+      "main": [
+        [
+          {
+            "node": "Mark Schedule Generated",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Schedule Duplicate Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Schedule Generated": {
+      "main": [
+        [
+          {
+            "node": "Follow Up Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Follow Up Loop": {
+      "main": [
+        [
+          {
+            "node": "Loop Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Due Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Schedule": {
+      "main": [
+        [
+          {
+            "node": "Normalize Claim Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Claim Result": {
+      "main": [
+        [
+          {
+            "node": "Was Claimed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Was Claimed?": {
+      "main": [
+        [
+          {
+            "node": "Get Client Info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Follow Up Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Client Info": {
+      "main": [
+        [
+          {
+            "node": "Get Campaign Language",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Schedule Duplicate Skipped": {
+      "main": [
+        [
+          {
+            "node": "Follow Up Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Campaign Language": {
+      "main": [
+        [
+          {
+            "node": "Get Platform Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Platform Settings": {
+      "main": [
+        [
+          {
+            "node": "Generate Follow Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Follow Up Content OK?": {
+      "main": [
+        [
+          {
+            "node": "Queue Follow Up Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Follow Up Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Follow Up Failure": {
+      "main": [
+        [
+          {
+            "node": "Follow Up Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reset Stale Claims": {
+      "main": [
+        [
+          {
+            "node": "Get Contacted No Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Follow Up Row": {
+      "main": [
+        [
+          {
+            "node": "Localize Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Localize Copy": {
+      "main": [
+        [
+          {
+            "node": "Follow Up Content OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

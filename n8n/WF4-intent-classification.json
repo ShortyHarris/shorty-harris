@@ -1,0 +1,1628 @@
+{
+  "id": "9FuCEjdyd2UCFMRU",
+  "name": "WF4 - Intent Classification (Supabase)",
+  "active": true,
+  "versionId": "bd30c92d-8344-4c80-a84e-c6222bf12b00",
+  "activeVersionId": "bd30c92d-8344-4c80-a84e-c6222bf12b00",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "AREZb2BtNxt2LBMx",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {}
+      },
+      "id": "1b0be910-5ca5-41d8-aa95-cef9436be745",
+      "name": "Gmail Reply Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -2016,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "id",
+              "keyValue": "={{ $(\"Resolve Prospect Match\").first().json.prospect_id }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "resource": "row",
+        "tableId": "prospects"
+      },
+      "id": "6a5b08f8-0444-4d73-ada7-a94567eb898c",
+      "name": "Lookup Prospect",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1584,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "gmail_thread_id",
+              "keyValue": "={{ $(\"Extract Sender\").item.json.thread_id || \"__no_thread_match__\" }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "tableId": "messages"
+      },
+      "id": "d890fc28-3a08-4da8-80ca-9e10c5fe97ec",
+      "name": "Find Original Message",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1344,
+        192
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "builtInTools": {
+          "codeExecution": false,
+          "googleSearch": false,
+          "urlContext": false
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=WHAT WE SELL (the sender's offer):\n{{ $('Get Client For Classifier').first().json.business_name }} sells: {{ $('Get Client For Classifier').first().json.business_type }}.\nWe emailed this prospect to offer them that. We are the seller. They are the potential buyer.\n\nTHE PROSPECT RECORD WE MATCHED THIS REPLY TO: {{ $('Lookup Prospect').first().json.business_name }} ({{ $('Lookup Prospect').first().json.category }}), address on file {{ $('Lookup Prospect').first().json.email }}.\nHOW IT WAS MATCHED: {{ $('Resolve Prospect Match').first().json.match_method }} (thread = replied inside our email thread, email = the sender is the exact address we wrote to, domain = only the company domain matched, so it may be a different person or conversation).\n\nTHE EMAIL WE SENT THEM (what they are supposed to be replying to):\nSubject: {{ $('Get Sent Message').first().json.subject ?? '(not found)' }}\n{{ String($('Get Sent Message').first().json.body ?? '').split('\\n\\n--')[0].slice(0, 700) }}\n\nTHEIR REPLY (it may include quoted earlier messages):\n{{ $(\"Extract Sender\").item.json.reply_text }}\n\nClassify it. Output exactly three lines, nothing else:\nLine 1: one token from: interested, question, resend_request, referred, maybe, not_interested, stop, wrong_person, out_of_office, automated, existing_conversation, uncertain\nLine 2: high or low (your confidence)\nLine 3: one short instruction for the client on what to do next, in plain words. If no action is needed, write \"No action needed.\""
+            }
+          ]
+        },
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "models/gemini-2.5-flash"
+        },
+        "operation": "message",
+        "options": {
+          "includeMergedResponse": true,
+          "maxOutputTokens": 2048,
+          "systemMessage": "You classify replies to a cold sales email. You work for the SELLER. The prospect received our offer. Your only job is to judge what the prospect's reply means for the seller.\n\nTHE MOST COMMON AND MOST EXPENSIVE MISTAKE is marking a reply \"interested\" when it is not a reply to our outreach, or when the prospect has not actually expressed interest in buying what we sell. \"interested\" creates a hot lead and charges the client money, so it must clear a high bar. When in doubt, never choose interested.\n\nTEST 0, THE ORIGIN TEST, apply this before anything else. We only count replies to OUR outreach email, which is shown above. If the reply belongs to a different conversation, choose existing_conversation. Signs of that: it quotes or answers a price quote, offer, order, invoice, site visit or message that is NOT our outreach email; it discusses work already agreed, in progress or being negotiated; it names a different property, person or project than the one we wrote to; the sender clearly already deals with the seller through other channels (for example they reply to a quote the seller's staff sent separately); or the match method is domain and the content does not clearly answer our email. An existing customer negotiating their own quote is existing_conversation, never interested, however much it sounds like a buyer.\n\nTEST 1, THE DIRECTION TEST: who is being sold to in this reply? We are selling to them. If the reply instead treats us as THEIR potential customer, asks what we need, offers us their services, quotes us a price, sends us their office hours or intake process, or asks us to submit a request, then the prospect has misunderstood the email. That is never \"interested\". Use question if they are asking us something, otherwise uncertain.\n\nTHE CATEGORIES, in the order you should test them:\n\n1. stop: they ask to be removed, unsubscribed, to stop emailing, or tell us not to contact them again. Any clear opt-out.\n\n2. wrong_person: they say they are not the right contact and do not pass it on, or the role or company does not match.\n\n3. out_of_office: an absence or holiday auto-reply, a return date, a stand-in contact while away.\n\n4. automated: machine-generated boilerplate with no human behind it. Ticket numbers, no-reply notices, mailing-list confirmations, generic \"we have received your message\" acknowledgements, intake forms, booking confirmations. Positive-sounding words like \"thank you for your interest\" do not make it a human reply.\n\n5. existing_conversation: see Test 0. Choose it whenever the reply is clearly about correspondence outside our outreach.\n\n6. resend_request: a human says they did not get our earlier email, asks us to resend or forward it, or cannot open an attachment or link. They are asking for the message, not for our product. This is NOT interested, however polite or helpful the reply sounds.\n\n7. referred: a human is passing it to a colleague, a department, or another company, or giving us someone else's contact details. Even if they add a kind word, forwarding is not buying. If they also say the company does not need it, choose not_interested instead.\n\n8. not_interested: a decline. They say no, they already have a supplier, they do it in-house, they have no need, no budget, or the timing is wrong with no opening. Polite thanks followed by a reason it does not apply is still a decline.\n\n9. interested: ONLY when a human, replying to OUR outreach, shows real interest in buying or seriously evaluating what WE sell. It must contain at least one of these: asking for a call, a meeting or a time; asking for pricing, a quote or a proposal; asking how to start or sign up; asking a specific question about our offer that shows they are weighing it; or plainly saying they want it. Examples that qualify: \"we would like to discuss snow removal, are you available next week\", \"send me your rates\", \"we can try it\". If none of that is present, or the reply is really about something else, do not use interested.\n\n10. question: a human asks us something real but has not shown buying interest yet, and it is not covered above. Also use this when they have misunderstood what we offer and are asking about it.\n\n11. maybe: a human engages, leaves the door open but commits to nothing, for example \"not now, try us in the spring\" or \"send me some information and I will look\".\n\n12. uncertain: you genuinely cannot tell, the reply is too short or garbled, or the direction test failed and nothing else fits.\n\nCONFIDENCE on line 2: write high only when the category is obvious from what they actually wrote. Write low whenever you are weighing two categories, the reply is vague, or you are reading between the lines. Never write high for interested unless the reply contains explicit words asking for a call, pricing, or to start, AND the reply clearly answers our email.\n\nLine 3 is for the client, not for us. Say what the person should do, in plain words, for example \"Reply with your rates and two times you could call.\" or \"Send them the original email again.\" For stop, wrong_person, out_of_office, automated and not_interested, write \"No action needed.\" For existing_conversation write what it appears to be, for example \"This is a reply to a separate quote, not to our outreach. Handle it as normal correspondence.\"\n\nOutput exactly three lines. No labels, no markdown, no commentary.",
+          "temperature": 0.1
+        },
+        "resource": "text"
+      },
+      "id": "ab25f4f6-02c5-404b-b980-f436878d98cf",
+      "name": "Classify Intent",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -1120,
+        192
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nlet out = String(raw.mergedResponse || '');\nif (!out) {\n  out = (raw.content && raw.content.parts && raw.content.parts[0] && raw.content.parts[0].text)\n    || (raw.candidates && raw.candidates[0] && raw.candidates[0].content && raw.candidates[0].content.parts && raw.candidates[0].content.parts[0] && raw.candidates[0].content.parts[0].text)\n    || raw.text || '';\n}\nconst lines = String(out).trim().split('\\n').map(l => l.trim()).filter(Boolean);\nconst line1 = (lines[0] || '').toLowerCase();\nconst line2 = (lines[1] || '').toLowerCase();\nconst line3 = lines.slice(2).join(' ').trim();\n\nconst VALID = ['interested','question','resend_request','referred','maybe','not_interested','stop','wrong_person','out_of_office','automated','existing_conversation','uncertain'];\n// Longest and most specific tokens first, so resend_request is not eaten by a looser match.\nconst ORDER = ['existing_conversation','not_interested','resend_request','out_of_office','wrong_person','referred','automated','uncertain','question','interested','maybe','stop'];\nlet intent = '';\nfor (const k of ORDER) {\n  if (line1.indexOf(k) !== -1 || line1.indexOf(k.replace(/_/g, ' ')) !== -1) { intent = k; break; }\n}\nif (!VALID.includes(intent)) intent = 'uncertain';\n\nconst confident = /\\bhigh\\b/.test(line2);\n\nconst resolved = $('Resolve Prospect Match').first().json || {};\nconst method = resolved.match_method || 'none';\n\nlet suggested_action = line3;\n\n// A hot lead costs the client a credit, so it needs BOTH a confident 'interested' AND a strong match.\n// A domain-only match can be a different person or a different conversation entirely.\nif (intent === 'interested' && !confident) intent = 'question';\nif (intent === 'interested' && method !== 'thread' && method !== 'email') {\n  intent = 'question';\n  suggested_action = 'Matched by company domain only, not by our email thread or the exact address we wrote to. Check that this is really a reply to our outreach before treating it as a lead.' + (line3 ? ' ' + line3 : '');\n}\n\nconst NO_ACTION = ['not_interested','stop','wrong_person','out_of_office','automated'];\nif (NO_ACTION.includes(intent)) {\n  suggested_action = 'No action needed.';\n} else if (!suggested_action) {\n  if (intent === 'resend_request') suggested_action = 'Send them the original email again.';\n  else if (intent === 'referred') suggested_action = 'Note the new contact they gave and reach out there.';\n  else if (intent === 'existing_conversation') suggested_action = 'This is a reply to correspondence outside our outreach. Handle it as normal correspondence.';\n  else if (intent === 'interested') suggested_action = 'Reply today with times you could talk.';\n  else suggested_action = 'Read the reply and decide whether to answer.';\n}\n\nconst prospect = $('Lookup Prospect').first().json;\nconst sender = $('Extract Sender').first().json;\nreturn [{ json: {\n  prospect_id: prospect.id,\n  client_id: prospect.client_id,\n  business_name: prospect.business_name || '',\n  message_id: resolved.message_id || null,\n  reply_text: sender.reply_text,\n  intent,\n  intent_confidence: confident ? 0.95 : 0.6,\n  suggested_action\n} }];",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "id": "8eeba3d0-30dc-480b-9d21-0237412e97a1",
+      "name": "Build Reply Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "prospect_id",
+              "fieldValue": "={{ $json.prospect_id }}"
+            },
+            {
+              "fieldId": "message_id",
+              "fieldValue": "={{ $json.message_id }}"
+            },
+            {
+              "fieldId": "client_id",
+              "fieldValue": "={{ $json.client_id }}"
+            },
+            {
+              "fieldId": "body",
+              "fieldValue": "={{ $json.reply_text }}"
+            },
+            {
+              "fieldId": "intent",
+              "fieldValue": "={{ $json.intent }}"
+            },
+            {
+              "fieldId": "intent_confidence",
+              "fieldValue": "={{ $json.intent_confidence }}"
+            },
+            {
+              "fieldId": "classified_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "gmail_message_id",
+              "fieldValue": "={{ $(\"Format As Email\").item.json.gmail_message_id ?? '' }}"
+            },
+            {
+              "fieldId": "match_method",
+              "fieldValue": "={{ $('Resolve Prospect Match').first().json.match_method ?? '' }}"
+            }
+          ]
+        },
+        "tableId": "replies"
+      },
+      "id": "48043622-178b-4256-a4b9-abc958e54a5b",
+      "name": "Insert Reply",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -672,
+        192
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "pipeline_status",
+              "fieldValue": "={{ $(\"Insert Reply\").first().json.intent === 'bounced' ? 'bounced' : 'replied' }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "id",
+              "keyValue": "={{ ['auto_reply','automated','out_of_office','uncertain'].includes($(\"Insert Reply\").first().json.intent) ? '00000000-0000-0000-0000-000000000000' : $(\"Insert Reply\").first().json.prospect_id }}"
+            },
+            {
+              "condition": "neq",
+              "keyName": "pipeline_status",
+              "keyValue": "hot_lead"
+            },
+            {
+              "condition": "neq",
+              "keyName": "pipeline_status",
+              "keyValue": "won"
+            },
+            {
+              "condition": "neq",
+              "keyName": "pipeline_status",
+              "keyValue": "called"
+            }
+          ]
+        },
+        "matchType": "allFilters",
+        "operation": "update",
+        "resource": "row",
+        "tableId": "prospects"
+      },
+      "id": "1eea0fab-f846-49a6-9098-4995d22fc0ba",
+      "name": "Mark Prospect Replied",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        192
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "other"
+        },
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Insert Reply\").first().json.intent }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "interested"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Insert Reply\").first().json.intent }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "stop"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              }
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Insert Reply\").first().json.intent }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "bounced"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              }
+            }
+          ]
+        }
+      },
+      "id": "d08bda21-19a9-45b1-b869-6a4334ea5cbb",
+      "name": "Route By Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -224,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsonBody": "={{ { \"prospect_id\": $(\"Build Reply Row\").first().json.prospect_id, \"intent\": $(\"Build Reply Row\").first().json.intent, \"reply_id\": $(\"Insert Reply\").first().json.id, \"business_name\": $(\"Build Reply Row\").first().json.business_name, \"ai_summary\": $(\"Build Reply Row\").first().json.business_name + \" replied: \" + $(\"Build Reply Row\").first().json.reply_text, \"suggested_action\": $(\"Build Reply Row\").first().json.suggested_action } }}",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://n8n.shortyharris.com/webhook/wf6-hot-lead"
+      },
+      "id": "22ec2b15-7818-4cba-b14b-571e15080a46",
+      "name": "Route To WF6",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $(\"Extract Sender\").first().json.sender_email }}"
+            },
+            {
+              "fieldId": "reason",
+              "fieldValue": "stop_request"
+            },
+            {
+              "fieldId": "source_prospect_id",
+              "fieldValue": "={{ $(\"Insert Reply\").first().json.prospect_id }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "do_not_contact"
+      },
+      "id": "3c6d7a84-1179-4b33-bcae-1d2ebd97f9f0",
+      "name": "Add To Do Not Contact",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "7885eb73-fef5-4288-bd50-93a0a6732173",
+      "name": "Logged Only",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_CdK80AB1j_99hPPZGGS_jA_XYsNzrUs"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_CdK80AB1j_99hPPZGGS_jA_XYsNzrUs"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "jsonBody": "={{ { \"p_prospect_id\": (['auto_reply','automated','out_of_office','bounced','uncertain'].includes($(\"Insert Reply\").first().json.intent) ? '00000000-0000-0000-0000-000000000000' : $(\"Insert Reply\").first().json.prospect_id) } }}",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "url": "https://lxoeotyibsalbxgbjfxo.supabase.co/rest/v1/rpc/record_ab_reply"
+      },
+      "id": "605ba705-fad8-4b66-927a-26057a52cc72",
+      "name": "Record AB Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "pid-check",
+              "leftValue": "={{ $json.prospect_id }}",
+              "operator": {
+                "operation": "notEmpty",
+                "singleValue": true,
+                "type": "string"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e08d2b14-b5f2-42d0-a6ea-d61cc5035b66",
+      "name": "Has Prospect Match",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1616,
+        496
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f32b2e6c-f4dd-4a01-b02a-e5ea54d47965",
+      "name": "Not A Prospect Reply",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -1120,
+        464
+      ],
+      "notes": "Email did not match any sent message thread - ignore (spam/newsletter/unsolicited)"
+    },
+    {
+      "id": "b0006a36-516f-473f-81ab-c5b7ee20c3d1",
+      "name": "Find Prospect By Sender Email",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1616,
+        700
+      ],
+      "parameters": {
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "email",
+              "keyValue": "={{ $(\"Extract Sender\").item.json.match_email }}"
+            },
+            {
+              "condition": "eq",
+              "keyName": "client_id",
+              "keyValue": "={{ $(\"Extract Sender\").item.json._client_id }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "tableId": "prospects"
+      }
+    },
+    {
+      "id": "f4bf9269-3545-46e5-af2a-89b42fe7a9c6",
+      "name": "Has Email Match",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1392,
+        700
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id ?? \"\" }}",
+              "operator": {
+                "operation": "notEmpty",
+                "singleValue": true,
+                "type": "string"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "cd22a25b-a10c-4f7c-9f05-360320fd574f",
+      "name": "Find Latest Message For Prospect",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1168,
+        640
+      ],
+      "parameters": {
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "prospect_id",
+              "keyValue": "={{ $json.id }}"
+            },
+            {
+              "condition": "eq",
+              "keyName": "send_status",
+              "keyValue": "sent"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "tableId": "messages"
+      }
+    },
+    {
+      "id": "2607ae3d-fca5-4957-88de-259dd8a569a1",
+      "name": "Resolve Prospect Match",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1616,
+        400
+      ],
+      "parameters": {
+        "jsCode": "let src = null;\nlet method = 'none';\ntry { const a = $('Find Original Message').first().json; if (a && a.id) { src = a; method = 'thread'; } } catch (e) {}\nif (!src) {\n  try {\n    const b = $('Find Latest Message For Prospect').first().json;\n    if (b && b.id) {\n      src = b;\n      let em = null;\n      try { em = $('Normalize Email Match').first().json; } catch (e) {}\n      method = (em && em.id) ? 'email' : 'domain';\n    }\n  } catch (e) {}\n}\nif (!src) src = {};\nreturn [{ json: {\n  prospect_id: src.prospect_id || '',\n  message_id: src.id || null,\n  gmail_thread_id: src.gmail_thread_id || '',\n  match_method: method\n} }];",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "02bbc281-a07d-4ddd-a01a-0b195b8a37d7",
+      "name": "Detect Automated Sender",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1344,
+        -48
+      ],
+      "parameters": {
+        "jsCode": "const sender = $('Extract Sender').first().json;\nconst email = (sender.sender_email || '').toLowerCase();\nconst text = (sender.reply_text || '').toLowerCase();\n\n// Bounces: mail delivery failures - a real deliverability problem worth tracking.\nconst bounceSenderPatterns = ['mailer-daemon', 'postmaster', 'mailer_daemon', 'bounce@'];\nconst bounceTextPatterns = [\n  \"wasn't delivered\", \"was not delivered\", \"delivery status notification\", \"undeliverable\",\n  \"delivery has failed\", \"delivery failed\", \"returned mail\", \"failure notice\", \"message could not be delivered\"\n];\n\n// Auto-replies: out-of-office / generic acks / no-reply inboxes - not a bounce, not a real reply either.\nconst autoReplySenderPatterns = ['no-reply', 'noreply', 'donotreply', 'do-not-reply'];\nconst autoReplyTextPatterns = [\n  \"out of office\", \"automatic reply\", \"auto-reply\", \"autoreply\", \"this is an automated\",\n  \"away from my desk\", \"away from the office\", \"on vacation\", \"on leave\",\n  \"we have received your\", \"your request has been forwarded\", \"thank you for contacting\",\n  \"we will respond to your email\", \"this mailbox is not monitored\", \"do not reply to this email\"\n];\n\nlet category = null; // 'bounced' | 'auto_reply' | null\nlet reason = null;\n\nfor (const p of bounceSenderPatterns) { if (email.includes(p)) { category = 'bounced'; reason = 'sender pattern: ' + p; break; } }\nif (!category) { for (const p of bounceTextPatterns) { if (text.includes(p)) { category = 'bounced'; reason = 'text pattern: \"' + p + '\"'; break; } } }\nif (!category) { for (const p of autoReplySenderPatterns) { if (email.includes(p)) { category = 'auto_reply'; reason = 'sender pattern: ' + p; break; } } }\nif (!category) { for (const p of autoReplyTextPatterns) { if (text.includes(p)) { category = 'auto_reply'; reason = 'text pattern: \"' + p + '\"'; break; } } }\n\nreturn [{ json: { is_automated: !!category, automated_category: category || '', automated_reason: reason || '' } }];"
+      }
+    },
+    {
+      "id": "31f22e20-3527-4335-8afa-e9da2f012c58",
+      "name": "Is Automated?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1120,
+        -48
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.is_automated }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "87a6e1b9-3652-40cd-9d2b-ea3ff2d2cad0",
+      "name": "Build Automated Reply Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        -160
+      ],
+      "parameters": {
+        "jsCode": "const prospect = $('Lookup Prospect').first().json;\nconst sender = $('Extract Sender').first().json;\nconst resolved = $('Resolve Prospect Match').first().json || {};\nconst auto = $('Detect Automated Sender').first().json;\nconst intent = auto.automated_category === 'bounced' ? 'bounced' : 'auto_reply';\nreturn [{ json: {\n  prospect_id: prospect.id,\n  client_id: prospect.client_id,\n  business_name: prospect.business_name || '',\n  message_id: resolved.message_id || null,\n  reply_text: sender.reply_text,\n  intent,\n  intent_confidence: 1.0,\n  suggested_action: 'No action needed. (' + (auto.automated_reason || 'automated message detected') + ')'\n} }];"
+      }
+    },
+    {
+      "id": "7e68f97f-7930-4e2b-be36-cfcd945d1d1d",
+      "name": "Extract Sender Domain",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1616,
+        880
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dom",
+              "name": "sender_domain",
+              "type": "string",
+              "value": "={{ (() => { const s = $(\"Extract Sender\").item.json; const free = new Set(['gmail.com','googlemail.com','yahoo.com','yahoo.co.uk','hotmail.com','hotmail.co.uk','outlook.com','live.com','msn.com','aol.com','icloud.com','me.com','mac.com','protonmail.com','proton.me','pm.me','gmx.com','gmx.net','gmx.de','gmx.at','gmx.ch','mail.com','yandex.com','yandex.ru','mail.ru','zoho.com','fastmail.com','ymail.com','rocketmail.com','hey.com','tutanota.com','seznam.cz','email.cz','centrum.cz','volny.cz','post.cz','atlas.cz','tiscali.cz','iol.cz','quick.cz','zoznam.sk','centrum.sk','azet.sk','post.sk','web.de','t-online.de','freenet.de','arcor.de','wp.pl','o2.pl','onet.pl','onet.eu','interia.pl','op.pl','poczta.fm','orange.fr','free.fr','laposte.net','sfr.fr','wanadoo.fr','libero.it','virgilio.it','tiscali.it','alice.it','ziggo.nl','kpnmail.nl','btinternet.com','comcast.net','verizon.net','att.net','sbcglobal.net','bellsouth.net','cox.net','charter.net','earthlink.net','optonline.net']); const em = s.match_email || ''; const dom = (em.split('@')[1] || '').toLowerCase(); const local = (s.sender_email.split('@')[0] || '').toLowerCase(); const system = !s.is_bounce && /^(no-?reply|do-?not-?reply|donotreply|alerts?|notifications?|notify|mailer-daemon|postmaster|bounce|billing|statements?|security|support-noreply)/.test(local); const regionalFree = /^(yahoo|hotmail|outlook|live|msn|gmx)\\.[a-z.]{2,}$/.test(dom); return (free.has(dom) || regionalFree || system || !dom) ? '__skip_free_domain__' : dom; })() }}"
+            }
+          ]
+        },
+        "mode": "manual",
+        "options": {}
+      }
+    },
+    {
+      "id": "e695dc4e-01fe-441c-b966-ff4af0a631fc",
+      "name": "Find Prospect By Domain",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1392,
+        880
+      ],
+      "parameters": {
+        "filters": {
+          "conditions": [
+            {
+              "condition": "like",
+              "keyName": "email",
+              "keyValue": "=%@{{ $json.sender_domain }}"
+            },
+            {
+              "condition": "eq",
+              "keyName": "client_id",
+              "keyValue": "={{ $(\"Extract Sender\").item.json._client_id }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "tableId": "prospects"
+      }
+    },
+    {
+      "id": "db20b380-5328-4d3b-a3a6-4a9bee3c9720",
+      "name": "Has Domain Match",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1168,
+        880
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id ?? \"\" }}",
+              "operator": {
+                "operation": "notEmpty",
+                "singleValue": true,
+                "type": "string"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b58069a8-f8e1-4338-9f17-e6eef565d46f",
+      "name": "Normalize Email Match",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1392,
+        700
+      ],
+      "parameters": {
+        "jsCode": "let found = {};\ntry {\n  const f = $('Find Prospect By Sender Email').first().json;\n  if (f && f.id) found = f;\n} catch (e) {}\nreturn [{ json: { id: found.id || '', client_id: found.client_id || '', business_name: found.business_name || '' } }];",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "1ea791d2-d99c-49cb-b619-01650c4bee83",
+      "name": "Normalize Domain Match",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1168,
+        880
+      ],
+      "parameters": {
+        "jsCode": "let found = {};\ntry {\n  const f = $('Find Prospect By Domain').first().json;\n  if (f && f.id) found = f;\n} catch (e) {}\nreturn [{ json: { id: found.id || '', client_id: found.client_id || '', business_name: found.business_name || '' } }];",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "c15899f4-9826-4878-9df5-55a788ab94a3",
+      "name": "Poll Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2016,
+        192
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4692f2d1-9b0f-4944-b4e8-eaa58c4410d8",
+      "name": "Get Active Client Emails",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1792,
+        192
+      ],
+      "parameters": {
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "status",
+              "keyValue": "active"
+            }
+          ]
+        },
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "returnAll": true,
+        "tableId": "client_email_credentials"
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "398c9897-e437-4770-ac0f-d9cb4595ba15",
+      "name": "Client Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1568,
+        192
+      ],
+      "parameters": {
+        "options": {}
+      }
+    },
+    {
+      "id": "ad271f5e-eca0-4418-a3e5-e47163854fdd",
+      "name": "Fetch Client Replies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1344,
+        192
+      ],
+      "parameters": {
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer sb_publishable_CdK80AB1j_99hPPZGGS_jA_XYsNzrUs"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "jsonBody": "={{ JSON.stringify({ action: \"read_replies\", client_id: $(\"Client Loop\").item.json.client_id, after_epoch: (() => { const now = Date.now(); const last = Date.parse($(\"Client Loop\").item.json.last_reply_poll_at || \"\") || (now - 600000); const floor24h = now - 86400000; const atLeast10min = now - 600000; return Math.floor(Math.max(floor24h, Math.min(last, atLeast10min)) / 1000); })() }) }}",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "url": "https://lxoeotyibsalbxgbjfxo.supabase.co/functions/v1/gmail-client"
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "0e11bf8b-3199-421a-a605-c2a07b9ff03c",
+      "name": "Has New Replies?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1120,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ ($json.messages || []).length }}",
+              "operator": {
+                "operation": "gt",
+                "type": "number"
+              },
+              "rightValue": 0
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e9a0c82a-df02-4d38-aec6-496bb4bdc4a0",
+      "name": "Split Replies",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -896,
+        96
+      ],
+      "parameters": {
+        "fieldToSplitOut": "messages",
+        "options": {}
+      }
+    },
+    {
+      "id": "05cc2306-3d76-4d1f-8b46-06281bc8482a",
+      "name": "Format As Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        96
+      ],
+      "parameters": {
+        "jsCode": "const msg = $json;\nconst clientId = $('Client Loop').item.json.client_id;\nreturn {\n  from: msg.from || '',\n  text: msg.body || msg.snippet || '',\n  snippet: msg.snippet || '',\n  threadId: msg.threadId || msg.thread_id || '',\n  gmail_message_id: msg.id || '',\n  _client_id: clientId\n};",
+        "language": "javaScript",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "599a6b90-3d39-4278-9d4c-a9b6c199ad57",
+      "name": "Already Processed?",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        96
+      ],
+      "parameters": {
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "gmail_message_id",
+              "keyValue": "={{ $json.gmail_message_id }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "tableId": "replies"
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "955cb602-4906-487c-b94a-9f0060ff32ab",
+      "name": "Is New?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -224,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id ?? '' }}",
+              "operator": {
+                "operation": "empty",
+                "type": "string"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8ad90ed4-bd23-4cec-be94-2a88353b35ac",
+      "name": "Extract Sender",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1792,
+        192
+      ],
+      "parameters": {
+        "jsCode": "const email = $json;\nconst fromRaw = email.from || email.From || '';\nconst match = fromRaw.match(/<(.+?)>/);\nconst sender_email = (match ? match[1] : fromRaw).toLowerCase().trim();\n\nconst rawText = email.text || email.snippet || '';\nconst reply_text = rawText\n  .split(/On .+? wrote:/)[0]\n  .split(/^>.*$/m)[0]\n  .split(/-----Original Message-----/)[0]\n  .replace(/&#39;/g, \"'\")\n  .replace(/&quot;/g, '\"')\n  .replace(/&amp;/g, '&')\n  .replace(/&lt;/g, '<')\n  .replace(/&gt;/g, '>')\n  .replace(/&nbsp;/g, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim();\n\n// --- Bounce detection on the raw envelope, independent of prospect matching ---\nconst lowText = String(rawText).toLowerCase();\nconst envelope = (sender_email + ' ' + String(email.from || '')).toLowerCase();\nconst isBounceSender = /mailer-daemon|postmaster|mail delivery (subsystem|system)|maildeliverysystem|bounce@/.test(envelope);\nconst isBounceText = /wasn't delivered|was not delivered|delivery status notification|undeliverable|delivery has failed|delivery failed|returned mail|failure notice|message could not be delivered|address not found|recipient address rejected|no such user|user unknown|mailbox (unavailable|full)|does not exist|couldn't be found|could not be found/.test(lowText);\nconst is_bounce = isBounceSender || isBounceText;\n\n// --- Extract the failed recipient address from the bounce body ---\nlet bounce_recipient = '';\nif (is_bounce) {\n  const dsn = rawText.match(/Final-Recipient:\\s*rfc822;\\s*<?([^\\s\\r\\n<>]+@[^\\s\\r\\n<>]+)>?/i)\n           || rawText.match(/Original-Recipient:\\s*rfc822;\\s*<?([^\\s\\r\\n<>]+@[^\\s\\r\\n<>]+)>?/i);\n  if (dsn) bounce_recipient = dsn[1].toLowerCase();\n  if (!bounce_recipient) {\n    const all = (rawText.match(/[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}/g) || []).map(e => e.toLowerCase());\n    const bad = /mailer-daemon|postmaster|no-?reply|do-?not-?reply|googlemail|mail\\.gmail\\.com|daemon|\\.google\\.com$/;\n    const candidates = all.filter(e => !bad.test(e) && e !== sender_email);\n    if (candidates.length) bounce_recipient = candidates[0];\n  }\n}\n\nconst match_email = (is_bounce && bounce_recipient) ? bounce_recipient : sender_email;\n\nreturn {\n  sender_email,\n  match_email,\n  is_bounce,\n  bounce_recipient,\n  reply_text,\n  thread_id: email.threadId || '',\n  gmail_message_id: email.gmail_message_id || '',\n  _client_id: email._client_id || '',\n  from: email.from || ''\n};",
+        "language": "javaScript",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "63b4813e-c0f8-482d-b95f-6adff23936e2",
+      "name": "Reply Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -784,
+        96
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "a9085a0f-8b13-4158-a04f-61bfdc6cfbe4",
+      "name": "Add Bounce To Do Not Contact",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        0,
+        288
+      ],
+      "parameters": {
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $(\"Lookup Prospect\").first().json.email }}"
+            },
+            {
+              "fieldId": "reason",
+              "fieldValue": "bounced"
+            },
+            {
+              "fieldId": "source_prospect_id",
+              "fieldValue": "={{ $(\"Insert Reply\").first().json.prospect_id }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "do_not_contact"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "09377833-59e8-4251-8e9b-8e50000a9edd",
+      "name": "Get Client For Classifier",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1120,
+        64
+      ],
+      "parameters": {
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "id",
+              "keyValue": "={{ $('Lookup Prospect').first().json.client_id }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "resource": "row",
+        "tableId": "clients"
+      },
+      "notes": "The classifier needs to know what the client sells, so it can tell interest in our offer from the prospect pitching us.",
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "f8547973-b204-43fa-b92c-05e45127ad62",
+      "name": "Get Sent Message",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1120,
+        64
+      ],
+      "parameters": {
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "id",
+              "keyValue": "={{ $('Resolve Prospect Match').first().json.message_id || '00000000-0000-0000-0000-000000000000' }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "resource": "row",
+        "tableId": "messages"
+      },
+      "notes": "The classifier compares the reply with the email we actually sent, so it can tell a reply to our outreach from a reply to some other conversation.",
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "028bcf5b-1ac3-4544-9d5a-e0ee347674c1",
+      "name": "Mark Client Polled",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -100,
+        760
+      ],
+      "parameters": {
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "last_reply_poll_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "client_id",
+              "keyValue": "={{ $('Client Loop').item.json.client_id }}"
+            }
+          ]
+        },
+        "matchType": "allFilters",
+        "operation": "update",
+        "tableId": "client_email_credentials"
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "Classify Intent": {
+      "main": [
+        [
+          {
+            "node": "Build Reply Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reply Row": {
+      "main": [
+        [
+          {
+            "node": "Insert Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Reply": {
+      "main": [
+        [
+          {
+            "node": "Mark Prospect Replied",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Prospect Replied": {
+      "main": [
+        [
+          {
+            "node": "Route By Intent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Record AB Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route By Intent": {
+      "main": [
+        [
+          {
+            "node": "Route To WF6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add To Do Not Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add Bounce To Do Not Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Logged Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Original Message": {
+      "main": [
+        [
+          {
+            "node": "Has Prospect Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Prospect Match": {
+      "main": [
+        [
+          {
+            "node": "Resolve Prospect Match",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Prospect By Sender Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Normalize Email Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Email Match": {
+      "main": [
+        [
+          {
+            "node": "Find Latest Message For Prospect",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Sender Domain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Latest Message For Prospect": {
+      "main": [
+        [
+          {
+            "node": "Resolve Prospect Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Prospect Match": {
+      "main": [
+        [
+          {
+            "node": "Lookup Prospect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Prospect": {
+      "main": [
+        [
+          {
+            "node": "Detect Automated Sender",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Automated Sender": {
+      "main": [
+        [
+          {
+            "node": "Is Automated?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Automated?": {
+      "main": [
+        [
+          {
+            "node": "Build Automated Reply Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Client For Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Automated Reply Row": {
+      "main": [
+        [
+          {
+            "node": "Insert Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Sender Domain": {
+      "main": [
+        [
+          {
+            "node": "Find Prospect By Domain",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Normalize Domain Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Domain Match": {
+      "main": [
+        [
+          {
+            "node": "Find Latest Message For Prospect",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not A Prospect Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Email Match": {
+      "main": [
+        [
+          {
+            "node": "Has Email Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Domain Match": {
+      "main": [
+        [
+          {
+            "node": "Has Domain Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Schedule": {
+      "main": [
+        [
+          {
+            "node": "Get Active Client Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Client Emails": {
+      "main": [
+        [
+          {
+            "node": "Client Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Client Loop": {
+      "main": [
+        null,
+        [
+          {
+            "node": "Fetch Client Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Client Replies": {
+      "main": [
+        [
+          {
+            "node": "Has New Replies?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has New Replies?": {
+      "main": [
+        [
+          {
+            "node": "Split Replies",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Client Polled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already Processed?": {
+      "main": [
+        [
+          {
+            "node": "Is New?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New?": {
+      "main": [
+        [
+          {
+            "node": "Find Original Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Sender": {
+      "main": [
+        [
+          {
+            "node": "Find Original Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Already Processed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format As Email": {
+      "main": [
+        [
+          {
+            "node": "Extract Sender",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Replies": {
+      "main": [
+        [
+          {
+            "node": "Reply Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply Loop": {
+      "main": [
+        [
+          {
+            "node": "Mark Client Polled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format As Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Logged Only": {
+      "main": [
+        [
+          {
+            "node": "Reply Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route To WF6": {
+      "main": [
+        [
+          {
+            "node": "Reply Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add To Do Not Contact": {
+      "main": [
+        [
+          {
+            "node": "Reply Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Not A Prospect Reply": {
+      "main": [
+        [
+          {
+            "node": "Reply Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Bounce To Do Not Contact": {
+      "main": [
+        [
+          {
+            "node": "Reply Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Client For Classifier": {
+      "main": [
+        [
+          {
+            "node": "Get Sent Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sent Message": {
+      "main": [
+        [
+          {
+            "node": "Classify Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Client Polled": {
+      "main": [
+        [
+          {
+            "node": "Client Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
