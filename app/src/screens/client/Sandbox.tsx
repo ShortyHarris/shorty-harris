@@ -6,9 +6,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useToast, ToastHost } from '../../components/Toast';
+import { SandboxClock } from '../../components/SandboxClock';
 import { useSendPacing } from '../../hooks/useSendPacing';
 import {
-  useSandbox, nextStepLabel, nextStepBlock, hasSent, sentCount, describeResult, clockAheadLabel, sandboxTimeLabel,
+  useSandbox, nextStepLabel, nextStepBlock, hasSent, sentCount, describeResult,
   type ReplyKind, type SandboxResult,
 } from '../../hooks/useSandbox';
 
@@ -97,43 +98,60 @@ export function Sandbox({
       {/* Time travel: shifts the account's whole timeline, so production's own rules
           (3/5/7 business days, approval reminders, recalculation) run unmodified. The
           sandbox also keeps its own time of day, which the 9-5 send window follows. */}
-      <section className="flex flex-col justify-between gap-3 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3.5">
-        <div className="flex min-w-0 items-start gap-3">
-          <Clock size={18} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
-          <div className="min-w-0">
-            <div className="text-[14px] font-semibold text-(--ad-ink)">
-              Sandbox time: {sandboxTimeLabel(minutesAdvanced, pacing?.time_zone ?? 'America/Chicago')}
-              <span className="font-normal text-(--ad-ink-soft)">
-                {' '}· {clockAheadLabel(minutesAdvanced)}
-                {pacing && warmupOn ? (pacing.today.in_window_now ? ' · sending hours' : ' · outside sending hours') : ''}
-              </span>
-            </div>
-            <p className="m-0 mt-0.5 text-[12.5px] leading-relaxed text-(--ad-ink-soft)">
-              Moves every send, draft and schedule on this account back in time, so the real follow-up rules apply:
-              leave a draft unapproved and advance 10 days to test an overdue approval. With real sending rules,
-              emails only go 9am to 5pm Mon-Fri on this clock. Reset puts the clock back to now.
-            </p>
-          </div>
+      <section className="flex flex-col justify-between gap-3.5 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3.5">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="m-0 flex items-center gap-1.5 text-[14px] font-semibold text-(--ad-ink)">
+            <Clock size={16} className="text-(--ad-green)" aria-hidden /> Sandbox clock
+          </h2>
+          <span className="text-[11.5px] text-(--ad-ink-ghost)">{pacing?.time_zone ?? 'America/Chicago'}</span>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <SandboxClock
+          minutesAdvanced={minutesAdvanced}
+          timeZone={pacing?.time_zone ?? 'America/Chicago'}
+          realRules={warmupOn}
+        />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {[
-            { key: 'h1', label: '+1 hour', action: () => advanceHours(1) },
-            { key: 'h4', label: '+4 hours', action: () => advanceHours(4) },
-            { key: 'd1', label: '+1 day', action: () => advanceTime(1) },
-            { key: 'd3', label: '+3 days', action: () => advanceTime(3) },
-            { key: 'd7', label: '+7 days', action: () => advanceTime(7) },
-            { key: 'nine', label: 'Next 9am', action: () => jumpToSendWindow() },
-          ].map((b) => (
-            <button
-              key={b.key}
-              onClick={() => run(`advance-${b.key}`, b.action)}
-              disabled={readOnly || busy !== null}
-              className={`${btn} border border-(--ad-line) bg-transparent whitespace-nowrap text-(--ad-ink) hover:bg-(--ad-surface-2)`}
-            >
-              {busy === `advance-${b.key}` ? 'Working…' : b.label}
-            </button>
+            { group: 'Hours', items: [
+              { key: 'h1', label: '+1h', title: 'Advance 1 hour', action: () => advanceHours(1) },
+              { key: 'h4', label: '+4h', title: 'Advance 4 hours', action: () => advanceHours(4) },
+            ] },
+            { group: 'Days', items: [
+              { key: 'd1', label: '+1d', title: 'Advance 1 day', action: () => advanceTime(1) },
+              { key: 'd3', label: '+3d', title: 'Advance 3 days', action: () => advanceTime(3) },
+              { key: 'd7', label: '+7d', title: 'Advance 7 days', action: () => advanceTime(7) },
+            ] },
+          ].map((g) => (
+            <div key={g.group} className="flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-(--ad-ink-ghost)">{g.group}</span>
+              <div className="inline-flex overflow-hidden rounded-lg border border-(--ad-line)">
+                {g.items.map((b, i) => (
+                  <button
+                    key={b.key}
+                    title={b.title}
+                    aria-label={b.title}
+                    onClick={() => run(`advance-${b.key}`, b.action)}
+                    disabled={readOnly || busy !== null}
+                    className={`cursor-pointer px-2.5 py-1.5 text-[12.5px] font-semibold text-(--ad-ink) tabular-nums transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-45 ${i > 0 ? 'border-l border-(--ad-line)' : ''}`}
+                  >
+                    {busy === `advance-${b.key}` ? '…' : b.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
+          <button
+            onClick={() => run('advance-nine', () => jumpToSendWindow())}
+            disabled={readOnly || busy !== null}
+            className={`${btn} border border-(--ad-green-line) bg-(--ad-green-tint) whitespace-nowrap text-(--ad-green) hover:opacity-90`}
+          >
+            {busy === 'advance-nine' ? 'Working…' : 'Jump to next 9am'}
+          </button>
         </div>
+        <p className="m-0 text-[12px] leading-relaxed text-(--ad-ink-soft)">
+          Moves every send, draft and schedule on this account back in time, so the real follow-up rules apply.
+          Leave a draft unapproved and advance 10 days to test an overdue approval. Reset puts the clock back to now.
+        </p>
       </section>
 
       {/* Sending rules: the real warm-up and send hours, or fast mode with neither. */}

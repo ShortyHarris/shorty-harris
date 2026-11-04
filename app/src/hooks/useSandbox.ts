@@ -150,8 +150,17 @@ export function clockAheadLabel(minutes: number): string {
   return `${parts.join(' ')} ahead`;
 }
 
-/** The sandbox's own date and time ("Thu 6 Nov, 17:40") in the account's send time zone. */
-export function sandboxTimeLabel(minutes: number, timeZone: string, now: Date = new Date()): string {
+export interface SandboxTimeParts {
+  weekday: string; // "Thu"
+  day: string;     // "5"
+  month: string;   // "Nov"
+  hour: number;    // 0-23
+  minute: number;  // 0-59
+  isWeekday: boolean;
+}
+
+/** The sandbox clock's time of day and date in the account's send time zone. */
+export function sandboxTimeParts(minutes: number, timeZone: string, now: Date = new Date()): SandboxTimeParts {
   const t = new Date(now.getTime() + minutes * 60000);
   const fmt = (tz: string) => new Intl.DateTimeFormat('en-GB', {
     timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
@@ -159,7 +168,24 @@ export function sandboxTimeLabel(minutes: number, timeZone: string, now: Date = 
   let parts: Intl.DateTimeFormatPart[];
   try { parts = fmt(timeZone); } catch { parts = fmt('America/Chicago'); }
   const g = (type: string) => parts.find((x) => x.type === type)?.value ?? '';
-  return `${g('weekday')} ${g('day')} ${g('month')}, ${g('hour')}:${g('minute')}`;
+  const weekday = g('weekday');
+  return {
+    weekday, day: g('day'), month: g('month'),
+    hour: Number(g('hour')) % 24, minute: Number(g('minute')),
+    isWeekday: !['Sat', 'Sun'].includes(weekday),
+  };
+}
+
+/** The sandbox's own date and time ("Thu 6 Nov, 17:40") in the account's send time zone. */
+export function sandboxTimeLabel(minutes: number, timeZone: string, now: Date = new Date()): string {
+  const p = sandboxTimeParts(minutes, timeZone, now);
+  const two = (n: number) => String(n).padStart(2, '0');
+  return `${p.weekday} ${p.day} ${p.month}, ${two(p.hour)}:${two(p.minute)}`;
+}
+
+/** Sending hours are 09:00-17:00 Monday to Friday, the same rule WF2.5 applies. */
+export function inSendingHours(p: SandboxTimeParts): boolean {
+  return p.isWeekday && p.hour >= 9 && p.hour < 17;
 }
 
 export function useSandbox(clientId: string, enabled: boolean, client: SupabaseClient = supabase) {
