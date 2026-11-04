@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone, BookOpen, BarChart3, Target, Filter, Users, Mail, Menu, ChevronDown, FlaskConical } from 'lucide-react';
@@ -105,19 +105,34 @@ export function Shell({
 
   const { theme, toggle: toggleTheme } = useAppTheme('client');
 
+  // Publish the pinned sandbox banner's height (it wraps on narrow screens)
+  // so the sticky top bars and sidebar sit below it instead of under it.
+  const sandboxBannerRef = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    const el = sandboxBannerRef.current;
+    if (!isSandbox || !el) return;
+    const root = document.documentElement;
+    const ro = new ResizeObserver(() => root.style.setProperty('--csbx-h', `${el.offsetHeight}px`));
+    ro.observe(el);
+    return () => { ro.disconnect(); root.style.removeProperty('--csbx-h'); };
+  }, [isSandbox]);
+
   return (
     <div className="cpage">
 
       {/* ═══ SANDBOX BANNER - fixed red, always on for a sandbox client so a
            tester can never mistake it for a live account. ═══ */}
       {isSandbox && (
-        <Link to={`${basePath}/sandbox`} className="csandbox-banner">
+        <Link ref={sandboxBannerRef} to={`${basePath}/sandbox`} className="csandbox-banner">
           <FlaskConical size={16} strokeWidth={2} className="shrink-0" aria-hidden />
           <span className="capproval-banner-text">
-            <strong className="font-bold">Sandbox.</strong> Test account: emails only go to your own connected mailbox.
+            <strong className="font-bold">Sandbox.</strong>
+            <span className="csandbox-long"> Test account: emails only go to your own connected mailbox.</span>
+            <span className="csandbox-short"> Emails only reach you.</span>
           </span>
           <span className="capproval-banner-cta csandbox-banner-cta">
-            Sandbox controls
+            <span className="csandbox-long">Sandbox controls</span>
+            <span className="csandbox-short">Controls</span>
             <ChevronRight size={14} strokeWidth={2.5} aria-hidden />
           </span>
         </Link>

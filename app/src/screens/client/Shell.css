@@ -27,10 +27,28 @@
     text-decoration: none;
     font-size: 13px;
     line-height: 1.35;
+    /* Pinned, unlike the approvals bar: a tester must never scroll into what
+       looks like a live account. Its height is published as --csbx-h by
+       Shell.tsx so the top bars and sidebar can sit below it. */
+    position: sticky;
+    top: 0;
+    z-index: 40;
   }
   .csandbox-banner:hover { background: #912018; }
   .csandbox-banner:focus-visible { outline: 2px solid #ffffff; outline-offset: -4px; }
   .csandbox-banner-cta.capproval-banner-cta { background: #ffffff; color: #b42318; }
+  /* Phones: one line, so the pinned bar costs ~40px rather than three lines. */
+  .csandbox-long { display: none; }
+  .csandbox-banner { flex-wrap: nowrap; padding: 7px 12px; gap: 8px; }
+  .csandbox-banner .capproval-banner-text { text-align: left; }
+  .csandbox-banner-cta.capproval-banner-cta { padding: 4px 6px 4px 10px; font-size: 12px; }
+  @media (min-width: 768px) {
+    .csandbox-long { display: inline; }
+    .csandbox-short { display: none; }
+    .csandbox-banner { flex-wrap: wrap; padding: 10px 16px; gap: 6px 12px; }
+    .csandbox-banner .capproval-banner-text { text-align: center; }
+    .csandbox-banner-cta.capproval-banner-cta { padding: 5px 8px 5px 12px; font-size: 12.5px; }
+  }
   .capproval-banner {
     display: flex;
     flex-wrap: wrap;
@@ -65,9 +83,7 @@
   @media (min-width: 768px) {
     .capproval-banner-note { display: inline; }
     /* The banner sits above the sticky sidebar, so the sidebar must give up its height to stay on screen. */
-    .cpage:has(> .capproval-banner) .cside { height: calc(100vh - var(--ctopbar-h) - 47px); }
-    .cpage:has(> .csandbox-banner) .cside { height: calc(100vh - var(--ctopbar-h) - 47px); }
-    .cpage:has(> .csandbox-banner):has(> .capproval-banner) .cside { height: calc(100vh - var(--ctopbar-h) - 94px); }
+    .cpage:has(> .capproval-banner) .cside { height: calc(100vh - var(--ctopbar-h) - var(--csbx-h, 0px) - 47px); }
   }
 
   /* Desktop top bar hidden on mobile in favor of .ctopbar below */
@@ -79,7 +95,7 @@
   /* ── Mobile topbar ─────────────────────────────────────────────────── */
   .ctopbar {
     position: sticky;
-    top: 0;
+    top: var(--csbx-h, 0px);
     z-index: 10;
     display: flex;
     align-items: center;
@@ -242,7 +258,7 @@
       background: var(--ad-surface);
       border-bottom: 1px solid var(--line);
       position: sticky;
-      top: 0;
+      top: var(--csbx-h, 0px);
       z-index: 30;
     }
     .ctopbar-desktop-right {
@@ -271,9 +287,9 @@
       flex-shrink: 0;
       background: var(--ad-surface);
       border-right: 1px solid var(--line);
-      height: calc(100vh - var(--ctopbar-h));
+      height: calc(100vh - var(--ctopbar-h) - var(--csbx-h, 0px));
       position: sticky;
-      top: var(--ctopbar-h);
+      top: calc(var(--ctopbar-h) + var(--csbx-h, 0px));
       overflow: hidden;
       padding: 18px 12px 16px;
     }
