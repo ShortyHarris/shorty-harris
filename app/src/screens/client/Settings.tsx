@@ -51,7 +51,16 @@ function formatLastUsed(iso: string): string {
    than an always-open form - tapping it opens an edit modal. */
 function ProfileSection({ clientId, onSaved, onError }: { clientId: string; onSaved?: () => void; onError?: (message: string) => void }) {
   const { profile, loading, updateProfile } = useClientProfile(clientId);
-  const [editing, setEditing] = useState(false);
+  // Deep link from the Targeting page (?open=website): open the editor with the
+  // Website URL box focused, since the targeting profile is built from it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openForWebsite = searchParams.get('open') === 'website';
+  const [editing, setEditing] = useState(openForWebsite);
+  const [focusWebsite] = useState(openForWebsite);
+  useEffect(() => {
+    if (openForWebsite) setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading || !profile) {
     return (
@@ -84,7 +93,7 @@ function ProfileSection({ clientId, onSaved, onError }: { clientId: string; onSa
 
       <AnimatePresence>
         {editing && (
-          <ProfileEditModal profile={profile} updateProfile={updateProfile} onClose={() => setEditing(false)} onSaved={onSaved} onError={onError} />
+          <ProfileEditModal profile={profile} updateProfile={updateProfile} onClose={() => setEditing(false)} onSaved={onSaved} onError={onError} focusWebsite={focusWebsite} />
         )}
       </AnimatePresence>
     </>
@@ -92,8 +101,9 @@ function ProfileSection({ clientId, onSaved, onError }: { clientId: string; onSa
 }
 
 function ProfileEditModal({
-  profile, updateProfile, onClose, onSaved, onError,
+  profile, updateProfile, onClose, onSaved, onError, focusWebsite = false,
 }: {
+  focusWebsite?: boolean;
   profile: ClientProfile;
   updateProfile: (input: UpdateClientProfileInput) => Promise<{ error: string | null }>;
   onClose: () => void;
@@ -207,7 +217,10 @@ function ProfileEditModal({
 
           <div className="mb-4">
             <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Website URL</label>
-            <input type="url" value={form.website_url} onChange={(e) => set('website_url', e.target.value)} placeholder="https://example.com" style={inputStyle} className={inputCls} />
+            <input type="url" value={form.website_url} onChange={(e) => set('website_url', e.target.value)} placeholder="https://example.com" style={inputStyle} className={inputCls} autoFocus={focusWebsite} />
+            <p className="m-0 mt-1 text-[12px]" style={{ color: 'var(--ink-faint)' }}>
+              We read this to build your targeting profile: who to look for and how to pitch you.
+            </p>
           </div>
 
           <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">

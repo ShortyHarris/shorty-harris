@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react';
-import { RefreshCw, ChevronDown, Users, Megaphone, Search, type LucideIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { RefreshCw, ChevronDown, Users, Megaphone, Search, Globe, type LucideIcon } from 'lucide-react';
+import { useClientProfile } from '../../hooks/useClientProfile';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import {
@@ -54,10 +56,18 @@ const SEARCH_FIELD: FieldDef = {
 
 const ALL_FIELDS = [...WHO_FIELDS, ...PITCH_FIELDS, SEARCH_FIELD];
 
-export function TargetingProfile({ clientId, client = supabase, readOnly = false }: {
-  clientId: string; client?: SupabaseClient; readOnly?: boolean;
+export function TargetingProfile({ clientId, client = supabase, readOnly = false, basePath = '/app', settingsAvailable = true }: {
+  clientId: string; client?: SupabaseClient; readOnly?: boolean; basePath?: string;
+  /** False in admin "View as client", which has no Settings page to link to. */
+  settingsAvailable?: boolean;
 }) {
   const { icp, loading, error, reload } = useClientIcp(clientId, client);
+  // The profile is built from the website saved in Settings. Without one, Refresh
+  // can only fail, so say so up front and link straight to the field.
+  const { profile, loading: profileLoading } = useClientProfile(clientId);
+  const website = (profile?.website_url ?? '').trim();
+  const noWebsite = !profileLoading && !!profile && !website;
+  const websiteSettingsHref = `${basePath}/settings?open=website`;
   const { rows: perf, loading: perfLoading } = useClientTargetingPerformance(clientId, client);
   const { toasts, toast, dismiss } = useToast();
   const [draft, setDraft] = useState<Record<string, string[]>>({});
@@ -161,6 +171,26 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
         <HelpButton content={HELP} />
       </div>
 
+      {noWebsite && (
+        <section className="flex flex-col gap-3 rounded-[10px] border px-4 py-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--leaf)', background: 'var(--leaf-tint)' }}>
+          <div className="flex min-w-0 gap-3">
+            <Globe size={18} className="mt-0.5 shrink-0" style={{ color: 'var(--leaf)' }} aria-hidden />
+            <div className="min-w-0">
+              <h2 className="m-0 text-[14px] font-semibold" style={{ color: 'var(--ink)' }}>Add your website to build this profile</h2>
+              <p className="m-0 mt-0.5 text-[12.5px]" style={{ color: 'var(--ink-soft)' }}>
+                We read your website to work out who to look for and how to pitch you, then fill in the fields below.
+                {readOnly || !settingsAvailable ? ' The client can add it in their Settings.' : ' You can also fill them in by hand.'}
+              </p>
+            </div>
+          </div>
+          {!readOnly && settingsAvailable && (
+            <Link to={websiteSettingsHref} className={`${btn('primary', 'md')} shrink-0 self-start no-underline sm:self-center`}>
+              Add your website
+            </Link>
+          )}
+        </section>
+      )}
+
       {(error || err) && (
         <div className="rounded-xl border px-4 py-3.5 text-[13.5px]" style={{ background: 'var(--clay-tint)', color: 'var(--clay)', borderColor: 'var(--line)' }}>
           {error ? `Couldn't load your targeting profile: ${error}` : err}
@@ -233,6 +263,15 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
             <p className="m-0 mt-0.5 text-[12.5px]" style={{ color: 'var(--ink-soft)' }}>
               Re-reads your website and updates the fields above, except any you've edited yourself.
             </p>
+            <p className="m-0 mt-1 text-[12.5px]" style={{ color: 'var(--ink-soft)' }}>
+              {website ? (
+                <>Reads <strong className="break-all font-semibold" style={{ color: 'var(--ink)' }}>{website}</strong>{settingsAvailable && <> · <Link to={websiteSettingsHref} className="font-semibold" style={{ color: 'var(--leaf)' }}>Change</Link></>}</>
+              ) : noWebsite ? (
+                settingsAvailable
+                  ? <>No website saved yet. <Link to={websiteSettingsHref} className="font-semibold" style={{ color: 'var(--leaf)' }}>Add it in Settings</Link> first.</>
+                  : <>No website saved yet. The client can add it in their Settings.</>
+              ) : null}
+            </p>
             {rebuilding && (
               <p className="m-0 mt-1.5 text-[12.5px] font-semibold" style={{ color: 'var(--leaf)' }} role="status">
                 Reading your website. This can take up to a minute, so please keep this page open.
@@ -250,7 +289,12 @@ export function TargetingProfile({ clientId, client = supabase, readOnly = false
               </div>
             )}
           </div>
-          <button onClick={handleRebuild} disabled={rebuilding} className={`${btn('secondary', 'md')} shrink-0 self-start`}>
+          <button
+            onClick={handleRebuild}
+            disabled={rebuilding || noWebsite}
+            title={noWebsite ? 'Add your website in Settings first' : undefined}
+            className={`${btn('secondary', 'md')} shrink-0 self-start`}
+          >
             <RefreshCw size={14} className={rebuilding ? 'animate-spin' : ''} aria-hidden />
             {rebuilding ? 'Refreshing…' : 'Refresh'}
           </button>

@@ -312,7 +312,7 @@ function ImpersonateZone() {
           <Route path="approvals" element={<Approvals clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} />} />
           <Route path="analytics" element={<ClientAnalytics clientId={clientId} client={client} />} />
           <Route path="results" element={<Results clientId={clientId} client={client} basePath={basePath} />} />
-          <Route path="targeting" element={<TargetingProfile clientId={clientId} client={client} readOnly={readOnly} />} />
+          <Route path="targeting" element={<TargetingProfile clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} settingsAvailable={false} />} />
           {/* Buying credits charges the client - read-only even in edit mode. */}
           <Route path="billing" element={<Billing clientId={clientId} client={client} readOnly />} />
           {isSandbox && <Route path="sandbox" element={<Sandbox clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} />} />}
