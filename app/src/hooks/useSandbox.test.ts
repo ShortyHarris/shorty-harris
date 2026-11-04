@@ -33,14 +33,23 @@ describe('nextStepBlock', () => {
   });
 
   it('blocks once follow-ups are stopped and something was sent', () => {
-    const p = { ...prospect('replied', [msg('approved', 'sent')]), followups_stopped: true };
+    const p = { ...prospect('contacted', [msg('approved', 'sent')]), followups_stopped: true };
     expect(nextStepBlock(p)?.label).toBe('Follow-ups stopped');
   });
 
-  it('lets an out-of-office reply carry on with the sequence', () => {
-    const p = { ...prospect('replied', [msg('approved', 'sent')]), followups_stopped: false };
+  it('lets an out-of-office reply carry on with the sequence (status unchanged)', () => {
+    const p = { ...prospect('contacted', [msg('approved', 'sent')]), followups_stopped: false };
     expect(nextStepBlock(p)).toBeNull();
     expect(nextStepLabel(p)).toBe('Make follow-up due');
+  });
+
+  it('stops after a real reply such as a question', () => {
+    expect(nextStepBlock(prospect('replied', [msg('approved', 'sent')]))?.label).toBe('Replied: waiting on you');
+  });
+
+  it('shows that an unsubscribed address is blocked for good', () => {
+    const p = { ...prospect('replied', [msg('approved', 'sent')]), followups_stopped: true, do_not_contact: true };
+    expect(nextStepBlock(p)?.label).toBe('Unsubscribed: all emails blocked');
   });
 
   it('does not block before anything was sent', () => {
