@@ -13,6 +13,24 @@
 
   /* ── Approvals banner - full-bleed, above the topbar/sidebar, same slot
      the impersonation "Viewing as…" bar occupies. ──────────────────────── */
+  /* Sandbox banner: fixed red rather than a theme token, so it reads the
+     same in light and dark and can't be mistaken for the green approvals bar. */
+  .csandbox-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px 12px;
+    padding: 10px 16px;
+    background: #b42318;
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  .csandbox-banner:hover { background: #912018; }
+  .csandbox-banner:focus-visible { outline: 2px solid #ffffff; outline-offset: -4px; }
+  .csandbox-banner-cta.capproval-banner-cta { background: #ffffff; color: #b42318; }
   .capproval-banner {
     display: flex;
     flex-wrap: wrap;
@@ -48,6 +66,8 @@
     .capproval-banner-note { display: inline; }
     /* The banner sits above the sticky sidebar, so the sidebar must give up its height to stay on screen. */
     .cpage:has(> .capproval-banner) .cside { height: calc(100vh - var(--ctopbar-h) - 47px); }
+    .cpage:has(> .csandbox-banner) .cside { height: calc(100vh - var(--ctopbar-h) - 47px); }
+    .cpage:has(> .csandbox-banner):has(> .capproval-banner) .cside { height: calc(100vh - var(--ctopbar-h) - 94px); }
   }
 
   /* Desktop top bar hidden on mobile in favor of .ctopbar below */

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone, BookOpen, BarChart3, Target, Filter, Users, Mail, Menu, ChevronDown } from 'lucide-react';
+import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone, BookOpen, BarChart3, Target, Filter, Users, Mail, Menu, ChevronDown, FlaskConical } from 'lucide-react';
 import type { ClientNotification } from '../../hooks/useClientNotifications';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { ModalClose } from '../../components/ModalClose';
@@ -30,6 +30,7 @@ export function Shell({
   hideSettings = false,
   signOutLabel = 'Sign out',
   basePath = '/app',
+  isSandbox = false,
   children,
 }: {
   businessName: string;
@@ -47,6 +48,8 @@ export function Shell({
   hideSettings?: boolean;
   signOutLabel?: string;
   basePath?: string;
+  /** clients.is_sandbox: shows the red sandbox banner and the Sandbox nav entry. */
+  isSandbox?: boolean;
   children: ReactNode;
 }) {
   const nameInitial = (displayName  || 'U')[0].toUpperCase();
@@ -57,6 +60,7 @@ export function Shell({
 
   const [moreOpen, setMoreOpen] = useState(false);
   const moreItems: SideNavItem[] = [
+    ...(isSandbox ? [{ to: `${basePath}/sandbox`, label: 'Sandbox', icon: FlaskConical }] : []),
     { to: `${basePath}/campaigns`, label: 'Campaigns', icon: Megaphone },
     { to: `${basePath}/targeting`, label: 'Targeting', icon: Target },
     { to: `${basePath}/analytics`, label: 'Analytics', icon: BarChart3 },
@@ -91,6 +95,7 @@ export function Shell({
     {
       label: 'Account',
       items: [
+        ...(isSandbox ? [{ to: `${basePath}/sandbox`, label: 'Sandbox', icon: FlaskConical }] : []),
         { to: `${basePath}/billing`, label: 'Billing', icon: CreditCard },
         ...(hideSettings ? [] : [{ to: `${basePath}/settings`, label: 'Settings', icon: Settings }]),
         { to: '/docs', label: 'Help & Docs', icon: BookOpen },
@@ -102,6 +107,21 @@ export function Shell({
 
   return (
     <div className="cpage">
+
+      {/* ═══ SANDBOX BANNER - fixed red, always on for a sandbox client so a
+           tester can never mistake it for a live account. ═══ */}
+      {isSandbox && (
+        <Link to={`${basePath}/sandbox`} className="csandbox-banner">
+          <FlaskConical size={16} strokeWidth={2} className="shrink-0" aria-hidden />
+          <span className="capproval-banner-text">
+            <strong className="font-bold">Sandbox.</strong> Test account: emails only go to your own connected mailbox.
+          </span>
+          <span className="capproval-banner-cta csandbox-banner-cta">
+            Sandbox controls
+            <ChevronRight size={14} strokeWidth={2.5} aria-hidden />
+          </span>
+        </Link>
+      )}
 
       {/* ═══ APPROVALS BANNER - full-bleed, above the topbar and sidebar
            both, same slot the impersonation "Viewing as…" bar uses. Shown
