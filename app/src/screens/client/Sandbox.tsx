@@ -89,9 +89,11 @@ export function Sandbox({
         </button>
       </header>
 
+      {/* Clock and warm-up side by side on wide screens, stacked on phones. */}
+      <div className="grid gap-4 xl:grid-cols-2">
       {/* Time travel: shifts the account's whole timeline, so production's own rules
           (3/5/7 business days, approval reminders, recalculation) run unmodified. */}
-      <section className="flex flex-col gap-3 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3.5 md:flex-row md:items-center md:justify-between">
+      <section className="flex flex-col justify-between gap-3 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3.5">
         <div className="flex min-w-0 items-start gap-3">
           <Clock size={18} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
           <div className="min-w-0">
@@ -119,7 +121,7 @@ export function Sandbox({
       </section>
 
       {/* Warm-up: real daily limits that step up with the sandbox clock, or fast mode. */}
-      <section className="flex flex-col gap-3 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3.5 md:flex-row md:items-center md:justify-between">
+      <section className="flex flex-col justify-between gap-3 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3.5">
         <div className="flex min-w-0 items-start gap-3">
           <Gauge size={18} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
           <div className="min-w-0">
@@ -142,11 +144,12 @@ export function Sandbox({
         <button
           onClick={() => run('warmup', () => setWarmup(!warmupOn))}
           disabled={readOnly || busy !== null}
-          className={`${btn} shrink-0 border border-(--ad-line) bg-transparent whitespace-nowrap text-(--ad-ink) hover:bg-(--ad-surface-2)`}
+          className={`${btn} shrink-0 self-start border border-(--ad-line) bg-transparent whitespace-nowrap text-(--ad-ink) hover:bg-(--ad-surface-2)`}
         >
           {busy === 'warmup' ? 'Working…' : warmupOn ? 'Switch to fast mode' : 'Switch warm-up on'}
         </button>
       </section>
+      </div>
 
       {readOnly && (
         <p className="m-0 rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3 text-[13px] text-(--ad-ink-soft)">
