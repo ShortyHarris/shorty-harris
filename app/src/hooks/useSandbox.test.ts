@@ -13,7 +13,7 @@ describe('nextStepLabel', () => {
     expect(nextStepLabel(prospect('new', []))).toBe('Write first email');
     expect(nextStepLabel(prospect('message_pending', [msg('pending', 'not_sent')]))).toBe('Approve draft');
     expect(nextStepLabel(prospect('message_pending', [msg('approved', 'not_sent')]))).toBe('Send it');
-    expect(nextStepLabel(prospect('contacted', [msg('approved', 'sent')]))).toBe('Make follow-up due');
+    expect(nextStepLabel(prospect('contacted', [msg('approved', 'sent')]))).toBe('Skip to next follow-up');
   });
 
   it('prefers a waiting draft over making a follow-up due', () => {
@@ -40,7 +40,7 @@ describe('nextStepBlock', () => {
   it('lets an out-of-office reply carry on with the sequence (status unchanged)', () => {
     const p = { ...prospect('contacted', [msg('approved', 'sent')]), followups_stopped: false };
     expect(nextStepBlock(p)).toBeNull();
-    expect(nextStepLabel(p)).toBe('Make follow-up due');
+    expect(nextStepLabel(p)).toBe('Skip to next follow-up');
   });
 
   it('stops after a real reply such as a question', () => {

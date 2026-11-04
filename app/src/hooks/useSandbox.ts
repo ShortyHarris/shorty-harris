@@ -106,7 +106,7 @@ export function nextStepLabel(p: SandboxProspect): string | null {
   if (msgs.length === 0) return 'Write first email';
   if (msgs.some((m) => m.approval_status === 'pending' && m.send_status === 'not_sent')) return 'Approve draft';
   if (msgs.some((m) => m.approval_status === 'approved' && m.send_status === 'not_sent')) return 'Send it';
-  if (msgs.some((m) => m.send_status === 'sent')) return 'Make follow-up due';
+  if (msgs.some((m) => m.send_status === 'sent')) return 'Skip to next follow-up';
   return 'Run next step';
 }
 
@@ -148,6 +148,17 @@ export function useSandbox(clientId: string, enabled: boolean, client: SupabaseC
     refetchInterval: 4000,
   });
 
+  // How far the sandbox clock has been moved forward (sandbox_advance_time).
+  const { data: daysAdvanced } = useQuery({
+    queryKey: ['sandbox-clock', clientId],
+    queryFn: async () => {
+      const { data: row } = await client.from('clients').select('sandbox_days_advanced').eq('id', clientId).maybeSingle();
+      return Number((row as { sandbox_days_advanced?: number } | null)?.sandbox_days_advanced ?? 0);
+    },
+    enabled: enabled && !!clientId,
+    refetchInterval: 4000,
+  });
+
   // Every other screen caches its own view of these rows; after a sandbox
   // action, refresh them all rather than track which ones it touched.
   const refreshAll = () => queryClient.invalidateQueries();
@@ -163,9 +174,11 @@ export function useSandbox(clientId: string, enabled: boolean, client: SupabaseC
 
   return {
     prospects: data ?? [],
+    daysAdvanced: daysAdvanced ?? 0,
     loading: isLoading,
     error: error ? (error as Error).message : null,
     reset: () => call('sandbox_reset', { p_client_id: clientId }),
+    advanceTime: (days: number) => call('sandbox_advance_time', { p_client_id: clientId, p_days: days }),
     nextStep: (prospectId: string) => call('sandbox_next_step', { p_prospect_id: prospectId }),
     simulateReply: (prospectId: string, kind: ReplyKind) =>
       call('sandbox_simulate_reply', { p_prospect_id: prospectId, p_kind: kind }),

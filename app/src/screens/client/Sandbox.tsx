@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { FlaskConical, Play, RotateCcw, MessageSquareReply, Ban } from 'lucide-react';
+import { FlaskConical, Play, RotateCcw, MessageSquareReply, Ban, Clock } from 'lucide-react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -46,7 +46,7 @@ export function Sandbox({
   readOnly?: boolean;
   basePath?: string;
 }) {
-  const { prospects, loading, error, reset, nextStep, simulateReply } = useSandbox(clientId, true, client);
+  const { prospects, daysAdvanced, loading, error, reset, advanceTime, nextStep, simulateReply } = useSandbox(clientId, true, client);
   const { toasts, toast, dismiss } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -72,8 +72,9 @@ export function Sandbox({
           <p className="m-0 mt-1 max-w-[640px] text-[13px] leading-relaxed text-(--ad-ink-soft)">
             Every test prospect is addressed to the mailbox connected in{' '}
             <Link to={`${basePath}/settings`} className="font-semibold text-(--ad-green)">Settings</Link>,
-            so emails can only reach you. <strong>Run next step</strong> moves one prospect forward
-            without waiting for the schedule. <strong>Simulate reply</strong> fakes their answer.
+            so emails can only reach you. <strong>Run next step</strong> moves one prospect forward,
+            <strong> Simulate reply</strong> fakes their answer, and <strong>Advance time</strong> moves the whole
+            account forward so follow-ups, reminders and overdue approvals happen without waiting.
           </p>
         </div>
         <button
@@ -84,6 +85,35 @@ export function Sandbox({
           <RotateCcw size={14} aria-hidden /> Reset sandbox
         </button>
       </header>
+
+      {/* Time travel: shifts the account's whole timeline, so production's own rules
+          (3/5/7 business days, approval reminders, recalculation) run unmodified. */}
+      <section className="flex flex-col gap-3 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3.5 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <Clock size={18} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
+          <div className="min-w-0">
+            <div className="text-[14px] font-semibold text-(--ad-ink)">
+              Sandbox clock: {daysAdvanced === 0 ? 'today' : `${daysAdvanced} day${daysAdvanced === 1 ? '' : 's'} ahead`}
+            </div>
+            <p className="m-0 mt-0.5 text-[12.5px] leading-relaxed text-(--ad-ink-soft)">
+              Moves every send, draft and schedule on this account back in time. The real follow-up rules then apply:
+              leave a draft unapproved and advance 10 days to test an overdue approval. Reset puts the clock back.
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {[1, 3, 7].map((d) => (
+            <button
+              key={d}
+              onClick={() => run(`advance-${d}`, () => advanceTime(d))}
+              disabled={readOnly || busy !== null}
+              className={`${btn} border border-(--ad-line) bg-transparent whitespace-nowrap text-(--ad-ink) hover:bg-(--ad-surface-2)`}
+            >
+              {busy === `advance-${d}` ? 'Working…' : `+${d} day${d === 1 ? '' : 's'}`}
+            </button>
+          ))}
+        </div>
+      </section>
 
       {readOnly && (
         <p className="m-0 rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3 text-[13px] text-(--ad-ink-soft)">
@@ -195,7 +225,7 @@ export function Sandbox({
             onCancel={() => setConfirmReset(false)}
           >
             Deletes every test prospect, email, reply and hot lead on this sandbox account, then creates 20 fresh
-            prospects and sets credits back to 10,000. Only this sandbox account is touched.
+            prospects, sets credits back to 10,000 and the clock back to today. Only this sandbox account is touched.
           </ConfirmDialog>
         )}
       </AnimatePresence>
