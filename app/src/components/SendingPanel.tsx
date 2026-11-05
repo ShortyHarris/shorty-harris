@@ -1,7 +1,11 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { GmailLogo } from './GmailLogo';
-import { AlertCircle, ChevronDown, Info, Send } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { AlertCircle, ChevronRight, Info, Send } from 'lucide-react';
+import { ModalClose } from './ModalClose';
+import { useOverlayClose } from '../hooks/useOverlayClose';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useSendPacing } from '../hooks/useSendPacing';
@@ -131,7 +135,6 @@ function SendingLineSummary({ pacing }: { pacing: SendPacing }) {
   const { text, warning } = compactSendingLine(pacing);
   const sentences = text.split(/(?<=\.)\s+/).filter(Boolean);
   const [headline, ...rest] = sentences;
-  const details = sendingDetails(pacing);
   return (
     <div
       role="status"
@@ -147,34 +150,17 @@ function SendingLineSummary({ pacing }: { pacing: SendPacing }) {
         {rest.length > 0 && <span className="text-[12.5px] leading-snug text-(--ad-ink-soft)">{rest.join(' ')}</span>}
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
           className="mt-1 inline-flex w-fit cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-[12.5px] font-semibold text-(--ad-green) hover:underline"
         >
-          {open ? 'Hide details' : 'How sending works'}
-          <ChevronDown size={14} aria-hidden className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+          How sending works <ChevronRight size={14} aria-hidden />
         </button>
-        {open && (
-          <span className="mt-2 flex flex-col gap-2.5 border-t border-(--ad-green-line) pt-3 text-[12.5px] leading-relaxed text-(--ad-ink-soft)">
-            <span>
-              <span className="block text-[11px] font-semibold uppercase tracking-wide text-(--ad-ink-ghost)">Next email</span>
-              <span className="text-[13px] font-semibold text-(--ad-ink)">{details.next}</span>
-            </span>
-            <span>
-              <span className="block text-[11px] font-semibold uppercase tracking-wide text-(--ad-ink-ghost)">The rules</span>
-              <ul className="m-0 mt-0.5 flex list-disc flex-col gap-1 pl-4">
-                {details.rules.map((r) => <li key={r}>{r}</li>)}
-              </ul>
-            </span>
-            {details.ladder.length > 0 && (
-              <span>
-                <span className="block text-[11px] font-semibold uppercase tracking-wide text-(--ad-ink-ghost)">Daily limit grows</span>
-                <ul className="m-0 mt-0.5 flex list-disc flex-col gap-1 pl-4">
-                  {details.ladder.map((l) => <li key={l}>{l}</li>)}
-                </ul>
-              </span>
-            )}
-          </span>
+        {createPortal(
+          <AnimatePresence>
+            {open && <SendingDetailsDialog key="sending-details" pacing={pacing} onClose={() => setOpen(false)} />}
+          </AnimatePresence>,
+          document.body,
         )}
       </span>
     </div>
@@ -193,4 +179,73 @@ export function SendingCard({ clientId, client = supabase }: ConnectedProps) {
 export function SendingLine({ clientId, client = supabase, settingsHref }: ConnectedProps & { settingsHref?: string | null }) {
   const { pacing } = useSendPacing(clientId, client);
   return pacing ? <SendingLineView pacing={pacing} settingsHref={settingsHref} /> : null;
+}
+
+/* "How sending works": the full picture behind the one-line summary, in a pop-up so the
+   page itself stays short. */
+function SendingDetailsDialog({ pacing, onClose }: { pacing: SendPacing; onClose: () => void }) {
+  const details = sendingDetails(pacing);
+  const overlay = useOverlayClose(onClose, { escape: true });
+  const label = 'block text-[11px] font-semibold uppercase tracking-wide text-(--ad-ink-ghost)';
+  return (
+    <motion.div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: 'rgba(14, 8, 34, 0.45)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      {...overlay}
+    >
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-label="How sending works"
+        className="flex max-h-[calc(100vh-32px)] w-full max-w-[520px] flex-col gap-4 overflow-y-auto rounded-lg bg-(--ad-surface) p-5 text-left shadow-2xl"
+        initial={{ y: 12, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 8, opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="m-0 flex items-center gap-2 text-[16px] font-bold text-(--ad-ink)">
+            <Send size={16} className="text-(--ad-green)" aria-hidden /> How sending works
+          </h2>
+          <ModalClose onClick={onClose} />
+        </div>
+
+        <div className="rounded-lg border border-(--ad-green-line) bg-(--ad-green-tint)/40 px-4 py-3">
+          <span className={label}>Next email</span>
+          <p className="m-0 mt-0.5 text-[13.5px] font-semibold leading-relaxed text-(--ad-ink)">{details.next}</p>
+        </div>
+
+        <div>
+          <span className={label}>The rules</span>
+          <ul className="m-0 mt-1 flex list-disc flex-col gap-1.5 pl-4 text-[13px] leading-relaxed text-(--ad-ink-soft)">
+            {details.rules.map((r) => <li key={r}>{r}</li>)}
+          </ul>
+        </div>
+
+        {details.ladder.length > 0 && (
+          <div>
+            <span className={label}>Daily limit grows</span>
+            <ul className="m-0 mt-1 flex list-disc flex-col gap-1 pl-4 text-[13px] leading-relaxed text-(--ad-ink-soft)">
+              {details.ladder.map((l) => <li key={l}>{l}</li>)}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover)"
+          >
+            Got it
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
 }
