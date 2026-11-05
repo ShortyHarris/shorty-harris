@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { FlaskConical, Play, RotateCcw, MessageSquareReply, Ban, Clock, Gauge } from 'lucide-react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useToast, ToastHost } from '../../components/Toast';
 import { SandboxClock } from '../../components/SandboxClock';
+import { ModalClose } from '../../components/ModalClose';
+import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { useSendPacing } from '../../hooks/useSendPacing';
 import {
   useSandbox, nextStepLabel, nextStepBlock, hasSent, sentCount, describeResult,
+  clockAheadLabel, sandboxTimeLabel, sandboxTimeParts, inSendingHours,
   type ReplyKind, type SandboxResult,
 } from '../../hooks/useSandbox';
 
@@ -57,6 +60,20 @@ export function Sandbox({
   const { toasts, toast, dismiss } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [clockOpen, setClockOpen] = useState(false);
+  const [clockMsg, setClockMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const tz = pacing?.time_zone ?? 'America/Chicago';
+
+  // Clock buttons inside the dialog: the result shows in the dialog, next to the clock.
+  async function moveClock(key: string, action: () => Promise<SandboxResult>) {
+    setBusy(key);
+    try {
+      const r = await action();
+      setClockMsg({ text: describeResult(r), ok: !!r.ok });
+    } finally {
+      setBusy(null);
+    }
+  }
   const [replyKind, setReplyKind] = useState<Record<string, ReplyKind>>({});
 
   async function run(key: string, action: () => Promise<SandboxResult>) {
@@ -98,60 +115,30 @@ export function Sandbox({
       {/* Time travel: shifts the account's whole timeline, so production's own rules
           (3/5/7 business days, approval reminders, recalculation) run unmodified. The
           sandbox also keeps its own time of day, which the 9-5 send window follows. */}
-      <section className="flex flex-col justify-between gap-3.5 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3.5">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="m-0 flex items-center gap-1.5 text-[14px] font-semibold text-(--ad-ink)">
-            <Clock size={16} className="text-(--ad-green)" aria-hidden /> Sandbox clock
-          </h2>
-          <span className="text-[11.5px] text-(--ad-ink-ghost)">{pacing?.time_zone ?? 'America/Chicago'}</span>
-        </div>
-        <SandboxClock
-          minutesAdvanced={minutesAdvanced}
-          timeZone={pacing?.time_zone ?? 'America/Chicago'}
-          realRules={warmupOn}
-        />
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          {[
-            { group: 'Hours', items: [
-              { key: 'h1', label: '+1h', title: 'Advance 1 hour', action: () => advanceHours(1) },
-              { key: 'h4', label: '+4h', title: 'Advance 4 hours', action: () => advanceHours(4) },
-            ] },
-            { group: 'Days', items: [
-              { key: 'd1', label: '+1d', title: 'Advance 1 day', action: () => advanceTime(1) },
-              { key: 'd3', label: '+3d', title: 'Advance 3 days', action: () => advanceTime(3) },
-              { key: 'd7', label: '+7d', title: 'Advance 7 days', action: () => advanceTime(7) },
-            ] },
-          ].map((g) => (
-            <div key={g.group} className="flex items-center gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-(--ad-ink-ghost)">{g.group}</span>
-              <div className="inline-flex overflow-hidden rounded-lg border border-(--ad-line)">
-                {g.items.map((b, i) => (
-                  <button
-                    key={b.key}
-                    title={b.title}
-                    aria-label={b.title}
-                    onClick={() => run(`advance-${b.key}`, b.action)}
-                    disabled={readOnly || busy !== null}
-                    className={`cursor-pointer px-2.5 py-1.5 text-[12.5px] font-semibold text-(--ad-ink) tabular-nums transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-45 ${i > 0 ? 'border-l border-(--ad-line)' : ''}`}
-                  >
-                    {busy === `advance-${b.key}` ? '…' : b.label}
-                  </button>
-                ))}
-              </div>
+      <section className="flex flex-col justify-between gap-3 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3.5">
+        <div className="flex min-w-0 items-start gap-3">
+          <Clock size={18} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
+          <div className="min-w-0">
+            <div className="text-[14px] font-semibold text-(--ad-ink)">
+              Sandbox clock: {sandboxTimeLabel(minutesAdvanced, tz)}
+              <span className="font-normal text-(--ad-ink-soft)">
+                {' '}· {minutesAdvanced === 0 ? 'same as real time' : clockAheadLabel(minutesAdvanced)}
+                {warmupOn ? (inSendingHours(sandboxTimeParts(minutesAdvanced, tz)) ? ' · sending hours' : ' · outside sending hours') : ''}
+              </span>
             </div>
-          ))}
-          <button
-            onClick={() => run('advance-nine', () => jumpToSendWindow())}
-            disabled={readOnly || busy !== null}
-            className={`${btn} border border-(--ad-green-line) bg-(--ad-green-tint) whitespace-nowrap text-(--ad-green) hover:opacity-90`}
-          >
-            {busy === 'advance-nine' ? 'Working…' : 'Jump to next 9am'}
-          </button>
+            <p className="m-0 mt-0.5 text-[12.5px] leading-relaxed text-(--ad-ink-soft)">
+              Moves every send, draft and schedule on this account back in time, so the real follow-up rules apply:
+              leave a draft unapproved and advance 10 days to test an overdue approval. Reset puts the clock back to now.
+            </p>
+          </div>
         </div>
-        <p className="m-0 text-[12px] leading-relaxed text-(--ad-ink-soft)">
-          Moves every send, draft and schedule on this account back in time, so the real follow-up rules apply.
-          Leave a draft unapproved and advance 10 days to test an overdue approval. Reset puts the clock back to now.
-        </p>
+        <button
+          onClick={() => { setClockMsg(null); setClockOpen(true); }}
+          disabled={readOnly || busy !== null}
+          className={`${btn} shrink-0 self-start border border-(--ad-line) bg-transparent whitespace-nowrap text-(--ad-ink) hover:bg-(--ad-surface-2)`}
+        >
+          <Clock size={14} aria-hidden /> Change time
+        </button>
       </section>
 
       {/* Sending rules: the real warm-up and send hours, or fast mode with neither. */}
@@ -281,6 +268,30 @@ export function Sandbox({
       )}
 
       <AnimatePresence>
+        {clockOpen && (
+          <ClockDialog
+            key="sandbox-clock-dialog"
+            minutesAdvanced={minutesAdvanced}
+            timeZone={tz}
+            realRules={warmupOn}
+            busy={busy}
+            message={clockMsg}
+            buttons={[
+              { group: 'Hours', items: [
+                { key: 'h1', label: '+1h', title: 'Advance 1 hour', action: () => advanceHours(1) },
+                { key: 'h4', label: '+4h', title: 'Advance 4 hours', action: () => advanceHours(4) },
+              ] },
+              { group: 'Days', items: [
+                { key: 'd1', label: '+1d', title: 'Advance 1 day', action: () => advanceTime(1) },
+                { key: 'd3', label: '+3d', title: 'Advance 3 days', action: () => advanceTime(3) },
+                { key: 'd7', label: '+7d', title: 'Advance 7 days', action: () => advanceTime(7) },
+              ] },
+            ]}
+            onMove={(key, action) => moveClock(`advance-${key}`, action)}
+            onJump={() => moveClock('advance-nine', () => jumpToSendWindow())}
+            onClose={() => setClockOpen(false)}
+          />
+        )}
         {confirmReset && (
           <ConfirmDialog
             key="confirm-sandbox-reset"
@@ -302,5 +313,105 @@ export function Sandbox({
 
       <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
+  );
+}
+
+interface ClockButton { key: string; label: string; title: string; action: () => Promise<SandboxResult> }
+
+/* The time-travel dialog: the clock face moves as each button is pressed. */
+export function ClockDialog({
+  minutesAdvanced, timeZone, realRules, busy, message, buttons, onMove, onJump, onClose,
+}: {
+  minutesAdvanced: number;
+  timeZone: string;
+  realRules: boolean;
+  busy: string | null;
+  message: { text: string; ok: boolean } | null;
+  buttons: { group: string; items: ClockButton[] }[];
+  onMove: (key: string, action: () => Promise<SandboxResult>) => void;
+  onJump: () => void;
+  onClose: () => void;
+}) {
+  const overlay = useOverlayClose(busy ? () => {} : onClose, { escape: true });
+  return (
+    <motion.div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: 'rgba(14, 8, 34, 0.45)', ...FONT }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      {...overlay}
+    >
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Sandbox clock"
+        className="flex w-full max-w-[480px] flex-col gap-4 rounded-lg bg-(--ad-surface) p-5 shadow-2xl"
+        initial={{ y: 12, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 8, opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="m-0 flex items-center gap-1.5 text-[16px] font-bold text-(--ad-ink)">
+              <Clock size={17} className="text-(--ad-green)" aria-hidden /> Sandbox clock
+            </h2>
+            <p className="m-0 mt-0.5 text-[12px] text-(--ad-ink-ghost)">{timeZone}</p>
+          </div>
+          <ModalClose onClick={onClose} />
+        </div>
+
+        <SandboxClock minutesAdvanced={minutesAdvanced} timeZone={timeZone} realRules={realRules} />
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          {buttons.map((g) => (
+            <div key={g.group} className="flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-(--ad-ink-ghost)">{g.group}</span>
+              <div className="inline-flex overflow-hidden rounded-lg border border-(--ad-line)">
+                {g.items.map((b, i) => (
+                  <button
+                    key={b.key}
+                    title={b.title}
+                    aria-label={b.title}
+                    onClick={() => onMove(b.key, b.action)}
+                    disabled={busy !== null}
+                    className={`cursor-pointer px-2.5 py-1.5 text-[12.5px] font-semibold text-(--ad-ink) tabular-nums transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-45 ${i > 0 ? 'border-l border-(--ad-line)' : ''}`}
+                  >
+                    {busy === `advance-${b.key}` ? '…' : b.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <button
+          onClick={onJump}
+          disabled={busy !== null}
+          className={`${btn} self-start border border-(--ad-green-line) bg-(--ad-green-tint) whitespace-nowrap text-(--ad-green) hover:opacity-90`}
+        >
+          {busy === 'advance-nine' ? 'Working…' : 'Jump to next 9am'}
+        </button>
+
+        <p
+          aria-live="polite"
+          className={`m-0 min-h-[36px] text-[12.5px] leading-relaxed ${message && !message.ok ? 'text-(--ad-clay)' : 'text-(--ad-ink-soft)'}`}
+        >
+          {message?.text ?? 'Time only moves forward. Reset sandbox puts the clock back to now.'}
+        </p>
+
+        <div className="flex justify-end">
+          <button
+            onClick={onClose}
+            disabled={busy !== null}
+            className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50"
+          >
+            Done
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
