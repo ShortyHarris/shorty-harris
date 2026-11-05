@@ -8,6 +8,7 @@ import { clientHeaderKey } from './useClientHeader';
 import { billingKey } from './useBilling';
 import { clientNotificationsKey } from './useClientNotifications';
 import { myCampaignsKey } from './useClientCampaigns';
+import { sendPacingKey } from './useSendPacing';
 
 /**
  * Sets up the single Supabase Realtime subscription for everything the
@@ -34,6 +35,8 @@ export function useClientRealtimeSync(clientId: string) {
           queryClient.invalidateQueries({ queryKey: clientPendingCountKey(clientId) });
           queryClient.invalidateQueries({ queryKey: approvalsScheduleKey(clientId) });
           queryClient.invalidateQueries({ queryKey: clientApprovedKey(clientId) });
+          // "2 of 5 sent today", the queue and "How sending works" change with every send.
+          queryClient.invalidateQueries({ queryKey: sendPacingKey(clientId) });
         }
       )
       // New hot leads routed in, or a status change - updates the Hot Leads

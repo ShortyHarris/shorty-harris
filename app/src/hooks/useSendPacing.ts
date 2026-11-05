@@ -21,6 +21,11 @@ export function useSendPacing(clientId: string | null, client: SupabaseClient = 
     queryFn: () => fetchSendPacing(clientId as string, client),
     enabled,
     staleTime: 30 * 1000,
+    // Sends refresh this at once through the realtime sync (messages). Polling covers what has no
+    // realtime feed: the clock moving into or out of sending hours, Gmail being reconnected, and the
+    // sandbox clock, so "next email at about..." never goes stale while the page is open.
+    refetchInterval: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
   return { pacing: data ?? null, loading: enabled && isLoading, error: (error as Error | null)?.message ?? null };
 }
