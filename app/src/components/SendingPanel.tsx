@@ -1,9 +1,16 @@
-import { AlertCircle, Info, Send } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { GmailLogo } from './GmailLogo';
+import { AnimatePresence, motion } from 'framer-motion';
+import { AlertCircle, ChevronRight, Info, Send } from 'lucide-react';
+import { ModalClose } from './ModalClose';
+import { useOverlayClose } from '../hooks/useOverlayClose';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useSendPacing } from '../hooks/useSendPacing';
 import {
-  sendingCopy, compactSendingLine, FOLLOW_UP_EXPLAINER, type SendPacing,
+  sendingCopy, compactSendingLine, sendingDetails, FOLLOW_UP_EXPLAINER, type SendPacing,
 } from '../lib/sendPacing';
 
 // Every sentence comes from lib/sendPacing; these components only lay it out. Colours use the shared
@@ -89,7 +96,42 @@ export function SendingCardView({ pacing }: { pacing: SendPacing }) {
  *  sentences and give the first one - the actual "X of Y sent today" fact -
  *  more visual weight than the warm-up/queue detail trailing it, so the one
  *  number someone actually needs doesn't read as equal to everything else. */
-export function SendingLineView({ pacing }: { pacing: SendPacing }) {
+export function SendingLineView({ pacing, settingsHref }: { pacing: SendPacing; settingsHref?: string | null }) {
+  // No Gmail: say so plainly, in warning colours, with the way to fix it. Approved emails
+  // wait (they are not lost) and send by themselves once Gmail is reconnected.
+  if (!pacing.mailbox_connected) {
+    return (
+      <div
+        role="alert"
+        className="flex flex-col gap-3 rounded-lg border border-(--ad-clay) bg-(--ad-clay-tint) px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <span className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-(--ad-line) bg-white">
+            <GmailLogo size={18} />
+          </span>
+          <span className="flex flex-col gap-0.5 pt-0.5">
+            <span className="text-[14.5px] font-bold leading-snug text-(--ad-ink)">Gmail isn't connected, so nothing can send.</span>
+            <span className="text-[12.5px] leading-snug text-(--ad-ink-soft)">
+              You can still approve. Approved emails wait here and send automatically once Gmail is connected again.
+            </span>
+          </span>
+        </span>
+        {settingsHref && (
+          <Link
+            to={settingsHref}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-(--ad-line) bg-white px-3.5 py-2 text-[13px] font-bold text-[#1f1f1f] no-underline hover:bg-[#f6f6f6]"
+          >
+            <GmailLogo size={16} /> Connect Gmail
+          </Link>
+        )}
+      </div>
+    );
+  }
+  return <SendingLineSummary pacing={pacing} />;
+}
+
+function SendingLineSummary({ pacing }: { pacing: SendPacing }) {
+  const [open, setOpen] = useState(false);
   const { text, warning } = compactSendingLine(pacing);
   const sentences = text.split(/(?<=\.)\s+/).filter(Boolean);
   const [headline, ...rest] = sentences;
@@ -103,9 +145,23 @@ export function SendingLineView({ pacing }: { pacing: SendPacing }) {
           ? <AlertCircle size={15} strokeWidth={2.3} aria-hidden />
           : <Send size={14} strokeWidth={2.3} aria-hidden />}
       </span>
-      <span className="flex flex-col gap-0.5 pt-0.5">
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
         <span className="text-[14.5px] font-bold leading-snug text-(--ad-ink)">{headline}</span>
         {rest.length > 0 && <span className="text-[12.5px] leading-snug text-(--ad-ink-soft)">{rest.join(' ')}</span>}
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          className="mt-1 inline-flex w-fit cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-[12.5px] font-semibold text-(--ad-green) hover:underline"
+        >
+          How sending works <ChevronRight size={14} aria-hidden />
+        </button>
+        {createPortal(
+          <AnimatePresence>
+            {open && <SendingDetailsDialog key="sending-details" pacing={pacing} onClose={() => setOpen(false)} />}
+          </AnimatePresence>,
+          document.body,
+        )}
       </span>
     </div>
   );
@@ -120,7 +176,76 @@ export function SendingCard({ clientId, client = supabase }: ConnectedProps) {
   return pacing ? <SendingCardView pacing={pacing} /> : null;
 }
 
-export function SendingLine({ clientId, client = supabase }: ConnectedProps) {
+export function SendingLine({ clientId, client = supabase, settingsHref }: ConnectedProps & { settingsHref?: string | null }) {
   const { pacing } = useSendPacing(clientId, client);
-  return pacing ? <SendingLineView pacing={pacing} /> : null;
+  return pacing ? <SendingLineView pacing={pacing} settingsHref={settingsHref} /> : null;
+}
+
+/* "How sending works": the full picture behind the one-line summary, in a pop-up so the
+   page itself stays short. */
+function SendingDetailsDialog({ pacing, onClose }: { pacing: SendPacing; onClose: () => void }) {
+  const details = sendingDetails(pacing);
+  const overlay = useOverlayClose(onClose, { escape: true });
+  const label = 'block text-[11px] font-semibold uppercase tracking-wide text-(--ad-ink-ghost)';
+  return (
+    <motion.div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: 'rgba(14, 8, 34, 0.45)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      {...overlay}
+    >
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-label="How sending works"
+        className="flex max-h-[calc(100vh-32px)] w-full max-w-[520px] flex-col gap-4 overflow-y-auto rounded-lg bg-(--ad-surface) p-5 text-left shadow-2xl"
+        initial={{ y: 12, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 8, opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="m-0 flex items-center gap-2 text-[16px] font-bold text-(--ad-ink)">
+            <Send size={16} className="text-(--ad-green)" aria-hidden /> How sending works
+          </h2>
+          <ModalClose onClick={onClose} />
+        </div>
+
+        <div className="rounded-lg border border-(--ad-green-line) bg-(--ad-green-tint)/40 px-4 py-3">
+          <span className={label}>Next email</span>
+          <p className="m-0 mt-0.5 text-[13.5px] font-semibold leading-relaxed text-(--ad-ink)">{details.next}</p>
+        </div>
+
+        <div>
+          <span className={label}>The rules</span>
+          <ul className="m-0 mt-1 flex list-disc flex-col gap-1.5 pl-4 text-[13px] leading-relaxed text-(--ad-ink-soft)">
+            {details.rules.map((r) => <li key={r}>{r}</li>)}
+          </ul>
+        </div>
+
+        {details.ladder.length > 0 && (
+          <div>
+            <span className={label}>Daily limit grows</span>
+            <ul className="m-0 mt-1 flex list-disc flex-col gap-1 pl-4 text-[13px] leading-relaxed text-(--ad-ink-soft)">
+              {details.ladder.map((l) => <li key={l}>{l}</li>)}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-(--ad-green-hover)"
+          >
+            Got it
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
 }

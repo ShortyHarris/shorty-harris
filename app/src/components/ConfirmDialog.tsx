@@ -51,7 +51,7 @@ export function ConfirmDialog({
             disabled={busy}
             className={`cursor-pointer rounded-lg px-4 py-2 text-[13px] font-bold transition-colors disabled:opacity-50 ${
               danger
-                ? 'border border-(--ad-clay) bg-(--ad-clay) text-white hover:bg-(--ad-clay-hover)'
+                ? 'border border-(--ad-clay) bg-(--ad-clay) text-(--ad-surface) hover:bg-(--ad-clay-hover)'
                 : 'border-0 bg-(--ad-green) text-white hover:bg-(--ad-green-hover)'
             }`}
           >

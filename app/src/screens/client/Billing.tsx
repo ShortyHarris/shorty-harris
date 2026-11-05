@@ -3,6 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { useBilling, type PaymentRow, type LedgerRow } from '../../hooks/useBilling';
+import { useClientHeader } from '../../hooks/useClientHeader';
+import { AnimatePresence } from 'framer-motion';
+import { PurchaseSuccess } from '../../components/PurchaseSuccess';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
@@ -69,12 +72,17 @@ export function Billing({
 }: { clientId: string; onCreditsChanged?: () => void; client?: SupabaseClient; readOnly?: boolean }) {
   const { data, loading, isFetching, dataUpdatedAt, error, reload } = useBilling(clientId, client);
   const { toasts, toast, dismiss } = useToast();
+  // A sandbox account never opens Stripe: Buy records a no-charge purchase instead.
+  const { isSandbox } = useClientHeader(clientId, client);
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh billing.');
   const [selected, setSelected]           = useState<number>(5);
   const [checkoutBusy, setCheckoutBusy]   = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [searchParams, setSearchParams]   = useSearchParams();
   const [banner, setBanner]               = useState<{ kind: 'success' | 'cancel'; text: string } | null>(null);
+  // The success card after buying credits. balance is set for a sandbox purchase (the RPC
+  // returns it); after Stripe the live balance is used, as the webhook may land a moment later.
+  const [celebrate, setCelebrate] = useState<{ credits: number | null; balance: number | null; sandbox: boolean } | null>(null);
 
   const [paymentsFilter, setPaymentsFilter] = useState<DateFilter>('all');
   const [paymentsPage, setPaymentsPage]     = useState(1);
@@ -96,7 +104,8 @@ export function Billing({
   useEffect(() => {
     const status = searchParams.get('status');
     if (status === 'success') {
-      setBanner({ kind: 'success', text: 'Payment received - your credits have been added.' });
+      const bought = Number(searchParams.get('credits'));
+      setCelebrate({ credits: Number.isFinite(bought) && bought > 0 ? bought : null, balance: null, sandbox: false });
       const t = setTimeout(() => { reload(); onCreditsChanged?.(); }, 2500);
       setSearchParams({}, { replace: true });
       return () => clearTimeout(t);
@@ -111,6 +120,23 @@ export function Billing({
     if (readOnly) return;
     setCheckoutBusy(true);
     setCheckoutError(null);
+    if (isSandbox) {
+      // Same end state as coming back from a paid Stripe checkout (see the
+      // status=success effect above), without leaving the app or charging a card.
+      const { data: res, error: err } = await supabase.rpc('sandbox_simulate_purchase', {
+        p_client_id: clientId, p_credits: pack.credits,
+      });
+      setCheckoutBusy(false);
+      const r = res as { ok?: boolean; error?: string; balance?: number } | null;
+      if (err || !r?.ok) {
+        setCheckoutError(`Could not record the sandbox purchase (${err?.message ?? r?.error ?? 'unknown error'}).`);
+        return;
+      }
+      setCelebrate({ credits: pack.credits, balance: typeof r.balance === 'number' ? r.balance : null, sandbox: true });
+      reload();
+      onCreditsChanged?.();
+      return;
+    }
     try {
  const endpoint = 'https://n8n.shortyharris.com/webhook/wf7-create-checkout';
       const res = await fetch(endpoint, {
@@ -197,7 +223,7 @@ export function Billing({
           <button className="checkout-btn rounded-lg" onClick={startCheckout} disabled={checkoutBusy || readOnly}>
             {!checkoutBusy && <LockIcon />}
             {checkoutBusy
-              ? 'Starting secure checkout…'
+              ? (isSandbox ? 'Recording sandbox purchase…' : 'Starting secure checkout…')
               : `Buy ${selected} credits - $${pack.priceUsd}`}
           </button>
           {readOnly && (
@@ -207,7 +233,9 @@ export function Billing({
             <p className="checkout-note checkout-note-error">{checkoutError}</p>
           )}
           <p className="checkout-note">
-            Secure checkout via Stripe. Credits are added immediately on success.
+            {isSandbox
+              ? 'Sandbox account: buying skips Stripe and no card is charged. The credits and the receipt are added exactly as after a real payment.'
+              : 'Secure checkout via Stripe. Credits are added immediately on success.'}
           </p>
         </div>
       </div>
@@ -329,6 +357,19 @@ export function Billing({
           </div>
         </>
       )}
+
+      <AnimatePresence>
+        {celebrate && (
+          <PurchaseSuccess
+            key="purchase-success"
+            creditsAdded={celebrate.credits}
+            balance={celebrate.balance ?? (loading ? null : data?.credits ?? null)}
+            sandbox={celebrate.sandbox}
+            leadsHref="/app"
+            onClose={() => setCelebrate(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <ToastHost toasts={toasts} onDismiss={dismiss} />
     </main>

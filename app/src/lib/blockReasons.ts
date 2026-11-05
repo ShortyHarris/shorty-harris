@@ -11,6 +11,8 @@ export type BlockReason =
   | 'campaign_inactive'
   | 'prospect_status'
   | 'unsubscribe_unhealthy'
+  | 'no_gmail'
+  | 'retrying_send'
   | 'waiting_followup_timing';
 
 export type BlockTone = 'blocked' | 'paused' | 'scheduled';
@@ -58,6 +60,16 @@ export const BLOCK_INFO: Record<BlockReason, BlockInfo> = {
   unsubscribe_unhealthy: {
     badge: 'Blocked', tone: 'blocked',
     text: 'Sending paused platform-wide: our team is fixing a compliance check',
+  },
+  // Gmail is disconnected: the email stays approved and sends once it is reconnected.
+  no_gmail: {
+    badge: 'Waiting for Gmail', tone: 'paused',
+    text: 'Waiting: connect Gmail in Settings and this sends automatically',
+  },
+  // Gmail refused the last attempt; it is retried automatically (up to 3 attempts).
+  retrying_send: {
+    badge: 'Retrying', tone: 'scheduled',
+    text: "Gmail didn't accept the last attempt; retrying automatically",
   },
   waiting_followup_timing: {
     badge: 'Scheduled', tone: 'scheduled',

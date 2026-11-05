@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseSendPacing, sendingCopy, compactSendingLine, formatClock, formatDays, formatDay, parseSendDays,
-  FOLLOW_UP_EXPLAINER, QUEUE_TOOLTIP,
+  FOLLOW_UP_EXPLAINER, QUEUE_TOOLTIP, sendingDetails, warmupGapMinutes,
 } from './sendPacing';
 
 const NOW = new Date('2026-10-28T12:00:00Z');
@@ -275,5 +275,55 @@ describe('compact one-line version', () => {
   it('nothing queued: just today', () => {
     const l = line({ queue: { ready: 0, ready_first_emails: 0, ready_follow_ups: 0, waiting_for_date: 0, estimated_clear_date: null } });
     expect(l.text).toBe('12 of 40 emails sent today.');
+  });
+});
+
+describe('sendingDetails', () => {
+  // The sandbox case from 2026-11-05: warming up at 5 a day, 2 sent, 3 queued, last send 09:50 Lusaka.
+  const warming = (over: Record<string, unknown> = {}) => parseSendPacing(body({
+    time_zone: 'Africa/Lusaka',
+    now: '2026-11-05T08:05:00Z', // 10:05 in Lusaka
+    window_applies: true,
+    last_sent_at: '2026-11-05T07:50:00Z', // 09:50 in Lusaka
+    warmup: {
+      mode: 'ramp', active: true, day: 0, next_step_cap: 10, next_step_date: '2026-11-12',
+      ladder: [
+        { cap: 5, starts_on: '2026-11-05' }, { cap: 10, starts_on: '2026-11-12' }, { cap: 20, starts_on: '2026-11-19' },
+        { cap: 30, starts_on: '2026-11-26' }, { cap: 40, starts_on: '2026-12-03' },
+      ],
+    },
+    today: { cap: 5, sent: 2, remaining: 3, in_window_now: true },
+    queue: { ready: 3, ready_first_emails: 3, ready_follow_ups: 0, waiting_for_date: 0, estimated_clear_date: '2026-11-05' },
+    ...over,
+  }));
+
+  it('matches the spacing WF2.5 uses while warming up', () => {
+    expect(warmupGapMinutes(5)).toEqual({ avg: 58, min: 43, max: 72 });
+    expect(warmupGapMinutes(10)).toEqual({ avg: 29, min: 22, max: 36 });
+    expect(warmupGapMinutes(40)).toBeNull();
+  });
+
+  it('says when the next email goes and why they are spaced out', () => {
+    const d = sendingDetails(warming(), NOW);
+    expect(d.next).toBe('The next email should go out at about 10:48 AM (about 58 min after the last one, at 9:50 AM). All 3 queued should be sent by about Nov 5.');
+    expect(d.rules[0]).toContain('up to 5 emails a day right now (day 1 of warm-up)');
+    expect(d.rules[1]).toBe('Emails go out one at a time, about 58 min apart (between 43 min and 1h 12m, varied so it looks natural).');
+    expect(d.rules[2]).toContain('Mon to Fri, 9:00 AM to 5:00 PM (Africa/Lusaka)');
+    expect(d.ladder).toEqual(['10 a day from Nov 12', '20 a day from Nov 19', '30 a day from Nov 26', '40 a day from Dec 3']);
+  });
+
+  it('explains a reached daily limit and time outside sending hours', () => {
+    expect(sendingDetails(warming({ today: { cap: 5, sent: 5, remaining: 0, in_window_now: true } }), NOW).next)
+      .toContain("Today's limit of 5 is reached, so the rest go from 9:00 AM on the next sending day.");
+    // 18:30 in Lusaka on a Thursday.
+    expect(sendingDetails(warming({ now: '2026-11-05T16:30:00Z', today: { cap: 5, sent: 2, remaining: 3, in_window_now: false } }), NOW).next)
+      .toContain('Outside sending hours: sending resumes tomorrow at 9:00 AM.');
+  });
+
+  it('describes fast mode and a fully warmed mailbox', () => {
+    const fast = sendingDetails(parseSendPacing(body({ window_applies: false, today: { cap: 100, sent: 0, remaining: 100, in_window_now: true } })), NOW);
+    expect(fast.rules).toContain('Sandbox fast mode: sending hours are switched off, so emails go at any hour.');
+    expect(fast.rules).toContain('Approved emails go out within a minute or two, up to 10 a minute.');
+    expect(fast.ladder).toEqual([]);
   });
 });

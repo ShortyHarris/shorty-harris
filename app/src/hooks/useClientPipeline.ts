@@ -137,7 +137,8 @@ export interface SequenceReply {
   body: string;
 }
 
-export type StoppedBecause = 'they_replied_with_interest' | 'unsubscribed_or_bounced' | null;
+export type StoppedBecause =
+  | 'they_replied_with_interest' | 'unsubscribed_or_bounced' | 'they_said_not_interested' | 'stopped' | null;
 
 export interface ProspectSequence {
   prospect: { prospect_id: string; business_name: string; email: string | null; pipeline_status: string };

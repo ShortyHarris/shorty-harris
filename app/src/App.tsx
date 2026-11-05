@@ -52,6 +52,7 @@ const Settings       = lazy(() => import('./screens/client/Settings').then((m) =
 const ClientAnalytics = lazy(() => import('./screens/client/Analytics').then((m) => ({ default: m.Analytics })));
 const TargetingProfile = lazy(() => import('./screens/client/TargetingProfile').then((m) => ({ default: m.TargetingProfile })));
 const Results         = lazy(() => import('./screens/client/Results').then((m) => ({ default: m.Results })));
+const Sandbox         = lazy(() => import('./screens/client/Sandbox').then((m) => ({ default: m.Sandbox })));
 const Prospects       = lazy(() => import('./screens/client/Prospects').then((m) => ({ default: m.Prospects })));
 const Docs           = lazy(() => import('./screens/docs/Docs').then((m) => ({ default: m.Docs })));
 
@@ -123,7 +124,7 @@ function SignupRoute() {
 function ClientZone() {
   const { profile, signOut } = useAuth();
   const clientId = profile!.client_id!;
-  const { businessName, credits } = useClientHeader(clientId);
+  const { businessName, credits, isSandbox } = useClientHeader(clientId);
   // Head count only - the badge must not load the whole queue on every page.
   const pendingApprovals = usePendingApprovalCount(clientId);
   const { awaitingProspects } = useApprovedQueueCounts(clientId);
@@ -180,6 +181,7 @@ function ClientZone() {
           onMarkAsRead={markAsRead}
           onMarkAllAsRead={markAllAsRead}
           onSignOut={signOut}
+          isSandbox={isSandbox}
         >
           <Routes>
             <Route index element={<Dashboard clientId={clientId} />} />
@@ -190,6 +192,7 @@ function ClientZone() {
             <Route path="results" element={<Results clientId={clientId} />} />
             <Route path="targeting" element={<TargetingProfile clientId={clientId} />} />
             <Route path="settings" element={<Settings clientId={clientId} onSignOut={signOut} />} />
+            {isSandbox && <Route path="sandbox" element={<Sandbox clientId={clientId} />} />}
             <Route path="billing" element={<Billing clientId={clientId} onCreditsChanged={() => {
               queryClient.invalidateQueries({ queryKey: clientHeaderKey(clientId) });
               queryClient.invalidateQueries({ queryKey: billingKey(clientId) });
@@ -229,7 +232,7 @@ function ImpersonateZone() {
   const [editMode, setEditMode] = useState(false);
   const [confirmEdit, setConfirmEdit] = useState(false);
   // The client's real balance, so the sidebar and header match what they see.
-  const { credits } = useClientHeader(clientId ?? '', session?.client ?? supabase);
+  const { credits, isSandbox } = useClientHeader(clientId ?? '', session?.client ?? supabase);
   // Wait for the impersonation session: falling back to the admin's own client here would count
   // drafts only an admin can see.
   const { awaitingProspects } = useApprovedQueueCounts(session ? clientId ?? '' : '', session?.client ?? supabase);
@@ -299,6 +302,7 @@ function ImpersonateZone() {
         signOutLabel="Exit impersonation"
         onSignOut={exit}
         basePath={basePath}
+        isSandbox={isSandbox}
       >
         <Routes>
           <Route index element={<Dashboard clientId={clientId} client={client} readOnly={readOnly} markViewedOnOpen={false} basePath={basePath} />} />
@@ -308,9 +312,10 @@ function ImpersonateZone() {
           <Route path="approvals" element={<Approvals clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} />} />
           <Route path="analytics" element={<ClientAnalytics clientId={clientId} client={client} />} />
           <Route path="results" element={<Results clientId={clientId} client={client} basePath={basePath} />} />
-          <Route path="targeting" element={<TargetingProfile clientId={clientId} client={client} readOnly={readOnly} />} />
+          <Route path="targeting" element={<TargetingProfile clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} settingsAvailable={false} />} />
           {/* Buying credits charges the client - read-only even in edit mode. */}
           <Route path="billing" element={<Billing clientId={clientId} client={client} readOnly />} />
+          {isSandbox && <Route path="sandbox" element={<Sandbox clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} />} />}
           <Route path="*" element={<Navigate to="" replace />} />
         </Routes>
       </Shell>

@@ -4,7 +4,7 @@ import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusP
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  useClients, createClient, sendClientInvite, updateClientLoginEmail,
+  useClients, createClient, createSandboxClient, sendClientInvite, updateClientLoginEmail,
   updateClient, getClientDeleteCounts, deleteClient, getClientUsage,
   adjustClientCredits, getClientCreditHistory,
 } from '../../hooks/useAdminData';
@@ -60,7 +60,7 @@ const STATUS_PILL: Record<string, StatusPillStyle> = {
 
 const ghostCls   = 'cursor-pointer whitespace-nowrap rounded-xl border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-line-strong) hover:bg-(--ad-surface-2)';
 const primaryCls = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-green) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover) disabled:opacity-50';
-const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50';
+const dangerCls  = 'cursor-pointer whitespace-nowrap rounded-xl border-0 bg-(--ad-clay) px-4 py-2 text-[13px] font-semibold text-(--ad-surface) transition-colors hover:bg-(--ad-clay-hover) disabled:opacity-50';
 const PAGE_SIZE  = 15;
 
 const fieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
@@ -74,6 +74,7 @@ export function Clients() {
   const { toasts, toast, dismiss } = useToast();
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh clients.');
   const [showNew, setShowNew]     = useState(false);
+  const [showNewSandbox, setShowNewSandbox] = useState(false);
   const [editClient, setEditClient]     = useState<ClientListRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClientListRow | null>(null);
   const [changeEmailTarget, setChangeEmailTarget] = useState<ClientListRow | null>(null);
@@ -128,6 +129,7 @@ export function Clients() {
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton content={HELP} />
           <RefreshButton onRefresh={handleRefresh} isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} className={ghostCls} />
+          <button onClick={() => setShowNewSandbox(true)} className={`${ghostCls} hidden md:inline-flex`} title="A test account for one tester. Emails only reach their own mailbox.">+ New sandbox</button>
           <button onClick={() => setShowNew(true)} className={`${primaryCls} hidden md:inline-flex`}>+ New client</button>
         </div>
       </header>
@@ -172,7 +174,10 @@ export function Clients() {
                   return (
                     <tr key={c.id} onClick={() => setEditClient(c)} className="group cursor-pointer">
                       <td className="min-w-0">
-                        <div className="truncate font-semibold text-(--ad-ink) group-hover:underline" title={c.business_name}>{c.business_name}</div>
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="truncate font-semibold text-(--ad-ink) group-hover:underline" title={c.business_name}>{c.business_name}</span>
+                          {c.is_sandbox && <SandboxBadge />}
+                        </div>
                         <span className="mt-0.5 inline-block max-w-full truncate rounded-full bg-(--ad-fill) px-2 py-0.5 text-[10px] font-semibold text-(--ad-ink-faint)" title={`Send timezone: ${c.send_timezone}`}>
                           {timezoneLabel(c.send_timezone)}
                         </span>
@@ -249,7 +254,10 @@ export function Clients() {
               return (
                 <div key={c.id} className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="min-w-0 truncate font-semibold text-[14px] text-(--ad-ink)" title={c.business_name}>{c.business_name}</span>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="min-w-0 truncate font-semibold text-[14px] text-(--ad-ink)" title={c.business_name}>{c.business_name}</span>
+                      {c.is_sandbox && <SandboxBadge />}
+                    </span>
                     <div className="flex shrink-0 items-center gap-1.5">
                       <span style={{ background: spill.bg, color: spill.text }}
                         className="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.04em]">
@@ -327,6 +335,13 @@ export function Clients() {
       <MobileFab onClick={() => setShowNew(true)} label="New client" />
 
       <AnimatePresence>
+        {showNewSandbox && (
+          <NewSandboxModal
+            key="new-sandbox-modal"
+            onClose={() => setShowNewSandbox(false)}
+            onCreated={(msg) => { setShowNewSandbox(false); toast(msg); reload(); }}
+          />
+        )}
         {showNew && (
           <NewClientModal
             key="new-client-modal"
@@ -438,6 +453,69 @@ function InviteCell({
         <span className="text-[11px] leading-snug text-(--ad-clay)">{errMsg}</span>
       )}
     </div>
+  );
+}
+
+/* ── Sandbox customers ─────────────────────────────────────────────── */
+function SandboxBadge() {
+  return (
+    <span
+      title="Sandbox: a test account. Emails only reach the tester's own mailbox, and it is left out of reporting."
+      className="inline-flex shrink-0 items-center rounded-full bg-[#b42318] px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-[.04em] text-white"
+    >
+      Sandbox
+    </span>
+  );
+}
+
+// One sandbox per tester, so two people testing never reset each other's data.
+function NewSandboxModal({ onClose, onCreated }: { onClose: () => void; onCreated: (message: string) => void }) {
+  const reqStar = <RequiredMark />;
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function submit() {
+    setBusy(true); setErr(null);
+    const res = await createSandboxClient(name.trim(), email.trim());
+    if (res.error || !res.clientId) { setBusy(false); setErr(res.error ?? 'Could not create the sandbox.'); return; }
+    const invite = await sendClientInvite(res.clientId, email.trim(), name.trim());
+    setBusy(false);
+    onCreated(invite.error && !invite.alreadyActive
+      ? `${res.businessName} created, but the invite failed (${invite.error}). Send it from the client's row.`
+      : `${res.businessName} created. ${name.trim()} gets a login invite: they log in, connect their own Gmail, then press Reset on the Sandbox page.`);
+  }
+
+  return (
+    <ModalShell onClose={onClose}>
+      <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
+        <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">New sandbox</h2>
+        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
+      </div>
+      <div className="flex flex-col gap-4 px-5 py-5">
+        <p className="m-0 text-[13px] leading-relaxed text-(--ad-ink-soft)">
+          A test account for one person. They get a login invite, connect their own Gmail, and every test email
+          goes only to that mailbox. It is left out of platform reporting, and Stripe, Apify and texts are simulated.
+        </p>
+        <div>
+          <label className={fieldLbl}>Tester's name{reqStar}</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Martin Vitek" style={FONT} className={inputCls} />
+        </div>
+        <div>
+          <label className={fieldLbl}>Tester's email{reqStar}</label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" style={FONT} className={inputCls} />
+          <p className="mt-1 text-[11px] text-(--ad-ink-faint)">The login invite goes here. It must not already be used by another account.</p>
+        </div>
+        {err && <p className="m-0 text-[12.5px] text-(--ad-clay)">{err}</p>}
+      </div>
+      <div className="flex justify-end gap-2.5 border-t border-(--ad-line) px-5 py-4">
+        <button onClick={onClose} className={ghostCls}>Cancel</button>
+        <button onClick={submit} disabled={busy || !name.trim() || !email.trim()} className={primaryCls}>
+          {busy ? 'Creating…' : 'Create sandbox and send invite'}
+        </button>
+      </div>
+    </ModalShell>
   );
 }
 

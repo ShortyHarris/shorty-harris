@@ -6,7 +6,8 @@ import { queryClient } from '../../lib/queryClient';
 import { useToast, ToastHost } from '../../components/Toast';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Zap, CheckCircle2, AlertTriangle, LogOut, BarChart3, ChevronRight, Lock, Building2, BookOpen, Compass, ShieldCheck, ShieldOff, Target } from 'lucide-react';
+import { GmailLogo } from '../../components/GmailLogo';
+import { Zap, CheckCircle2, AlertTriangle, LogOut, BarChart3, ChevronRight, Lock, Building2, BookOpen, Compass, ShieldCheck, ShieldOff, Target } from 'lucide-react';
 import { BlockedDomainsModal } from './BlockedDomains';
 import { openConsentPreferences } from '../../lib/consent';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
@@ -51,7 +52,16 @@ function formatLastUsed(iso: string): string {
    than an always-open form - tapping it opens an edit modal. */
 function ProfileSection({ clientId, onSaved, onError }: { clientId: string; onSaved?: () => void; onError?: (message: string) => void }) {
   const { profile, loading, updateProfile } = useClientProfile(clientId);
-  const [editing, setEditing] = useState(false);
+  // Deep link from the Targeting page (?open=website): open the editor with the
+  // Website URL box focused, since the targeting profile is built from it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openForWebsite = searchParams.get('open') === 'website';
+  const [editing, setEditing] = useState(openForWebsite);
+  const [focusWebsite] = useState(openForWebsite);
+  useEffect(() => {
+    if (openForWebsite) setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading || !profile) {
     return (
@@ -84,7 +94,7 @@ function ProfileSection({ clientId, onSaved, onError }: { clientId: string; onSa
 
       <AnimatePresence>
         {editing && (
-          <ProfileEditModal profile={profile} updateProfile={updateProfile} onClose={() => setEditing(false)} onSaved={onSaved} onError={onError} />
+          <ProfileEditModal profile={profile} updateProfile={updateProfile} onClose={() => setEditing(false)} onSaved={onSaved} onError={onError} focusWebsite={focusWebsite} />
         )}
       </AnimatePresence>
     </>
@@ -92,8 +102,9 @@ function ProfileSection({ clientId, onSaved, onError }: { clientId: string; onSa
 }
 
 function ProfileEditModal({
-  profile, updateProfile, onClose, onSaved, onError,
+  profile, updateProfile, onClose, onSaved, onError, focusWebsite = false,
 }: {
+  focusWebsite?: boolean;
   profile: ClientProfile;
   updateProfile: (input: UpdateClientProfileInput) => Promise<{ error: string | null }>;
   onClose: () => void;
@@ -207,7 +218,10 @@ function ProfileEditModal({
 
           <div className="mb-4">
             <label className={fieldLbl} style={{ color: 'var(--ink-faint)' }}>Website URL</label>
-            <input type="url" value={form.website_url} onChange={(e) => set('website_url', e.target.value)} placeholder="https://example.com" style={inputStyle} className={inputCls} />
+            <input type="url" value={form.website_url} onChange={(e) => set('website_url', e.target.value)} placeholder="https://example.com" style={inputStyle} className={inputCls} autoFocus={focusWebsite} />
+            <p className="m-0 mt-1 text-[12px]" style={{ color: 'var(--ink-faint)' }}>
+              We read this to build your targeting profile: who to look for and how to pitch you.
+            </p>
           </div>
 
           <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -549,8 +563,8 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
           <div className="p-5" data-tour="gmail-connect">
             <div className="flex items-center justify-between gap-3 mb-1">
               <h2 className="text-[15px] font-semibold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
-                <Mail size={16} style={{ color: 'var(--leaf)' }} />
-                Email Connection
+                <GmailLogo size={18} />
+                Gmail connection
               </h2>
               <span
                 className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
@@ -584,8 +598,8 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
           <div className="p-5" data-tour="gmail-connect">
             <div className="flex items-center justify-between gap-3 mb-1">
               <h2 className="text-[15px] font-semibold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
-                <Mail size={16} style={{ color: 'var(--clay)' }} />
-                Email Connection
+                <GmailLogo size={18} />
+                Gmail connection
               </h2>
               <span
                 className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
@@ -607,14 +621,14 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
               href={connectUrl}
               className={btn('primary', 'lg')}
             >
-              Reconnect Gmail
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white"><GmailLogo size={15} /></span> Reconnect Gmail
             </a>
           </div>
         ) : (
           <div className="p-5" data-tour="gmail-connect">
             <h2 className="text-[15px] font-semibold flex items-center gap-2 mb-1" style={{ color: 'var(--ink)' }}>
-              <Mail size={16} style={{ color: 'var(--ink-faint)' }} />
-              Email Connection
+              <GmailLogo size={18} />
+              Gmail connection
             </h2>
             <p className="text-[13px] mb-4" style={{ color: 'var(--ink-soft)' }}>
               Connect your Gmail to send outreach emails from your own address.
@@ -623,7 +637,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
               href={connectUrl}
               className={btn('primary', 'lg')}
             >
-              <Mail size={15} /> Connect Gmail
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white"><GmailLogo size={15} /></span> Connect Gmail
             </a>
           </div>
         )}

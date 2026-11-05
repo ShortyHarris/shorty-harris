@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { SendingCardView, SendingLineView } from './SendingPanel';
 import { parseSendPacing } from '../lib/sendPacing';
 
@@ -89,8 +90,16 @@ describe('SendingLineView', () => {
     expect(screen.getByRole('status').textContent).toContain('12 of 40 emails sent today.');
   });
 
-  it('shows the warning in place of the usual line', () => {
+  it('shows a no-Gmail alert in place of the usual line, saying approved emails wait', () => {
     render(<SendingLineView pacing={pacing({ mailbox_connected: false })} />);
-    expect(screen.getByRole('status').textContent).toBe('Connect Gmail, nothing can send until you do.');
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain("Gmail isn't connected, so nothing can send.");
+    expect(alert.textContent).toContain('send automatically once Gmail is connected again');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('offers a Connect Gmail link when given the settings path', () => {
+    render(<MemoryRouter><SendingLineView pacing={pacing({ mailbox_connected: false })} settingsHref="/app/settings" /></MemoryRouter>);
+    expect(screen.getByRole('link', { name: 'Connect Gmail' }).getAttribute('href')).toBe('/app/settings');
   });
 });

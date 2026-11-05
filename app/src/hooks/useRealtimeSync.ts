@@ -26,6 +26,8 @@ export function useRealtimeSync() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
         queryClient.invalidateQueries({ queryKey: AQ_KEYS.items });
         queryClient.invalidateQueries({ queryKey: AQ_KEYS.stats });
+        // Every client's Sending summary (admin views, view-as-client): sent today, queue, next email.
+        queryClient.invalidateQueries({ queryKey: ['send-pacing'] });
       })
 
       // Prospect pipeline_status changes via n8n WF4
