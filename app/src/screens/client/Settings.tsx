@@ -6,7 +6,8 @@ import { queryClient } from '../../lib/queryClient';
 import { useToast, ToastHost } from '../../components/Toast';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Zap, CheckCircle2, AlertTriangle, LogOut, BarChart3, ChevronRight, Lock, Building2, BookOpen, Compass, ShieldCheck, ShieldOff, Target } from 'lucide-react';
+import { GmailLogo } from '../../components/GmailLogo';
+import { Zap, CheckCircle2, AlertTriangle, LogOut, BarChart3, ChevronRight, Lock, Building2, BookOpen, Compass, ShieldCheck, ShieldOff, Target } from 'lucide-react';
 import { BlockedDomainsModal } from './BlockedDomains';
 import { openConsentPreferences } from '../../lib/consent';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
@@ -562,8 +563,8 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
           <div className="p-5" data-tour="gmail-connect">
             <div className="flex items-center justify-between gap-3 mb-1">
               <h2 className="text-[15px] font-semibold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
-                <Mail size={16} style={{ color: 'var(--leaf)' }} />
-                Email Connection
+                <GmailLogo size={18} />
+                Gmail connection
               </h2>
               <span
                 className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
@@ -597,8 +598,8 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
           <div className="p-5" data-tour="gmail-connect">
             <div className="flex items-center justify-between gap-3 mb-1">
               <h2 className="text-[15px] font-semibold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
-                <Mail size={16} style={{ color: 'var(--clay)' }} />
-                Email Connection
+                <GmailLogo size={18} />
+                Gmail connection
               </h2>
               <span
                 className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
@@ -620,14 +621,14 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
               href={connectUrl}
               className={btn('primary', 'lg')}
             >
-              Reconnect Gmail
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white"><GmailLogo size={15} /></span> Reconnect Gmail
             </a>
           </div>
         ) : (
           <div className="p-5" data-tour="gmail-connect">
             <h2 className="text-[15px] font-semibold flex items-center gap-2 mb-1" style={{ color: 'var(--ink)' }}>
-              <Mail size={16} style={{ color: 'var(--ink-faint)' }} />
-              Email Connection
+              <GmailLogo size={18} />
+              Gmail connection
             </h2>
             <p className="text-[13px] mb-4" style={{ color: 'var(--ink-soft)' }}>
               Connect your Gmail to send outreach emails from your own address.
@@ -636,7 +637,7 @@ export function Settings({ clientId, onSignOut }: { clientId: string; onSignOut:
               href={connectUrl}
               className={btn('primary', 'lg')}
             >
-              <Mail size={15} /> Connect Gmail
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white"><GmailLogo size={15} /></span> Connect Gmail
             </a>
           </div>
         )}

@@ -5,6 +5,12 @@
 export interface SendPacing {
   is_admin: boolean;
   time_zone: string;
+  /** The server's "now": the sandbox clock for a sandbox, real time otherwise. null on older servers. */
+  now: string | null;
+  /** False only for a sandbox in fast mode (no send hours). */
+  window_applies: boolean;
+  /** When the last email went out (sandbox clock for a sandbox). */
+  last_sent_at: string | null;
   window: { start: string; end: string; days: string };
   mailbox_connected: boolean;
   paused_until: string | null;
@@ -52,6 +58,9 @@ export function parseSendPacing(body: unknown): SendPacing {
   return {
     is_admin: isAdmin,
     time_zone: str(b.time_zone, 'America/Chicago'),
+    now: strOrNull(b.now),
+    window_applies: b.window_applies !== false,
+    last_sent_at: strOrNull(b.last_sent_at),
     window: { start: str(win.start, '09:00'), end: str(win.end, '17:00'), days: str(win.days, 'Mon-Fri') },
     mailbox_connected: b.mailbox_connected === true,
     paused_until: strOrNull(b.paused_until),
@@ -203,7 +212,14 @@ export function nextSendStart(p: SendPacing, now: Date = new Date()): string | n
   return null;
 }
 
+/** The account's own "now": the server's (sandbox clock aware) time when sent, else the given one. */
+export function pacingNow(p: SendPacing, now: Date = new Date()): Date {
+  const t = p.now ? new Date(p.now) : null;
+  return t && !Number.isNaN(t.getTime()) ? t : now;
+}
+
 function todayLine(p: SendPacing, now?: Date): string {
+  now = pacingNow(p, now);
   const counts = `${p.today.sent} of ${p.today.cap} emails sent today`;
   if (p.today.in_window_now) return `${counts}.`;
   const w = p.window;
@@ -272,4 +288,98 @@ export function compactSendingLine(p: SendPacing, now?: Date): { text: string; w
   const q = queueLine(p, now);
   if (q) parts.push(q.text);
   return { text: parts.join(' '), warning: false };
+}
+
+// ── "How sending works" details ──────────────────────────────────────────────
+
+/** Average gap WF2.5 leaves between sends while warming up: (480 / cap) x 0.6, give or take 25%. */
+export function warmupGapMinutes(cap: number): { avg: number; min: number; max: number } | null {
+  if (cap <= 0 || cap >= 40) return null;
+  const avg = (480 / cap) * 0.6;
+  return { avg: Math.round(avg), min: Math.round(avg * 0.75), max: Math.round(avg * 1.25) };
+}
+
+function duration(mins: number): string {
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return m ? `${h}h ${m}m` : `${h} hour${h === 1 ? '' : 's'}`;
+}
+
+function timeOfDay(d: Date, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', minute: '2-digit' }).format(d);
+  } catch {
+    return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(d);
+  }
+}
+
+export interface SendingDetails {
+  /** When the next email should go, in plain words. */
+  next: string;
+  /** The rules, one sentence each. */
+  rules: string[];
+  /** Warm-up steps still to come ("10 a day from Nov 12"), empty when fully warmed up. */
+  ladder: string[];
+}
+
+/**
+ * The full picture behind the one-line summary: when the next email goes, how far apart they are,
+ * the send hours and how the daily limit grows. Everything is derived from send_pacing and the
+ * same spacing rule WF2.5 applies, so the explanation matches what will actually happen.
+ */
+export function sendingDetails(p: SendPacing, nowIn: Date = new Date()): SendingDetails {
+  const now = pacingNow(p, nowIn);
+  const cap = p.today.cap;
+  const ramp = p.warmup.active;
+  const gap = ramp ? warmupGapMinutes(cap) : null;
+  const tz = p.time_zone;
+  const hours = `${formatDays(p.window.days)}, ${formatClock(p.window.start)} to ${formatClock(p.window.end)} (${tz})`;
+
+  const rules: string[] = [];
+  if (ramp) {
+    rules.push(`Your mailbox is new, so it is warming up: up to ${cap} emails a day right now (day ${p.warmup.day + 1} of warm-up). Sending slowly at first protects your deliverability.`);
+  } else {
+    rules.push(`Up to ${cap} emails a day.`);
+  }
+  if (gap) {
+    rules.push(`Emails go out one at a time, about ${duration(gap.avg)} apart (between ${duration(gap.min)} and ${duration(gap.max)}, varied so it looks natural).`);
+  } else {
+    rules.push('Approved emails go out within a minute or two, up to 10 a minute.');
+  }
+  rules.push(p.window_applies
+    ? `Emails only send during sending hours: ${hours}. Anything left waits for the next sending day.`
+    : 'Sandbox fast mode: sending hours are switched off, so emails go at any hour.');
+  if (p.today.remaining > 0) {
+    rules.push(`${p.today.sent} sent today, ${p.today.remaining} more allowed today.`);
+  }
+
+  let next: string;
+  if (p.paused_until) {
+    next = `Sending is paused until ${formatDay(p.paused_until, tz, now)}.`;
+  } else if (p.queue.ready <= 0) {
+    next = 'Nothing approved is waiting to send. Approved emails go out by the rules below.';
+  } else if (p.today.remaining <= 0) {
+    next = `Today's limit of ${cap} is reached, so the rest go ${p.window_applies ? `from ${formatClock(p.window.start)} on the next sending day` : 'tomorrow'}.`;
+  } else if (p.window_applies && !p.today.in_window_now) {
+    const start = nextSendStart(p, now);
+    next = start ? `Outside sending hours: ${start}.` : `Outside sending hours (${hours}).`;
+  } else if (gap && p.last_sent_at) {
+    const at = new Date(new Date(p.last_sent_at).getTime() + gap.avg * 60_000);
+    next = at.getTime() <= now.getTime() + 60_000
+      ? 'The next email should go out within the next few minutes.'
+      : `The next email should go out at about ${timeOfDay(at, tz)} (about ${duration(gap.avg)} after the last one, at ${timeOfDay(new Date(p.last_sent_at), tz)}).`;
+  } else {
+    next = 'The next email should go out within the next few minutes.';
+  }
+  if (p.queue.ready > 0 && p.queue.estimated_clear_date) {
+    next += ` All ${p.queue.ready} queued should be sent by about ${formatDay(p.queue.estimated_clear_date, tz, now)}.`;
+  }
+
+  const today = now.toISOString().slice(0, 10);
+  const ladder = ramp
+    ? p.warmup.ladder
+        .filter((s) => s.starts_on > today)
+        .map((s) => `${s.cap} a day from ${formatDay(s.starts_on, tz, now)}`)
+    : [];
+  return { next, rules, ladder };
 }
