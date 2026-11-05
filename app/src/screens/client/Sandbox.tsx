@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useToast, ToastHost } from '../../components/Toast';
 import { SandboxClock } from '../../components/SandboxClock';
+import { SendingLineView } from '../../components/SendingPanel';
 import { ModalClose } from '../../components/ModalClose';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { useSendPacing } from '../../hooks/useSendPacing';
@@ -63,6 +64,8 @@ export function Sandbox({
   const [clockOpen, setClockOpen] = useState(false);
   const [clockMsg, setClockMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const tz = pacing?.time_zone ?? 'America/Chicago';
+  // Nothing can send without Gmail: say so at the top and hold the Send it buttons.
+  const noGmail = pacing ? !pacing.mailbox_connected : false;
 
   // Clock buttons inside the dialog: the result shows in the dialog, next to the clock.
   async function moveClock(key: string, action: () => Promise<SandboxResult>) {
@@ -172,6 +175,8 @@ export function Sandbox({
       </section>
       </div>
 
+      {noGmail && <SendingLineView pacing={pacing!} settingsHref={readOnly ? null : `${basePath}/settings`} />}
+
       {readOnly && (
         <p className="m-0 rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3 text-[13px] text-(--ad-ink-soft)">
           View only. Switch to edit mode to use the sandbox buttons.
@@ -228,7 +233,8 @@ export function Sandbox({
                       ) : (
                         <button
                           onClick={() => run(`next-${p.id}`, () => nextStep(p.id))}
-                          disabled={readOnly || busy !== null || label === null}
+                          disabled={readOnly || busy !== null || label === null || (label === 'Send it' && noGmail)}
+                          title={label === 'Send it' && noGmail ? 'Connect Gmail in Settings first' : undefined}
                           className={`${btn} border-0 bg-(--ad-green) whitespace-nowrap text-white hover:bg-(--ad-green-hover)`}
                         >
                           <Play size={12} aria-hidden />

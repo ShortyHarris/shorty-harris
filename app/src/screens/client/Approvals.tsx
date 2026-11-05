@@ -384,7 +384,7 @@ export function Approvals({
         </div>
       </header>
 
-      <SendingLine clientId={clientId} client={client} />
+      <SendingLine clientId={clientId} client={client} settingsHref={readOnly ? null : `${basePath}/settings`} />
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

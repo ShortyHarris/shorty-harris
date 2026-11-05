@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { AlertCircle, Info, Send } from 'lucide-react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -89,7 +90,37 @@ export function SendingCardView({ pacing }: { pacing: SendPacing }) {
  *  sentences and give the first one - the actual "X of Y sent today" fact -
  *  more visual weight than the warm-up/queue detail trailing it, so the one
  *  number someone actually needs doesn't read as equal to everything else. */
-export function SendingLineView({ pacing }: { pacing: SendPacing }) {
+export function SendingLineView({ pacing, settingsHref }: { pacing: SendPacing; settingsHref?: string | null }) {
+  // No Gmail: say so plainly, in warning colours, with the way to fix it. Approved emails
+  // wait (they are not lost) and send by themselves once Gmail is reconnected.
+  if (!pacing.mailbox_connected) {
+    return (
+      <div
+        role="alert"
+        className="flex flex-col gap-3 rounded-lg border border-(--ad-clay) bg-(--ad-clay-tint) px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <span className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--ad-clay) text-(--ad-surface)">
+            <AlertCircle size={15} strokeWidth={2.3} aria-hidden />
+          </span>
+          <span className="flex flex-col gap-0.5 pt-0.5">
+            <span className="text-[14.5px] font-bold leading-snug text-(--ad-ink)">Gmail isn't connected, so nothing can send.</span>
+            <span className="text-[12.5px] leading-snug text-(--ad-ink-soft)">
+              You can still approve. Approved emails wait here and send automatically once Gmail is connected again.
+            </span>
+          </span>
+        </span>
+        {settingsHref && (
+          <Link
+            to={settingsHref}
+            className="inline-flex shrink-0 items-center justify-center rounded-lg bg-(--ad-clay) px-3.5 py-2 text-[13px] font-bold text-(--ad-surface) no-underline hover:opacity-90"
+          >
+            Connect Gmail
+          </Link>
+        )}
+      </div>
+    );
+  }
   const { text, warning } = compactSendingLine(pacing);
   const sentences = text.split(/(?<=\.)\s+/).filter(Boolean);
   const [headline, ...rest] = sentences;
@@ -120,7 +151,7 @@ export function SendingCard({ clientId, client = supabase }: ConnectedProps) {
   return pacing ? <SendingCardView pacing={pacing} /> : null;
 }
 
-export function SendingLine({ clientId, client = supabase }: ConnectedProps) {
+export function SendingLine({ clientId, client = supabase, settingsHref }: ConnectedProps & { settingsHref?: string | null }) {
   const { pacing } = useSendPacing(clientId, client);
-  return pacing ? <SendingLineView pacing={pacing} /> : null;
+  return pacing ? <SendingLineView pacing={pacing} settingsHref={settingsHref} /> : null;
 }
