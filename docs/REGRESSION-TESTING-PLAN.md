@@ -24,7 +24,9 @@ must pass the checks before it can merge, and merging is what deploys.
 | Release | Merging to `main` deploys the app (Vercel). Database and n8n changes are applied live by hand. Nothing blocks a merge. |
 
 **Issues found while preparing this plan** (each becomes one of the first regression tests):
-1. **Follow-up dates can disagree about holidays.** WF3 sets a follow-up's due date as 3/5/7
+1. **Follow-up dates could disagree about holidays.** *Fixed 2026-11-05: the database now
+   recomputes every new follow-up's due date with the send gate's own rule
+   (`20261105070000_follow_up_due_matches_send_gate.sql`).* Before the fix: WF3 sets a follow-up's due date as 3/5/7
    business days *without* holidays; the send gate requires 3/5/7 business days *with* the
    client country's holidays. Around a holiday the follow-up is written for a day it is not
    allowed to send.
@@ -179,7 +181,19 @@ A separate suite in its own folder, sharing the sandbox and the same test runner
 | **2. End-to-end** | Dedicated E2E sandbox account and mailbox; Playwright smoke tests on previews (login, approve, reject, Approvals dates, unsubscribe); nightly WF99 pipeline run with the `test_runs` table and failure email. | Medium |
 | **3. Visibility and growth** | Admin Tests tab and Run tests button; P2/P3 coverage (replies, CRM, campaigns, AI output, reporting); BDR suite when that project starts. | Ongoing |
 
-## 10. Decisions and access needed
+## 10. Progress
+
+| Item | Status |
+| --- | --- |
+| Release checks on every pull request (type check, tests, build, lint with known errors recorded) | Done; required on `main` through the "Protect main" ruleset |
+| Pull request template with the testing checklist | Done |
+| n8n Code node logic in git (`n8n/code/`) with tests: WF2.5 sending hours, time zones, daily and warm-up limits, spacing, send order, sandbox clock; WF3 follow-up cadence | Done (22 tests) |
+| Holiday mismatch between follow-up schedules and the send gate (issue 1) | Fixed |
+| Full n8n workflow export | Needs the export script run from a machine that can reach n8n, with an API key |
+| Database baseline so tests can build a fresh database | Next; needs a Supabase access token or database password |
+| Clear the 24 recorded lint errors | Later |
+
+## 11. Decisions and access needed
 
 1. **Branch protection on `main`**: needs a GitHub repository admin to switch on required checks.
 2. **Who may approve a `release-exception`** (suggest: the project owner only).
