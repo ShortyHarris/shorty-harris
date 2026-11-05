@@ -79,6 +79,8 @@ production.
    diff with the change, so workflow history lives in git. The script redacts secrets;
    review the diff anyway.
 
+See `SANDBOX-TESTS.md` for the acceptance test plan.
+
 ## Not covered yet
 
 - Automated regression checks on every pull request and a nightly run (planned separately).
