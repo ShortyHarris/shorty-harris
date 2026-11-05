@@ -1,0 +1,82 @@
+# Required checks for every pull request into main (see docs/REGRESSION-TESTING-PLAN.md).
+# Branch protection on main requires the "Release checks" job, so a failure blocks the merge,
+# and therefore the production deploy. Repository admins may bypass it in an emergency; label
+# the pull request "release-exception" and give the reason in its description.
+
+name: Release checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-checks:
+    name: Release checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Type check
+        id: typecheck
+        run: npx tsc -b
+
+      - name: Unit and component tests
+        id: tests
+        if: ${{ !cancelled() }}
+        run: npx vitest run --reporter=default --reporter=github-actions --reporter=junit --outputFile.junit=../test-results/vitest.xml
+
+      - name: Production build
+        id: build
+        if: ${{ !cancelled() }}
+        # vite build directly: the npm postbuild step regenerates blog pages from live data,
+        # which is not part of what a pull request changes.
+        run: npx vite build
+
+      - name: Lint
+        id: lint
+        if: ${{ !cancelled() }}
+        # Errors that existed when these checks started are recorded in app/eslint-suppressions.json
+        # and are being fixed separately; any new error fails. After fixing a recorded one, run
+        # `npx eslint . --prune-suppressions` and commit the updated file.
+        run: npx eslint .
+
+      - name: Report
+        if: ${{ always() }}
+        working-directory: .
+        env:
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+        run: node scripts/ci/report.mjs test-results/vitest.xml >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          if-no-files-found: ignore
