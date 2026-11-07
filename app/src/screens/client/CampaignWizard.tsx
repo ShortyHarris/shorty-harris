@@ -1,84 +1,177 @@
-// Campaign Wizard (docs/CAMPAIGN_WIZARD_BUILD_PLAN.md): three screens.
-//   1. Your website  - a URL (read by AI), or "I don't have a website" and a short description
-//   2. Check what we found - business, services, who you sell to, area, goal (all editable)
-//   3. Pick your campaigns - 1-5 AI ideas with estimates; each pick becomes a free draft
-// Answers autosave to wizard_sessions. Screen 2's Continue saves them to the client's profile
+// Campaign Wizard (docs/CAMPAIGN_WIZARD_BUILD_PLAN.md), designed after Airbnb's host setup and
+// Apple's onboarding guidance: full screen, one question per page, big type, nothing else on
+// screen, and a fixed bar at the bottom with progress, Back and Next.
+//
+//   Step 1  Your business      website (read by AI), or a short description
+//   Step 2  Check the details  about · services · customers · area · goal (one page each)
+//   Step 3  Pick campaigns     1-5 AI ideas; each pick becomes a free draft
+//
+// Answers autosave to wizard_sessions. The last page of step 2 saves the client's profile
 // (confirm_wizard_profile). AI calls go through the wizard-ai edge function.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { Check, Globe, Loader2, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import {
+  CalendarDays, Check, ChevronDown, FileText, Globe, Loader2, MessageCircle, Phone, Plus, RefreshCw, Sparkles, X,
+} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { TagInput } from '../../components/TagInput';
 import { LocationAreaInput } from '../../components/LocationAreaInput';
-import { RequiredMark } from '../../components/RequiredMark';
 import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { Label } from '../../components/ui/label';
-import { Badge } from '../../components/ui/badge';
-import { Checkbox } from '../../components/ui/checkbox';
-import { Progress } from '../../components/ui/progress';
-import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert';
-import { RadioGroup, RadioGroupItem } from '../../components/ui/radio-group';
 import { queryClient } from '../../lib/queryClient';
 import { cn } from '../../lib/utils';
 import {
-  COMPANY_SIZES, GOALS, MONTH_LABELS, addService, carryDescription, ideasFingerprint, markConfirmed, mergeAnalysis,
-  missingFields, missingMessage, needsCheck, normalizeWebsite, profileComplete, seasonLabel, toggleMonth,
-  type WizardAnswers, type WizardEntry, type WizardGoal, type WizardScreen, type WizardService,
+  COMPANY_SIZES, GOALS, MONTH_LABELS, addService, carryDescription, ideasFingerprint, mergeAnalysis,
+  missingFields, missingMessage, normalizeWebsite, profileComplete, seasonLabel, toggleMonth,
+  type WizardAnswers, type WizardEntry, type WizardGoal, type WizardService,
 } from '../../lib/wizardSession';
+import {
+  STEP_NAMES, STEP_OF, confirmPage, firstPageOf, nextPage, pageHasGuesses, pageReady, prevPage, stepProgress,
+  type WizardPage,
+} from '../../lib/wizardPages';
 import {
   confirmProfile, fetchOpenSession, fetchSavedProfile, saveSession, startSession, useAutosave, type WizardSessionRow,
 } from '../../hooks/useWizardSession';
 import {
-  callWizardAi, costForIdeas, estimateProspects, launchLine, wizardErrorMessage,
+  callWizardAi, costForIdeas, estimateProspects, wizardErrorMessage,
   type AnalyzeResult, type DraftsResult, type IdeasResult, type WizardIdea,
 } from '../../hooks/useWizardAi';
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
-const STEPS = ['Your website', 'Check what we found', 'Pick your campaigns'];
-const ANALYZE_LINES = ['Reading your website', 'Finding your services', 'Working out who you sell to'];
-const DESCRIBE_LINES = ['Reading your description', 'Listing your services', 'Working out who you sell to'];
-const IDEA_LINES = ['Matching your services to buyers', 'Checking your existing campaigns', 'Estimating how many businesses we can find'];
+const field = 'h-14 rounded-xl border-border bg-background px-4 text-[16px] shadow-none focus-visible:ring-2 focus-visible:ring-offset-0';
+const quiet = 'h-auto p-0 text-[14px] font-semibold text-foreground underline underline-offset-4 hover:bg-transparent';
+const GOAL_ICON: Record<WizardGoal, typeof FileText> = { quotes: FileText, meetings: CalendarDays, calls: Phone, replies: MessageCircle };
 const FIT_LABEL: Record<WizardIdea['fit'], string> = {
-  strong: 'Strong fit', seasonal: 'Seasonal', new_segment: 'New segment', expansion: 'Service expansion', own: 'Your idea',
+  strong: 'Strong fit', seasonal: 'Seasonal', new_segment: 'New kind of customer', expansion: 'More of your services', own: 'Your idea',
 };
-const linkBtn = 'h-auto p-0 text-[13px] font-semibold underline underline-offset-4';
 
-function CheckTag() {
+// ── Frame: top bar, one centred question, bottom bar ───────────────────────────────────────
+function Frame({ step, progress, onExit, onManual, children, footer, wide }: {
+  step: number | null; progress: [number, number, number]; onExit: () => void; onManual?: () => void;
+  children: React.ReactNode; footer?: React.ReactNode; wide?: boolean;
+}) {
   return (
-    <Badge variant="outline" className="border-(--ad-amber-line) bg-(--ad-amber-tint) px-1.5 py-0 text-[10.5px] uppercase tracking-wider text-(--ad-amber-ink)">
-      Please check
-    </Badge>
+    <div style={FONT} className="fixed inset-0 z-[70] flex flex-col bg-background text-foreground">
+      <header className="flex h-16 shrink-0 items-center justify-between gap-3 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] md:px-10">
+        <span className="flex items-center gap-2 text-[14px] font-semibold">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary"><Sparkles className="h-4 w-4" aria-hidden /></span>
+          New campaign
+        </span>
+        <span className="flex items-center gap-1.5">
+          {onManual && <Button variant="ghost" className="h-9 rounded-full px-4 text-[13px] font-semibold" onClick={onManual}>Create manually</Button>}
+          <Button variant="outline" className="h-9 rounded-full px-4 text-[13px] font-semibold" onClick={onExit}>Save &amp; exit</Button>
+        </span>
+      </header>
+      <main className="flex-1 overflow-y-auto">
+        <div className={cn('mx-auto w-full px-6 pb-16 pt-6 md:pt-14', wide ? 'max-w-[880px]' : 'max-w-[600px]')}>
+          {step && <p className="m-0 mb-3 text-[13px] font-semibold text-muted-foreground">Step {step} of 3 · {STEP_NAMES[step as 1 | 2 | 3]}</p>}
+          {children}
+        </div>
+      </main>
+      {footer !== undefined && (
+        <footer className="shrink-0 bg-background pb-[env(safe-area-inset-bottom)]">
+          <div className="grid grid-cols-3 gap-1.5" aria-hidden>
+            {progress.map((v, i) => (
+              <div key={i} className="h-1 overflow-hidden bg-border">
+                <div className="h-full bg-foreground transition-[width] duration-500 ease-out" style={{ width: `${v * 100}%` }} />
+              </div>
+            ))}
+          </div>
+          <div className="flex min-h-20 items-center justify-between gap-3 py-3 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] md:px-10">
+            {footer}
+          </div>
+        </footer>
+      )}
+    </div>
   );
 }
 
-/** Honest progress while the AI works: one line at a time, each ticked as time passes. */
-function Working({ lines, title }: { lines: string[]; title: string }) {
+function Title({ children, sub }: { children: React.ReactNode; sub?: React.ReactNode }) {
+  return (
+    <div className="mb-8 md:mb-10">
+      <h1 className="m-0 text-[28px] font-semibold leading-[1.15] tracking-tight text-balance md:text-[34px]">{children}</h1>
+      {sub && <p className="m-0 mt-3 text-[16px] leading-relaxed text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
+function NextButton({ children, ...props }: React.ComponentProps<typeof Button>) {
+  return <Button className="h-12 rounded-xl px-6 text-[15px] font-semibold" {...props}>{children}</Button>;
+}
+
+/** One quiet line instead of a tag on every field. */
+function FromWebsite({ source }: { source: 'website' | 'description' }) {
+  return (
+    <p className="m-0 mb-6 flex items-center gap-2 rounded-xl bg-primary/5 px-4 py-3 text-[14px] text-foreground">
+      <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+      {source === 'website' ? 'We filled this in from your website. Check it, then continue.' : 'We filled this in from your description. Check it, then continue.'}
+    </p>
+  );
+}
+
+/** Honest progress while the AI works, centred and calm. */
+function Working({ title, lines }: { title: string; lines: string[] }) {
   const [step, setStep] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setStep((s) => Math.min(s + 1, lines.length - 1)), 5000);
     return () => clearInterval(t);
   }, [lines.length]);
   return (
-    <Card aria-live="polite">
-      <CardContent className="flex flex-col gap-3 pt-6">
-        <span className="flex items-center gap-2 text-[14px] font-semibold text-(--ad-ink)"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />{title}</span>
-        <Progress value={((step + 1) / (lines.length + 1)) * 100} className="h-1.5" />
-        <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[13px]">
-          {lines.map((l, i) => (
-            <li key={l} className={cn('flex items-center gap-2', i <= step ? 'text-(--ad-ink)' : 'text-(--ad-ink-faint)')}>
-              {i < step ? <Check className="h-3.5 w-3.5 text-(--ad-green)" aria-hidden /> : i === step ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <span className="inline-block h-3.5 w-3.5" />}
-              {l}…
+    <div className="flex flex-col items-center py-16 text-center" aria-live="polite">
+      <span className="mb-8 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+        <Loader2 className="h-7 w-7 animate-spin text-primary" aria-hidden />
+      </span>
+      <h1 className="m-0 text-[26px] font-semibold tracking-tight md:text-[30px]">{title}</h1>
+      <ul className="m-0 mt-6 flex list-none flex-col gap-2.5 p-0 text-[15px]">
+        {lines.map((l, i) => (
+          <li key={l} className={cn('flex items-center justify-center gap-2 transition-colors', i <= step ? 'text-foreground' : 'text-muted-foreground/60')}>
+            {i < step ? <Check className="h-4 w-4 text-primary" aria-hidden /> : <span className="inline-block h-4 w-4" />}
+            {l}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** A list of short answers as removable pills, with one input to add more. */
+function Pills({ id, values, onChange, placeholder, label }: {
+  id: string; values: string[]; onChange: (v: string[]) => void; placeholder: string; label: string;
+}) {
+  const [text, setText] = useState('');
+  const add = () => {
+    const parts = text.split(',').map((s) => s.trim()).filter(Boolean);
+    const next = [...values];
+    for (const p of parts) if (!next.some((v) => v.toLowerCase() === p.toLowerCase())) next.push(p);
+    onChange(next); setText('');
+  };
+  return (
+    <div className="flex flex-col gap-3">
+      {values.length > 0 && (
+        <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+          {values.map((v) => (
+            <li key={v} className="flex items-center gap-1.5 rounded-full border border-border py-2 pl-4 pr-2 text-[15px]">
+              {v}
+              <button type="button" aria-label={`Remove ${v}`} onClick={() => onChange(values.filter((x) => x !== v))}
+                className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground">
+                <X className="h-3.5 w-3.5" aria-hidden />
+              </button>
             </li>
           ))}
         </ul>
-      </CardContent>
-    </Card>
+      )}
+      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); add(); }}>
+        <Label htmlFor={id} className="sr-only">{label}</Label>
+        <Input id={id} className={field} placeholder={placeholder} value={text} onChange={(e) => setText(e.target.value)} onBlur={() => text.trim() && add()} />
+        <Button type="submit" variant="outline" className="h-14 w-14 shrink-0 rounded-xl" disabled={!text.trim()} aria-label={`Add ${label.toLowerCase()}`}>
+          <Plus className="h-5 w-5" aria-hidden />
+        </Button>
+      </form>
+    </div>
   );
 }
 
@@ -95,24 +188,24 @@ export function CampaignWizard({
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   const [session, setSession] = useState<WizardSessionRow | null>(null);
   const [answers, setAnswers] = useState<WizardAnswers>({});
-  const [screen, setScreen] = useState<WizardScreen>(1);
+  const [page, setPage] = useState<WizardPage>('website');
   const [busy, setBusy] = useState(false);
-  const [working, setWorking] = useState<null | 'analyze' | 'describe'>(null);
+  const [working, setWorking] = useState<null | 'website' | 'describe'>(null);
   const [siteError, setSiteError] = useState<string | null>(null);
-  const [thinNote, setThinNote] = useState(false);
+  const [source, setSource] = useState<'website' | 'description'>('website');
+  const [thin, setThin] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const autosave = useAutosave(session?.id ?? null, client);
-
   const campaignsPath = `${basePath}/campaigns`;
 
   const begin = useCallback(async (from: WizardEntry) => {
     setPhase({ kind: 'loading' });
     try {
       const saved = await fetchSavedProfile(clientId, client);
-      // Returning users and "Find new campaigns" skip the website step when the profile is complete.
-      const first: WizardScreen = from === 'find_new' || profileComplete(saved) ? 2 : 1;
+      // Returning users and "Find new campaigns" skip the website when the profile is complete.
+      const first = from === 'find_new' || profileComplete(saved) ? 2 : 1;
       const s = await startSession(clientId, from, saved, first, client);
-      setSession(s); setAnswers(s.answers); setScreen(s.screen);
+      setSession(s); setAnswers(s.answers); setPage(firstPageOf(s.screen));
       setPhase({ kind: 'ready' });
     } catch (e) {
       setPhase({ kind: 'error', message: (e as Error).message });
@@ -128,7 +221,7 @@ export function CampaignWizard({
       .then(([flag, open]) => {
         if (cancelled) return;
         if (flag.data?.wizard_enabled !== true) {
-          setPhase({ kind: 'error', message: "it isn't switched on for your account yet. Contact us if you'd like to try it." });
+          setPhase({ kind: 'error', message: "The campaign wizard isn't switched on for your account yet. Contact us if you'd like to try it." });
           return;
         }
         if (open) setPhase({ kind: 'resume', session: open });
@@ -140,33 +233,37 @@ export function CampaignWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
-  function resume(s: WizardSessionRow) {
-    setSession(s); setAnswers(s.answers ?? {}); setScreen(s.screen);
-    setPhase({ kind: 'ready' });
+  function update(next: WizardAnswers) {
+    setErr(null);
+    setAnswers(next);
+    autosave.queue({ answers: next });
   }
 
-  function update(next: WizardAnswers, confirmField?: string) {
-    const a = confirmField ? markConfirmed(next, confirmField) : next;
+  async function go(to: WizardPage, from: WizardAnswers = answers) {
     setErr(null);
+    // The description from step 1 becomes "What you do" unless the user already wrote one.
+    const a = to === 'about' ? carryDescription(from) : from;
     setAnswers(a);
-    autosave.queue({ answers: a });
-  }
-
-  async function goTo(s: WizardScreen, from: WizardAnswers = answers) {
-    setErr(null);
-    // Screen 1's description becomes screen 2's "What you do" unless the user already wrote one.
-    const a = s === 2 ? carryDescription(from) : from;
-    setAnswers(a);
-    setScreen(s);
-    autosave.queue({ screen: s, answers: a });
+    setPage(to);
+    autosave.queue({ screen: STEP_OF[to], answers: a });
     await autosave.flush();
-    window.scrollTo({ top: 0 });
+    document.querySelector('main')?.scrollTo({ top: 0 });
   }
 
-  /** Screen 1: AI reads the website or the description, then screen 2 shows the result. */
+  async function exit() {
+    await autosave.flush();
+    navigate(campaignsPath);
+  }
+
+  async function manual() {
+    await autosave.flush();
+    navigate(`${campaignsPath}?new=manual`);
+  }
+
+  /** Step 1: the AI reads the website or the description. */
   async function analyze() {
     const describe = answers.website?.mode === 'describe';
-    setSiteError(null); setErr(null); setThinNote(false);
+    setSiteError(null); setErr(null); setThin(false);
     let payload: Record<string, unknown>;
     if (describe) {
       payload = { name: answers.business?.name ?? '', description: answers.website?.description ?? '', area_text: answers.website?.area_text ?? '', best_customers: answers.website?.best_customers ?? '' };
@@ -175,14 +272,13 @@ export function CampaignWizard({
       if (!url) { setSiteError(wizardErrorMessage('bad_url')); return; }
       payload = { url };
     }
-    setWorking(describe ? 'describe' : 'analyze');
+    setWorking(describe ? 'describe' : 'website');
     const r = await callWizardAi<AnalyzeResult>('analyze', payload, client);
     setWorking(null);
     if (!r.ok) {
       if (describe) {
-        // The AI is optional: carry on with what was typed.
         setErr(`${wizardErrorMessage(r.error)} We've kept what you typed.`);
-        await goTo(2);
+        await go('about');
         return;
       }
       setSiteError(wizardErrorMessage(r.error));
@@ -190,359 +286,360 @@ export function CampaignWizard({
     }
     const best = (answers.website?.best_customers ?? '').split(',').map((s) => s.trim()).filter(Boolean);
     const withBest = best.length ? { ...answers, audience: { ...answers.audience, business_types: [...(answers.audience?.business_types ?? []), ...best] } } : answers;
-    const merged = mergeAnalysis(withBest, r.data.profile, r.data.source);
-    setThinNote(r.data.thin);
-    await goTo(2, merged);
+    setSource(r.data.source);
+    setThin(r.data.thin);
+    await go('about', mergeAnalysis(withBest, r.data.profile, r.data.source));
   }
 
-  async function continueFromProfile() {
-    const missing = missingFields(answers);
-    if (missing.length) { setErr(missingMessage(missing)); return; }
-    if (!session) return;
-    setBusy(true); setErr(null);
-    autosave.queue({ answers });
-    await autosave.flush();
-    const r = await confirmProfile(session.id, client);
-    setBusy(false);
-    if (!r.ok) {
-      setErr(r.error === 'missing_fields' && 'missing' in r ? missingMessage(r.missing) : `Couldn't save your profile: ${r.error}`);
+  /** Next on a step-2 page: confirm what is shown; the last page saves the profile. */
+  async function next() {
+    const confirmed = confirmPage(page, answers);
+    if (page === 'goal') {
+      const missing = missingFields(confirmed);
+      if (missing.length) { setErr(missingMessage(missing)); return; }
+      if (!session) return;
+      setBusy(true); setErr(null);
+      setAnswers(confirmed);
+      autosave.queue({ answers: confirmed });
+      await autosave.flush();
+      const r = await confirmProfile(session.id, client);
+      setBusy(false);
+      if (!r.ok) {
+        setErr(r.error === 'missing_fields' && 'missing' in r ? missingMessage(r.missing) : `Couldn't save your details: ${r.error}`);
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ['client-icp', clientId] });
+      await go('ideas', confirmed);
       return;
     }
-    queryClient.invalidateQueries({ queryKey: ['client-icp', clientId] });
-    await goTo(3);
+    const to = nextPage(page);
+    if (to) await go(to, confirmed);
   }
 
-  async function skipToManual() {
-    await autosave.flush();
-    navigate(`${campaignsPath}?new=manual`);
-  }
-
+  // ── Before the wizard is ready ────────────────────────────────────────────────────────────
   if (phase.kind === 'loading') {
-    return <div style={FONT} className="content text-[13px] text-(--ad-ink-soft)">Loading the campaign wizard…</div>;
+    return <Frame step={null} progress={[0, 0, 0]} onExit={() => navigate(campaignsPath)}><Working title="Getting things ready" lines={['Loading your details']} /></Frame>;
   }
   if (phase.kind === 'error') {
     return (
-      <div style={FONT} className="content flex flex-col items-start gap-3">
-        <p className="m-0 text-[13px] text-(--ad-ink)">Couldn't open the campaign wizard: {phase.message}</p>
-        <Button asChild variant="outline"><Link to={campaignsPath}>Back to campaigns</Link></Button>
-      </div>
+      <Frame step={null} progress={[0, 0, 0]} onExit={() => navigate(campaignsPath)}>
+        <Title sub={phase.message}>We couldn't open the campaign wizard</Title>
+        <NextButton onClick={() => navigate(campaignsPath)}>Back to campaigns</NextButton>
+      </Frame>
     );
   }
   if (phase.kind === 'resume') {
     const s = phase.session;
-    const when = new Date(s.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const when = new Date(s.updated_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
     return (
-      <div style={FONT} className="content flex max-w-[560px] flex-col gap-4">
-        <h1 className="m-0 text-[22px] font-extrabold tracking-tight text-(--ad-ink)">Continue where you left off?</h1>
-        <p className="m-0 text-[13px] text-(--ad-ink-soft)">
-          You started the campaign wizard on {when} and got to step {s.screen} of 3, “{STEPS[s.screen - 1]}”. Your answers are saved.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => resume(s)}>Continue</Button>
-          <Button variant="outline" onClick={() => void begin(entry)}>Start again</Button>
+      <Frame step={null} progress={[0, 0, 0]} onExit={() => navigate(campaignsPath)}>
+        <Title sub={`You started on ${when} and got to step ${s.screen} of 3, “${STEP_NAMES[s.screen]}”. Everything you entered is saved.`}>
+          Welcome back. Pick up where you left off?
+        </Title>
+        <div className="flex flex-wrap gap-3">
+          <NextButton onClick={() => { setSession(s); setAnswers(s.answers ?? {}); setPage(firstPageOf(s.screen)); setPhase({ kind: 'ready' }); }}>Continue</NextButton>
+          <Button variant="outline" className="h-12 rounded-xl px-6 text-[15px] font-semibold" onClick={() => void begin(entry)}>Start again</Button>
         </div>
-      </div>
+      </Frame>
+    );
+  }
+
+  // ── Step 3 has its own footer ─────────────────────────────────────────────────────────────
+  if (page === 'ideas' && session) {
+    return (
+      <IdeasStep clientId={clientId} client={client} session={session} answers={answers}
+        onAnswers={(a) => { setAnswers(a); autosave.queue({ answers: a }); }}
+        onBack={() => void go('goal')} onExit={() => void exit()} onManual={() => void manual()}
+        onCreated={(n) => navigate(`${campaignsPath}?drafts=${n}`)} />
     );
   }
 
   const describe = answers.website?.mode === 'describe';
-  const screen1Ready = describe ? !!answers.business?.name?.trim() && !!answers.website?.description?.trim() : !!normalizeWebsite(answers.website?.url ?? '');
+  const websiteReady = describe ? !!answers.business?.name?.trim() && !!answers.website?.description?.trim() : !!normalizeWebsite(answers.website?.url ?? '');
+  const ready = page === 'website' ? websiteReady : pageReady(page, answers);
+  const back = prevPage(page);
+
+  const footer = working ? null : (
+    <>
+      {back ? <Button variant="ghost" className={quiet} onClick={() => void go(back)}>Back</Button> : <span />}
+      <NextButton disabled={!ready || busy} onClick={() => void (page === 'website' ? analyze() : next())}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : page === 'website' ? (describe ? 'Continue' : 'Read my website') : page === 'goal' ? 'Find campaigns' : 'Next'}
+      </NextButton>
+    </>
+  );
 
   return (
-    <div style={FONT} className="content flex flex-col gap-5">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-(--ad-green)">Campaign wizard · step {screen} of 3</span>
-          <span className="text-[11.5px] text-(--ad-ink-faint)" aria-live="polite">
-            {autosave.state === 'saving' ? 'Saving…' : autosave.state === 'error' ? "Couldn't save - we'll retry" : 'All changes saved'}
-          </span>
-        </div>
-        <div className="grid grid-cols-3 gap-1.5" aria-hidden>
-          {STEPS.map((_, i) => <div key={i} className="h-1 rounded-full" style={{ background: i < screen ? 'var(--ad-green)' : 'var(--ad-line)' }} />)}
-        </div>
-      </header>
-
-      {screen === 1 && (working
-        ? <Working title={working === 'analyze' ? 'Reading your website' : 'Building your profile'} lines={working === 'analyze' ? ANALYZE_LINES : DESCRIBE_LINES} />
-        : <WebsiteStep answers={answers} update={update} siteError={siteError} onAnalyze={() => void analyze()}
-            onDescribe={() => { setSiteError(null); update({ ...answers, website: { ...answers.website, mode: 'describe' } }); }} />)}
-      {screen === 2 && <ProfileStep answers={answers} update={update} entry={session?.entry_point ?? entry} thin={thinNote}
-        onReread={answers.website?.url && !describe ? () => void goTo(1) : undefined} />}
-      {screen === 3 && session && (
-        <IdeasStep clientId={clientId} client={client} session={session} answers={answers}
-          onAnswers={(a) => { setAnswers(a); autosave.queue({ answers: a }); }}
-          onBack={() => void goTo(2)} onManual={() => void skipToManual()}
-          onCreated={(n) => navigate(`${campaignsPath}?drafts=${n}`)} />
+    <Frame step={STEP_OF[page]} progress={stepProgress(page)} onExit={() => void exit()} onManual={() => void manual()} footer={footer}>
+      {working ? (
+        <Working title={working === 'website' ? 'Reading your website' : 'Reading your description'}
+          lines={working === 'website' ? ['Reading your website', 'Finding your services', 'Working out who you sell to'] : ['Reading your description', 'Listing your services', 'Working out who you sell to']} />
+      ) : (
+        <>
+          {page !== 'website' && pageHasGuesses(page, answers) && <FromWebsite source={source} />}
+          {page === 'about' && thin && (
+            <p className="m-0 mb-6 rounded-xl bg-muted px-4 py-3 text-[14px]">Your website didn't say much, so please fill in the gaps.</p>
+          )}
+          {page === 'website' && <WebsitePage answers={answers} update={update} siteError={siteError} onAnalyze={() => void analyze()} />}
+          {page === 'about' && <AboutPage answers={answers} update={update} />}
+          {page === 'services' && <ServicesPage answers={answers} update={update} />}
+          {page === 'customers' && <CustomersPage answers={answers} update={update} />}
+          {page === 'area' && <AreaPage answers={answers} update={update} />}
+          {page === 'goal' && <GoalPage answers={answers} update={update} />}
+          {err && <p role="alert" className="m-0 mt-6 rounded-xl bg-destructive/10 px-4 py-3 text-[14px] text-foreground">{err}</p>}
+        </>
       )}
-
-      {err && <Alert variant="destructive" role="alert"><AlertDescription>{err}</AlertDescription></Alert>}
-
-      {screen !== 3 && !working && (
-        <footer className="flex flex-col-reverse gap-3 border-t border-(--ad-line) pt-4 md:flex-row md:items-center md:justify-between">
-          <Button variant="link" className={cn(linkBtn, 'self-start')} onClick={() => void skipToManual()}>Skip wizard &amp; create manually</Button>
-          <div className="flex gap-2">
-            {screen === 1 && <Button asChild variant="outline"><Link to={campaignsPath}>Cancel</Link></Button>}
-            {screen === 2 && <Button variant="outline" onClick={() => void goTo(1)}>← Back</Button>}
-            {screen === 1 && (
-              <Button disabled={!screen1Ready} onClick={() => void analyze()}>
-                <Sparkles className="mr-1.5 h-4 w-4" aria-hidden />{describe ? 'Continue' : 'Analyze my website'}
-              </Button>
-            )}
-            {screen === 2 && (
-              <Button disabled={busy} onClick={() => void continueFromProfile()}
-                title={missingFields(answers).length ? missingMessage(missingFields(answers)) : undefined}>
-                {busy ? 'Saving…' : 'Find campaigns →'}
-              </Button>
-            )}
-          </div>
-        </footer>
-      )}
-    </div>
+    </Frame>
   );
 }
 
-// ── Screen 1 ────────────────────────────────────────────────────────────────────────────────
-function WebsiteStep({ answers, update, siteError, onAnalyze, onDescribe }: {
-  answers: WizardAnswers; update: (a: WizardAnswers, f?: string) => void; siteError: string | null; onAnalyze: () => void; onDescribe: () => void;
+// ── Step 1 ──────────────────────────────────────────────────────────────────────────────────
+function WebsitePage({ answers, update, siteError, onAnalyze }: {
+  answers: WizardAnswers; update: (a: WizardAnswers) => void; siteError: string | null; onAnalyze: () => void;
 }) {
   const mode = answers.website?.mode ?? 'website';
   const url = answers.website?.url ?? '';
   const setWebsite = (patch: Partial<NonNullable<WizardAnswers['website']>>) =>
     update({ ...answers, website: { mode, ...answers.website, ...patch } });
 
+  if (mode === 'describe') {
+    return (
+      <>
+        <Title sub="A few words is enough. We'll suggest campaigns from this.">Tell us about your business</Title>
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="wiz-name" className="text-[15px] font-semibold">Company name</Label>
+            <Input id="wiz-name" className={field} value={answers.business?.name ?? ''} onChange={(e) => update({ ...answers, business: { ...answers.business, name: e.target.value } })} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="wiz-desc" className="text-[15px] font-semibold">What do you do?</Label>
+            <Textarea id="wiz-desc" rows={3} className="rounded-xl border-border px-4 py-3 text-[16px] shadow-none"
+              placeholder="e.g. Lawn mowing, landscaping and snow removal for businesses around Bozeman."
+              value={answers.website?.description ?? ''} onChange={(e) => setWebsite({ description: e.target.value })} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="wiz-where" className="text-[15px] font-semibold">Where do you work?</Label>
+            <Input id="wiz-where" className={field} placeholder="e.g. Bozeman, Montana" value={answers.website?.area_text ?? ''} onChange={(e) => setWebsite({ area_text: e.target.value })} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="wiz-best" className="text-[15px] font-semibold">Who are your best customers? <span className="font-normal text-muted-foreground">Optional</span></Label>
+            <Input id="wiz-best" className={field} placeholder="e.g. property managers, HOAs" value={answers.website?.best_customers ?? ''} onChange={(e) => setWebsite({ best_customers: e.target.value })} />
+          </div>
+          <Button variant="ghost" className={cn(quiet, 'self-start')} onClick={() => setWebsite({ mode: 'website' })}>I have a website</Button>
+        </div>
+      </>
+    );
+  }
+
   return (
-    <section className="flex flex-col gap-4">
-      <div>
-        <h1 className="m-0 text-[22px] font-extrabold tracking-tight text-(--ad-ink)">Tell us about your business</h1>
-        <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">We read your website and suggest B2B campaigns. You can change everything on the next screen.</p>
-      </div>
-      {mode === 'website' ? (
-        <Card>
-          <CardContent className="flex flex-col gap-4 pt-6">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="wiz-url" className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5" aria-hidden /> Company website</Label>
-              <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); onAnalyze(); }}>
-                <Input id="wiz-url" placeholder="yourcompany.com" value={url} inputMode="url" autoComplete="url"
-                  onChange={(e) => setWebsite({ url: e.target.value })} aria-invalid={!!siteError} />
-              </form>
-              {url.trim() && !normalizeWebsite(url) && (
-                <p className="m-0 text-[12px] text-(--ad-clay)">That doesn't look like a website address. Try something like yourcompany.com.</p>
-              )}
-              <p className="m-0 text-[12px] text-(--ad-ink-faint)">We read only your public website. It takes about 20 seconds.</p>
-            </div>
-            {siteError && (
-              <Alert variant="destructive">
-                <AlertTitle>We couldn't use that website</AlertTitle>
-                <AlertDescription className="flex flex-col gap-3">
-                  <span>{siteError}</span>
-                  <span className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={onDescribe}>Describe my business</Button>
-                    <Button size="sm" variant="outline" onClick={onAnalyze}>Try again</Button>
-                  </span>
-                </AlertDescription>
-              </Alert>
-            )}
-            <Button variant="link" className={cn(linkBtn, 'self-start')} onClick={onDescribe}>I don't have a website</Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="flex flex-col gap-4 pt-6">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="wiz-name">Company name <RequiredMark /></Label>
-              <Input id="wiz-name" value={answers.business?.name ?? ''} onChange={(e) => update({ ...answers, business: { ...answers.business, name: e.target.value } })} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="wiz-desc">What do you do? <RequiredMark /></Label>
-              <Textarea id="wiz-desc" rows={3} placeholder="e.g. Lawn mowing, landscaping and snow removal for businesses around Bozeman."
-                value={answers.website?.description ?? ''} onChange={(e) => setWebsite({ description: e.target.value })} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="wiz-where">Where do you work?</Label>
-              <Input id="wiz-where" placeholder="e.g. Bozeman, Montana and 50 miles around" value={answers.website?.area_text ?? ''} onChange={(e) => setWebsite({ area_text: e.target.value })} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="wiz-best">Who are your best customers? <span className="text-[11px] font-normal text-(--ad-ink-faint)">Optional</span></Label>
-              <Input id="wiz-best" placeholder="e.g. property managers, HOAs" value={answers.website?.best_customers ?? ''} onChange={(e) => setWebsite({ best_customers: e.target.value })} />
-            </div>
-            <Button variant="link" className={cn(linkBtn, 'self-start')} onClick={() => setWebsite({ mode: 'website' })}>I do have a website</Button>
-          </CardContent>
-        </Card>
+    <>
+      <Title sub="We'll read it and fill in the details for you. It takes about 20 seconds.">What's your website?</Title>
+      <form onSubmit={(e) => { e.preventDefault(); onAnalyze(); }}>
+        <Label htmlFor="wiz-url" className="sr-only">Company website</Label>
+        <div className="relative">
+          <Globe className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input id="wiz-url" className={cn(field, 'h-16 pl-12 text-[18px]')} placeholder="yourcompany.com" value={url} inputMode="url" autoComplete="url"
+            autoFocus onChange={(e) => setWebsite({ url: e.target.value })} aria-invalid={!!siteError} />
+        </div>
+      </form>
+      {url.trim() && !normalizeWebsite(url) && (
+        <p className="m-0 mt-3 text-[14px] text-destructive">That doesn't look like a website address. Try something like yourcompany.com.</p>
       )}
-    </section>
+      {siteError && (
+        <div role="alert" className="mt-6 flex flex-col gap-3 rounded-2xl bg-muted px-5 py-4">
+          <p className="m-0 text-[15px] font-semibold">{siteError}</p>
+          <span className="flex flex-wrap gap-2">
+            <Button className="h-10 rounded-xl px-4 font-semibold" onClick={() => setWebsite({ mode: 'describe' })}>Describe my business</Button>
+            <Button variant="outline" className="h-10 rounded-xl px-4 font-semibold" onClick={onAnalyze}>Try again</Button>
+          </span>
+        </div>
+      )}
+      <p className="m-0 mt-8 text-[15px] text-muted-foreground">
+        No website?{' '}
+        <Button variant="ghost" className={quiet} onClick={() => setWebsite({ mode: 'describe' })}>Describe your business instead</Button>
+      </p>
+    </>
   );
 }
 
-// ── Screen 2 ────────────────────────────────────────────────────────────────────────────────
-function Section({ title, children, required, check }: { title: string; children: React.ReactNode; required?: boolean; check?: boolean }) {
+// ── Step 2 pages ────────────────────────────────────────────────────────────────────────────
+type PageProps = { answers: WizardAnswers; update: (a: WizardAnswers) => void };
+
+function AboutPage({ answers, update }: PageProps) {
+  const set = (k: 'name' | 'industry' | 'description', v: string) => update({ ...answers, business: { ...answers.business, [k]: v } });
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-[14px] font-bold">{title}{required && <RequiredMark />}{check && <CheckTag />}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">{children}</CardContent>
-    </Card>
+    <>
+      <Title sub="Change anything that isn't quite right.">Is this your business?</Title>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="wiz-bname" className="text-[15px] font-semibold">Company name</Label>
+          <Input id="wiz-bname" className={field} value={answers.business?.name ?? ''} onChange={(e) => set('name', e.target.value)} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="wiz-industry" className="text-[15px] font-semibold">Industry</Label>
+          <Input id="wiz-industry" className={field} placeholder="e.g. Landscaping" value={answers.business?.industry ?? ''} onChange={(e) => set('industry', e.target.value)} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="wiz-bdesc" className="text-[15px] font-semibold">What you do, in a sentence</Label>
+          <Textarea id="wiz-bdesc" rows={2} className="rounded-xl border-border px-4 py-3 text-[16px] shadow-none" value={answers.business?.description ?? ''} onChange={(e) => set('description', e.target.value)} />
+        </div>
+      </div>
+    </>
   );
 }
 
-function ProfileStep({ answers, update, entry, thin, onReread }: {
-  answers: WizardAnswers; update: (a: WizardAnswers, f?: string) => void; entry: WizardEntry; thin: boolean; onReread?: () => void;
-}) {
-  const [newService, setNewService] = useState('');
-  const [showMore, setShowMore] = useState(
-    !!(answers.audience?.roles?.length || answers.audience?.exclusions?.length || answers.audience?.company_size),
-  );
+function ServicesPage({ answers, update }: PageProps) {
   const services = answers.services ?? [];
-  const missing = useMemo(() => missingFields(answers), [answers]);
-  const anyGuesses = (answers.unconfirmed ?? []).length > 0;
-
-  const setBusiness = (k: 'name' | 'industry' | 'description', v: string) =>
-    update({ ...answers, business: { ...answers.business, [k]: v } }, `business.${k}`);
-  const setAudience = (patch: Partial<NonNullable<WizardAnswers['audience']>>, field: string) =>
-    update({ ...answers, audience: { ...answers.audience, ...patch } }, field);
-  const setServices = (list: WizardService[]) => update({ ...answers, services: list }, 'services');
-
+  const [text, setText] = useState('');
+  const [open, setOpen] = useState<number | null>(null);
+  const setServices = (list: WizardService[]) => update({ ...answers, services: list });
   return (
-    <section className="flex flex-col gap-4">
-      <div>
-        <h1 className="m-0 text-[22px] font-extrabold tracking-tight text-(--ad-ink)">Check what we found</h1>
-        <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">
-          {entry === 'find_new'
-            ? 'This is the profile you saved before. Change anything that is new, then find more campaigns.'
-            : 'Everything here is editable. We use it to suggest campaigns that fit your business.'}
-        </p>
-      </div>
-      {thin && (
-        <Alert><AlertTitle>We found very little on your website</AlertTitle>
-          <AlertDescription>Please fill in the gaps. Anything marked “Please check” is our guess.</AlertDescription></Alert>
-      )}
-      {anyGuesses && !thin && (
-        <p className="m-0 text-[12.5px] text-(--ad-ink-soft)">Anything marked <CheckTag /> is our guess. It clears when you change or confirm it.</p>
-      )}
-      {onReread && <Button variant="link" className={cn(linkBtn, 'self-start text-[12.5px]')} onClick={onReread}>Re-read my website</Button>}
-
-      <Section title="Business">
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="wiz-bname" className="flex items-center gap-2">Company name <RequiredMark />{needsCheck(answers, 'business.name') && <CheckTag />}</Label>
-            <Input id="wiz-bname" value={answers.business?.name ?? ''} onChange={(e) => setBusiness('name', e.target.value)} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="wiz-industry" className="flex items-center gap-2">Industry {needsCheck(answers, 'business.industry') && <CheckTag />}</Label>
-            <Input id="wiz-industry" placeholder="e.g. Landscaping" value={answers.business?.industry ?? ''} onChange={(e) => setBusiness('industry', e.target.value)} />
-          </div>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="wiz-bdesc" className="flex items-center gap-2">What you do, in a sentence {needsCheck(answers, 'business.description') && <CheckTag />}</Label>
-          <Input id="wiz-bdesc" value={answers.business?.description ?? ''} onChange={(e) => setBusiness('description', e.target.value)} />
-        </div>
-      </Section>
-
-      <Section title="Services" required check={needsCheck(answers, 'services')}>
-        {services.length === 0 && <p className="m-0 text-[12.5px] text-(--ad-ink-faint)">Add at least one service you sell to businesses.</p>}
-        <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {services.map((s, i) => (
-            <li key={`${s.name}-${i}`} className="flex flex-col gap-2 rounded-lg border border-(--ad-line) px-3 py-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[13px] font-semibold text-(--ad-ink)">{s.name}</span>
-                <span className="flex items-center gap-2">
-                  <span className="text-[11.5px] text-(--ad-ink-faint)">{seasonLabel(s.seasonal_months)}</span>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Remove ${s.name}`} onClick={() => setServices(services.filter((_, j) => j !== i))}>
-                    <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                  </Button>
-                </span>
-              </div>
-              <details>
-                <summary className="cursor-pointer text-[12px] text-(--ad-ink-soft)">Seasonal? Pick the months you sell it</summary>
-                <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label={`Months for ${s.name}`}>
+    <>
+      <Title sub="Only what you sell to businesses. You can add or remove any.">What do you sell?</Title>
+      <ul className="m-0 flex list-none flex-col p-0">
+        {services.map((s, i) => (
+          <li key={`${s.name}-${i}`} className="border-b border-border py-4 first:pt-0">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[17px] font-medium">{s.name}</span>
+              <span className="flex items-center gap-1">
+                <Button variant="ghost" className="h-9 rounded-full px-3 text-[13px] text-muted-foreground" aria-expanded={open === i}
+                  onClick={() => setOpen(open === i ? null : i)}>
+                  {seasonLabel(s.seasonal_months)} <ChevronDown className={cn('ml-1 h-3.5 w-3.5 transition-transform', open === i && 'rotate-180')} aria-hidden />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground" aria-label={`Remove ${s.name}`}
+                  onClick={() => setServices(services.filter((_, j) => j !== i))}>
+                  <X className="h-4 w-4" aria-hidden />
+                </Button>
+              </span>
+            </div>
+            {open === i && (
+              <div className="mt-3">
+                <p className="m-0 mb-2 text-[13px] text-muted-foreground">Only sold in some months? Pick them. Leave empty for all year.</p>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label={`Months for ${s.name}`}>
                   {MONTH_LABELS.map((m, mi) => {
                     const on = (s.seasonal_months ?? []).includes(mi + 1);
                     return (
-                      <Button key={m} size="sm" variant={on ? 'default' : 'outline'} aria-pressed={on} className="h-7 px-2 text-[11.5px]"
+                      <button key={m} type="button" aria-pressed={on}
+                        className={cn('h-9 min-w-12 cursor-pointer rounded-full border px-3 text-[13px] font-medium transition-colors',
+                          on ? 'border-foreground bg-foreground text-background' : 'border-border bg-background text-foreground hover:border-foreground')}
                         onClick={() => setServices(services.map((x, j) => (j === i ? { ...x, seasonal_months: toggleMonth(x.seasonal_months, mi + 1) } : x)))}>
                         {m}
-                      </Button>
+                      </button>
                     );
                   })}
                 </div>
-              </details>
-            </li>
-          ))}
-        </ul>
-        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); setServices(addService(services, newService)); setNewService(''); }}>
-          <Label htmlFor="wiz-newsvc" className="sr-only">New service</Label>
-          <Input id="wiz-newsvc" placeholder="e.g. Snow removal" value={newService} onChange={(e) => setNewService(e.target.value)} />
-          <Button type="submit" variant="outline" disabled={!newService.trim()}><Plus className="mr-1 h-4 w-4" aria-hidden />Add service</Button>
-        </form>
-      </Section>
-
-      <Section title="Who you sell to" check={needsCheck(answers, 'audience.business_types')}>
-        <TagInput sentenceLabel label="Types of business to reach" required placeholder="e.g. property managers, office parks"
-          helper="Businesses, not people. We only run business-to-business campaigns."
-          values={answers.audience?.business_types ?? []} onChange={(v) => setAudience({ business_types: v }, 'audience.business_types')} splitOn="," />
-        {!showMore ? (
-          <Button variant="link" className={cn(linkBtn, 'self-start text-[12.5px] no-underline')} onClick={() => setShowMore(true)}>
-            + Roles, company size and exclusions (optional)
-          </Button>
-        ) : (
-          <>
-            <TagInput sentenceLabel label="Who decides (roles)" placeholder="e.g. facilities manager, owner" helper="Shapes the wording of your emails."
-              values={answers.audience?.roles ?? []} onChange={(v) => setAudience({ roles: v }, 'audience.roles')} splitOn="," />
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="wiz-size">Company size</Label>
-              <select id="wiz-size" className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                value={answers.audience?.company_size || COMPANY_SIZES[0]}
-                onChange={(e) => setAudience({ company_size: e.target.value === COMPANY_SIZES[0] ? '' : e.target.value }, 'audience.company_size')}>
-                {COMPANY_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <TagInput sentenceLabel label="Don't contact" placeholder="e.g. residential homeowners, competitors"
-              values={answers.audience?.exclusions ?? []} onChange={(v) => setAudience({ exclusions: v }, 'audience.exclusions')} splitOn="," />
-          </>
-        )}
-      </Section>
-
-      <Section title="Area" check={needsCheck(answers, 'area')}>
-        {answers.website?.area_text && !(answers.area?.areas ?? []).length && (
-          <p className="m-0 text-[12.5px] text-(--ad-ink-soft)">{answers.website.mode === 'describe' ? 'You said' : 'Your website says'}: “{answers.website.area_text}”. Add it below as a place or a radius.</p>
-        )}
-        <LocationAreaInput sentenceLabel label="Where you work" required helper="A city, a region, or a radius around a point."
-          values={answers.area?.areas ?? []} onChange={(v) => update({ ...answers, area: { areas: v } }, 'area')} maxItems={3} capLabel="area" />
-      </Section>
-
-      <Section title="Your goal" required check={needsCheck(answers, 'goal')}>
-        <RadioGroup className="grid gap-2 md:grid-cols-2" aria-label="Your goal" value={answers.goal?.goal ?? ''}
-          onValueChange={(v) => update({ ...answers, goal: { ...answers.goal, goal: v as WizardGoal } }, 'goal')}>
-          {GOALS.map((g) => (
-            <Label key={g.value} htmlFor={`goal-${g.value}`}
-              className={cn('flex cursor-pointer items-start gap-3 rounded-lg border px-3.5 py-2.5 font-normal',
-                answers.goal?.goal === g.value ? 'border-(--ad-green) bg-(--ad-green-tint)' : 'border-(--ad-line)')}>
-              <RadioGroupItem id={`goal-${g.value}`} value={g.value} className="mt-0.5" />
-              <span className="flex flex-col gap-0.5">
-                <span className="text-[13px] font-semibold text-(--ad-ink)">{g.label}</span>
-                <span className="text-[11.5px] text-(--ad-ink-soft)">{g.hint}</span>
-              </span>
-            </Label>
-          ))}
-        </RadioGroup>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="wiz-cta">What should they do? <span className="text-[11px] font-normal text-(--ad-ink-faint)">Optional</span></Label>
-          <Input id="wiz-cta" placeholder="e.g. Reply for a free quote" value={answers.goal?.cta ?? ''}
-            onChange={(e) => update({ ...answers, goal: { ...answers.goal, cta: e.target.value } }, 'goal')} />
-        </div>
-      </Section>
-
-      {missing.length > 0 && <p className="m-0 text-[12.5px] text-(--ad-ink-soft)">{missingMessage(missing)}</p>}
-    </section>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+      <form className="mt-6 flex gap-2" onSubmit={(e) => { e.preventDefault(); setServices(addService(services, text)); setText(''); }}>
+        <Label htmlFor="wiz-newsvc" className="sr-only">Add a service</Label>
+        <Input id="wiz-newsvc" className={field} placeholder="Add a service, e.g. Snow removal" value={text} onChange={(e) => setText(e.target.value)} />
+        <Button type="submit" variant="outline" className="h-14 w-14 shrink-0 rounded-xl" disabled={!text.trim()} aria-label="Add service">
+          <Plus className="h-5 w-5" aria-hidden />
+        </Button>
+      </form>
+    </>
   );
 }
 
-// ── Screen 3 ────────────────────────────────────────────────────────────────────────────────
+function CustomersPage({ answers, update }: PageProps) {
+  const a = answers.audience ?? {};
+  const [more, setMore] = useState(!!(a.roles?.length || a.exclusions?.length || a.company_size));
+  const set = (patch: Partial<NonNullable<WizardAnswers['audience']>>) => update({ ...answers, audience: { ...answers.audience, ...patch } });
+  return (
+    <>
+      <Title sub="Types of business, not people. We only run business-to-business campaigns.">Who buys from you?</Title>
+      <Pills id="wiz-types" label="Type of business" placeholder="Add a type of business, e.g. office parks" values={a.business_types ?? []} onChange={(v) => set({ business_types: v })} />
+      <div className="mt-10 border-t border-border pt-6">
+        <button type="button" className="flex w-full cursor-pointer items-center justify-between border-0 bg-transparent p-0 text-left" aria-expanded={more} onClick={() => setMore(!more)}>
+          <span>
+            <span className="block text-[16px] font-semibold">More detail</span>
+            <span className="block text-[14px] text-muted-foreground">Optional: who decides, company size, who to avoid</span>
+          </span>
+          <ChevronDown className={cn('h-5 w-5 text-muted-foreground transition-transform', more && 'rotate-180')} aria-hidden />
+        </button>
+        {more && (
+          <div className="mt-6 flex flex-col gap-8">
+            <div className="flex flex-col gap-3">
+              <p className="m-0 text-[15px] font-semibold">Who decides</p>
+              <Pills id="wiz-roles" label="Role" placeholder="e.g. facilities manager" values={a.roles ?? []} onChange={(v) => set({ roles: v })} />
+            </div>
+            <div className="flex flex-col gap-3">
+              <p className="m-0 text-[15px] font-semibold">Company size</p>
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Company size">
+                {COMPANY_SIZES.map((s, i) => {
+                  const on = (a.company_size || COMPANY_SIZES[0]) === s;
+                  return (
+                    <button key={s} type="button" role="radio" aria-checked={on}
+                      className={cn('h-11 cursor-pointer rounded-full border px-4 text-[14px] font-medium transition-colors',
+                        on ? 'border-foreground bg-foreground text-background' : 'border-border bg-background hover:border-foreground')}
+                      onClick={() => set({ company_size: i === 0 ? '' : s })}>{s}</button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex flex-col gap-3">
+              <p className="m-0 text-[15px] font-semibold">Don't contact</p>
+              <Pills id="wiz-excl" label="Exclusion" placeholder="e.g. residential homeowners" values={a.exclusions ?? []} onChange={(v) => set({ exclusions: v })} />
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function AreaPage({ answers, update }: PageProps) {
+  return (
+    <>
+      <Title sub="A city, a region, or a radius around where you're based.">Where do you work?</Title>
+      <div className="[&_input]:h-14 [&_input]:rounded-xl [&_input]:text-[16px]">
+        <LocationAreaInput label="Where you work" sentenceLabel values={answers.area?.areas ?? []}
+          onChange={(v) => update({ ...answers, area: { areas: v } })} maxItems={3} capLabel="area" />
+      </div>
+    </>
+  );
+}
+
+function GoalPage({ answers, update }: PageProps) {
+  const goal = answers.goal?.goal;
+  return (
+    <>
+      <Title sub="We'll write your emails to ask for this.">What should a new customer do?</Title>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Your goal">
+        {GOALS.map((g) => {
+          const on = goal === g.value;
+          const Icon = GOAL_ICON[g.value];
+          return (
+            <button key={g.value} type="button" role="radio" aria-checked={on}
+              onClick={() => update({ ...answers, goal: { ...answers.goal, goal: g.value } })}
+              className={cn('flex cursor-pointer flex-col items-start gap-3 rounded-2xl border bg-background p-5 text-left transition-[border-color,box-shadow]',
+                on ? 'border-foreground shadow-[0_0_0_1px_var(--color-foreground)]' : 'border-border hover:border-foreground/40')}>
+              <Icon className="h-6 w-6" aria-hidden />
+              <span>
+                <span className="block text-[16px] font-semibold">{g.label}</span>
+                <span className="block text-[14px] text-muted-foreground">{g.hint}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-8 flex flex-col gap-2">
+        <Label htmlFor="wiz-cta" className="text-[15px] font-semibold">In your own words <span className="font-normal text-muted-foreground">Optional</span></Label>
+        <Input id="wiz-cta" className={field} placeholder="e.g. Reply for a free quote" value={answers.goal?.cta ?? ''}
+          onChange={(e) => update({ ...answers, goal: { ...answers.goal, cta: e.target.value } })} />
+      </div>
+    </>
+  );
+}
+
+// ── Step 3 ──────────────────────────────────────────────────────────────────────────────────
 interface IdeasState { ideas: WizardIdea[]; duplicates: string[]; slotsLeft: number | null }
 
-function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onManual, onCreated }: {
+function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onExit, onManual, onCreated }: {
   clientId: string; client: SupabaseClient; session: WizardSessionRow; answers: WizardAnswers;
-  onAnswers: (a: WizardAnswers) => void; onBack: () => void; onManual: () => void; onCreated: (n: number) => void;
+  onAnswers: (a: WizardAnswers) => void; onBack: () => void; onExit: () => void; onManual: () => void; onCreated: (n: number) => void;
 }) {
   const fp = ideasFingerprint(answers);
   const [savedIdeas] = useState(() => (session.ideas ?? []) as WizardIdea[]);
@@ -568,10 +665,10 @@ function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onMa
   const state: IdeasState = override ?? initial.data ?? { ideas: [], duplicates: [], slotsLeft: null };
   const loading = initial.isLoading || regenerating;
   const loadErr = initial.error ? wizardErrorMessage((initial.error as Error).message) : null;
-  // Screen 2 changed since these ideas were made: offer to refresh them.
+  // The details changed since these ideas were made: offer to refresh them.
   const stale = !!answers.ideas_fp && answers.ideas_fp !== fp && state.ideas.some((i) => i.fit !== 'own');
 
-  // One credit line per idea, in order (free launches left this month are used first).
+  // One launch line per idea, in order (free launches left this month are used first).
   const items = state.ideas.map((i) => ({ lo: i.est_lo ?? 0, hi: i.est_hi ?? i.max_results }));
   const { data: cost = null } = useQuery({
     queryKey: ['wizard-cost', clientId, items],
@@ -619,120 +716,109 @@ function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onMa
   }
 
   const n = state.ideas.filter((i) => selected.has(i.id)).length;
-  const costFor = (i: number) => cost?.items?.[i];
+  const toggle = (id: string) => setSelected((s) => { const nx = new Set(s); if (nx.has(id)) nx.delete(id); else nx.add(id); return nx; });
+
+  const footer = loading || creating ? null : (
+    <>
+      <Button variant="ghost" className={quiet} onClick={onBack}>Back</Button>
+      <span className="flex items-center gap-4">
+        <span className="hidden text-[14px] text-muted-foreground sm:inline">{n === 0 ? 'Pick at least one' : `${n} selected · drafts are free`}</span>
+        <NextButton disabled={n === 0} onClick={() => void create()}>{n <= 1 ? 'Create draft' : `Create ${n} drafts`}</NextButton>
+      </span>
+    </>
+  );
 
   return (
-    <section className="flex flex-col gap-4">
-      <div>
-        <h1 className="m-0 text-[22px] font-extrabold tracking-tight text-(--ad-ink)">Pick your campaigns</h1>
-        <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">Each one you pick becomes its own draft. Drafts are free and nothing is sent until you launch. Every number is an estimate.</p>
-      </div>
-
-      {stale && !loading && (
-        <Alert>
-          <AlertTitle>Your changes affect these ideas</AlertTitle>
-          <AlertDescription className="flex flex-col gap-2">
-            <span>You changed your business details since these were suggested.</span>
-            <Button size="sm" className="self-start" onClick={() => void generate()}><RefreshCw className="mr-1.5 h-3.5 w-3.5" aria-hidden />Refresh ideas</Button>
-          </AlertDescription>
-        </Alert>
-      )}
-      {loading && <Working title="Finding campaigns that fit" lines={IDEA_LINES} />}
-      {(err || loadErr) && <Alert variant="destructive" role="alert"><AlertDescription>{err ?? loadErr}</AlertDescription></Alert>}
-
-      {!loading && state.duplicates.length > 0 && (
-        <p className="m-0 text-[12.5px] text-(--ad-ink-soft)">
-          {state.duplicates.length} idea{state.duplicates.length === 1 ? '' : 's'} skipped: you already run {state.duplicates.map((d) => `“${d}”`).join(', ')}.
-        </p>
-      )}
-      {!loading && state.slotsLeft !== null && state.slotsLeft < 5 && state.slotsLeft > 0 && (
-        <p className="m-0 text-[12.5px] text-(--ad-ink-soft)">You have room for {state.slotsLeft} more campaign{state.slotsLeft === 1 ? '' : 's'} on your plan.</p>
-      )}
-
-      {!loading && state.ideas.length === 0 && !err && !loadErr && (
-        <Card>
-          <CardContent className="flex flex-col items-start gap-3 pt-6">
-            <strong className="text-[14px] text-(--ad-ink)">
-              {state.slotsLeft === 0 ? "You've reached your campaign limit." : "We couldn't find a strong B2B campaign from this profile."}
-            </strong>
-            <span className="text-[13px] text-(--ad-ink-soft)">
-              {state.slotsLeft === 0 ? 'Archive a campaign or contact us to raise your limit.' : 'That usually means the services or customers are too narrow. Here is what you can do.'}
-            </span>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={onBack}>← Edit business info</Button>
-              {state.slotsLeft !== 0 && <Button variant="outline" onClick={() => setShowOwn(true)}><Plus className="mr-1 h-4 w-4" aria-hidden />Add my own idea</Button>}
-              <Button onClick={onManual}>Create manually</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {!loading && state.ideas.length > 0 && (
+    <Frame step={3} progress={[1, 1, 1]} onExit={onExit} onManual={onManual} footer={footer} wide>
+      {creating ? (
+        <Working title="Writing your emails" lines={['Writing four emails for each campaign', 'Saving your drafts']} />
+      ) : loading ? (
+        <Working title="Finding campaigns that fit" lines={['Matching your services to buyers', 'Checking your existing campaigns', 'Estimating how many businesses we can find']} />
+      ) : (
         <>
-          {state.ideas.length < 3 && state.ideas.some((i) => i.fit !== 'own') && (
-            <p className="m-0 text-[12.5px] text-(--ad-ink-soft)">Only {state.ideas.length} idea{state.ideas.length === 1 ? '' : 's'} fit well. We don't pad the list; add more services on the previous screen to see more.</p>
+          <Title sub="Each one becomes a draft you can edit. Nothing is sent or charged until you launch.">Pick your campaigns</Title>
+
+          {stale && (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-muted px-5 py-4">
+              <span className="text-[14px]">You changed your details since these were suggested.</span>
+              <Button variant="outline" className="h-10 rounded-xl font-semibold" onClick={() => void generate()}><RefreshCw className="mr-1.5 h-4 w-4" aria-hidden />Refresh ideas</Button>
+            </div>
           )}
-          <div className="grid gap-3 md:grid-cols-2">
-            {state.ideas.map((idea, i) => {
-              const on = selected.has(idea.id);
-              const line = costFor(i);
-              const toggle = () => setSelected((s) => { const nx = new Set(s); if (nx.has(idea.id)) nx.delete(idea.id); else nx.add(idea.id); return nx; });
-              return (
-                <Card key={idea.id} role="checkbox" aria-checked={on} tabIndex={0}
-                  onClick={toggle} onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); } }}
-                  className={cn('cursor-pointer transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', on && 'border-(--ad-green) shadow-[0_0_0_1px_var(--ad-green)]')}>
-                  <CardContent className="flex flex-col gap-2.5 pt-5">
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge variant={idea.fit === 'seasonal' ? 'outline' : 'secondary'}
-                        className={cn('text-[10.5px] uppercase tracking-wider', idea.fit === 'seasonal' && 'border-(--ad-amber-line) bg-(--ad-amber-tint) text-(--ad-amber-ink)')}>
-                        {FIT_LABEL[idea.fit]}
-                      </Badge>
-                      <Checkbox checked={on} tabIndex={-1} aria-hidden onClick={(e) => e.stopPropagation()} onCheckedChange={toggle} />
+          {(err || loadErr) && <p role="alert" className="m-0 mb-6 rounded-xl bg-destructive/10 px-4 py-3 text-[14px]">{err ?? loadErr}</p>}
+
+          {state.ideas.length === 0 && !err && !loadErr ? (
+            <div className="rounded-2xl bg-muted px-6 py-8">
+              <p className="m-0 text-[18px] font-semibold">
+                {state.slotsLeft === 0 ? "You've reached your campaign limit" : "We couldn't find a strong match"}
+              </p>
+              <p className="m-0 mt-2 text-[15px] text-muted-foreground">
+                {state.slotsLeft === 0 ? 'Archive a campaign or contact us to raise your limit.' : 'Your services or customers may be too narrow. Go back and add more, add your own idea, or create a campaign yourself.'}
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Button variant="outline" className="h-11 rounded-xl font-semibold" onClick={onBack}>Edit details</Button>
+                {state.slotsLeft !== 0 && <Button variant="outline" className="h-11 rounded-xl font-semibold" onClick={() => setShowOwn(true)}>Add my own idea</Button>}
+                <Button className="h-11 rounded-xl font-semibold" onClick={onManual}>Create manually</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {state.ideas.map((idea, i) => {
+                const on = selected.has(idea.id);
+                const line = cost?.items?.[i];
+                return (
+                  <div key={idea.id} role="checkbox" aria-checked={on} tabIndex={0}
+                    onClick={() => toggle(idea.id)} onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(idea.id); } }}
+                    className={cn('flex cursor-pointer flex-col rounded-2xl border bg-background p-6 transition-[border-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      on ? 'border-foreground shadow-[0_0_0_1px_var(--color-foreground)]' : 'border-border hover:border-foreground/40')}>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-[13px] font-medium text-muted-foreground">{FIT_LABEL[idea.fit]}{idea.suggested_start && ` · starts ${new Date(`${idea.suggested_start}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}</span>
+                      <span aria-hidden className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+                        on ? 'border-foreground bg-foreground text-background' : 'border-border')}>
+                        {on && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                      </span>
                     </div>
-                    <strong className="text-[14.5px] text-(--ad-ink)">{idea.name}</strong>
-                    <span className="text-[12.5px] text-(--ad-ink-soft)"><b className="font-semibold text-(--ad-ink)">Target:</b> {idea.target}</span>
-                    {idea.reason && idea.fit !== 'own' && <span className="text-[12.5px] text-(--ad-ink-soft)">{idea.reason}</span>}
-                    {idea.service && <span className="text-[10.5px] font-semibold uppercase tracking-wider text-(--ad-ink-faint)">{idea.service}</span>}
-                    <div className="flex flex-col gap-1 rounded-md bg-(--ad-surface-2) px-3 py-2 text-[12.5px] text-(--ad-ink)">
-                      <span><b className="font-semibold">Est. prospects:</b> {idea.est_lo ?? '…'}–{idea.est_hi ?? '…'} businesses</span>
-                      <span className="flex flex-wrap items-center gap-1.5"><b className="font-semibold">Est. hot leads:</b> {line ? `${line.hot_lo}–${line.hot_hi}` : '…'}
-                        <Badge variant="outline" className="px-1.5 py-0 text-[10px] uppercase tracking-wider">Every campaign varies</Badge></span>
-                      <span><b className="font-semibold">Launch:</b> {line ? launchLine(line, cost) : '…'}</span>
-                      {idea.suggested_start && <span><b className="font-semibold">Suggested start:</b> {new Date(`${idea.suggested_start}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} (seasonal)</span>}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                    <h2 className="m-0 mt-2 text-[19px] font-semibold leading-snug tracking-tight">{idea.name}</h2>
+                    <p className="m-0 mt-1 text-[15px] text-muted-foreground">{idea.target}</p>
+                    {idea.fit !== 'own' && idea.reason && <p className="m-0 mt-3 text-[14px] leading-relaxed">{idea.reason}</p>}
+                    <dl className="m-0 mt-5 grid grid-cols-3 gap-3 border-t border-border pt-4">
+                      <div>
+                        <dt className="text-[12px] text-muted-foreground">Businesses</dt>
+                        <dd className="m-0 mt-0.5 text-[15px] font-semibold tabular-nums">{idea.est_lo ?? '…'}–{idea.est_hi ?? '…'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[12px] text-muted-foreground">Hot leads</dt>
+                        <dd className="m-0 mt-0.5 text-[15px] font-semibold tabular-nums">{line ? `${line.hot_lo}–${line.hot_hi}` : '…'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[12px] text-muted-foreground">Launch</dt>
+                        <dd className="m-0 mt-0.5 text-[15px] font-semibold">{line ? (line.launch === 'free' ? 'Free' : '1 credit') : '…'}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {state.ideas.length > 0 && (
+            <p className="m-0 mt-4 text-[13px] text-muted-foreground">
+              Estimates, not promises. Every campaign varies.
+              {cost && ` You have ${cost.free_launches_left} of ${cost.free_launches_per_month} free launches left this month, then each launch is 1 credit.`}
+              {state.duplicates.length > 0 && ` Skipped ${state.duplicates.map((d) => `“${d}”`).join(', ')}: you already run ${state.duplicates.length === 1 ? 'it' : 'them'}.`}
+            </p>
+          )}
+
+          {showOwn ? (
+            <OwnIdeaForm services={(answers.services ?? []).map((s) => s.name)} onCancel={() => setShowOwn(false)} onAdd={(x) => void addOwn(x)} />
+          ) : state.ideas.length > 0 && (
+            <div className="mt-8 flex flex-wrap gap-2">
+              <Button variant="outline" className="h-11 rounded-full px-5 font-semibold" onClick={() => setShowOwn(true)}><Plus className="mr-1.5 h-4 w-4" aria-hidden />Add my own idea</Button>
+              <Button variant="ghost" className="h-11 rounded-full px-5 font-semibold" onClick={() => void generate()}><RefreshCw className="mr-1.5 h-4 w-4" aria-hidden />Suggest different ideas</Button>
+            </div>
+          )}
         </>
       )}
-
-      {showOwn && <OwnIdeaForm services={(answers.services ?? []).map((s) => s.name)} onCancel={() => setShowOwn(false)} onAdd={(x) => void addOwn(x)} />}
-
-      {!loading && (
-        <footer className="flex flex-col gap-3 border-t border-(--ad-line) pt-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-col">
-              <strong className="text-[13px] text-(--ad-ink)">{n} selected</strong>
-              <span className="text-[12px] text-(--ad-ink-soft)">
-                Every selected campaign becomes its own draft. Drafts are free.
-                {cost && cost.short_by > 0 && n > 0 && ` Launching all of them later would need ${cost.credits_needed} credit${cost.credits_needed === 1 ? '' : 's'}.`}
-              </span>
-            </div>
-            <Button disabled={n === 0 || creating} onClick={() => void create()}>
-              {creating ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />Writing your emails…</> : `Create ${n} draft${n === 1 ? '' : 's'} →`}
-            </Button>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={onBack}>← Edit business info</Button>
-            {state.ideas.length > 0 && <Button variant="ghost" onClick={() => void generate()}><RefreshCw className="mr-1.5 h-4 w-4" aria-hidden />Regenerate ideas</Button>}
-            {state.ideas.length > 0 && !showOwn && <Button variant="ghost" onClick={() => setShowOwn(true)}><Plus className="mr-1 h-4 w-4" aria-hidden />Add my own idea</Button>}
-            <Button variant="link" className={cn(linkBtn, 'ml-auto')} onClick={onManual}>Skip wizard &amp; create manually</Button>
-          </div>
-        </footer>
-      )}
-    </section>
+    </Frame>
   );
 }
 
@@ -741,30 +827,33 @@ function OwnIdeaForm({ services, onAdd, onCancel }: { services: string[]; onAdd:
   const [service, setService] = useState(services[0] ?? '');
   const [who, setWho] = useState('');
   return (
-    <Card>
-      <CardHeader className="pb-3"><CardTitle className="text-[14px] font-bold">Add your own campaign idea</CardTitle></CardHeader>
-      <CardContent>
-        <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); if (name.trim() && who.trim()) onAdd({ name, service, who }); }}>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="own-name">Campaign name</Label>
-            <Input id="own-name" autoFocus placeholder="e.g. Office park grounds" value={name} onChange={(e) => setName(e.target.value)} />
+    <form className="mt-8 flex flex-col gap-5 rounded-2xl border border-border p-6" onSubmit={(e) => { e.preventDefault(); if (name.trim() && who.trim()) onAdd({ name, service, who }); }}>
+      <p className="m-0 text-[18px] font-semibold">Your own campaign idea</p>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="own-name" className="text-[15px] font-semibold">Name it</Label>
+        <Input id="own-name" autoFocus className={field} placeholder="e.g. Office park grounds" value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="own-who" className="text-[15px] font-semibold">Who should it reach?</Label>
+        <Input id="own-who" className={field} placeholder="A type of business, e.g. office parks" value={who} onChange={(e) => setWho(e.target.value)} />
+      </div>
+      {services.length > 1 && (
+        <div className="flex flex-col gap-2">
+          <p className="m-0 text-[15px] font-semibold">Which service?</p>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Which service">
+            {services.map((s) => (
+              <button key={s} type="button" role="radio" aria-checked={service === s} onClick={() => setService(s)}
+                className={cn('h-11 cursor-pointer rounded-full border px-4 text-[14px] font-medium', service === s ? 'border-foreground bg-foreground text-background' : 'border-border bg-background')}>
+                {s}
+              </button>
+            ))}
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="own-service">Service</Label>
-            <select id="own-service" className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={service} onChange={(e) => setService(e.target.value)}>
-              {services.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="own-who">Type of business to reach</Label>
-            <Input id="own-who" placeholder="e.g. office parks" value={who} onChange={(e) => setWho(e.target.value)} />
-          </div>
-          <div className="flex gap-2">
-            <Button type="submit" disabled={!name.trim() || !who.trim()}>Add idea</Button>
-            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Button type="submit" className="h-11 rounded-xl px-5 font-semibold" disabled={!name.trim() || !who.trim()}>Add idea</Button>
+        <Button type="button" variant="ghost" className="h-11 rounded-xl px-5 font-semibold" onClick={onCancel}>Cancel</Button>
+      </div>
+    </form>
   );
 }
