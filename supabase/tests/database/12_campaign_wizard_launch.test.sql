@@ -2,7 +2,7 @@
 -- today's cost line, drafts from ideas, launch checks, start dates, lifecycle, free rewrites
 -- and the edit log.
 begin;
-select plan(43);
+select plan(46);
 
 select tests.client() as client_a \gset
 select tests.user(:'client_a') as user_a \gset
@@ -92,6 +92,21 @@ select tests.claims_service();
 set local session authorization service_role;
 select is((public.create_wizard_drafts(:'session_a', array['hoa']))->'skipped'->0->>'reason', 'campaign_limit',
           'An idea over the client''s campaign limit is skipped with a reason');
+reset session authorization;
+
+-- ── Cost line for saved campaigns (editor, Launch all) ───────────────────────────────────
+select tests.claims_client(:'user_a');
+set local session authorization authenticated;
+select public.campaign_cost_estimate(array[(select id from public.campaigns where name = 'Commercial Snow Removal'),
+                                            (select id from public.campaigns where name = 'Commercial Lawn Maintenance')]) as saved_cost \gset
+select is((:'saved_cost'::jsonb)->'items'->1->>'campaign_id', (select id::text from public.campaigns where name = 'Commercial Lawn Maintenance'),
+          'Each line carries its campaign id, in the order asked');
+select is((:'saved_cost'::jsonb)->'items'->1->>'prospects_lo', '120', 'and the draft''s stored estimate');
+reset session authorization;
+select tests.claims_client(:'user_b');
+set local session authorization authenticated;
+select is((public.campaign_cost_estimate(array[(select id from public.campaigns where name = 'Commercial Snow Removal')]))->>'error', 'not_permitted',
+          'Another client cannot price these campaigns');
 reset session authorization;
 
 -- ── Launch checks ────────────────────────────────────────────────────────────────────────

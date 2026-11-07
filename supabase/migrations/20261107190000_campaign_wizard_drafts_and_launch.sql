@@ -211,7 +211,7 @@ begin
   v_result := public.estimate_campaign_cost(v_client, v_items);
   -- Put the campaign ids back on each line.
   return v_result || jsonb_build_object('items', (
-    select coalesce(jsonb_agg(line || jsonb_build_object('campaign_id', v_items->(i - 1)->>'id') order by i), '[]')
+    select coalesce(jsonb_agg(line || jsonb_build_object('campaign_id', v_items->((i - 1)::int)->>'id') order by i), '[]')
       from jsonb_array_elements(v_result->'items') with ordinality as t(line, i)));
 end;
 $function$;

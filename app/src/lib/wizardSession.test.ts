@@ -140,8 +140,9 @@ describe('mergeAnalysis', () => {
     expect(a.services?.[0].source).toBe('website');
     expect(a.goal?.goal).toBe('quotes');
     expect(a.website?.area_text).toBe('Bozeman, Montana');
+    expect(a.area?.areas).toEqual([{ mode: 'text', label: 'Bozeman, Montana' }]);
     expect(new Set(a.unconfirmed)).toEqual(new Set(['business.name', 'business.industry', 'business.description', 'services',
-      'audience.business_types', 'audience.roles', 'goal']));
+      'audience.business_types', 'audience.roles', 'goal', 'area']));
   });
 
   it('never overwrites what the user typed', () => {
@@ -156,6 +157,7 @@ describe('mergeAnalysis', () => {
     expect(a.services?.map((s) => s.name)).toEqual(['lawn mowing', 'Snow removal']);
     expect(a.audience?.business_types).toEqual(['Property managers', 'Office parks']);
     expect(a.goal?.goal).toBe('meetings');
+    expect(mergeAnalysis({ area: { areas: [{ mode: 'text', label: 'Denver' }] } }, profile, 'website').area?.areas).toEqual([{ mode: 'text', label: 'Denver' }]);
     expect(a.unconfirmed).not.toContain('business.name');
     expect(a.unconfirmed).not.toContain('goal');
   });

@@ -15,7 +15,9 @@ import { enqueueCampaign } from '../../lib/scrapeEnqueue';
 import { costForCampaigns, launchLine, type CostEstimate } from '../../hooks/useWizardAi';
 
 export interface LaunchCandidate { id: string; name: string }
-type Outcome = { id: string; tone: 'ok' | 'warn' | 'error'; text: string };
+type Outcome = { id: string; name: string; tone: 'ok' | 'warn' | 'error'; text: string };
+
+const niceDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
 export function LaunchAllDialog({ open, onOpenChange, drafts, basePath, onDone, client = supabase }: {
   open: boolean; onOpenChange: (o: boolean) => void; drafts: LaunchCandidate[]; basePath: string; onDone: () => void; client?: SupabaseClient;
@@ -43,21 +45,23 @@ export function LaunchAllDialog({ open, onOpenChange, drafts, basePath, onDone, 
   async function run() {
     setRunning(true);
     const out: Outcome[] = [];
+    // Names are captured now: once launched, a campaign is no longer in the drafts list.
+    const names = Object.fromEntries(drafts.map((d) => [d.id, d.name]));
     for (const id of ids) {
+      const name = names[id] ?? 'Campaign';
       const { data: prep } = await client.rpc('prepare_campaign_launch', { p_campaign_id: id });
-      if (!prep?.ok) { out.push({ id, tone: 'error', text: "Couldn't check this campaign." }); continue; }
-      if (prep.result === 'problems') { out.push({ id, tone: 'warn', text: (prep.problems as { message: string }[]).map((p) => p.message).join(' ') }); continue; }
-      if (prep.result === 'scheduled') { out.push({ id, tone: 'ok', text: `Scheduled for ${prep.start_date}.` }); continue; }
+      if (!prep?.ok) { out.push({ id, name, tone: 'error', text: "Couldn't check this campaign." }); continue; }
+      if (prep.result === 'problems') { out.push({ id, name, tone: 'warn', text: (prep.problems as { message: string }[]).map((p) => p.message).join(' ') }); continue; }
+      if (prep.result === 'scheduled') { out.push({ id, name, tone: 'ok', text: `Scheduled to start on ${niceDate(prep.start_date)}. Nothing is charged until then.` }); continue; }
       const r = await enqueueCampaign(id);
-      if (r.kind === 'queued' || r.kind === 'already_queued') out.push({ id, tone: 'ok', text: 'Launched.' });
-      else out.push({ id, tone: r.kind === 'error' ? 'error' : 'warn', text: r.message });
+      if (r.kind === 'queued' || r.kind === 'already_queued') out.push({ id, name, tone: 'ok', text: 'Launched.' });
+      else out.push({ id, name, tone: r.kind === 'error' ? 'error' : 'warn', text: r.message });
     }
     setOutcomes(out);
     setRunning(false);
     onDone();
   }
 
-  const nameOf = (id: string) => drafts.find((d) => d.id === id)?.name ?? 'Campaign';
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!running) { onOpenChange(o); if (!o) setOutcomes(null); } }}>
@@ -72,7 +76,7 @@ export function LaunchAllDialog({ open, onOpenChange, drafts, basePath, onDone, 
             {outcomes.map((o) => (
               <li key={o.id} className="flex items-start gap-2 rounded-lg border border-(--ad-line) px-3 py-2 text-[13px]">
                 {o.tone === 'ok' ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-(--ad-green)" aria-hidden /> : <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-(--ad-clay)" aria-hidden />}
-                <span><b className="font-semibold">{nameOf(o.id)}</b>: {o.text}{' '}
+                <span><b className="font-semibold">{o.name}</b>: {o.text}{' '}
                   {o.tone !== 'ok' && <Link className="font-semibold text-(--ad-green)" to={`${basePath}/campaigns/${o.id}/edit`}>Open</Link>}</span>
               </li>
             ))}

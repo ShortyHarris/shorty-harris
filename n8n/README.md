@@ -9,6 +9,7 @@ it goes live.
 | --- | --- |
 | `code/wf2.5-compute-per-client-send-batch.js` | WF2.5 - Approval Trigger > Compute Per-Client Send Batch |
 | `code/wf3-schedule-next-follow-up.js` | WF3 - Send Outreach Message > Schedule Next Follow-up |
+| `code/wf2-template-instruction.js` | WF2 - Message Generation and WF5 - Follow-up Engine > Build Template Instruction (new, Campaign Wizard) |
 
 **Changing one of these nodes:** edit the file here, run the tests (`cd app && npx vitest run src/n8n`),
 then paste the same code into the node (in a `-dev` copy first, see `docs/SANDBOX.md`). The
@@ -26,3 +27,24 @@ reach n8n.shortyharris.com; the cloud sessions used for development cannot.
 whose single HTTP node uses the n8n "Supabase account" credential. Inputs: `action`
 (`claim` or `release`), `message_id`, `error`. Do not switch these calls back to the
 publishable key: they would fail with "permission denied".
+
+## Campaign Wizard: emails follow the campaign template (manual step)
+
+Wizard campaigns store a four-email template in `campaigns.sequence`. To have the AI
+personalise that template instead of writing from scratch, add two nodes to the **-dev**
+copies of WF2 and WF5 first (see `docs/SANDBOX.md`), test, then copy to the live workflows:
+
+1. **Template Input** (Set node), just before the Gemini node, with these fields:
+   `message_type` (initial in WF2; the follow-up's message_type in WF5), `campaign_sequence`
+   (the campaign's `sequence` column; add it to the campaign lookup's select),
+   `campaign_language`, `prospect_business`, `prospect_contact`, `sender_name`.
+2. **Build Template Instruction** (Code node) after it, with the code of
+   `code/wf2-template-instruction.js` pasted in unchanged.
+3. In the Gemini prompt, append `{{ $json.prompt_instruction }}` at the end. It is empty for
+   campaigns without a template, so their emails are written exactly as today.
+4. Optional: if the Gemini call fails and `has_template` is true, use `prefilled_subject` /
+   `prefilled_body` (placeholders already filled) instead of skipping the prospect.
+
+Sandbox check: create a wizard campaign for a sandbox client, launch it, and confirm the first
+email in Approvals follows the template's subject and offer, with names filled in. Then do
+the same for a manual campaign and confirm its emails look as they did before.

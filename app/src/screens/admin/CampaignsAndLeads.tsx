@@ -69,6 +69,8 @@ const CAMP_PILL: Record<string, { bg: string; text: string; border?: string }> =
   active:         { bg: 'var(--ad-green-tint)', text: 'var(--ad-green)' },
   paused:         { bg: 'var(--ad-amber-tint)', text: 'var(--ad-amber)' },
   completed:      { bg: 'var(--ad-fill)', text: 'var(--ad-ink-faint)' },
+  scheduled:      { bg: 'var(--ad-purple-tint)', text: 'var(--ad-purple)' },
+  archived:       { bg: 'var(--ad-fill)', text: 'var(--ad-ink-faint)', border: '1px solid var(--ad-line)' },
 };
 
 const CAMP_STATUS_LABEL: Record<string, string> = {
@@ -77,6 +79,8 @@ const CAMP_STATUS_LABEL: Record<string, string> = {
   active: 'Active',
   paused: 'Paused',
   completed: 'Completed',
+  scheduled: 'Scheduled',
+  archived: 'Archived',
 };
 
 const LEAD_PILL: Record<string, StatusPillStyle> = {

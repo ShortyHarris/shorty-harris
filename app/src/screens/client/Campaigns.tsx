@@ -165,7 +165,7 @@ export function Campaigns({
             <span className="md:hidden" title={launchLimitTitle}> · {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used</span>
           </p>
         </div>
-        <div className="flex items-center gap-2 md:gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center justify-end gap-2 md:gap-2.5">
           <span className="hidden md:inline text-[12px] font-semibold text-(--ad-ink-soft)" title={launchLimitTitle}>
             {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used
           </span>

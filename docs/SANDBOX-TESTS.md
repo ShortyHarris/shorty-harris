@@ -117,6 +117,33 @@ Use a different prospect for each, after its first email has been sent.
 
 ---
 
+## K. Campaign Wizard (pilot)
+
+Before you start: as admin, open your sandbox client and tick **Campaign wizard (pilot)**.
+The wizard's AI uses the live Gemini key; each run is a few cents. The launch gate and sourcing
+are the same as for any campaign, so in the sandbox discovery is simulated.
+
+| ID | Do | Expected |
+| --- | --- | --- |
+| K1 | Campaigns with no campaigns yet. | "Start the campaign wizard" and "Create manually". With campaigns: **+ New campaign**, **Find new campaigns**, **Create manually**. |
+| K2 | Step 1: enter a real B2B website, **Analyze my website**. | Progress lines, then step 2 filled in: business, services, business types, area, goal. AI guesses are tagged "Please check". |
+| K3 | Step 1: enter `localhost` or `10.0.0.1`. | Refused as not a website address; nothing is fetched. |
+| K4 | Step 1: a site that doesn't exist (e.g. `no-such-site-12345.com`). | "We couldn't use that website" with **Describe my business** and **Try again**. |
+| K5 | Step 1: **I don't have a website**, fill the short form, **Continue**. | Step 2 filled from the description; what you typed is kept. |
+| K6 | Step 2: clear the area and press **Find campaigns**. | Not saved; the missing field is named. |
+| K7 | Step 2 complete, **Find campaigns**. | 1-5 cards with est. prospects, est. hot leads ("Every campaign varies") and a launch line ("Free launch (N of 5 left this month)" or "1 credit to launch"). No dollar amounts. |
+| K8 | Close the tab on step 2, open the wizard again. | "Continue where you left off?" with Continue / Start again. |
+| K9 | Step 3: pick two ideas and add your own, **Create 3 drafts**; double-click the button. | Three drafts, never six. Banner: "3 drafts created. Nothing has been sent or charged." |
+| K10 | Open a draft: **Emails**, use **Rewrite** three times. | The counter goes 3 → 0; then Rewrite is disabled. Editing by hand still works. |
+| K11 | Empty one email's subject, open **Launch**. | "Follow-up 1 needs a subject." Launch is disabled until fixed. |
+| K12 | Launch a draft. | It goes through the normal launch gate (free launches, then 1 credit) and sources like any campaign. No admin review. The first emails appear in Approvals. |
+| K13 | Launch a draft with a future start date. | Status **Scheduled**, nothing sourced or charged; **Cancel the start date** returns it to draft. |
+| K14 | **Launch all** with one draft that has a blank email. | The others launch; that one is listed as needing fixes. |
+| K15 | Pause, resume, archive, restore, **Make a copy**. | Each works; a restored launched campaign comes back paused; a copy is a new draft. |
+| K16 | **Find new campaigns**. | Starts on step 2 with the saved profile; ideas skip campaigns you already run. |
+| K17 | A client without the pilot switch opens `/app/campaigns/wizard`. | "It isn't switched on for your account yet." |
+| K18 | After the n8n step in `n8n/README.md`: launch a wizard campaign. | The first email in Approvals follows the template's subject and offer with names filled in. A manual campaign's emails look as before. |
+
 ## Not covered by this plan (by design or planned separately)
 
 - **Automated regression checks** on every pull request and nightly (spec 2.5): planned separately.

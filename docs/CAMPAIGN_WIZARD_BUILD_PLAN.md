@@ -1,6 +1,6 @@
 # Campaign Wizard: build plan (lean version)
 
-Status: draft for Ian and Martin's review, November 2026. Nothing here is built yet.
+Status: built on branch `claude/relaxed-ritchie-4ltpdn` (November 7, 2026), not yet live. See `docs/CAMPAIGN_WIZARD_RELEASE.md` for what was built and how to switch it on.
 Sources: PRD v1.4.2, prototype v1.4.1, *Campaign Wizard: Outstanding Questions* v2,
 and the code on `main` at `a50a63e`.
 
@@ -234,11 +234,11 @@ ordering the work. Martin's estimate replaces them.
 |---|---|---|
 | **M0 Decisions** | Agenda items plus section 6 below. Write PRD v1.5. | — |
 | **M1 Foundation** ✅ *built Nov 7* | Migrations and RLS, feature flag, entry points (onboarding welcome, New campaign / Find new campaigns / Create manually on Campaigns), wizard route with autosave and resume, manual modal writes the new fields, retire `pending_review`. | 4–5 |
-| **M2 Screens 1–2** | `wizard-ai` `analyze` (website and no-website), safe fetch, screen 1 with progress and fallbacks, screen 2 review form with "Please check" tags and required-field gate. | 5–6 |
-| **M3 Screen 3 + drafts** | `wizard-ai` `ideas` and `sequence`, prospect estimate (search history, then default range), duplicate check, cards, regenerate, own idea, idempotent `create_wizard_drafts`. | 5–6 |
-| **M4 Editor + launch** | Editor tabs (targeting, the four emails with 3 free rewrites, cadence shown read-only as today's rule, launch checklist), unsaved-changes guard, detail modal, pause/resume/clone/archive, `estimate_campaign_cost` on today's rules, launch and Launch all through the existing WF0a gate. | 5–7 |
-| **M5 Emails follow the template** | WF2 and WF5 prompts use the campaign's four-email template and personalise it per prospect. Logic kept in `n8n/code/` files with tests, as for WF2.5 and WF3. | 2–3 |
-| **M6 Test + pilot** | Sandbox end-to-end run (wizard → draft → launch → sourcing → emails → approval → send → follow-ups → reply → hot lead), wizard cases in SANDBOX-TESTS and the regression plan, funnel events, pilot with Mountains Mowing and one specialist B2B client. | 3–4 |
+| **M2 Screens 1–2** ✅ *built* | `wizard-ai` `analyze` (website and no-website), safe fetch, screen 1 with progress and fallbacks, screen 2 review form with "Please check" tags and required-field gate. | 5–6 |
+| **M3 Screen 3 + drafts** ✅ *built* | `wizard-ai` `ideas` and `sequence`, prospect estimate (search history, then default range), duplicate check, cards, regenerate, own idea, idempotent `create_wizard_drafts`. | 5–6 |
+| **M4 Editor + launch** ✅ *built* | Editor tabs (targeting, the four emails with 3 free rewrites, cadence shown read-only as today's rule, launch checklist), unsaved-changes guard, detail modal, pause/resume/clone/archive, `estimate_campaign_cost` on today's rules, launch and Launch all through the existing WF0a gate. | 5–7 |
+| **M5 Emails follow the template** ✅ *code built; n8n wiring is a manual step* | WF2 and WF5 prompts use the campaign's four-email template and personalise it per prospect. Logic kept in `n8n/code/` files with tests, as for WF2.5 and WF3. | 2–3 |
+| **M6 Test + pilot** ✅ *tested locally; pilot not started* | Sandbox end-to-end run (wizard → draft → launch → sourcing → emails → approval → send → follow-ups → reply → hot lead), wizard cases in SANDBOX-TESTS and the regression plan, funnel events, pilot with Mountains Mowing and one specialist B2B client. | 3–4 |
 | *Later, separate project* | *New pricing (PRD section 8): ×10 credits, prospect charges, first launch free, batch cap, starter grant, new packs, balance conversion. Replaces the inside of `estimate_campaign_cost` and the launch gate.* | *6–8* |
 
 **Rough total: 24–31 developer days** for the wizard, against 43–59 for the full PRD build.

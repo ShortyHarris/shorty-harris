@@ -116,6 +116,8 @@ async function analyze({ body, apiKey, mock }: Ctx) {
   if (body.url) {
     const url = normalizeWebsite(String(body.url))
     if (!url) throw new WizardError('bad_url')
+    // Sample mode: an address containing "unreachable" behaves like a site that won't load.
+    if (mock && url.includes('unreachable')) throw new WizardError('site_unreachable')
     const html = mock ? '<title>Mock</title>' + 'Sample text. '.repeat(60) : await fetchSite(url)
     const text = htmlToText(html)
     const thin = isThin(text)

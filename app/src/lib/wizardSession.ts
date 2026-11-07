@@ -230,8 +230,14 @@ export function mergeAnalysis(a: WizardAnswers, p: AiProfile, source: FieldSourc
   let goal = a.goal;
   if (!a.goal?.goal && isGoal(p.goal)) { goal = { ...a.goal, goal: p.goal }; unconfirmed.add('goal'); }
   const website = a.website && !a.website.area_text && p.area_text ? { ...a.website, area_text: p.area_text } : a.website;
+  // The area the website or description names becomes the first area, to check or replace.
+  let area = a.area;
+  if (!(a.area?.areas ?? []).length && p.area_text.trim()) {
+    area = { areas: [{ mode: 'text', label: p.area_text.trim() }] };
+    unconfirmed.add('area');
+  }
 
-  return { ...a, website: website ?? (p.area_text ? { mode: 'website', area_text: p.area_text } : a.website), business, services, audience, goal, unconfirmed: [...unconfirmed] };
+  return { ...a, website: website ?? (p.area_text ? { mode: 'website', area_text: p.area_text } : a.website), business, services, audience, goal, area, unconfirmed: [...unconfirmed] };
 }
 
 /** A short fingerprint of what campaign ideas depend on, to notice when screen 2 changed since. */

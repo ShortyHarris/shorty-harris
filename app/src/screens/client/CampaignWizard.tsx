@@ -502,7 +502,7 @@ function ProfileStep({ answers, update, entry, thin, onReread }: {
         )}
       </Section>
 
-      <Section title="Area">
+      <Section title="Area" check={needsCheck(answers, 'area')}>
         {answers.website?.area_text && !(answers.area?.areas ?? []).length && (
           <p className="m-0 text-[12.5px] text-(--ad-ink-soft)">{answers.website.mode === 'describe' ? 'You said' : 'Your website says'}: “{answers.website.area_text}”. Add it below as a place or a radius.</p>
         )}
