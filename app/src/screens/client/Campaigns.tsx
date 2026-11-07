@@ -1,7 +1,7 @@
 import { btn } from '../../lib/clientButtons';
 import { ModalClose } from '../../components/ModalClose';
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ChevronRight, TriangleAlert, Pencil, Trash2, Megaphone, X } from 'lucide-react';
@@ -43,6 +43,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { COUNTRY_OPTIONS, countryName, defaultCampaignCountry, findCountryHold, isEuCountry } from '../../lib/countries';
 import { RequiredMark } from '../../components/RequiredMark';
 import { MobileFab } from '../../components/MobileFab';
+import { useClientHeader } from '../../hooks/useClientHeader';
 
 const HELP: HelpContent = {
   title: 'Campaigns',
@@ -104,7 +105,21 @@ export function Campaigns({
   const { holds } = useCountrySendHolds(client);
   const { toasts, toast, dismiss } = useToast();
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh campaigns.');
-  const [showNew, setShowNew] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The wizard's "Skip wizard & create manually" lands here with ?new=manual.
+  const [showNew, setShowNew] = useState(() => searchParams.get('new') === 'manual' && !readOnly);
+  // Campaign Wizard pilot: "New campaign" opens the wizard, "Create manually" opens the form.
+  const { wizardEnabled } = useClientHeader(clientId, client);
+  const navigate = useNavigate();
+  const openWizard = (entry?: 'find_new' | 'onboarding') =>
+    navigate(`${basePath}/campaigns/wizard${entry ? `?entry=${entry}` : ''}`);
+  const startNew = () => (wizardEnabled ? openWizard() : setShowNew(true));
+  // Drop ?new=manual once the form is open, so a reload doesn't reopen it.
+  useEffect(() => {
+    if (searchParams.get('new') !== 'manual') return;
+    const next = new URLSearchParams(searchParams); next.delete('new');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [openCampaign, setOpenCampaignRaw] = useState<ClientCampaignRow | null>(null);
   // The table's Edit button opens the same window already in edit mode.
   const [openInEdit, setOpenInEdit] = useState(false);
@@ -145,9 +160,21 @@ export function Campaigns({
           </span>
           <HelpButton content={HELP} />
           <RefreshButton onRefresh={handleRefresh} isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} className={ghostCls} />
+          {!readOnly && wizardEnabled && (
+            <>
+              {rows.length > 0 && (
+                <button onClick={() => openWizard('find_new')} disabled={newCampaignDisabled} title={newCampaignTitle} className={`${ghostCls} max-md:hidden`}>
+                  <Sparkles size={14} aria-hidden /> Find new campaigns
+                </button>
+              )}
+              <button onClick={() => setShowNew(true)} disabled={newCampaignDisabled} title={newCampaignTitle} className={`${ghostCls} max-md:hidden`}>
+                Create manually
+              </button>
+            </>
+          )}
           {!readOnly && (
             <button
-              onClick={() => setShowNew(true)}
+              onClick={startNew}
               disabled={newCampaignDisabled}
               title={newCampaignTitle}
               className={`${primaryCls} max-md:hidden`}
@@ -198,16 +225,27 @@ export function Campaigns({
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
           <strong className="text-[15px] font-semibold text-(--ad-ink)">No campaigns yet.</strong>
-          <span className="text-[13px] text-(--ad-ink-soft)">Create your first campaign to tell us who to target.</span>
+          <span className="text-[13px] text-(--ad-ink-soft)">
+            {wizardEnabled
+              ? 'Start with the campaign wizard: tell us about your business and we\'ll help you choose who to target. Or set up a campaign yourself.'
+              : 'Create your first campaign to tell us who to target.'}
+          </span>
           {!readOnly && (
-            <button
-              onClick={() => setShowNew(true)}
-              disabled={newCampaignDisabled}
-              title={newCampaignTitle}
-              className={`${primaryCls} mt-2`}
-            >
-              + New campaign
-            </button>
+            <div className="mt-2 flex flex-wrap justify-center gap-2">
+              <button
+                onClick={() => (wizardEnabled ? openWizard('onboarding') : setShowNew(true))}
+                disabled={newCampaignDisabled}
+                title={newCampaignTitle}
+                className={primaryCls}
+              >
+                {wizardEnabled ? 'Start the campaign wizard' : '+ New campaign'}
+              </button>
+              {wizardEnabled && (
+                <button onClick={() => setShowNew(true)} disabled={newCampaignDisabled} title={newCampaignTitle} className={ghostCls}>
+                  Create manually
+                </button>
+              )}
+            </div>
           )}
         </div>
       ) : (
@@ -316,7 +354,7 @@ export function Campaigns({
       {/* Mobile FAB */}
       {!readOnly && (
         <MobileFab
-          onClick={() => setShowNew(true)}
+          onClick={startNew}
           label="New campaign"
           disabled={newCampaignDisabled}
           title={newCampaignTitle}

@@ -233,7 +233,7 @@ ordering the work. Martin's estimate replaces them.
 | Milestone | Scope | Rough days |
 |---|---|---|
 | **M0 Decisions** | Agenda items plus section 6 below. Write PRD v1.5. | — |
-| **M1 Foundation** | Migrations and RLS, feature flag, entry points (onboarding welcome, New campaign / Find new campaigns / Create manually on Campaigns), wizard route with autosave and resume, manual modal writes the new fields, retire `pending_review`. | 4–5 |
+| **M1 Foundation** ✅ *built Nov 7* | Migrations and RLS, feature flag, entry points (onboarding welcome, New campaign / Find new campaigns / Create manually on Campaigns), wizard route with autosave and resume, manual modal writes the new fields, retire `pending_review`. | 4–5 |
 | **M2 Screens 1–2** | `wizard-ai` `analyze` (website and no-website), safe fetch, screen 1 with progress and fallbacks, screen 2 review form with "Please check" tags and required-field gate. | 5–6 |
 | **M3 Screen 3 + drafts** | `wizard-ai` `ideas` and `sequence`, prospect estimate (search history, then default range), duplicate check, cards, regenerate, own idea, idempotent `create_wizard_drafts`. | 5–6 |
 | **M4 Editor + launch** | Editor tabs (targeting, the four emails with 3 free rewrites, cadence shown read-only as today's rule, launch checklist), unsaved-changes guard, detail modal, pause/resume/clone/archive, `estimate_campaign_cost` on today's rules, launch and Launch all through the existing WF0a gate. | 5–7 |

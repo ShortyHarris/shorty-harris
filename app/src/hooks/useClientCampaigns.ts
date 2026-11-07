@@ -110,7 +110,7 @@ export async function createClientCampaign(
   // separate, privileged update.
   const { data: clientRow } = await supabase
     .from('clients')
-    .select('auto_approve_campaigns')
+    .select('auto_approve_campaigns, wizard_enabled')
     .eq('id', input.client_id)
     .single();
 
@@ -131,7 +131,8 @@ export async function createClientCampaign(
       scrape_enabled: true,
     });
 
-  return { autoApproved: clientRow?.auto_approve_campaigns ?? false, error };
+  // Pilot clients (wizard_enabled) skip the review too: no staff approval on launch.
+  return { autoApproved: (clientRow?.auto_approve_campaigns || clientRow?.wizard_enabled) ?? false, error };
 }
 
 export interface UpdateClientCampaignInput {

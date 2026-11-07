@@ -125,8 +125,16 @@ schedule off. Run it once now while I watch, and show me the log.
 
 ## Step 5: point the local app at the local stack, not production
 
-1. Create `app/.env.local` (gitignored) with the local stack's URL and anon key, and
-   `supabase/functions/.env.local` for `supabase functions serve`.
+1. Create `app/.env.local` (gitignored) with `VITE_LOCAL_SUPABASE_URL` and
+   `VITE_LOCAL_SUPABASE_ANON_KEY` for the local stack, and `supabase/functions/.env.local` for
+   `supabase functions serve`. **The usual `VITE_SUPABASE_URL` is ignored**: the live address is
+   hard-coded in `app/src/lib/supabase.ts`, which reads the `VITE_LOCAL_…` pair in dev mode only.
+   Other live addresses are still hard-coded and must also be made local-safe:
+   `app/src/lib/impersonation.ts`, `app/src/hooks/useGmailConnection.ts` and
+   `app/src/screens/docs/DocsSearchPanel.tsx`. Before you log in locally, block
+   `*.supabase.co` in the browser or check the network tab, so nothing reaches live.
+   The test stack in `scripts/db/stack` has the data API switched off (`[api] enabled = false`);
+   the development stack must switch it on.
 2. The app has n8n webhook URLs hard-coded in `app/src/lib/scrapeEnqueue.ts`,
    `app/src/screens/client/Billing.tsx`, `app/src/screens/admin/Clients.tsx`,
    `app/src/screens/admin/Prospects.tsx` and `app/src/screens/admin/Blog.tsx`. Move them behind

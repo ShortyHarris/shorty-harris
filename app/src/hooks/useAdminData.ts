@@ -497,6 +497,8 @@ export interface ClientListRow {
   monthly_prospect_limit: number;
   max_campaigns: number;
   auto_approve_campaigns: boolean;
+  /** Campaign Wizard pilot: the client sees the wizard, and its campaigns skip review. */
+  wizard_enabled: boolean;
   allow_generic_mailboxes: boolean;
   is_internal: boolean;
   /** Test account: emails only reach the tester's own mailbox. */
@@ -527,7 +529,7 @@ export function activationByClient(
 async function fetchClients(): Promise<ClientListRow[]> {
   const { data, error } = await supabase
     .from('clients')
-    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, representative_name, notification_channel, status, created_at, monthly_prospect_limit, max_campaigns, auto_approve_campaigns, allow_generic_mailboxes, is_internal, is_sandbox, country, send_timezone')
+    .select('id, business_name, business_type, location, website_url, contact_email, contact_phone, contact_name, representative_name, notification_channel, status, created_at, monthly_prospect_limit, max_campaigns, auto_approve_campaigns, wizard_enabled, allow_generic_mailboxes, is_internal, is_sandbox, country, send_timezone')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -767,6 +769,7 @@ export interface UpdateClientInput {
   monthly_prospect_limit: number;
   max_campaigns: number;
   auto_approve_campaigns: boolean;
+  wizard_enabled: boolean;
   allow_generic_mailboxes: boolean;
 }
 
@@ -787,6 +790,7 @@ export async function updateClient(id: string, input: UpdateClientInput) {
     monthly_prospect_limit: input.monthly_prospect_limit,
     max_campaigns: input.max_campaigns,
     auto_approve_campaigns: input.auto_approve_campaigns,
+    wizard_enabled: input.wizard_enabled,
     allow_generic_mailboxes: input.allow_generic_mailboxes,
     updated_at: new Date().toISOString(),
   }).eq('id', id);
