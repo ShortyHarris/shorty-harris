@@ -10,12 +10,30 @@ own, one estimated credit total per campaign) in **three screens instead of seve
 fewer moving parts behind them. Section 6 lists where it departs from the PRD, which Ian and
 Martin need to agree to.
 
+### Decisions so far (November 7)
+
+- **Three screens**: website, check what we found, pick campaigns.
+- **Wizard first, today's pricing.** The wizard runs on the current credit rules (5 free
+  launches a month, then 1 credit per launch, 1 credit per hot lead). The new pricing
+  (PRD section 8) becomes its own project later. The wizard reads every credit number from
+  one estimate function, so switching pricing later means changing that function only.
+- **Emails written up front.** When a draft is created, the AI writes the campaign's four
+  emails (first email plus three follow-ups) as a template the client can read, edit and
+  rewrite before launch. After launch, the AI personalises that template for each prospect,
+  and the client approves each email in Approvals as today.
+- **Today's cadence.** Follow-ups go 3, 5 and 7 business days after the previous email,
+  skipping weekends and holidays. The editor shows this instead of the prototype's
+  "Day 0 / 3 / 5 / 7".
+- **No staff approval on launch** (Ian, Oct 30).
+- Design is settled after the functionality works.
+
 Ground rules (unchanged):
 
 - B2B targeting only.
 - Each campaign card shows estimated prospects, estimated hot leads ("Every campaign varies")
-  and one estimated credit total. There are no dollars and no setup fee in the wizard. Dollars
-  and the breakdown live in the "How credits work" FAQ and on the credit packs.
+  and one credit line from the estimate function. There are no dollars in the wizard. Under
+  today's pricing that line reads "Free launch (3 of 5 left this month)" or "1 credit to
+  launch". Under the future pricing it becomes the PRD's single "Estimated credits" total.
 - No staff approval on launch (Ian, Oct 30). Launch goes straight to sourcing.
 - Skipping the wizard has no penalty. Every campaign stays editable and is launched on its
   own. Prices come from a versioned pricing policy, never from wizard code.
@@ -82,7 +100,10 @@ One page with five compact sections. Every field is prefilled where we could and
 ### Screen 3: Pick your campaigns
 - One to five cards. Each shows its name, who it targets, why it fits, a fit label (Strong fit,
   Seasonal, New segment…), **Est. prospects**, **Est. hot leads · Every campaign varies** and
-  **Estimated credits**. The first launch is marked "First launch free".
+  the **credit line** from `estimate_campaign_cost` ("Free launch (3 of 5 left this month)" or
+  "1 credit to launch" under today's pricing).
+- The number of cards respects the client's own limits (`max_campaigns`, monthly prospect
+  limit). If they have room for two more campaigns, the cards say so.
 - Cards can be selected with mouse or keyboard (AC-60). Below them: **Regenerate ideas**,
   **Add my own idea**, **← Edit business info**, and **Create N drafts →**.
 - Creating drafts is free and starts nothing (AC-37). The user lands on Campaigns with the
@@ -136,10 +157,10 @@ After that, the campaign editor and Launch are the same for wizard and manual ca
 
 | Case | Behaviour |
 |---|---|
-| Total changed since the user looked (balance, edits, first-free already used in another tab) | Launch is refused with no charge. The screen refreshes with the new total, and the user confirms again. |
-| Launch all where one campaign can't launch (no credits, failed checklist) | The others launch. That one stays a draft with the reason and a fix link (AC-35). |
-| Sourcing fails or the launch is cancelled before sourcing starts | Fee refunded, first-free restored (D7). |
-| Credits run out during sourcing | Sourcing stops at what was paid for. Follow-ups to prospects already found continue. |
+| No free launches left and no credits | The existing launch gate refuses. The launch step says so and offers **Add credits**. |
+| Launch all where one campaign can't launch (no credits, failed checklist, campaign limit) | The others launch. That one stays a draft with the reason and a fix link (AC-35). |
+| Sourcing fails | The existing `refund_campaign_launch` gives back the credit or the free launch. |
+| Monthly prospect limit reached | The existing gate refuses, with its current message. |
 
 ---
 
@@ -152,10 +173,10 @@ After that, the campaign editor and Launch are the same for wizard and manual ca
 | Search inputs and limits | `suggest_campaign_inputs`, `validate_campaign_inputs`, `scrape_limits` | No change. Every idea is checked against them. |
 | Manual creation | 4-step New campaign modal | Becomes "Create manually", and writes `origin = 'manual'`. |
 | Area picker | `LocationAreaInput`, `RadiusMap`, `TargetAreaChips` | No change. |
-| Sourcing | WF0a gate → `discovery_queue` → WF0b Apify | WF0a stops charging. The launch function charges and queues. |
-| Writing emails | WF2 writes one email per prospect, client approves in Approvals | WF2 uses the campaign's 4-step sequence as its template and personalises it per prospect. |
-| Follow-up timing | WF3/WF5 business-day schedule | Reads the campaign's cadence instead of fixed 3/5/7. |
-| Hot-lead charge | WF6 / `route_call_outcome_to_hot_lead` deduct 1 | Deduct the policy amount, and add a one-click dispute. |
+| Sourcing and launch charging | WF0a gate (`wf0-enqueue`) → `discovery_queue` → WF0b Apify; 5 free launches a month, then 1 credit; `refund_campaign_launch` | No change. Wizard campaigns launch through the same gate. |
+| Writing emails | WF2 writes one email per prospect, client approves in Approvals; WF5 writes follow-ups when due (or all up front with `upfront_sequence`) | WF2 and WF5 use the campaign's four-email template as the base and personalise it per prospect. Campaigns without a template (older ones) keep today's behaviour. |
+| Follow-up timing | WF3/WF5: 3, 5, 7 business days after the previous email | No change. |
+| Hot-lead charge | WF6 / `route_call_outcome_to_hot_lead` deduct 1 | No change. |
 | Staff campaign review | `pending_review` + `auto_approve_campaigns` | Removed for client launches (Ian's decision). |
 
 ---
@@ -176,20 +197,15 @@ After that, the campaign editor and Launch are the same for wizard and manual ca
 3. **Edits to live campaigns apply to emails not yet written.** Emails already written and
    waiting in Approvals stay as they are. Emails already sent never change. Every edit is
    logged in `audit_logs`. There are no campaign versions or pending revisions.
-4. **Billing is one settings row and one launch function.**
-   - `pricing_policies`: one row per version (`v2.0`), with every PRD 8 value in a `values`
-     column and `effective_from`. Per-client overrides wait until we need them.
-   - `estimate_campaign_cost(campaign_ids)`: read-only, used by cards, the editor and the
-     Launch screen.
-   - `launch_campaigns(campaign_ids, expected_total, idempotency_key)`: one database
-     transaction. It recalculates the total and refuses if it differs from `expected_total`
-     (this replaces quote tokens). It claims first-free with a single conditional update on
-     `clients.first_launch_used_at`, applies the batch cap, charges, and queues sourcing. Each
-     campaign passes or fails on its own.
-   - Prospects are charged per block as they are actually sourced. Sourcing stops when credits
-     run out. Nothing is reserved or released.
-   - The ledger stays `credit_transactions`, with `policy_version`, `idempotency_key` (unique)
-     and `balance_after` added, plus the new types.
+4. **Today's pricing, behind one function.**
+   - `estimate_campaign_cost(campaign_ids)`: read-only, used by the cards, the editor and the
+     launch step. Today it returns estimated prospects, estimated hot leads (0.5–1.0% of the
+     prospect range, labelled "Every campaign varies") and the launch line from
+     `monthly_launch_usage` and the credit balance. No screen calculates credits itself.
+   - Launching uses the existing WF0a gate unchanged, one campaign at a time. "Launch all"
+     calls it for each selected campaign and reports which launched and which didn't.
+   - The new pricing project later replaces the inside of `estimate_campaign_cost` and the
+     launch gate. The wizard screens don't change.
 5. **One campaign model and a feature flag.** Wizard, manual and Find-new drafts are the same
    `campaigns` row with `origin`. `clients.wizard_enabled` turns the wizard on for pilot
    clients.
@@ -200,12 +216,11 @@ After that, the campaign editor and Launch are the same for wizard and manual ca
 - `client_services`: client_id, name, seasonal_months, confirmed.
 - `client_icp`: add goal, cta, exclusions, company_size, confirmed fields.
 - `campaigns`: add origin, service_id, icp (business types, roles, exclusions), sequence
-  (4 steps: delay, subject, body), start_date, rewrites_used, archived_at, cloned_from_id,
-  launched_at, launch_fee_tx_id, launch_policy_version, fee_waiver_reason. Status check gains
-  `scheduled` and `archived`, and loses `pending_review`.
-- `clients`: add wizard_enabled, first_launch_used_at.
-- `pricing_policies`: version, effective_from, status, values.
-- `credit_transactions`: add policy_version, idempotency_key, balance_after, batch_id.
+  (4 emails: subject, body; gaps follow today's 3/5/7 business-day rule), start_date,
+  rewrites_used, archived_at, cloned_from_id. Status check gains `scheduled` and `archived`,
+  and loses `pending_review`.
+- `clients`: add wizard_enabled.
+- No billing table changes in this project.
 
 ---
 
@@ -221,14 +236,12 @@ ordering the work. Martin's estimate replaces them.
 | **M1 Foundation** | Migrations and RLS, feature flag, entry points (onboarding welcome, New campaign / Find new campaigns / Create manually on Campaigns), wizard route with autosave and resume, manual modal writes the new fields, retire `pending_review`. | 4–5 |
 | **M2 Screens 1–2** | `wizard-ai` `analyze` (website and no-website), safe fetch, screen 1 with progress and fallbacks, screen 2 review form with "Please check" tags and required-field gate. | 5–6 |
 | **M3 Screen 3 + drafts** | `wizard-ai` `ideas` and `sequence`, prospect estimate (search history, then default range), duplicate check, cards, regenerate, own idea, idempotent `create_wizard_drafts`. | 5–6 |
-| **M4 Editor + launch** | Editor tabs (targeting, emails with 3 free rewrites, cadence, launch checklist), unsaved-changes guard, detail modal, pause/resume/clone/archive, WF2 uses the template, WF3/WF5 use the cadence. | 5–7 |
-| **M5 Pricing** | `pricing_policies`, `estimate_campaign_cost`, `launch_campaigns` (first-free, batch cap, expected total), per-block prospect charging, policy-based hot-lead charge and dispute, refund on failed launch, starter grant, low-balance banner, Billing FAQ and packs read the policy, legacy balance conversion. | 6–8 |
-| **M6 Test + pilot** | Sandbox end-to-end run, wizard cases in SANDBOX-TESTS and the regression plan, funnel events, pilot with Mountains Mowing and one specialist B2B client. | 3–4 |
+| **M4 Editor + launch** | Editor tabs (targeting, the four emails with 3 free rewrites, cadence shown read-only as today's rule, launch checklist), unsaved-changes guard, detail modal, pause/resume/clone/archive, `estimate_campaign_cost` on today's rules, launch and Launch all through the existing WF0a gate. | 5–7 |
+| **M5 Emails follow the template** | WF2 and WF5 prompts use the campaign's four-email template and personalise it per prospect. Logic kept in `n8n/code/` files with tests, as for WF2.5 and WF3. | 2–3 |
+| **M6 Test + pilot** | Sandbox end-to-end run (wizard → draft → launch → sourcing → emails → approval → send → follow-ups → reply → hot lead), wizard cases in SANDBOX-TESTS and the regression plan, funnel events, pilot with Mountains Mowing and one specialist B2B client. | 3–4 |
+| *Later, separate project* | *New pricing (PRD section 8): ×10 credits, prospect charges, first launch free, batch cap, starter grant, new packs, balance conversion. Replaces the inside of `estimate_campaign_cost` and the launch gate.* | *6–8* |
 
-**Rough total: 28–36 developer days**, against 43–59 for the full PRD build. M5 can run
-alongside M2–M4 once its decisions are settled. Until M5 lands, `estimate_campaign_cost` can
-read the current rules (5 free launches a month, 1 credit per hot lead), so the wizard could
-pilot before the new pricing if Ian wants.
+**Rough total: 24–31 developer days** for the wizard, against 43–59 for the full PRD build.
 
 ---
 
@@ -238,34 +251,34 @@ pilot before the new pricing if Ian wants.
 |---|---|---|
 | Five question steps plus a confirm step (S01–S05) | Three screens: website, review, pick | The AI fills most answers, so the user checks instead of typing. |
 | Separate campaign approval, versions and pending revisions (AC-33, AC-47) | Launch is the approval. Edits apply to emails not yet written. Edits are logged. | Clients already approve each email. Also answers agenda 2.2. |
-| Quote tokens with 15-minute expiry (AC-64) | Launch is refused if the total changed since it was shown | Same protection, no quotes table. |
-| Credit reservation and release at launch (AC-49) | Charge per block as prospects are found, and stop at zero | Same total for the user, nothing to reconcile. |
-| Scoped pricing rules, coupons and waivers (AC-66 partly) | One versioned policy row. Admin adjustments cover goodwill. | Add scopes and coupons when there is a real need. |
+| New pricing, quotes, reservations, first-free, batch cap (PRD 8, AC-48 to AC-56, AC-63 to AC-69) | Today's pricing in this project; the new pricing is a later project | Ship a working wizard first; keep the money change separate. |
 | Expert refine, A/B pack, Brand voice ("Proposed") | Not in MVP | Already optional in the PRD. |
 | Collateral file upload | Not in MVP | Agenda 3.2 isn't settled, and the website covers most of it. |
 | AI jobs with queued/running states (PRD 5.1) | Synchronous calls with live progress text and retry | Every call finishes within about 30 seconds. |
 
-Unchanged: B2B only, the card display rules, the 3 free rewrites, Launch all with the batch cap,
-first launch free, start dates, Find new campaigns, the credits FAQ, and no staff approval.
+| Cadence day 0/3/5/7 | Today's 3/5/7 business days after the previous email | Already built and tested. |
 
-### Still open from the agenda
-- **2.3 Email timing:** this plan assumes the 4-step sequence is written up front as a
-  template and WF2 personalises it per prospect.
+Unchanged: B2B only, estimated prospects and hot leads on the cards, the 3 free rewrites,
+Launch all, start dates, Find new campaigns, and no staff approval.
+
+### Decided
+- **2.3 Email timing:** written up front as a four-email template, personalised per prospect.
+- **Cadence:** today's rule.
+
+### Still open
 - **2.4 Multi-business accounts:** assumed no for MVP.
 - **2.5 ACs 1–25 from v1.0:** still need finding.
-- **Hot-lead definition:** billing waits on Martin.
-- **Cadence:** PRD day 0/3/5/7 versus the current 3/5/7 business days after the previous send.
-- **Credit conversion:** 1 old credit (bought at about $20–25) becomes 100 new ($10). Martin
-  to confirm.
-- **Payment provider:** still undecided, and needed for the new packs.
+- For the later pricing project: hot-lead definition, credit conversion (1 old credit bought at
+  about $20–25 becomes 100 new = $10), payment provider.
 
 ---
 
 ## 7. Risks
-- **Estimate accuracy.** The prospect range drives the credit total on every card. Show ranges
-  only, label them "Estimate", and replace the default with real yield data as it builds up.
-- **Re-denominating credits** touches every balance and the public Pricing page. Migrate once,
-  one logged adjustment per client, with a dry-run report first.
+- **Estimate accuracy.** Show prospect and hot-lead ranges only, label them "Estimate", and
+  replace the default with real yield data as it builds up.
+- **Template-based emails** change the WF2/WF5 prompts that every campaign uses. Older
+  campaigns without a template keep today's prompt, and the change goes through the `-dev`
+  workflows and the sandbox first.
 - **Synchronous AI calls** depend on Gemini being quick. If a call regularly takes over 30
   seconds, move that action to a background job. The screens don't change.
 - **WF9 webhook exposure** gets fixed in M2 whatever else is decided.
