@@ -56,6 +56,21 @@ describe('sending hours (Mon-Fri, 9am-5pm in the client time zone)', () => {
   });
 });
 
+describe('public holidays (OA-4)', () => {
+  // KNOWN ISSUE (docs/REGRESSION-TESTING-PLAN.md, issue 7): the send window checks Mon-Fri and
+  // 9-5 only. The node gets no holiday information, so an approved first email goes out on the
+  // client country's public holiday, while Approvals (approvals_schedule) promises the next
+  // business day. Follow-ups are not affected: the send gate already skips holidays for them.
+  // A fix would add the day's status to client_send_limits (named today_is_business_day here)
+  // and skip the client when it is false. it.fails: this test passes while the issue exists;
+  // when the fix lands it will fail, as a reminder to turn it into a normal it().
+  it.fails('sends nothing on the client country\'s public holiday', () => {
+    const THANKSGIVING_10AM_CHICAGO = '2026-11-26T16:00:00Z';
+    const clients = [{ ...client(), today_is_business_day: false } as Client];
+    expect(batch({ now: THANKSGIVING_10AM_CHICAGO, clients, approved: approved(2) })).toEqual([]);
+  });
+});
+
 describe('daily limit', () => {
   it('stops at the daily limit, counting only today in the client time zone', () => {
     const today = Array.from({ length: 39 }, () => sentAt('2026-11-04T15:30:00Z'));

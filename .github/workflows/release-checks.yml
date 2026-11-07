@@ -23,7 +23,7 @@ jobs:
   release-checks:
     name: Release checks
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: app
@@ -63,6 +63,19 @@ jobs:
         # `npx eslint . --prune-suppressions` and commit the updated file.
         run: npx eslint .
 
+      # Database tests run in this job (not a separate one) so the required "Release checks"
+      # status covers them. They build a throwaway local database from supabase/baseline plus
+      # newer migrations; no production secrets are used.
+      - name: Database tests
+        id: dbtests
+        if: ${{ !cancelled() }}
+        working-directory: .
+        env:
+          TAP_LOG: test-results/db-tests.tap
+        run: |
+          sudo apt-get install -y -q libtap-parser-sourcehandler-pgtap-perl >/dev/null
+          scripts/db/test.sh
+
       - name: Report
         if: ${{ always() }}
         working-directory: .
@@ -71,7 +84,8 @@ jobs:
           TESTS: ${{ steps.tests.outcome }}
           BUILD: ${{ steps.build.outcome }}
           LINT: ${{ steps.lint.outcome }}
-        run: node scripts/ci/report.mjs test-results/vitest.xml >> "$GITHUB_STEP_SUMMARY"
+          DBTESTS: ${{ steps.dbtests.outcome }}
+        run: node scripts/ci/report.mjs test-results/vitest.xml test-results/db-tests.tap >> "$GITHUB_STEP_SUMMARY"
 
       - name: Keep test results
         if: ${{ always() }}

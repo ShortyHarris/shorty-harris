@@ -3,7 +3,7 @@ import { loadNodeCode, runNode } from './runNode';
 
 // WF3 > Schedule Next Follow-up: after an email is sent, when is the next follow-up due?
 // The database recomputes due_at on insert with holidays (follow_up_schedules trigger, see
-// supabase/migrations/20261105070000_follow_up_due_matches_send_gate.sql); these tests pin the
+// supabase/migrations/20261105054849_follow_up_due_matches_send_gate.sql); these tests pin the
 // cadence WF3 proposes so the two cannot silently drift apart.
 const code = loadNodeCode('wf3-schedule-next-follow-up.js');
 

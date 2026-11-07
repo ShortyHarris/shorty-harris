@@ -1,0 +1,38 @@
+# Local Supabase stack for the database tests only (scripts/db/test.sh). It lives here, not in
+# supabase/, so the CLI never sees supabase/migrations: that history cannot build a database
+# (see supabase/migrations/README.md). scripts/db/build-test-db.sh builds it from the baseline.
+project_id = "shorty-harris-tests"
+
+[db]
+port = 54322
+major_version = 17
+
+[db.migrations]
+enabled = false
+
+[db.seed]
+enabled = false
+
+[api]
+enabled = false
+
+[studio]
+enabled = false
+
+[local_smtp]
+enabled = false
+
+[analytics]
+enabled = false
+
+[edge_runtime]
+enabled = false
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+
+[realtime]
+enabled = true
