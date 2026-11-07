@@ -13,7 +13,7 @@ Testing it means testing what actually runs.
 | Texts (Twilio) | Notifications are logged as `sandbox_logged` and WF6 skips Twilio for them. |
 | Card payments (Stripe) | Billing's Buy records a no-charge purchase (`sandbox_simulate_purchase`). |
 | Apify credits | Campaign launches are completed by `simulate_sandbox_discovery`: made-up businesses go through the real import. |
-| Reporting | Admin Analytics, `optout_stats` and the mailbox health monitor exclude sandbox accounts. They stay visible, with a red badge, in the admin lists. |
+| Reporting | Admin Analytics, `optout_stats` and the mailbox health monitor exclude sandbox accounts. They stay visible, with a red Sandbox badge, in the admin Clients and Hot Leads lists; a sandbox hot lead does not raise the admin Hot Leads alert count. |
 | A reset deleting live data | Every `sandbox_*` function refuses non-sandbox accounts. |
 
 Gemini (writing emails, reading websites) runs for real: a few cents per full run.
