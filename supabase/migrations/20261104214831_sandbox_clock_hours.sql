@@ -1,24 +1,3 @@
--- The sandbox clock moves hours as well as days, and sandboxes can test sending hours.
---
--- The clock works by moving the account's timeline back (all its timestamps), so every
--- elapsed-time rule runs unchanged. Time of day and weekday cannot be faked that way,
--- so a sandbox also carries a clock offset: its "now" is now() + offset. The offset is
--- read only where the time of day or the calendar date matters (the send window and
--- "sent today"). sandbox_clock_offset() is zero for every non-sandbox client, so real
--- clients' sending is computed exactly as before.
---
---  * clients.sandbox_minutes_advanced: total offset in minutes (days stay in
---    sandbox_days_advanced as whole days, for existing readers).
---  * sandbox_shift_clock(client, minutes): the one place that moves the timeline;
---    sandbox_advance_time (days) and sandbox_advance_hours (hours) call it, and
---    sandbox_jump_to_send_window moves to the next weekday 09:00 on the sandbox clock.
---  * Send window for sandboxes: applied when clients.sandbox_warmup is on (now "real
---    sending rules": warm-up and 9-5 Mon-Fri), skipped in fast mode.
---  * client_send_limits gains clock_offset_minutes and sandbox_fast for WF2.5, which
---    (n8n, changed live in the same step) uses them for the window and the day count.
---
--- Applied live as 20261104233000; statements exactly as applied.
-
 alter table public.clients add column if not exists sandbox_minutes_advanced integer not null default 0;
 update public.clients set sandbox_minutes_advanced = sandbox_days_advanced * 1440
  where is_sandbox and sandbox_minutes_advanced = 0 and sandbox_days_advanced <> 0;
@@ -104,16 +83,15 @@ $function$;
 revoke all on function public.sandbox_shift_clock(uuid, integer) from public, anon, authenticated;
 grant execute on function public.sandbox_shift_clock(uuid, integer) to service_role;
 
--- Shared wording for the three clock buttons.
 create or replace function public.sandbox_clock_message(p_client_id uuid, p_moved text, r jsonb)
  returns jsonb
  language sql
- volatile security definer
+ stable security definer
  set search_path to 'public'
 as $function$
   select case when coalesce((r->>'ok')::boolean, false) then r || jsonb_build_object(
     'total_days_advanced', (r->>'total_minutes_advanced')::int / 1440,
-    'detail', 'Moved ' || p_moved || '. Sandbox time is now '
+    'detail', 'Moved ' || p_moved || ' forward. Sandbox time is now '
       || to_char((now() + public.sandbox_clock_offset(p_client_id))
                  at time zone coalesce((select nullif(send_timezone, '') from clients where id = p_client_id), 'America/Chicago'),
                  'Dy DD Mon, HH24:MI') || '. '
@@ -132,14 +110,12 @@ create or replace function public.sandbox_advance_time(p_client_id uuid, p_days 
  security definer
  set search_path to 'public'
 as $function$
-declare r jsonb;
 begin
   if p_days is null or p_days < 1 or p_days > 60 then
     return jsonb_build_object('ok', false, 'error', 'invalid_days', 'detail', 'Advance between 1 and 60 days.');
   end if;
-  -- Shift first, then word the message in a separate statement so it sees the new clock.
-  r := public.sandbox_shift_clock(p_client_id, p_days * 1440);
-  return public.sandbox_clock_message(p_client_id, p_days || ' day' || case when p_days = 1 then '' else 's' end || ' forward', r);
+  return public.sandbox_clock_message(p_client_id, p_days || ' day' || case when p_days = 1 then '' else 's' end,
+    public.sandbox_shift_clock(p_client_id, p_days * 1440));
 end;
 $function$;
 
@@ -149,19 +125,17 @@ create or replace function public.sandbox_advance_hours(p_client_id uuid, p_hour
  security definer
  set search_path to 'public'
 as $function$
-declare r jsonb;
 begin
   if p_hours is null or p_hours < 1 or p_hours > 72 then
     return jsonb_build_object('ok', false, 'error', 'invalid_hours', 'detail', 'Advance between 1 and 72 hours.');
   end if;
-  r := public.sandbox_shift_clock(p_client_id, p_hours * 60);
-  return public.sandbox_clock_message(p_client_id, p_hours || ' hour' || case when p_hours = 1 then '' else 's' end || ' forward', r);
+  return public.sandbox_clock_message(p_client_id, p_hours || ' hour' || case when p_hours = 1 then '' else 's' end,
+    public.sandbox_shift_clock(p_client_id, p_hours * 60));
 end;
 $function$;
 revoke all on function public.sandbox_advance_hours(uuid, integer) from public, anon;
 grant execute on function public.sandbox_advance_hours(uuid, integer) to authenticated, service_role;
 
--- Next weekday 09:00 on the sandbox clock, in the account's send time zone.
 create or replace function public.sandbox_jump_to_send_window(p_client_id uuid)
  returns jsonb
  language plpgsql
@@ -173,7 +147,6 @@ declare
   v_local timestamp;
   v_target timestamp;
   v_minutes integer;
-  r jsonb;
 begin
   select coalesce(nullif(send_timezone, ''), 'America/Chicago') into v_tz from clients where id = p_client_id;
   if v_tz is null then
@@ -184,15 +157,14 @@ begin
   if v_target <= v_local then v_target := v_target + interval '1 day'; end if;
   while extract(isodow from v_target) > 5 loop v_target := v_target + interval '1 day'; end loop;
   v_minutes := greatest(1, ceil(extract(epoch from (v_target - v_local)) / 60)::int);
-  r := public.sandbox_shift_clock(p_client_id, v_minutes);
   return public.sandbox_clock_message(p_client_id,
-    'to ' || to_char(v_target, 'Dy') || ' 09:00 (' || (v_minutes / 60) || 'h ' || (v_minutes % 60) || 'm)', r);
+    'to ' || to_char(v_target, 'Dy') || ' 09:00 (' || (v_minutes / 60) || 'h ' || (v_minutes % 60) || 'm)',
+    public.sandbox_shift_clock(p_client_id, v_minutes));
 end;
 $function$;
 revoke all on function public.sandbox_jump_to_send_window(uuid) from public, anon;
 grant execute on function public.sandbox_jump_to_send_window(uuid) to authenticated, service_role;
 
--- Reset puts the hour offset back too.
 do $mig$
 declare d text := pg_get_functiondef('public.sandbox_reset'::regproc);
   a text := '  update clients set sandbox_days_advanced = 0 where id = p_client_id;';
@@ -201,8 +173,6 @@ begin
   execute replace(d, a, '  update clients set sandbox_days_advanced = 0, sandbox_minutes_advanced = 0 where id = p_client_id;');
 end $mig$;
 
--- send_pacing: sandbox time of day and "today" follow the sandbox clock; the window is
--- skipped only in fast mode. For real clients the offset is zero and v_fast is false.
 do $mig$
 declare d text := pg_get_functiondef('public.send_pacing'::regproc);
   pairs text[][] := array[
@@ -238,26 +208,3 @@ create or replace view public.client_send_limits with (security_invoker = true) 
     case when cl.is_sandbox then cl.sandbox_minutes_advanced else 0 end as clock_offset_minutes,
     (cl.is_sandbox and not cl.sandbox_warmup) as sandbox_fast
    from clients cl;
-
--- Applied live as a second step (sandbox_rules_wording): the switch's message now
--- describes both rules it controls.
-create or replace function public.sandbox_set_warmup(p_client_id uuid, p_on boolean)
- returns jsonb
- language plpgsql
- security definer
- set search_path to 'public'
-as $function$
-begin
-  if not coalesce((select is_sandbox from clients where id = p_client_id), false) then
-    return jsonb_build_object('ok', false, 'error', 'not_a_sandbox_client');
-  end if;
-  if not (public.is_admin() or public.can_manage_client(p_client_id)) then
-    return jsonb_build_object('ok', false, 'error', 'not_permitted');
-  end if;
-  update clients set sandbox_warmup = coalesce(p_on, true) where id = p_client_id;
-  return jsonb_build_object('ok', true, 'warmup', coalesce(p_on, true),
-    'detail', case when coalesce(p_on, true)
-      then 'Real sending rules on: warm-up limits (' || public.mailbox_daily_cap(p_client_id) || ' today), spacing between sends, and 9am to 5pm Mon-Fri on the sandbox clock.'
-      else 'Fast testing mode: up to 100 emails a day at any hour, with no spacing.' end);
-end;
-$function$;

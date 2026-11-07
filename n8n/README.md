@@ -17,3 +17,12 @@ file and the live node must stay identical.
 **Full workflow export:** `N8N_API_KEY=... node scripts/export-n8n-workflows.mjs` writes every
 workflow to this folder as JSON (secrets redacted). It must be run from a machine that can
 reach n8n.shortyharris.com; the cloud sessions used for development cannot.
+
+## Backend-only calls (WF3a)
+
+`claim_message_for_send` and `release_message_claim` can only be called by the backend
+(service role) since 2026-11-07; the public key is refused. WF3's **Claim Send** and
+**Release Claim** nodes therefore call **WF3a - Send Claim (backend)** (`zBzxccx9CMq5Qkzq`),
+whose single HTTP node uses the n8n "Supabase account" credential. Inputs: `action`
+(`claim` or `release`), `message_id`, `error`. Do not switch these calls back to the
+publishable key: they would fail with "permission denied".

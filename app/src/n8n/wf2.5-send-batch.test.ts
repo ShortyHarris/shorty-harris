@@ -56,6 +56,11 @@ describe('sending hours (Mon-Fri, 9am-5pm in the client time zone)', () => {
   });
 });
 
+// Public holidays (OA-4) are not this node's job: since 2026-11-07 the send gate it reads
+// (sendable_messages) holds every email on a weekend or a public holiday in the email's send
+// country, so on a holiday this node receives nothing to send. Tested in the database tests
+// (supabase/tests/database/10_overdue_approvals.test.sql, OA-4).
+
 describe('daily limit', () => {
   it('stops at the daily limit, counting only today in the client time zone', () => {
     const today = Array.from({ length: 39 }, () => sentAt('2026-11-04T15:30:00Z'));

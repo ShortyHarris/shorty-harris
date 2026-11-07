@@ -1,10 +1,3 @@
--- send_pacing reports what the "How sending works" details need to say when the next
--- email goes: the last send time, "now", and whether the 9-5 window applies.
--- Times are on the sandbox clock for a sandbox (offset is zero for real clients), so
--- they match the rest of the response.
---
--- Applied live as 20261105060000; statements exactly as applied.
-
 do $mig$
 declare d text := pg_get_functiondef('public.send_pacing'::regproc);
   a text := '    ''time_zone'', v_tz,';

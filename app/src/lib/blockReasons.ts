@@ -13,6 +13,7 @@ export type BlockReason =
   | 'unsubscribe_unhealthy'
   | 'no_gmail'
   | 'retrying_send'
+  | 'not_a_send_day'
   | 'waiting_followup_timing';
 
 export type BlockTone = 'blocked' | 'paused' | 'scheduled';
@@ -70,6 +71,11 @@ export const BLOCK_INFO: Record<BlockReason, BlockInfo> = {
   retrying_send: {
     badge: 'Retrying', tone: 'scheduled',
     text: "Gmail didn't accept the last attempt; retrying automatically",
+  },
+  // Today is a weekend or a public holiday in the email's send country: it goes out on the next business day.
+  not_a_send_day: {
+    badge: 'Scheduled', tone: 'scheduled',
+    text: 'Scheduled: today is not a business day here, so this sends on the next one',
   },
   waiting_followup_timing: {
     badge: 'Scheduled', tone: 'scheduled',

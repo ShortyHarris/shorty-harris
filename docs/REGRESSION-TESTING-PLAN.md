@@ -26,7 +26,7 @@ must pass the checks before it can merge, and merging is what deploys.
 **Issues found while preparing this plan** (each becomes one of the first regression tests):
 1. **Follow-up dates could disagree about holidays.** *Fixed 2026-11-05: the database now
    recomputes every new follow-up's due date with the send gate's own rule
-   (`20261105070000_follow_up_due_matches_send_gate.sql`).* Before the fix: WF3 sets a follow-up's due date as 3/5/7
+   (`20261105054849_follow_up_due_matches_send_gate.sql`).* Before the fix: WF3 sets a follow-up's due date as 3/5/7
    business days *without* holidays; the send gate requires 3/5/7 business days *with* the
    client country's holidays. Around a holiday the follow-up is written for a day it is not
    allowed to send.
@@ -36,6 +36,21 @@ must pass the checks before it can merge, and merging is what deploys.
    campaign cadence after approvals" (3.5) does not apply yet; its test is listed for when it does.
 4. Recent incidents these tests would have caught: the Approvals page failing for every client
    (a missing database permission), and emails silently marked failed when Gmail was disconnected.
+
+**Found by the Phase 1 database tests; fixed 2026-11-07** (each now has a normal test):
+5. **Approvals dates used the client's country, the send gate the campaign's.** Live, 3 active US
+   campaigns belong to a CZ client, so Approvals could show a follow-up on US Thanksgiving, which
+   the gate would not send on. `approvals_schedule` now uses each email's send country (campaign,
+   then client). (`20261107092342_send_rules_holidays_and_campaign_country.sql`,
+   `04_follow_up_dates.test.sql`)
+6. **The send-claim functions were callable by anyone with the public API key.** With a message
+   id, a caller could hold an email or mark it failed. They are now backend-only; WF3 calls them
+   through WF3a with the service-role credential (`n8n/README.md`).
+   (`20261107092730_send_claim_functions_backend_only.sql`, `05_permissions.test.sql`)
+7. **First emails could go out on a public holiday.** WF2.5's window checks Mon-Fri 9-5 only. The
+   send gate now holds every email on a weekend or public holiday in its send country (sandboxes
+   in fast mode excepted); Approvals shows these as Scheduled (`not_a_send_day`). OA-4 in
+   `10_overdue_approvals.test.sql`.
 
 ## 2. Why three kinds of test, and which tools (3.3, 3.11: framework and structure)
 
@@ -190,7 +205,11 @@ A separate suite in its own folder, sharing the sandbox and the same test runner
 | n8n Code node logic in git (`n8n/code/`) with tests: WF2.5 sending hours, time zones, daily and warm-up limits, spacing, send order, sandbox clock; WF3 follow-up cadence | Done (22 tests) |
 | Holiday mismatch between follow-up schedules and the send gate (issue 1) | Fixed |
 | Full n8n workflow export | Needs the export script run from a machine that can reach n8n, with an API key |
-| Database baseline so tests can build a fresh database | Next; needs a Supabase access token or database password |
+| Database baseline so tests can build a fresh database (`supabase/baseline`); migration file names reconciled with the live history | Done 2026-11-05; rebuilt database checked identical to live |
+| pgTAP harness, helpers and database tests on every pull request (`scripts/db/test.sh`, part of Release checks) | Done |
+| P1 database tests: business days and holidays, approvals, rejections, unsubscribe, follow-up dates (incl. a sweep checking stored due dates against the send gate), permissions per role | Done |
+| Overdue-approval suite OA-1 to OA-10 (`10_overdue_approvals.test.sql`) | Done (database level); WF2.5 parts in the n8n tests |
+| Issues 5-7 found by the tests | Fixed and live 2026-11-07 |
 | Clear the 24 recorded lint errors | Later |
 
 ## 11. Decisions and access needed
