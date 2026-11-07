@@ -11,11 +11,14 @@ export interface WizardSessionRow {
   entry_point: WizardEntry;
   screen: WizardScreen;
   answers: WizardAnswers;
+  /** Campaign ideas on screen 3 (written by the wizard-ai function, plus the user's own). */
+  ideas: unknown[];
+  selected: string[];
   status: 'open' | 'completed' | 'abandoned';
   updated_at: string;
 }
 
-const COLS = 'id, client_id, entry_point, screen, answers, status, updated_at';
+const COLS = 'id, client_id, entry_point, screen, answers, ideas, selected, status, updated_at';
 
 export async function fetchOpenSession(clientId: string, client: SupabaseClient = supabase): Promise<WizardSessionRow | null> {
   const { data, error } = await client
@@ -44,7 +47,7 @@ export async function startSession(
 }
 
 export async function saveSession(
-  id: string, patch: { answers?: WizardAnswers; screen?: WizardScreen },
+  id: string, patch: { answers?: WizardAnswers; screen?: WizardScreen; ideas?: unknown[] },
   client: SupabaseClient = supabase,
 ): Promise<void> {
   const { error } = await client.from('wizard_sessions').update(patch).eq('id', id);

@@ -25,6 +25,8 @@ export interface WizardAnswers {
   goal?: { goal?: WizardGoal | ''; cta?: string };
   /** Fields the AI filled in and the user has not touched yet, e.g. "business.industry". */
   unconfirmed?: string[];
+  /** ideasFingerprint() of the answers the current campaign ideas were made from. */
+  ideas_fp?: string;
 }
 
 export const GOALS: { value: WizardGoal; label: string; hint: string }[] = [
@@ -169,4 +171,77 @@ export function carryDescription(a: WizardAnswers): WizardAnswers {
   const typed = a.website?.mode === 'describe' ? a.website.description?.trim() : '';
   if (!typed || a.business?.description?.trim()) return a;
   return { ...a, business: { ...a.business, description: typed } };
+}
+
+// ── AI profile (wizard-ai "analyze") ────────────────────────────────────────────────────────
+export interface AiProfile {
+  business: { name: string; industry: string; description: string };
+  services: { name: string; seasonal_months: number[] }[];
+  audience: { business_types: string[]; roles: string[]; company_size: string };
+  area_text: string;
+  goal: string;
+  language: string;
+}
+
+const isGoal = (g: string): g is WizardGoal => g === 'quotes' || g === 'meetings' || g === 'calls' || g === 'replies';
+
+/**
+ * Fills the answers from the AI's reading of the website or description. Never overwrites
+ * anything the user typed or confirmed: empty fields are filled, lists gain new entries, and
+ * every field the AI filled is marked "Please check".
+ */
+export function mergeAnalysis(a: WizardAnswers, p: AiProfile, source: FieldSource): WizardAnswers {
+  const unconfirmed = new Set(a.unconfirmed ?? []);
+  const fill = (cur: string | undefined, next: string, field: string): string => {
+    if (cur?.trim() || !next.trim()) return cur ?? '';
+    unconfirmed.add(field);
+    return next;
+  };
+  const union = (cur: string[] | undefined, next: string[], field: string): string[] => {
+    const have = new Set((cur ?? []).map((x) => x.toLowerCase()));
+    const added = next.filter((x) => x.trim() && !have.has(x.toLowerCase()));
+    if (added.length) unconfirmed.add(field);
+    return [...(cur ?? []), ...added];
+  };
+
+  let services = a.services ?? [];
+  const before = services.length;
+  for (const s of p.services) {
+    services = addService(services, s.name, source);
+    const added = services[services.length - 1];
+    if (services.length > before && added.name.toLowerCase() === s.name.toLowerCase() && s.seasonal_months.length) {
+      services = services.map((x) => (x === added ? { ...x, seasonal_months: s.seasonal_months } : x));
+    }
+  }
+  if (services.length > before) unconfirmed.add('services');
+
+  const business = {
+    ...a.business,
+    name: fill(a.business?.name, p.business.name, 'business.name'),
+    industry: fill(a.business?.industry, p.business.industry, 'business.industry'),
+    description: fill(a.business?.description, p.business.description, 'business.description'),
+  };
+  const audience = {
+    ...a.audience,
+    business_types: union(a.audience?.business_types, p.audience.business_types, 'audience.business_types'),
+    roles: union(a.audience?.roles, p.audience.roles, 'audience.roles'),
+    company_size: a.audience?.company_size || p.audience.company_size || '',
+  };
+  let goal = a.goal;
+  if (!a.goal?.goal && isGoal(p.goal)) { goal = { ...a.goal, goal: p.goal }; unconfirmed.add('goal'); }
+  const website = a.website && !a.website.area_text && p.area_text ? { ...a.website, area_text: p.area_text } : a.website;
+
+  return { ...a, website: website ?? (p.area_text ? { mode: 'website', area_text: p.area_text } : a.website), business, services, audience, goal, unconfirmed: [...unconfirmed] };
+}
+
+/** A short fingerprint of what campaign ideas depend on, to notice when screen 2 changed since. */
+export function ideasFingerprint(a: WizardAnswers): string {
+  return JSON.stringify([
+    a.business?.name?.trim().toLowerCase(),
+    (a.services ?? []).map((s) => [s.name.trim().toLowerCase(), s.seasonal_months ?? []]),
+    (a.audience?.business_types ?? []).map((x) => x.toLowerCase()),
+    (a.audience?.exclusions ?? []).map((x) => x.toLowerCase()),
+    (a.area?.areas ?? []).map((x) => x.label.toLowerCase()),
+    a.goal?.goal,
+  ]);
 }

@@ -44,6 +44,8 @@ import { COUNTRY_OPTIONS, countryName, defaultCampaignCountry, findCountryHold, 
 import { RequiredMark } from '../../components/RequiredMark';
 import { MobileFab } from '../../components/MobileFab';
 import { useClientHeader } from '../../hooks/useClientHeader';
+import { LaunchAllDialog } from './LaunchAllDialog';
+import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert';
 
 const HELP: HelpContent = {
   title: 'Campaigns',
@@ -64,6 +66,8 @@ const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif
 const CAMP_PILL: Record<string, StatusPillStyle> = {
   pending_review: { ...PILL.waiting, icon: 'clock' },
   draft:          { ...PILL.closed,  icon: 'minus' },
+  scheduled:      { ...PILL.waiting, icon: 'clock' },
+  archived:       { ...PILL.closed,  icon: 'minus' },
   active:         { ...PILL.sent,    icon: 'send' },
   paused:         { ...PILL.ahead,   icon: 'clock' },
   completed:      { ...PILL.closed,  icon: 'check' },
@@ -78,6 +82,8 @@ function lastScrapedLabel(iso: string | null): string {
 const CAMP_STATUS_LABEL: Record<string, string> = {
   pending_review: 'In review',
   draft: 'Draft',
+  scheduled: 'Scheduled',
+  archived: 'Archived',
   active: 'Active',
   paused: 'Paused',
   completed: 'Completed',
@@ -114,10 +120,13 @@ export function Campaigns({
   const openWizard = (entry?: 'find_new' | 'onboarding') =>
     navigate(`${basePath}/campaigns/wizard${entry ? `?entry=${entry}` : ''}`);
   const startNew = () => (wizardEnabled ? openWizard() : setShowNew(true));
+  const openEditor = (id: string) => navigate(`${basePath}/campaigns/${id}/edit`);
+  const [showLaunchAll, setShowLaunchAll] = useState(false);
+  const [draftsCreated, setDraftsCreated] = useState(() => Number(searchParams.get('drafts')) || 0);
   // Drop ?new=manual once the form is open, so a reload doesn't reopen it.
   useEffect(() => {
-    if (searchParams.get('new') !== 'manual') return;
-    const next = new URLSearchParams(searchParams); next.delete('new');
+    if (searchParams.get('new') !== 'manual' && !searchParams.get('drafts')) return;
+    const next = new URLSearchParams(searchParams); next.delete('new'); next.delete('drafts');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
   const [openCampaign, setOpenCampaignRaw] = useState<ClientCampaignRow | null>(null);
@@ -136,6 +145,8 @@ export function Campaigns({
 
   const newCampaignDisabled = atLimit || atLaunchLimit;
   const newCampaignTitle = atLaunchLimit ? launchLimitTitle : (atLimit ? limitTitle : undefined);
+
+  const launchableDrafts = rows.filter((c) => c.status === 'draft' || c.status === 'pending_review').map((c) => ({ id: c.id, name: c.name }));
 
   // One banner per held country that at least one of this client's campaigns targets.
   const heldGroups = holds
@@ -170,6 +181,11 @@ export function Campaigns({
               <button onClick={() => setShowNew(true)} disabled={newCampaignDisabled} title={newCampaignTitle} className={`${ghostCls} max-md:hidden`}>
                 Create manually
               </button>
+              {launchableDrafts.length > 1 && (
+                <button onClick={() => setShowLaunchAll(true)} className={`${ghostCls} max-md:hidden`}>
+                  Launch all ({launchableDrafts.length})
+                </button>
+              )}
             </>
           )}
           {!readOnly && (
@@ -206,6 +222,24 @@ export function Campaigns({
             <strong className="font-semibold">Campaign limit reached</strong> - you've used {usage!.campaign_count} of {usage!.max_campaigns} slots. Contact us to increase it before creating another one.
           </p>
         </div>
+      )}
+
+      {wizardEnabled && draftsCreated > 0 && (
+        <Alert>
+          <AlertTitle>{draftsCreated} draft{draftsCreated === 1 ? '' : 's'} created</AlertTitle>
+          <AlertDescription className="flex flex-col gap-2">
+            <span>Nothing has been sent or charged. Open each one to check its emails, then launch it, or launch them together.</span>
+            <span className="flex flex-wrap gap-2">
+              {launchableDrafts.length > 1 && <button className={primaryCls} onClick={() => setShowLaunchAll(true)}>Launch all</button>}
+              <button className={ghostCls} onClick={() => setDraftsCreated(0)}>Dismiss</button>
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {showLaunchAll && (
+        <LaunchAllDialog open={showLaunchAll} onOpenChange={setShowLaunchAll} drafts={launchableDrafts} basePath={basePath} client={client}
+          onDone={() => { void reload(); setDraftsCreated(0); queryClient.invalidateQueries({ queryKey: ['client-usage', clientId] }); }} />
       )}
 
       {heldGroups.map(({ hold, campaigns }) => (
@@ -270,7 +304,7 @@ export function Campaigns({
                 {rows.map((c) => {
                   const pill = CAMP_PILL[c.status] ?? CAMP_PILL.draft;
                   const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
-                  const isDraft = c.status === 'draft' || c.status === 'pending_review';
+                  const isDraft = c.status === 'draft' || c.status === 'pending_review' || c.status === 'scheduled';
                   return (
                     <tr key={c.id} onClick={() => setOpenCampaign(c)} className="group cursor-pointer">
                       <td className="min-w-0">
@@ -298,7 +332,14 @@ export function Campaigns({
                       </td>
                       <td className="px-3">
                         <div className="flex items-center justify-end gap-2">
-                          {isDraft && !readOnly && (
+                          {wizardEnabled && !readOnly ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openEditor(c.id); }}
+                              className={btn(isDraft ? 'primary' : 'secondary', 'sm')}
+                            >
+                              {isDraft ? 'Edit & launch' : 'Open'}
+                            </button>
+                          ) : isDraft && !readOnly && (
                             <button
                               onClick={(e) => { e.stopPropagation(); setOpenCampaign(c, true); }}
                               className={btn('secondary', 'sm')}
@@ -395,6 +436,7 @@ export function Campaigns({
             canDelete={canDelete}
             basePath={basePath}
             hold={findCountryHold(holds, openCampaign.country)}
+            onOpenEditor={wizardEnabled && !readOnly ? () => openEditor(openCampaign.id) : undefined}
             onClose={() => setOpenCampaign(null)}
             onUpdated={() => {
               reload();
@@ -923,9 +965,12 @@ function ReviewRow({ label, value, tags }: { label: string; value?: string; tags
 /* ── Campaign Detail Modal ─────────────────────────────────────────── */
 function CampaignDetailModal({
   campaign, startInEdit = false, clientId, onClose, onUpdated, onDeleted, client = supabase, readOnly = false, canDelete = true, basePath = '/app', hold = null,
+  onOpenEditor,
 }: {
   campaign: ClientCampaignRow; startInEdit?: boolean; clientId: string; onClose: () => void; onUpdated: () => void; onDeleted: () => void;
   client?: SupabaseClient; readOnly?: boolean; canDelete?: boolean; basePath?: string; hold?: { country: string; reason: string } | null;
+  /** Campaign Wizard pilot: the pencil opens the full campaign editor instead of the inline form. */
+  onOpenEditor?: () => void;
 }) {
   const { rows: prospects, loading } = useClientCampaignProspects(campaign.id, client);
 
@@ -1053,7 +1098,7 @@ function CampaignDetailModal({
             {!editing && !readOnly && (
               <>
                 <button
-                  onClick={startEdit}
+                  onClick={onOpenEditor ?? startEdit}
                   aria-label="Edit campaign"
                   title="Edit campaign"
                   className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-(--ad-ink-soft) transition-colors hover:bg-(--ad-surface-2) hover:text-(--ad-green)"

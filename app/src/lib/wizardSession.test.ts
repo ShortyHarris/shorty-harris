@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addService, answersFromProfile, carryDescription, markConfirmed, missingFields, missingMessage, needsCheck,
+  addService, answersFromProfile, carryDescription, ideasFingerprint, mergeAnalysis, markConfirmed, missingFields, missingMessage, needsCheck,
   normalizeWebsite, seasonLabel, toggleMonth, type WizardAnswers,
 } from './wizardSession';
 
@@ -119,5 +119,53 @@ describe('carryDescription', () => {
     expect(carryDescription(own)).toBe(own);
     const site: WizardAnswers = { website: { mode: 'website', url: 'a.com', description: 'x' } };
     expect(carryDescription(site)).toBe(site);
+  });
+});
+
+describe('mergeAnalysis', () => {
+  const profile = {
+    business: { name: 'Mountains Mowing LLC', industry: 'Landscaping', description: 'Lawn care' },
+    services: [{ name: 'Lawn mowing', seasonal_months: [] }, { name: 'Snow removal', seasonal_months: [11, 12, 1] }],
+    audience: { business_types: ['Property managers', 'Office parks'], roles: ['Facilities manager'], company_size: '' },
+    area_text: 'Bozeman, Montana',
+    goal: 'quotes',
+    language: 'English',
+  };
+
+  it('fills empty fields and marks them "Please check"', () => {
+    const a = mergeAnalysis({}, profile, 'website');
+    expect(a.business?.name).toBe('Mountains Mowing LLC');
+    expect(a.services?.map((s) => s.name)).toEqual(['Lawn mowing', 'Snow removal']);
+    expect(a.services?.[1].seasonal_months).toEqual([11, 12, 1]);
+    expect(a.services?.[0].source).toBe('website');
+    expect(a.goal?.goal).toBe('quotes');
+    expect(a.website?.area_text).toBe('Bozeman, Montana');
+    expect(new Set(a.unconfirmed)).toEqual(new Set(['business.name', 'business.industry', 'business.description', 'services',
+      'audience.business_types', 'audience.roles', 'goal']));
+  });
+
+  it('never overwrites what the user typed', () => {
+    const typed: WizardAnswers = {
+      business: { name: 'Mountains Mowing' },
+      services: [{ name: 'lawn mowing' }],
+      audience: { business_types: ['Property managers'] },
+      goal: { goal: 'meetings' },
+    };
+    const a = mergeAnalysis(typed, profile, 'website');
+    expect(a.business?.name).toBe('Mountains Mowing');
+    expect(a.services?.map((s) => s.name)).toEqual(['lawn mowing', 'Snow removal']);
+    expect(a.audience?.business_types).toEqual(['Property managers', 'Office parks']);
+    expect(a.goal?.goal).toBe('meetings');
+    expect(a.unconfirmed).not.toContain('business.name');
+    expect(a.unconfirmed).not.toContain('goal');
+  });
+});
+
+describe('ideasFingerprint', () => {
+  it('changes when something ideas depend on changes, not on the CTA wording', () => {
+    const base = ideasFingerprint(complete);
+    expect(ideasFingerprint({ ...complete, goal: { goal: 'quotes', cta: 'Call us' } })).toBe(base);
+    expect(ideasFingerprint({ ...complete, services: [{ name: 'Snow removal' }] })).not.toBe(base);
+    expect(ideasFingerprint({ ...complete, area: { areas: [{ mode: 'text', label: 'Denver' }] } })).not.toBe(base);
   });
 });
