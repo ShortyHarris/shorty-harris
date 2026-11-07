@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { newHotLeadAlertCount } from '../../lib/hotLeadBadge';
 import { NavLink, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -50,7 +51,7 @@ export function AdminLayout() {
   const { rows: unresolvedErrors } = useErrorLogs();
   const { rows: campaigns } = useCampaigns();
 
-  const newHotLeadCount = hotLeads.filter((l) => l.status === 'new').length;
+  const newHotLeadCount = newHotLeadAlertCount(hotLeads);
   const campaignsToReview = campaigns.filter((c) => c.needsReview).length;
 
   const NAV_DAILY: NavItem[] = [

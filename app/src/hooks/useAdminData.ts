@@ -416,7 +416,7 @@ export interface AdminHotLead {
   status: string;
   routed_at: string;
   prospect: { business_name: string; category: string | null; location: string | null } | null;
-  client: { business_name: string; send_timezone: string | null } | null;
+  client: { business_name: string; send_timezone: string | null; is_sandbox: boolean | null } | null;
   reply: { body: string } | null;
   reply_match: ReplyMatch | null;
 }
@@ -426,7 +426,7 @@ async function fetchAdminHotLeads(): Promise<AdminHotLead[]> {
     .from('hot_leads')
     .select(`id, ai_summary, suggested_action, status, routed_at,
              prospect:prospects ( business_name, category, location ),
-             client:clients ( business_name, send_timezone ),
+             client:clients ( business_name, send_timezone, is_sandbox ),
              reply:replies ( body, match_method, message:messages ( subject, sent_at ) )`)
     .order('routed_at', { ascending: false });
   if (error) throw new Error(error.message);
