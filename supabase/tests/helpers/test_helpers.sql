@@ -308,3 +308,29 @@ begin
 end $$;
 
 grant execute on all functions in schema tests to anon, authenticated, service_role;
+
+-- ── Pinning "is today a send day" ────────────────────────────────────────────────────────
+-- The send gate holds every email on weekends and public holidays (is_send_day). Tests that
+-- are not about that pin the answer for their transaction, like freezing a clock, so they
+-- give the same result on any day; tests.unpin_send_day() restores the real rule. Both are
+-- undone by the test's rollback in any case.
+create or replace function tests.pin_send_day(p_on boolean default true) returns void
+language plpgsql as $pin$
+begin
+  create temp table if not exists _send_day_def (def text) on commit drop;
+  if not exists (select 1 from _send_day_def) then
+    insert into _send_day_def values (pg_get_functiondef('public.is_send_day(uuid,uuid)'::regprocedure));
+  end if;
+  execute format($f$create or replace function public.is_send_day(p_client_id uuid, p_campaign_id uuid)
+    returns boolean language sql stable as $b$ select %L::boolean $b$ $f$, p_on);
+end $pin$;
+
+create or replace function tests.unpin_send_day() returns void
+language plpgsql as $$
+begin
+  if to_regclass('pg_temp._send_day_def') is not null then
+    execute (select def from _send_day_def);
+  end if;
+end $$;
+
+grant execute on all functions in schema tests to anon, authenticated, service_role;

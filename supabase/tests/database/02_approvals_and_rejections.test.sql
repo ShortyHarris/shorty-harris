@@ -3,6 +3,8 @@
 -- and a rejected draft never sends.
 begin;
 select plan(22);
+-- Not a test of weekends and holidays: today counts as a send day (see tests.pin_send_day).
+select tests.pin_send_day(true);
 
 select tests.client() as client_id \gset
 select tests.user(:'client_id') as user_id \gset

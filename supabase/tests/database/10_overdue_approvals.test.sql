@@ -10,7 +10,9 @@
 -- moments (tests.business_moment) and time moves with tests.travel_business_days, which keeps
 -- every "N business days after the send" relation intact.
 begin;
-select plan(73);
+select plan(79);
+-- Not a test of weekends and holidays: today counts as a send day (see tests.pin_send_day).
+select tests.pin_send_day(true);
 
 select 'America/Chicago' as tz, 'US' as ctry \gset
 select tests.business_moment(:'tz', :'ctry') as x0 \gset
@@ -114,6 +116,9 @@ select isnt((select due_at from public.follow_up_schedules where id = :'p2_s1'),
             public.add_business_days(tests.minus_business_days(:'x0', 1, :'tz', :'ctry'), 3, :'tz', :'ctry'),
             'OA-2: ...not 3 business days after the draft was written');
 
+-- OA-3 and OA-4 are about sending hours, weekends and holidays: use the real send-day rule.
+select tests.unpin_send_day();
+
 -- ═════════════════════════════════════════════════════════════════════════════════════════
 -- OA-3  Approved outside sending hours: it waits for the next sending window.
 -- (Time zones are chosen so that it is evening, or early morning, there right now.)
@@ -143,8 +148,8 @@ select is((select estimated_send_at from tests.schedule(:'c3b', :'p3b_i')),
                then ((now() at time zone :'tz_morning')::date + time '09:00') at time zone :'tz_morning'
                else tests.next_window((now() at time zone :'tz_morning')::date, :'tz_morning', 'GB') end,
           'OA-3: approved before 9:00, it is dated 9:00 that day (or the next business day)');
-select ok(tests.sendable(:'p3_i') and tests.sendable(:'p3b_i'),
-          'OA-3: the database does not hold it back; WF2.5 applies the sending window (tested in wf2.5-send-batch.test.ts)');
+select is(tests.sendable(:'p3_i'), extract(isodow from (now() at time zone :'tz_evening')) < 6,
+          'OA-3: the database holds it only on a non-business day; WF2.5 applies the 9-5 window (wf2.5-send-batch.test.ts)');
 
 -- ═════════════════════════════════════════════════════════════════════════════════════════
 -- OA-4  Approved on a public holiday: Approvals shows the next business day; follow-up
@@ -169,6 +174,24 @@ select is((select (estimated_send_at at time zone :'tz_day')::date from tests.sc
                else (tests.next_window(:'local_today', :'tz_day', 'FR') at time zone :'tz_day')::date end,
           'OA-4: the same approval in a country without that holiday is dated today (if a weekday)');
 select ok(not public.is_business_day(:'local_today', 'GB'), 'OA-4: the holiday is not a business day for the follow-up calendar either');
+select ok(not tests.sendable(:'p4_i'), 'OA-4: the send gate does not release a first email on the public holiday (issue 7)');
+select is(tests.block_reason(:'p4_i'), 'not_a_send_day', 'OA-4: Approvals shows it as waiting for a business day');
+select is((select basis from tests.schedule(:'c4', :'p4_i')), 'queue_position_and_daily_cap', 'OA-4: and still gives it a date (it is not "held")');
+select is(tests.sendable(:'p4b_i'), public.is_business_day(:'local_today', 'FR'),
+          'OA-4: in a country without that holiday it is released on a weekday');
+-- A follow-up that is due is held on the holiday too.
+select tests.prospect(:'camp4') as p4c \gset
+select tests.message(:'p4c', 'initial', 'approved') as p4c_i \gset
+select tests.sent(:'p4c_i', now() - interval '30 days');
+select tests.message(:'p4c', 'follow_up_d3', 'approved') as p4c_f1 \gset
+select ok(not tests.sendable(:'p4c_f1'), 'OA-4: a due follow-up waits for the next business day as well');
+-- The campaign's country decides: a GB client's US campaign sends on the GB holiday.
+select tests.campaign(:'c4', 'US') as camp4us \gset
+select tests.prospect(:'camp4us') as p4d \gset
+select tests.message(:'p4d', 'initial', 'approved') as p4d_i \gset
+select is(tests.sendable(:'p4d_i'), public.is_business_day(:'local_today', 'US'),
+          'OA-4: a US campaign of the same client follows US holidays, not GB ones');
+select tests.pin_send_day(true);
 
 -- ═════════════════════════════════════════════════════════════════════════════════════════
 -- OA-5  Overdue follow-up after the first email was sent long ago.

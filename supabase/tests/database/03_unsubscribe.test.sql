@@ -3,6 +3,8 @@
 -- reply is not an opt-out.
 begin;
 select plan(21);
+-- Not a test of weekends and holidays: today counts as a send day (see tests.pin_send_day).
+select tests.pin_send_day(true);
 
 select tests.client() as client_id \gset
 select tests.campaign(:'client_id') as campaign_id \gset

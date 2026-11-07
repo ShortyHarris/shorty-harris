@@ -97,5 +97,8 @@ describe('Gmail-related reasons', () => {
   it('treats a send being retried as a normal waiting state', () => {
     expect(blockInfo('retrying_send').badge).toBe('Retrying');
     expect(isBlocking('retrying_send')).toBe(false);
+    // Weekends and public holidays (send gate, 2026-11-07): scheduled, not blocked.
+    expect(isBlocking('not_a_send_day')).toBe(false);
+    expect(blockInfo('not_a_send_day').badge).toBe('Scheduled');
   });
 });

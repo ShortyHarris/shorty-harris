@@ -3,7 +3,7 @@
 -- function and table the app uses is usable by signed-in users (a missing grant took the
 -- Approvals page down for every client once).
 begin;
-select plan(31);
+select plan(33);
 
 select tests.client() as client_a \gset
 select tests.user(:'client_a') as user_a \gset
@@ -100,15 +100,19 @@ select is((select count(*)::int from public.clients), 0, 'nor clients');
 reset session authorization;
 select tests.claims_none();
 
--- ── Known issue: the send pipeline's claim functions are open to anonymous callers ───────
--- claim_message_for_send and release_message_claim are executable by anon (the public API key).
--- With a message id, anyone could hold an email (claim) or, by releasing it three times,
--- mark it failed. Only the backend (n8n, service role) calls them.
-select todo('Send-pipeline functions should be backend-only (docs/REGRESSION-TESTING-PLAN.md, issue 6)', 2);
+-- ── The send pipeline's claim functions are backend-only (issue 6, fixed 2026-11-07) ──────
+-- With a message id, anyone holding the public key could otherwise hold an email (claim) or,
+-- by releasing it three times, mark it failed. WF3 calls them with the service role.
 select ok(not has_function_privilege('anon', 'public.claim_message_for_send(uuid)', 'execute'),
           'Anonymous callers cannot claim emails for sending');
 select ok(not has_function_privilege('anon', 'public.release_message_claim(uuid, text)', 'execute'),
           'Anonymous callers cannot release send claims (which can mark emails failed)');
+select ok(not has_function_privilege('authenticated', 'public.claim_message_for_send(uuid)', 'execute')
+          and not has_function_privilege('authenticated', 'public.release_message_claim(uuid, text)', 'execute'),
+          'Signed-in users cannot either');
+select ok(has_function_privilege('service_role', 'public.claim_message_for_send(uuid)', 'execute')
+          and has_function_privilege('service_role', 'public.release_message_claim(uuid, text)', 'execute'),
+          'The backend (service role) can, so sending keeps working');
 
 select * from finish();
 rollback;

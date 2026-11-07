@@ -5,6 +5,8 @@
 -- (approvals_schedule) must all agree. Issue 1 in docs/REGRESSION-TESTING-PLAN.md.
 begin;
 select plan(13);
+-- Not a test of weekends and holidays: today counts as a send day (see tests.pin_send_day).
+select tests.pin_send_day(true);
 
 select tests.client('US', 'America/Chicago') as us_client \gset
 select tests.campaign(:'us_client') as us_campaign \gset
@@ -65,9 +67,8 @@ select is((select estimated_send_at from tests.schedule(:'us_client', :'p1_fu3')
 select is((select basis from tests.schedule(:'us_client', :'p1_fu3')), 'previous_email_sent',
           'and says the date is counted from the previous email''s actual send');
 
--- KNOWN ISSUE: approvals_schedule counts holidays by the CLIENT's country, while the send gate
--- and the stored due date use the CAMPAIGN's country first. Live: 3 active US campaigns belong
--- to a CZ client, so Approvals can show a date the gate will not send on.
+-- Issue 5 (fixed 2026-11-07): Approvals counts holidays by the email's send country (campaign
+-- first, then client), as the send gate does. Live, 3 US campaigns belong to a CZ client.
 select tests.client('CZ', 'America/Chicago', true, 'CZ client, US campaign') as mixed_client \gset
 select tests.campaign(:'mixed_client', 'US') as mixed_campaign \gset
 select tests.prospect(:'mixed_campaign') as p5 \gset
@@ -77,9 +78,8 @@ select tests.schedule_next(:'p5_initial', '2026-11-26 15:00+00') as p5_schedule 
 select tests.message(:'p5', 'follow_up_d3', 'pending') as p5_fu1 \gset
 select is((select due_at from public.follow_up_schedules where id = :'p5_schedule'), '2026-11-27 15:00+00'::timestamptz,
           'US campaign of a CZ client: the stored due date skips US Thanksgiving');
-select todo('approvals_schedule uses the client''s country, not the campaign''s (docs/REGRESSION-TESTING-PLAN.md, issue 5)', 1);
 select is((select estimated_send_at from tests.schedule(:'mixed_client', :'p5_fu1')), '2026-11-27 15:00+00'::timestamptz,
-          'Approvals shows the same date for that follow-up');
+          'Approvals shows the same date for that follow-up (US holidays, not the client''s CZ ones)');
 
 -- ── Property: stored due date and send gate agree for every send time ───────────────────
 -- For sends every 5 hours over the last 26 days, in a US and a CZ client (covering weekends,
