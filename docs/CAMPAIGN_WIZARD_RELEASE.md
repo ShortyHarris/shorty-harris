@@ -1,7 +1,11 @@
 # Campaign Wizard: what was built, and how to switch it on
 
-Branch `claude/relaxed-ritchie-4ltpdn`, November 7, 2026. **Nothing is live yet.** The plan
-and its decisions are in `docs/CAMPAIGN_WIZARD_BUILD_PLAN.md`.
+Branch `claude/relaxed-ritchie-4ltpdn`, November 7, 2026. The plan and its decisions are in
+`docs/CAMPAIGN_WIZARD_BUILD_PLAN.md`.
+
+**Live status (Nov 7):** database migrations applied and `wizard-ai` deployed to the live
+project. No client has the pilot switch on, so nobody sees the wizard yet. The app changes
+reach users only when this branch is merged and deployed (or on its preview link).
 
 ## What a pilot client gets
 
@@ -51,13 +55,14 @@ Nothing, apart from three things that apply to everyone:
 
 Do these in order. Test against the sandbox first (`docs/SANDBOX.md`).
 
-1. **Database.** Apply, in order:
-   - `supabase/migrations/20261107170000_campaign_wizard_foundation.sql`
-   - `supabase/migrations/20261107190000_campaign_wizard_drafts_and_launch.sql`
+1. **Database.** ✅ Done Nov 7. Applied, in order:
+   - `supabase/migrations/20261107182332_campaign_wizard_foundation.sql`
+   - `supabase/migrations/20261107182447_campaign_wizard_drafts_and_launch.sql`
+   - `supabase/migrations/20261107182520_campaign_wizard_trigger_fn_not_callable.sql`
 
    The second one schedules an hourly pg_cron job, `release-scheduled-campaigns`. When a
    scheduled campaign's start date arrives, the job sends it to `wf0-enqueue`.
-2. **Edge function.** Deploy `supabase/functions/wizard-ai` (it imports `../_shared/wizard.ts`).
+2. **Edge function.** ✅ Done Nov 7. Deployed `supabase/functions/wizard-ai` (it imports `../_shared/wizard.ts`).
    - It uses the `GEMINI_API_KEY` secret that docs-search already uses.
    - Do **not** set `WIZARD_AI_MOCK` in production; that returns sample data.
 3. **App.** Merge and deploy as usual.
