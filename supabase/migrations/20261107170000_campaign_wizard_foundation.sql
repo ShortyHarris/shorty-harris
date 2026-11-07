@@ -182,6 +182,7 @@ begin
     if should_auto_approve then
       perform set_config('app.bypass_campaign_protection', 'true', true); -- true = local to this transaction only
       update public.campaigns set status = 'active' where id = new.id;
+      perform set_config('app.bypass_campaign_protection', 'false', true);
     end if;
   end if;
   return new;
