@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { ThinkingOrb } from 'thinking-orbs';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { CalendarClock, Check, CircleAlert, Loader2, Rocket, Sparkles } from 'lucide-react';
@@ -324,7 +325,7 @@ function EditorBody({ clientId, client, basePath, campaign, rewriteLimit, proble
                   {rewritesLeft} of {rewriteLimit} free AI rewrites left
                 </span>
                 <Button variant="outline" size="sm" disabled={rewritesLeft === 0 || rewriting !== null} onClick={() => void rewrite(null)}>
-                  {rewriting === 'all' ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden />}
+                  {rewriting === 'all' ? <ThinkingOrb state="composing" size={20} color="#7412ef" className="mr-1.5" aria-hidden /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden />}
                   Rewrite all four (uses 1)
                 </Button>
               </div>
@@ -342,7 +343,7 @@ function EditorBody({ clientId, client, basePath, campaign, rewriteLimit, proble
                         <CardDescription className="text-[12px]">{CADENCE[i].when}</CardDescription>
                       </div>
                       <Button variant="ghost" size="sm" disabled={rewritesLeft === 0 || rewriting !== null} onClick={() => void rewrite(i)}>
-                        {rewriting === i ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden />}Rewrite
+                        {rewriting === i ? <ThinkingOrb state="composing" size={20} color="#7412ef" className="mr-1.5" aria-hidden /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden />}Rewrite
                       </Button>
                     </CardHeader>
                     <CardContent className="flex flex-col gap-3">

@@ -9,7 +9,9 @@
 // Answers autosave to wizard_sessions. The last page of step 2 saves the client's profile
 // (confirm_wizard_profile). AI calls go through the wizard-ai edge function.
 
-import { useCallback, useEffect, useState } from 'react';
+import { Children, useCallback, useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { ThinkingOrb, type OrbState } from 'thinking-orbs';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -22,6 +24,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { Label } from '../../components/ui/label';
+import { AITextLoading } from '../../components/ui/ai-text-loading';
 import { queryClient } from '../../lib/queryClient';
 import { cn } from '../../lib/utils';
 import {
@@ -113,28 +116,34 @@ function FromWebsite({ source }: { source: 'website' | 'description' }) {
   );
 }
 
-/** Honest progress while the AI works, centred and calm. */
-function Working({ title, lines }: { title: string; lines: string[] }) {
-  const [step, setStep] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setStep((s) => Math.min(s + 1, lines.length - 1)), 5000);
-    return () => clearInterval(t);
-  }, [lines.length]);
+const BRAND = '#7412ef';
+
+/** While the AI works: a thinking orb and shimmering text saying what is happening. */
+function Working({ title, lines, orb = 'working' }: { title: string; lines: string[]; orb?: OrbState }) {
   return (
-    <div className="flex flex-col items-center py-16 text-center" aria-live="polite">
-      <span className="mb-8 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-        <Loader2 className="h-7 w-7 animate-spin text-primary" aria-hidden />
-      </span>
+    <div className="flex flex-col items-center py-14 text-center" aria-live="polite">
+      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, ease: 'easeOut' }}
+        className="mb-8 flex h-28 w-28 items-center justify-center rounded-full bg-primary/5">
+        <ThinkingOrb state={orb} size={64} color={BRAND} dotSize={1.35} aria-hidden />
+      </motion.div>
       <h1 className="m-0 text-[26px] font-semibold tracking-tight md:text-[30px]">{title}</h1>
-      <ul className="m-0 mt-6 flex list-none flex-col gap-2.5 p-0 text-[15px]">
-        {lines.map((l, i) => (
-          <li key={l} className={cn('flex items-center justify-center gap-2 transition-colors', i <= step ? 'text-foreground' : 'text-muted-foreground/60')}>
-            {i < step ? <Check className="h-4 w-4 text-primary" aria-hidden /> : <span className="inline-block h-4 w-4" />}
-            {l}
-          </li>
-        ))}
-      </ul>
+      <AITextLoading texts={lines} interval={2600} stopAtEnd className="mt-4 text-[16px] font-medium" />
     </div>
+  );
+}
+
+/** Content arriving after the AI: children fade up one after another (still for reduced motion). */
+function Rise({ children, className, gap = 0.06, ...aria }: { children: React.ReactNode; className?: string; gap?: number; role?: string; 'aria-label'?: string }) {
+  const reduce = useReducedMotion();
+  if (reduce) return <div className={className} {...aria}>{children}</div>;
+  return (
+    <motion.div className={className} {...aria} initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: gap } } }}>
+      {Children.toArray(children).map((child, i) => (
+        <motion.div key={i} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } } }}>
+          {child}
+        </motion.div>
+      ))}
+    </motion.div>
   );
 }
 
@@ -318,7 +327,7 @@ export function CampaignWizard({
 
   // ── Before the wizard is ready ────────────────────────────────────────────────────────────
   if (phase.kind === 'loading') {
-    return <Frame step={null} progress={[0, 0, 0]} onExit={() => navigate(campaignsPath)}><Working title="Getting things ready" lines={['Loading your details']} /></Frame>;
+    return <Frame step={null} progress={[0, 0, 0]} onExit={() => navigate(campaignsPath)}><Working title="Getting things ready" lines={['Loading your details…']} orb="breathing" /></Frame>;
   }
   if (phase.kind === 'error') {
     return (
@@ -371,10 +380,12 @@ export function CampaignWizard({
   return (
     <Frame step={STEP_OF[page]} progress={stepProgress(page)} onExit={() => void exit()} onManual={() => void manual()} footer={footer}>
       {working ? (
-        <Working title={working === 'website' ? 'Reading your website' : 'Reading your description'}
-          lines={working === 'website' ? ['Reading your website', 'Finding your services', 'Working out who you sell to'] : ['Reading your description', 'Listing your services', 'Working out who you sell to']} />
+        <Working title={working === 'website' ? 'Reading your website' : 'Reading your description'} orb="searching"
+          lines={working === 'website'
+            ? ['Opening your website…', 'Reading what you do…', 'Finding your services…', 'Working out who you sell to…', 'Almost there…']
+            : ['Reading your description…', 'Listing your services…', 'Working out who you sell to…', 'Almost there…']} />
       ) : (
-        <>
+        <motion.div key={page} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: 'easeOut' }}>
           {page !== 'website' && pageHasGuesses(page, answers) && <FromWebsite source={source} />}
           {page === 'about' && thin && (
             <p className="m-0 mb-6 rounded-xl bg-muted px-4 py-3 text-[14px]">Your website didn't say much, so please fill in the gaps.</p>
@@ -386,7 +397,7 @@ export function CampaignWizard({
           {page === 'area' && <AreaPage answers={answers} update={update} />}
           {page === 'goal' && <GoalPage answers={answers} update={update} />}
           {err && <p role="alert" className="m-0 mt-6 rounded-xl bg-destructive/10 px-4 py-3 text-[14px] text-foreground">{err}</p>}
-        </>
+        </motion.div>
       )}
     </Frame>
   );
@@ -469,7 +480,7 @@ function AboutPage({ answers, update }: PageProps) {
   return (
     <>
       <Title sub="Change anything that isn't quite right.">Is this your business?</Title>
-      <div className="flex flex-col gap-6">
+      <Rise className="flex flex-col gap-6">
         <div className="flex flex-col gap-2">
           <Label htmlFor="wiz-bname" className="text-[15px] font-semibold">Company name</Label>
           <Input id="wiz-bname" className={field} value={answers.business?.name ?? ''} onChange={(e) => set('name', e.target.value)} />
@@ -482,7 +493,7 @@ function AboutPage({ answers, update }: PageProps) {
           <Label htmlFor="wiz-bdesc" className="text-[15px] font-semibold">What you do, in a sentence</Label>
           <Textarea id="wiz-bdesc" rows={2} className="rounded-xl border-border px-4 py-3 text-[16px] shadow-none" value={answers.business?.description ?? ''} onChange={(e) => set('description', e.target.value)} />
         </div>
-      </div>
+      </Rise>
     </>
   );
 }
@@ -607,7 +618,7 @@ function GoalPage({ answers, update }: PageProps) {
   return (
     <>
       <Title sub="We'll write your emails to ask for this.">What should a new customer do?</Title>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Your goal">
+      <Rise className="grid grid-cols-1 gap-3 sm:grid-cols-2" gap={0.05} role="radiogroup" aria-label="Your goal">
         {GOALS.map((g) => {
           const on = goal === g.value;
           const Icon = GOAL_ICON[g.value];
@@ -624,7 +635,7 @@ function GoalPage({ answers, update }: PageProps) {
             </button>
           );
         })}
-      </div>
+      </Rise>
       <div className="mt-8 flex flex-col gap-2">
         <Label htmlFor="wiz-cta" className="text-[15px] font-semibold">In your own words <span className="font-normal text-muted-foreground">Optional</span></Label>
         <Input id="wiz-cta" className={field} placeholder="e.g. Reply for a free quote" value={answers.goal?.cta ?? ''}
@@ -731,9 +742,9 @@ function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onEx
   return (
     <Frame step={3} progress={[1, 1, 1]} onExit={onExit} onManual={onManual} footer={footer} wide>
       {creating ? (
-        <Working title="Writing your emails" lines={['Writing four emails for each campaign', 'Saving your drafts']} />
+        <Working title="Writing your emails" orb="composing" lines={['Writing the first email…', 'Writing three follow-ups…', 'Keeping your offer and tone…', 'Saving your drafts…']} />
       ) : loading ? (
-        <Working title="Finding campaigns that fit" lines={['Matching your services to buyers', 'Checking your existing campaigns', 'Estimating how many businesses we can find']} />
+        <Working title="Finding campaigns that fit" orb="connecting" lines={['Matching your services to buyers…', 'Checking your existing campaigns…', 'Estimating how many businesses we can find…', 'Almost there…']} />
       ) : (
         <>
           <Title sub="Each one becomes a draft you can edit. Nothing is sent or charged until you launch.">Pick your campaigns</Title>
@@ -761,7 +772,7 @@ function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onEx
               </div>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
+            <Rise className="grid gap-4 md:grid-cols-2" gap={0.08}>
               {state.ideas.map((idea, i) => {
                 const on = selected.has(idea.id);
                 const line = cost?.items?.[i];
@@ -797,7 +808,7 @@ function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onEx
                   </div>
                 );
               })}
-            </div>
+            </Rise>
           )}
 
           {state.ideas.length > 0 && (
