@@ -7,6 +7,7 @@ import { PublicFooter } from "@/components/PublicFooter";
 import { useSeo } from "@/hooks/useSeo";
 import { PACKS } from "@/lib/pricing";
 import { PUBLIC_PAGES } from "@/lib/publicPages";
+import { CTA_LABEL } from "@/lib/marketing";
 
 const FONT: React.CSSProperties = {
   fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
@@ -27,7 +28,7 @@ const BTN_SECONDARY =
 const INCLUDED = [
   "Finding businesses that fit",
   "Emails written for each business",
-  "Follow-ups on day 3, 7 and 14",
+  "Follow-ups until they reply",
   "Hot leads with their reply and a next step",
 ];
 
@@ -41,15 +42,15 @@ const FREE = [
 const FAQS: { q: string; a: string }[] = [
   {
     q: "What counts as a hot lead?",
-    a: "A business that replies to your outreach with genuine interest, such as asking about pricing, availability, or a meeting. Our AI reads every reply. Out-of-office messages, unsubscribes and \"no thanks\" replies are filtered out and never cost a credit.",
+    a: "A business that replies to your outreach with genuine interest, such as asking about pricing, availability, or a meeting. Our AI reads every reply. Out-of-office messages, unsubscribes and \"no thanks\" replies are filtered out and never count as a hot lead.",
   },
   {
-    q: "Do credits cost anything if I get no hot leads?",
-    a: "No. A credit is only used when a hot lead is routed to you. Prospecting, writing and follow-ups don't use credits.",
+    q: "What if I don't get any hot leads?",
+    a: "Then you don't pay for any. Finding businesses, writing and follow-ups are included. A lead from your pack is only used when a hot lead reaches you.",
   },
   {
     q: "Is there a subscription or setup fee?",
-    a: "No. You buy a pack of credits when you want one and use them at your own pace. Buy more any time from your dashboard.",
+    a: "No. You buy a pack of hot leads when you want one, and it's used at your own pace. Buy more any time from your dashboard.",
   },
 ];
 
@@ -69,8 +70,8 @@ export function Pricing() {
             Not before.
           </h1>
           <p className="text-[17px] lg:text-[18px] leading-[1.6] text-[#605978] max-w-[500px] m-0">
-            No subscription and no setup fee. You buy credits, and one credit is used only when a
-            business replies with real interest and lands on your dashboard.
+            No subscription and no set-up fee. Pick how many hot leads you want. You only pay when a
+            business replies wanting to talk.
           </p>
         </section>
 
@@ -109,7 +110,7 @@ export function Pricing() {
                     ? BTN_PRIMARY
                     : BTN_SECONDARY}`}
                 >
-                  Get started
+                  {CTA_LABEL}
                 </Link>
               </motion.div>
             );
@@ -119,8 +120,8 @@ export function Pricing() {
 
         <section className="max-w-[960px] mx-auto w-full px-6 lg:px-12 py-24 lg:py-32">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-20">
-            <ListBlock title="What a credit covers" items={INCLUDED} tone="brand" />
-            <ListBlock title="What never costs a credit" items={FREE} tone="grey" />
+            <ListBlock title="What's included" items={INCLUDED} tone="brand" />
+            <ListBlock title="What you never pay for" items={FREE} tone="grey" />
           </div>
         </section>
 
@@ -137,7 +138,7 @@ export function Pricing() {
             to="/signup"
             className="inline-flex items-center justify-center h-12 px-7 rounded-full bg-brand text-white text-[15px] font-semibold no-underline hover:bg-brand-deep transition-colors"
           >
-            Get started
+            {CTA_LABEL}
           </Link>
         </section>
       </main>
