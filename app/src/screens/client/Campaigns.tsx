@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ChevronRight, TriangleAlert, Pencil, Trash2, Megaphone, X } from 'lucide-react';
+import { ChevronRight, Pencil, Trash2, Megaphone, X, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import {
@@ -45,7 +45,6 @@ import { RequiredMark } from '../../components/RequiredMark';
 import { MobileFab } from '../../components/MobileFab';
 import { useClientHeader } from '../../hooks/useClientHeader';
 import { LaunchAllDialog } from './LaunchAllDialog';
-import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert';
 
 const HELP: HelpContent = {
   title: 'Campaigns',
@@ -122,7 +121,8 @@ export function Campaigns({
   const startNew = () => (wizardEnabled ? openWizard() : setShowNew(true));
   const openEditor = (id: string) => navigate(`${basePath}/campaigns/${id}/edit`);
   const [showLaunchAll, setShowLaunchAll] = useState(false);
-  const [draftsCreated, setDraftsCreated] = useState(() => Number(searchParams.get('drafts')) || 0);
+  // The wizard lands here with ?drafts=<id>,<id> so the new drafts can be listed with a link each.
+  const [newDraftIds, setNewDraftIds] = useState<string[]>(() => (searchParams.get('drafts') ?? '').split(',').filter((x) => x.length > 30));
   // Drop ?new=manual once the form is open, so a reload doesn't reopen it.
   useEffect(() => {
     if (searchParams.get('new') !== 'manual' && !searchParams.get('drafts')) return;
@@ -147,6 +147,9 @@ export function Campaigns({
   const newCampaignTitle = atLaunchLimit ? launchLimitTitle : (atLimit ? limitTitle : undefined);
 
   const launchableDrafts = rows.filter((c) => c.status === 'draft' || c.status === 'pending_review').map((c) => ({ id: c.id, name: c.name }));
+  const newDrafts = rows.filter((c) => newDraftIds.includes(c.id));
+  // Pilot clients go straight to the campaign's own page (targeting, emails, launch).
+  const openRow = (c: ClientCampaignRow) => (wizardEnabled && !readOnly ? openEditor(c.id) : setOpenCampaign(c));
 
   // One banner per held country that at least one of this client's campaigns targets.
   const heldGroups = holds
@@ -202,44 +205,50 @@ export function Campaigns({
         </div>
       </header>
 
+      {/* Notices use the same quiet bar as the Approvals page. */}
       {atLaunchLimit && (
-        <div className="flex items-start gap-3 rounded-xl border border-(--ad-green-line) bg-(--ad-green-tint) px-4 py-3.5">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--ad-green-line)">
-            <TriangleAlert size={15} strokeWidth={2.2} className="text-(--ad-green-hover)" />
-          </span>
-          <p className="m-0 pt-0.5 text-[13px] leading-snug text-(--ad-green-hover)">
-            <strong className="font-semibold">Launch limit reached</strong> - you've used {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches this month. Contact us to increase it before creating another campaign.
-          </p>
-        </div>
+        <p role="status" className="m-0 flex items-start gap-2 rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3 text-[13px] leading-relaxed text-(--ad-ink)">
+          <AlertCircle size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
+          <span><strong className="font-semibold">Launch limit reached.</strong> You've used {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches this month. Contact us if you need more.</span>
+        </p>
       )}
 
       {atLimit && (
-        <div className="flex items-start gap-3 rounded-xl border border-(--ad-green-line) bg-(--ad-green-tint) px-4 py-3.5">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--ad-green-line)">
-            <TriangleAlert size={15} strokeWidth={2.2} className="text-(--ad-green-hover)" />
-          </span>
-          <p className="m-0 pt-0.5 text-[13px] leading-snug text-(--ad-green-hover)">
-            <strong className="font-semibold">Campaign limit reached</strong> - you've used {usage!.campaign_count} of {usage!.max_campaigns} slots. Contact us to increase it before creating another one.
-          </p>
-        </div>
+        <p role="status" className="m-0 flex items-start gap-2 rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3 text-[13px] leading-relaxed text-(--ad-ink)">
+          <AlertCircle size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
+          <span><strong className="font-semibold">Campaign limit reached.</strong> You're using {usage!.campaign_count} of {usage!.max_campaigns} campaign slots. Contact us if you need more.</span>
+        </p>
       )}
 
-      {wizardEnabled && draftsCreated > 0 && (
-        <Alert>
-          <AlertTitle>{draftsCreated} draft{draftsCreated === 1 ? '' : 's'} created</AlertTitle>
-          <AlertDescription className="flex flex-col gap-2">
-            <span>Nothing has been sent or charged. Open each one to check its emails, then launch it, or launch them together.</span>
-            <span className="flex flex-wrap gap-2">
-              {launchableDrafts.length > 1 && <button className={primaryCls} onClick={() => setShowLaunchAll(true)}>Launch all</button>}
-              <button className={ghostCls} onClick={() => setDraftsCreated(0)}>Dismiss</button>
+      {wizardEnabled && newDrafts.length > 0 && (
+        <div role="status" className="flex flex-col gap-3 rounded-xl border border-(--ad-green-line) bg-(--ad-green-tint)/40 px-4 py-3.5">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="m-0 flex items-start gap-2 text-[13px] leading-relaxed text-(--ad-ink)">
+              <Sparkles size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
+              <span>
+                <strong className="font-semibold">{newDrafts.length} new draft{newDrafts.length === 1 ? '' : 's'} ready.</strong> Nothing has been sent or charged.
+                Open each one to read and edit its four emails, then launch it.
+              </span>
+            </p>
+            <span className="flex shrink-0 gap-2">
+              {newDrafts.length > 1 && <button className={btn('primary', 'md')} onClick={() => setShowLaunchAll(true)}>Launch all</button>}
+              <button className={btn('secondary', 'md')} onClick={() => setNewDraftIds([])}>Dismiss</button>
             </span>
-          </AlertDescription>
-        </Alert>
+          </div>
+          <ul className="m-0 flex list-none flex-col divide-y divide-(--ad-line) overflow-hidden rounded-lg border border-(--ad-line) bg-(--ad-surface) p-0">
+            {newDrafts.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                <span className="min-w-0 truncate text-[13px] font-semibold text-(--ad-ink)">{c.name}</span>
+                <Link to={`${basePath}/campaigns/${c.id}/edit?tab=emails`} className={`${btn('secondary', 'sm')} shrink-0`}>Review emails</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {showLaunchAll && (
         <LaunchAllDialog open={showLaunchAll} onOpenChange={setShowLaunchAll} drafts={launchableDrafts} basePath={basePath} client={client}
-          onDone={() => { void reload(); setDraftsCreated(0); queryClient.invalidateQueries({ queryKey: ['client-usage', clientId] }); }} />
+          onDone={() => { void reload(); setNewDraftIds([]); queryClient.invalidateQueries({ queryKey: ['client-usage', clientId] }); }} />
       )}
 
       {heldGroups.map(({ hold, campaigns }) => (
@@ -306,7 +315,7 @@ export function Campaigns({
                   const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
                   const isDraft = c.status === 'draft' || c.status === 'pending_review' || c.status === 'scheduled';
                   return (
-                    <tr key={c.id} onClick={() => setOpenCampaign(c)} className="group cursor-pointer">
+                    <tr key={c.id} onClick={() => openRow(c)} className="group cursor-pointer">
                       <td className="min-w-0">
                         <div className="line-clamp-2 font-semibold leading-snug text-(--ad-ink) group-hover:underline" title={c.name}>{c.name}</div>
                         {isEuCountry(c.country) && <div className="mt-1"><EuBadge /></div>}
@@ -364,7 +373,7 @@ export function Campaigns({
               return (
                 <button
                   key={c.id}
-                  onClick={() => setOpenCampaign(c)}
+                  onClick={() => openRow(c)}
                   className="cursor-pointer rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4 text-left"
                 >
                   <div className="flex items-start justify-between gap-2">

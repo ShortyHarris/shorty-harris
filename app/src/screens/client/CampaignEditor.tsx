@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { CalendarClock, Check, CircleAlert, Loader2, Rocket, Sparkles } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -71,7 +71,9 @@ interface Checks { problems: Problem[]; cost: CostEstimate | null }
 
 export function CampaignEditor({ clientId, client = supabase, basePath = '/app' }: { clientId: string; client?: SupabaseClient; basePath?: string }) {
   const { campaignId = '' } = useParams();
-  const [tab, setTab] = useState('targeting');
+  const [params] = useSearchParams();
+  // ?tab=emails opens the emails straight away (the "Review emails" link after the wizard).
+  const [tab, setTab] = useState(() => (['targeting', 'emails', 'cadence', 'launch'].includes(params.get('tab') ?? '') ? params.get('tab')! : 'targeting'));
   const editor = useQuery({
     queryKey: ['campaign-editor', campaignId],
     queryFn: async (): Promise<Loaded> => {

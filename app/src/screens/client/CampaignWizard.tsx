@@ -350,7 +350,7 @@ export function CampaignWizard({
       <IdeasStep clientId={clientId} client={client} session={session} answers={answers}
         onAnswers={(a) => { setAnswers(a); autosave.queue({ answers: a }); }}
         onBack={() => void go('goal')} onExit={() => void exit()} onManual={() => void manual()}
-        onCreated={(n) => navigate(`${campaignsPath}?drafts=${n}`)} />
+        onCreated={(ids) => navigate(`${campaignsPath}?drafts=${ids.join(',')}`)} />
     );
   }
 
@@ -639,7 +639,7 @@ interface IdeasState { ideas: WizardIdea[]; duplicates: string[]; slotsLeft: num
 
 function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onExit, onManual, onCreated }: {
   clientId: string; client: SupabaseClient; session: WizardSessionRow; answers: WizardAnswers;
-  onAnswers: (a: WizardAnswers) => void; onBack: () => void; onExit: () => void; onManual: () => void; onCreated: (n: number) => void;
+  onAnswers: (a: WizardAnswers) => void; onBack: () => void; onExit: () => void; onManual: () => void; onCreated: (campaignIds: string[]) => void;
 }) {
   const fp = ideasFingerprint(answers);
   const [savedIdeas] = useState(() => (session.ideas ?? []) as WizardIdea[]);
@@ -712,7 +712,7 @@ function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onEx
     setCreating(false);
     if (!r.ok) { setErr(wizardErrorMessage(r.error)); return; }
     queryClient.invalidateQueries({ queryKey: ['my-campaigns', clientId] });
-    onCreated(r.data.created.length);
+    onCreated(r.data.created.map((c) => c.campaign_id));
   }
 
   const n = state.ideas.filter((i) => selected.has(i.id)).length;
