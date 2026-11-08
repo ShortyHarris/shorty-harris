@@ -1,16 +1,24 @@
-# Campaign Wizard: sandbox tests
+# Campaign Wizard: test plan
 
-The same tests as section K of `docs/SANDBOX-TESTS.md`, on their own so they're easy to find.
-Test on the preview: https://shorty-harris-git-claude-relaxed-104119-martin-viteks-projects.vercel.app
-(log in as your sandbox client).
+The wizard's own test list, separate from the general sandbox plan (`docs/SANDBOX-TESTS.md`).
+What was built and how it is released: `docs/CAMPAIGN_WIZARD_RELEASE.md`.
+
+## Where and how
+
+- **Before release:** test on the preview,
+  https://shorty-harris-git-claude-relaxed-104119-martin-viteks-projects.vercel.app, logged in
+  as a sandbox client. The preview uses the live database, where the wizard is still switched off
+  by default until release: an admin ticks **Campaign wizard** on the sandbox client (Admin >
+  Clients > edit). Marcus's sandbox already has it on.
+- **After release:** the wizard is on for every client; nothing to switch on. An admin can switch
+  it off for one client.
+- Check the client's campaign limit: it is 3 by default, and the Campaigns page shows it as
+  "N of 3 campaigns".
+- The wizard's AI uses the live Gemini key (a few cents a run). The launch gate and sourcing are
+  the same as for any campaign, so in the sandbox discovery is simulated.
+- Report a failure with its test ID, what you saw and a screenshot.
 
 ## Tests
-
-Before you start: nothing to switch on. The wizard is on for every client by default; an admin
-can switch it off per client (**Campaign wizard** on the client edit form). Check the client's
-campaign limit: it is 3 by default, and the Campaigns page shows it as "N of 3 campaigns". The
-wizard's AI uses the live Gemini key; each run is a few cents. The launch gate and sourcing are
-the same as for any campaign, so in the sandbox discovery is simulated.
 
 Run the K tests once in light mode and once in dark mode (moon icon at the top).
 
