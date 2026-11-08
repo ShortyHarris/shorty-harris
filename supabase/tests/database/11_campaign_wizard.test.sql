@@ -2,7 +2,7 @@
 -- sessions, services, the screen-2 profile save, draft campaigns, and no staff approval for
 -- pilot clients. See docs/CAMPAIGN_WIZARD_BUILD_PLAN.md.
 begin;
-select plan(33);
+select plan(35);
 
 select tests.client() as client_a \gset
 select tests.user(:'client_a') as user_a \gset
@@ -17,12 +17,13 @@ select ok(not has_table_privilege('anon', 'public.wizard_sessions', 'select'), '
 select ok(has_function_privilege('authenticated', 'public.confirm_wizard_profile(uuid)', 'execute'), 'Signed-in users can confirm a wizard profile');
 select ok(not has_function_privilege('anon', 'public.confirm_wizard_profile(uuid)', 'execute'), 'The public cannot');
 
--- ── The pilot switch is the admin's ──────────────────────────────────────────────────────
+-- ── On for every client; only an admin can switch it off ─────────────────────────────────
+select is((select wizard_enabled from public.clients where id = :'client_a'), true, 'Every client has the wizard by default');
 select tests.claims_client(:'user_a');
 set local session authorization authenticated;
-update public.clients set wizard_enabled = true where id = :'client_a';
+update public.clients set wizard_enabled = false where id = :'client_a';
 reset session authorization;
-select is((select wizard_enabled from public.clients where id = :'client_a'), false, 'A client cannot switch the wizard on for themselves');
+select is((select wizard_enabled from public.clients where id = :'client_a'), true, 'A client cannot switch the wizard off themselves');
 
 -- ── Sessions: own only, one open at a time ───────────────────────────────────────────────
 select tests.claims_client(:'user_a');
@@ -93,23 +94,28 @@ select throws_ok(format($$ insert into public.campaigns (client_id, name, status
                  '23514', null, 'A campaign holds at most four emails');
 reset session authorization;
 
--- ── No staff approval for pilot clients ──────────────────────────────────────────────────
+-- ── No staff approval with the wizard on ─────────────────────────────────────────────────
+select tests.claims_client(:'admin_user');
+set local session authorization authenticated;
+update public.clients set wizard_enabled = false where id = :'client_b';
+reset session authorization;
+select is((select wizard_enabled from public.clients where id = :'client_b'), false, 'An admin can switch the wizard off for a client');
 select tests.claims_client(:'user_b');
 set local session authorization authenticated;
 insert into public.campaigns (client_id, name, status, channel) values (:'client_b', 'Not in pilot', 'pending_review', 'email');
 reset session authorization;
-select is((select status from public.campaigns where name = 'Not in pilot'), 'pending_review', 'Outside the pilot, a new campaign still waits for review');
+select is((select status from public.campaigns where name = 'Not in pilot'), 'pending_review', 'With the wizard off, a new campaign still waits for review');
 
 select tests.claims_client(:'admin_user');
 set local session authorization authenticated;
 update public.clients set wizard_enabled = true where id = :'client_b';
 reset session authorization;
-select is((select wizard_enabled from public.clients where id = :'client_b'), true, 'An admin can switch the wizard on');
+select is((select wizard_enabled from public.clients where id = :'client_b'), true, 'An admin can switch it back on');
 select tests.claims_client(:'user_b');
 set local session authorization authenticated;
 insert into public.campaigns (client_id, name, status, channel) values (:'client_b', 'In pilot', 'pending_review', 'email');
 reset session authorization;
-select is((select status from public.campaigns where name = 'In pilot'), 'active', 'In the pilot, it goes straight to active (no staff approval)');
+select is((select status from public.campaigns where name = 'In pilot'), 'active', 'With the wizard on, it goes straight to active (no staff approval)');
 
 select tests.claims_client(:'user_b');
 set local session authorization authenticated;

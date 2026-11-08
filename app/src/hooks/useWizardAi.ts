@@ -29,7 +29,7 @@ export const WIZARD_ERRORS: Record<string, string> = {
   bad_url: "That doesn't look like a website address. Try something like yourcompany.com.",
   ai_failed: 'Something went wrong while our AI was working. Try again in a moment, or fill in the details yourself.',
   rate_limited: "You've used the AI a lot in the last hour. Try again later, or carry on by hand.",
-  wizard_not_enabled: "The campaign wizard isn't switched on for your account.",
+  wizard_not_enabled: "The campaign wizard is switched off for your account. Contact us if you'd like it back.",
   missing_description: 'Add your company name and what you do first.',
   no_rewrites_left: "You've used this campaign's free AI rewrites. You can still edit the emails yourself.",
   nothing_selected: 'Pick at least one campaign first.',

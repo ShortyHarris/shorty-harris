@@ -232,7 +232,7 @@ export function CampaignWizard({
       .then(([flag, open]) => {
         if (cancelled) return;
         if (flag.data?.wizard_enabled !== true) {
-          setPhase({ kind: 'error', message: "The campaign wizard isn't switched on for your account yet. Contact us if you'd like to try it." });
+          setPhase({ kind: 'error', message: "The campaign wizard is switched off for your account. Contact us if you'd like it back." });
           return;
         }
         // "Continue" on the Campaigns page opens the unfinished setup (?resume=1). Anything else

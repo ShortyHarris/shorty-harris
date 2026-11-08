@@ -119,10 +119,11 @@ Use a different prospect for each, after its first email has been sent.
 
 ## K. Campaign Wizard (pilot)
 
-Before you start: as admin, open your sandbox client and tick **Campaign wizard (pilot)**. Check
-the client's campaign limit too: it is 3 by default, and the Campaigns page shows it as "N of 3
-campaigns". The wizard's AI uses the live Gemini key; each run is a few cents. The launch gate and
-sourcing are the same as for any campaign, so in the sandbox discovery is simulated.
+Before you start: nothing to switch on. The wizard is on for every client by default; an admin
+can switch it off per client (**Campaign wizard** on the client edit form). Check the client's
+campaign limit: it is 3 by default, and the Campaigns page shows it as "N of 3 campaigns". The
+wizard's AI uses the live Gemini key; each run is a few cents. The launch gate and sourcing are
+the same as for any campaign, so in the sandbox discovery is simulated.
 
 Run the K tests once in light mode and once in dark mode (moon icon at the top).
 
@@ -152,16 +153,21 @@ Run the K tests once in light mode and once in dark mode (moon icon at the top).
 | K22 | ⋮ menu: Pause, Resume, Archive, Restore, **Make a copy**. | Each works; a copy opens as a new draft. |
 | K23 | ⋮ menu > **Delete campaign**; also the ⋮ on a table row. | The "Permanently delete...?" window lists what goes. After deleting, the pop-up closes and the row is gone. |
 | K24 | Have as many campaigns as your limit, open Campaigns. | "Campaign limit reached" note; **+ New campaign** is disabled. Same for 5 launches this month. |
-| K25 | A client without the pilot switch opens `/app/campaigns/wizard`. | "The campaign wizard isn't switched on for your account yet." **+ New campaign** opens the manual form. |
+| K25 | As admin, untick **Campaign wizard** for a client; as that client open Campaigns and `/app/campaigns/wizard`. | **+ New campaign** opens the manual form; the wizard says "The campaign wizard is switched off for your account." A campaign they create waits for admin review. Tick it again afterwards. |
 | K26 | After the n8n step in `n8n/README.md`: launch a wizard campaign. | The first email in Approvals follows the template's subject and offer with names filled in. A manual campaign's emails look as before. |
 | K27 | Open a running campaign (or one that has found businesses), tab **Prospects**. | The businesses it found, newest first, each with contact, type, place and status (Emailed, They replied...). Over 8 businesses: a search box filters them. Drafts don't show this tab. |
 
-## Not covered by this plan (by design or planned separately)
+## Automated checks, and what this plan does not cover
 
-- **Automated regression checks** on every pull request and nightly (spec 2.5): planned separately.
-- **Testing database changes on a copy** before release (spec 2.3): the process is in `SANDBOX.md`; not run per change yet.
-- **Future BDR agent access** (spec 2.4): designed for, not built.
-- The sandbox clock moves dates and time of day, but the follow-up writer runs on the real calendar's weekdays (E6).
+Checked 2026-11-08 against the repository and the campaign wizard's pull request.
+
+| Spec | What | Status |
+| --- | --- | --- |
+| 2.5 | **Regression checks on every pull request** | **Done.** "Release checks" (`.github/workflows/release-checks.yml`) runs the type check, unit and component tests (530), the production build, lint and the database tests (265) on every pull request into `main`, and is required before merging. The campaign wizard pull request passes them. |
+| 2.5 | Nightly full run and browser (end-to-end) tests on previews | Not built yet. Phase 2 of `docs/REGRESSION-TESTING-PLAN.md`; needs a dedicated test sandbox account and mailbox. |
+| 2.3 | **Testing database changes on a copy before release** | **Done for every pull request.** The checks build a fresh database from `supabase/baseline` plus the pull request's migrations and run the database tests on it; production is changed only after merge, from the same file. Trying a risky change on a copy of live data (a Supabase preview branch) is still a manual step (`SANDBOX.md`). |
+| 2.4 | Future BDR agent access | Designed for (`docs/REGRESSION-TESTING-PLAN.md` section 8), not built. |
+| | Sandbox clock and weekends | The clock moves dates and time of day, but the follow-up writer runs on the real calendar's weekdays (E6, a known limit). |
 
 ## Results sheet
 
@@ -190,6 +196,7 @@ Run the K tests once in light mode and once in dark mode (moon icon at the top).
 | E3 | | |
 | E4 | | |
 | E5 | | |
+| E6 | Note only | |
 | F1 | | |
 | F2 | | |
 | F3 | | |

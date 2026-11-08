@@ -497,7 +497,7 @@ export interface ClientListRow {
   monthly_prospect_limit: number;
   max_campaigns: number;
   auto_approve_campaigns: boolean;
-  /** Campaign Wizard pilot: the client sees the wizard, and its campaigns skip review. */
+  /** Campaign wizard (on by default): the client sees the wizard, and its campaigns skip review. */
   wizard_enabled: boolean;
   allow_generic_mailboxes: boolean;
   is_internal: boolean;

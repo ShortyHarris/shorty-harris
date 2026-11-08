@@ -26,6 +26,9 @@ Martin need to agree to.
   "Day 0 / 3 / 5 / 7".
 - **No staff approval on launch** (Ian, Oct 30).
 - Design is settled after the functionality works.
+- **On for everyone at release, no pilot** (November 8). Merging makes the wizard available to
+  every client without an admin ticking anything. The admin checkbox stays as an off-switch
+  for one client (`20261108120000_campaign_wizard_for_everyone.sql`, applied at merge).
 
 Ground rules (unchanged):
 

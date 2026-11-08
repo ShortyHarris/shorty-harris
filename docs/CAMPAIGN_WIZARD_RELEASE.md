@@ -1,76 +1,81 @@
-# Campaign Wizard: what was built, and how to switch it on
+# Campaign Wizard: what was built, and how to release it
 
-Branch `claude/relaxed-ritchie-4ltpdn`, November 7, 2026. The plan and its decisions are in
-`docs/CAMPAIGN_WIZARD_BUILD_PLAN.md`.
+Branch `claude/relaxed-ritchie-4ltpdn` (draft pull request #12), updated November 8, 2026. The
+plan and its decisions are in `docs/CAMPAIGN_WIZARD_BUILD_PLAN.md`. Tests to run by hand:
+`docs/CAMPAIGN_WIZARD_TESTS.md`.
 
-**Live status (Nov 7):** database migrations applied and `wizard-ai` deployed to the live
-project. No client has the pilot switch on, so nobody sees the wizard yet. The app changes
-reach users only when this branch is merged and deployed (or on its preview link).
+**Live status (Nov 8):** the first three database migrations are applied and `wizard-ai` is
+deployed to the live project. The app changes reach users only when this branch is merged and
+deployed (until then, only on the preview link). The wizard is **on for every client** once
+released: no admin has to tick anything (see "Releasing it").
 
-## What a pilot client gets
+## What every client gets
 
-1. **Campaigns page.** **+ New campaign** opens the wizard. Next to it: **Find new campaigns**,
-   **Create manually** (the existing form) and **Launch all (N)** when there are drafts. A
-   client with no campaigns sees "Start the campaign wizard".
-2. **Step 1, your website.** The AI reads the public website. Addresses that aren't public
-   websites are refused. If the site won't load, the client gets **Describe my business**
-   instead. "I don't have a website" opens a short form, and the AI works from that.
-3. **Step 2, check what we found.**
-   - Business, services (with seasonal months), types of business to reach, roles, company
-     size, exclusions, area and goal.
-   - Everything is editable. AI guesses carry **Please check** until touched. Nothing the client
-     typed is ever overwritten.
-   - Continuing saves this as the client's profile (the same profile Targeting uses).
-4. **Step 3, pick your campaigns.**
-   - One to five ideas. Each card shows est. prospects, est. hot leads ("Every campaign
-     varies") and a launch line under **today's pricing** ("Free launch (3 of 5 left this
-     month)" or "1 credit to launch"). No dollars.
-   - Ideas that duplicate a running campaign are skipped and named. The client's campaign limit
-     is respected.
-   - The client can also: **Regenerate ideas**, **Add my own idea**, and **Refresh** when the
-     profile changed.
-   - **Create N drafts** writes each draft's four emails and creates the drafts. This is free,
-     and a double click never duplicates.
-5. **Campaign editor**, for wizard and manual campaigns alike:
-   - **Targeting:** search terms, areas, maximum businesses, language, start date.
-   - **Emails:** the four-email template, with 3 free AI rewrites per campaign and a counter.
-   - **Cadence:** today's rule (3, 5, 7 business days), read-only.
-   - **Launch:** the estimate, a checklist with **Fix** links, and Launch through the normal
-     launch gate. A future start date schedules the campaign instead.
-   - **Actions:** pause, resume, archive, restore, cancel the start date, make a copy.
-   - Unsaved changes are protected.
-6. **No staff approval.** Pilot clients' campaigns skip admin review. Clients still approve each
-   email in Approvals, as today.
+1. **Campaigns page.**
+   - One **+ New campaign** button. It asks how to start: **Find campaigns for me**
+     (the wizard, recommended) or **Set it up myself** (the existing form).
+   - Under the title, both limits in words: "1 of 3 campaigns · 0 of 5 launches used this month".
+   - An unfinished wizard setup shows as a quiet note with **Continue** / **Discard**. The wizard
+     itself always starts fresh, filled from the saved business profile.
+   - New drafts are listed with **Review emails**, plus **Launch all**.
+2. **Step 1, your business.** The AI reads the public website. Addresses that aren't public
+   websites are refused. If the site won't load, the client can **Describe my business** instead.
+3. **Step 2, check the details,** one question per page: business, services (with seasonal
+   months), who buys, area (place suggestions as you type, or a radius on a map) and goal.
+   AI guesses are marked to check; nothing the client typed is overwritten. The last page saves
+   this as the client's profile (the same profile Targeting uses).
+4. **Step 3, pick campaigns.** One to five ideas with est. businesses, est. hot leads ("Every
+   campaign varies") and the launch cost under **today's pricing** (free launches, then 1
+   credit). Duplicates of running campaigns are skipped and the campaign limit is respected.
+   Creating the drafts writes each one's four emails; it is free and a double click never
+   duplicates.
+5. **Campaign window** (a pop-up, for wizard and manual campaigns alike), with tabs:
+   - **Emails:** the four-email template, each with when it goes out (first email, then 3, 5
+     and 7 business days later), and 3 free AI rewrites per campaign.
+   - **Who & where:** name, types of business, areas; size, language and start date under
+     "More settings".
+   - **Prospects** (once launched or once businesses are found): the businesses found, with
+     their status, and a search box.
+   - **Launch** / **Status:** the estimate, a checklist with **Fix** links, and Launch through
+     the normal launch gate. A future start date schedules it instead.
+   - The ⋮ menu: pause, resume, archive, restore, cancel the start date, make a copy, delete.
+6. **No staff approval.** Campaigns go live when the client launches them. Clients still approve
+   each email in Approvals, as today.
+7. Light and dark mode throughout.
 
-Admins get a **Campaign wizard (pilot)** checkbox on the client edit form.
+Admins have a **Campaign wizard** checkbox on the client edit form, ticked by default. Unticking
+it hides the wizard for that client and sends their campaigns back through admin review.
 
-## What changes for clients who are not in the pilot
+## What changes for everyone
 
-Nothing, apart from three things that apply to everyone:
-- Clients may now save a campaign as a **draft** (before, only "in review" could be inserted).
-- Campaigns can now have the statuses **scheduled** and **archived**.
-- Edits to a running campaign are now written to the audit log.
+- Campaigns created by hand no longer wait for admin review (the wizard switch also covers
+  them), unless an admin unticks **Campaign wizard** for that client.
+- Clients may save a campaign as a **draft**; campaigns can be **scheduled** and **archived**.
+- Edits to a running campaign are written to the audit log.
 
-## Switching it on
+## Releasing it
 
-Do these in order. Test against the sandbox first (`docs/SANDBOX.md`).
+Do these in order.
 
-1. **Database.** ✅ Done Nov 7. Applied, in order:
-   - `supabase/migrations/20261107182332_campaign_wizard_foundation.sql`
-   - `supabase/migrations/20261107182447_campaign_wizard_drafts_and_launch.sql`
-   - `supabase/migrations/20261107182520_campaign_wizard_trigger_fn_not_callable.sql`
-
-   The second one schedules an hourly pg_cron job, `release-scheduled-campaigns`. When a
-   scheduled campaign's start date arrives, the job sends it to `wf0-enqueue`.
-2. **Edge function.** ✅ Done Nov 7. Deployed `supabase/functions/wizard-ai` (it imports `../_shared/wizard.ts`).
-   - It uses the `GEMINI_API_KEY` secret that docs-search already uses.
-   - Do **not** set `WIZARD_AI_MOCK` in production; that returns sample data.
-3. **App.** Merge and deploy as usual.
+1. **Database.**
+   - ✅ Done Nov 7: `20261107182332_campaign_wizard_foundation.sql`,
+     `20261107182447_campaign_wizard_drafts_and_launch.sql`,
+     `20261107182520_campaign_wizard_trigger_fn_not_callable.sql`. The second one schedules an
+     hourly pg_cron job, `release-scheduled-campaigns`, which sends a scheduled campaign to
+     `wf0-enqueue` on its start date.
+   - **At merge:** apply `20261108120000_campaign_wizard_for_everyone.sql`. It switches the wizard
+     on for every client and makes it the default for new ones. Not before merge: it also skips
+     admin review for campaigns created by hand, and today's production app doesn't show the
+     wizard yet. Then rename the file to the version the database records
+     (`supabase/migrations/README.md`).
+2. **Edge function.** ✅ Done Nov 7: `supabase/functions/wizard-ai` (imports `../_shared/wizard.ts`),
+   using the existing `GEMINI_API_KEY`. Do **not** set `WIZARD_AI_MOCK` in production.
+3. **App.** Merge pull request #12 (Release checks must be green) and deploy as usual. Check that
+   `VITE_MAPBOX_TOKEN` is set in Vercel production, for place suggestions.
 4. **n8n (manual).** Follow "Campaign Wizard: emails follow the campaign template" in
-   `n8n/README.md`, in the `-dev` workflows first. Until this is done, wizard campaigns still
-   work, but their emails are written from scratch rather than from the template.
-5. **Pilot.** Tick **Campaign wizard (pilot)** for Mountains Mowing and one specialist B2B
-   client. Run sandbox tests K1–K18 (`docs/SANDBOX-TESTS.md`).
+   `n8n/README.md`, in the `-dev` workflows first. Until then, wizard campaigns work but their
+   emails are written from scratch rather than from the template.
+5. **Check.** Run `docs/CAMPAIGN_WIZARD_TESTS.md` (K1-K27) on production with a sandbox client.
 
 Settings an admin can change without a deploy (`wizard_settings` table):
 - `free_rewrites_per_campaign` (3)
@@ -83,17 +88,18 @@ Settings an admin can change without a deploy (`wizard_settings` table):
 
 | Check | Result |
 | --- | --- |
-| Database (pgTAP, `scripts/db/test.sh`) | 263 pass, 79 of them new (`11_campaign_wizard`, `12_campaign_wizard_launch`) |
-| App (vitest) | 521 pass, including the wizard logic, the AI function's shared logic and the new n8n node |
+| Release checks on pull request #12 (GitHub) | Pass (type check, tests, build, lint, database tests) |
+| Database (pgTAP, `scripts/db/test.sh`) | 265 pass, 81 of them for the wizard (`11_campaign_wizard`, `12_campaign_wizard_launch`) |
+| App (vitest) | 530 pass, including the wizard logic, place suggestions, the AI function's shared logic and the new n8n node |
 | Type check, lint, production build | Pass (lint: one older warning in `AuthProvider.tsx`) |
-| Edge function | Type-checks with Deno 2.1.4. It ran locally in sample mode, with sign-in, pilot check, rate limit and logging working. |
+| Edge function | Type-checks with Deno 2.1.4. It ran locally in sample mode, with sign-in, the on/off check, rate limit and logging working. |
 | Browser, end to end (local Supabase, sample AI, launch gate stubbed) | Pass, no console or network errors, nothing sent to live Supabase or n8n. The run covered: unreachable site → real site → step 2 → ideas → own idea → 3 drafts → Launch all (one launched, one scheduled) → editor (rewrite, blank-subject check, save, ready) → Find new campaigns → phone width. |
 
 ## Not done, or worth checking in review
 
 - **Not tested with the real Gemini model or real websites.** Everything ran on sample output.
   The prompts are in `supabase/functions/_shared/wizard.ts`; review them, and expect to tune
-  them during the pilot.
+  them after release.
 - **Not tested with the real launch gate (n8n WF0a).** The browser test stubbed it.
 - **The n8n template step (M5)** is code plus instructions; someone has to wire it in n8n.
 - **Prospect estimates** use past campaigns' results (this client's, then everyone's), else a

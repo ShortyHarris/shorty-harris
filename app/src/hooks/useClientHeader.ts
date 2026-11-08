@@ -7,7 +7,7 @@ export interface ClientHeader {
   businessName: string;
   credits: number;
   isSandbox: boolean;
-  /** Campaign Wizard pilot switch (clients.wizard_enabled, set by an admin). */
+  /** Campaign wizard (clients.wizard_enabled: on by default, an admin can switch it off). */
   wizardEnabled: boolean;
 }
 
