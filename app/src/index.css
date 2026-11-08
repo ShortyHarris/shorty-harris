@@ -15,9 +15,14 @@
   --color-brand-deep: #5b0fc2;
   --color-glow: #e8dafd;
 
-  /* shadcn/ui tokens - bridged to the existing client/admin theme variables
-     so shadcn components pick up brand colors automatically. Falls back to
-     the client theme's defaults outside a themed scope. */
+}
+
+/* shadcn/ui tokens - bridged to the existing client/admin theme variables
+   so shadcn components pick up brand colors automatically. Falls back to
+   the client theme's defaults outside a themed scope. `inline` makes each
+   utility read the variable where it is used; without it the values were
+   fixed at :root (always light) and shadcn parts stayed white in dark mode. */
+@theme inline {
   --color-background: var(--bg, #ffffff);
   --color-foreground: var(--ink, #0e0822);
   --color-border: var(--line, #e8e3f7);
@@ -29,10 +34,10 @@
   --color-card-foreground: var(--ink, #0e0822);
   --color-accent: var(--leaf-tint, #f1e9ff);
   --color-accent-foreground: var(--leaf, #7412ef);
-  --color-muted: var(--bg, #ffffff);
+  --color-muted: var(--ad-surface-2, #f9f6ff);
   --color-muted-foreground: var(--ink-faint, #605978);
   --color-primary: var(--leaf, #7412ef);
-  --color-primary-foreground: #ffffff;
+  --color-primary-foreground: var(--ad-on-accent, #ffffff);
   --color-secondary: var(--bg, #ffffff);
   --color-secondary-foreground: var(--ink, #0e0822);
   --color-destructive: var(--clay, #0e0822);

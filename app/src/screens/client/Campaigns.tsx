@@ -125,7 +125,9 @@ export function Campaigns({
   const navigate = useNavigate();
   const openWizard = (entry?: 'find_new' | 'onboarding') =>
     navigate(`${basePath}/campaigns/wizard${entry ? `?entry=${entry}` : ''}`);
-  const startNew = () => (wizardEnabled ? openWizard() : setShowNew(true));
+  // One "New campaign" button; pilot clients then choose the wizard or setting it up themselves.
+  const [choosing, setChoosing] = useState(false);
+  const startNew = () => (wizardEnabled ? setChoosing(true) : setShowNew(true));
   // The campaign window is in the address (?open=<id>&tab=emails) so links and reloads land on it.
   const openId = wizardEnabled && !readOnly ? searchParams.get('open') : null;
   const openEditor = (id: string, tab?: string) => {
@@ -195,33 +197,18 @@ export function Campaigns({
             <Megaphone size={24} strokeWidth={2} className="text-(--ad-green)" aria-hidden />
             Campaigns
           </h1>
-          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">{rows.length} campaign{rows.length !== 1 ? 's' : ''}
-            <span className="md:hidden" title={launchLimitTitle}> · {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used</span>
+          {/* Two separate limits, both spelled out: how many campaigns you can have, and how many
+              you can launch this month. */}
+          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">
+            {usage
+              ? <span title={limitTitle}>{usage.campaign_count} of {usage.max_campaigns} campaigns</span>
+              : <span>{rows.length} campaign{rows.length !== 1 ? 's' : ''}</span>}
+            <span title={launchLimitTitle}> · {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used this month</span>
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 md:gap-2.5">
-          <span className="hidden md:inline text-[12px] font-semibold text-(--ad-ink-soft)" title={launchLimitTitle}>
-            {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used
-          </span>
           <HelpButton content={HELP} />
           <RefreshButton onRefresh={handleRefresh} isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} className={ghostCls} />
-          {!readOnly && wizardEnabled && (
-            <>
-              {rows.length > 0 && (
-                <button onClick={() => openWizard('find_new')} disabled={newCampaignDisabled} title={newCampaignTitle} className={`${ghostCls} max-md:hidden`}>
-                  <Sparkles size={14} aria-hidden /> Find new campaigns
-                </button>
-              )}
-              <button onClick={() => setShowNew(true)} disabled={newCampaignDisabled} title={newCampaignTitle} className={`${ghostCls} max-md:hidden`}>
-                Create manually
-              </button>
-              {launchableDrafts.length > 1 && (
-                <button onClick={() => setShowLaunchAll(true)} className={`${ghostCls} max-md:hidden`}>
-                  Launch all ({launchableDrafts.length})
-                </button>
-              )}
-            </>
-          )}
           {!readOnly && (
             <button
               onClick={startNew}
@@ -317,24 +304,14 @@ export function Campaigns({
           <strong className="text-[15px] font-semibold text-(--ad-ink)">No campaigns yet.</strong>
           <span className="text-[13px] text-(--ad-ink-soft)">
             {wizardEnabled
-              ? 'Start with the campaign wizard: tell us about your business and we\'ll help you choose who to target. Or set up a campaign yourself.'
+              ? 'Tell us about your business and we\'ll suggest who to target, or set a campaign up yourself.'
               : 'Create your first campaign to tell us who to target.'}
           </span>
           {!readOnly && (
             <div className="mt-2 flex flex-wrap justify-center gap-2">
-              <button
-                onClick={() => (wizardEnabled ? openWizard('onboarding') : setShowNew(true))}
-                disabled={newCampaignDisabled}
-                title={newCampaignTitle}
-                className={primaryCls}
-              >
-                {wizardEnabled ? 'Start the campaign wizard' : '+ New campaign'}
+              <button onClick={startNew} disabled={newCampaignDisabled} title={newCampaignTitle} className={primaryCls}>
+                + New campaign
               </button>
-              {wizardEnabled && (
-                <button onClick={() => setShowNew(true)} disabled={newCampaignDisabled} title={newCampaignTitle} className={ghostCls}>
-                  Create manually
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -469,6 +446,16 @@ export function Campaigns({
       )}
 
       <AnimatePresence>
+        {choosing && (
+          <NewCampaignChooser
+            key="new-campaign-chooser"
+            onClose={() => setChoosing(false)}
+            onWizard={() => { setChoosing(false); openWizard(rows.length > 0 ? 'find_new' : undefined); }}
+            onManual={() => { setChoosing(false); setShowNew(true); }}
+            draftCount={launchableDrafts.length}
+            onLaunchAll={() => { setChoosing(false); setShowLaunchAll(true); }}
+          />
+        )}
         {showNew && (
           <NewCampaignModal
             key="new-campaign-modal"
@@ -1446,6 +1433,58 @@ function CampaignDetailModal({
       )}
     </AnimatePresence>
     </>
+  );
+}
+
+/* ── New campaign: choose how to start ────────────────────────────────
+   One button on the page; this small window offers the two ways in. */
+function NewCampaignChooser({ onClose, onWizard, onManual, draftCount, onLaunchAll }: {
+  onClose: () => void; onWizard: () => void; onManual: () => void; draftCount: number; onLaunchAll: () => void;
+}) {
+  const option = 'flex w-full cursor-pointer items-start gap-4 rounded-2xl border border-(--ad-line) bg-(--ad-surface) p-5 text-left transition-colors hover:border-(--ad-ink-soft)';
+  return (
+    <motion.div
+      className="fixed inset-0 z-60 flex items-end justify-center bg-[rgba(14,8,34,0.45)] md:items-center md:p-6"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
+      {...useOverlayClose(onClose, { escape: true })}
+    >
+      <motion.div
+        style={FONT} role="dialog" aria-modal="true" aria-label="New campaign"
+        className="w-full max-w-[520px] rounded-t-2xl bg-(--ad-surface) p-6 md:rounded-2xl md:border md:border-(--ad-line)"
+        initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }}
+        transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="m-0 text-[22px] font-bold tracking-tight text-(--ad-ink)">New campaign</h2>
+            <p className="m-0 mt-1 text-[14px] text-(--ad-ink-soft)">How would you like to start?</p>
+          </div>
+          <ModalClose onClick={onClose} />
+        </div>
+        <div className="mt-5 flex flex-col gap-3">
+          <button type="button" className={option} onClick={onWizard} autoFocus>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--ad-green-tint) text-(--ad-green)"><Sparkles size={18} aria-hidden /></span>
+            <span>
+              <span className="block text-[15px] font-semibold text-(--ad-ink)">Find campaigns for me <span className="ml-1 rounded-full bg-(--ad-green-tint) px-2 py-0.5 text-[11px] font-semibold text-(--ad-green)">Recommended</span></span>
+              <span className="mt-0.5 block text-[13.5px] leading-relaxed text-(--ad-ink-soft)">We read your website, suggest who to target and write the emails. About 2 minutes.</span>
+            </span>
+          </button>
+          <button type="button" className={option} onClick={onManual}>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--ad-surface-2) text-(--ad-ink)"><Pencil size={17} aria-hidden /></span>
+            <span>
+              <span className="block text-[15px] font-semibold text-(--ad-ink)">Set it up myself</span>
+              <span className="mt-0.5 block text-[13.5px] leading-relaxed text-(--ad-ink-soft)">Choose the types of business and areas yourself.</span>
+            </span>
+          </button>
+        </div>
+        {draftCount > 1 && (
+          <p className="m-0 mt-4 text-[13px] text-(--ad-ink-soft)">
+            Or <button type="button" onClick={onLaunchAll} className="cursor-pointer border-0 bg-transparent p-0 font-semibold text-(--ad-ink) underline underline-offset-4">launch your {draftCount} drafts</button>.
+          </p>
+        )}
+      </motion.div>
+    </motion.div>
   );
 }
 

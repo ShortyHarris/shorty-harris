@@ -161,7 +161,7 @@ function Shell({ label, onClose, children }: { label: string; onClose: () => voi
     >
       <motion.div
         style={FONT} role="dialog" aria-modal="true" aria-label={label}
-        className="flex h-full w-full flex-col overflow-hidden bg-background text-foreground md:h-[min(880px,calc(100vh-48px))] md:max-w-[760px] md:rounded-2xl md:border md:border-border"
+        className="flex h-full w-full flex-col overflow-hidden bg-card text-foreground md:h-[min(880px,calc(100vh-48px))] md:max-w-[760px] md:rounded-2xl md:border md:border-border"
         initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }}
         transition={{ type: 'spring', damping: 30, stiffness: 320 }}
         onClick={(e) => e.stopPropagation()}

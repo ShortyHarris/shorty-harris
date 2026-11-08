@@ -21,6 +21,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { LocationAreaInput } from '../../components/LocationAreaInput';
 import { Button } from '../../components/ui/button';
+import { BrandMark } from '../../components/BrandLockup';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { Label } from '../../components/ui/label';
@@ -61,7 +62,7 @@ function Frame({ step, progress, onExit, onManual, children, footer, wide }: {
     <div style={FONT} className="fixed inset-0 z-[70] flex flex-col bg-background text-foreground">
       <header className="flex h-16 shrink-0 items-center justify-between gap-3 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] md:px-10">
         <span className="flex items-center gap-2 text-[14px] font-semibold">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary"><Sparkles className="h-4 w-4" aria-hidden /></span>
+          <BrandMark size={22} />
           New campaign
         </span>
         <span className="flex items-center gap-1.5">
@@ -134,13 +135,13 @@ function Working({ title, lines, orb = 'working' }: { title: string; lines: stri
 }
 
 /** Content arriving after the AI: children fade up one after another (still for reduced motion). */
-function Rise({ children, className, gap = 0.06, ...aria }: { children: React.ReactNode; className?: string; gap?: number; role?: string; 'aria-label'?: string }) {
+function Rise({ children, className, itemClassName, gap = 0.06, ...aria }: { children: React.ReactNode; className?: string; itemClassName?: string; gap?: number; role?: string; 'aria-label'?: string }) {
   const reduce = useReducedMotion();
-  if (reduce) return <div className={className} {...aria}>{children}</div>;
+  if (reduce) return <div className={className} {...aria}>{Children.toArray(children).map((child, i) => <div key={i} className={itemClassName}>{child}</div>)}</div>;
   return (
     <motion.div className={className} {...aria} initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: gap } } }}>
       {Children.toArray(children).map((child, i) => (
-        <motion.div key={i} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } } }}>
+        <motion.div key={i} className={itemClassName} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } } }}>
           {child}
         </motion.div>
       ))}
@@ -606,14 +607,14 @@ function GoalPage({ answers, update }: PageProps) {
   return (
     <>
       <Title sub="We'll write your emails to ask for this.">What should a new customer do?</Title>
-      <Rise className="grid grid-cols-1 gap-3 sm:grid-cols-2" gap={0.05} role="radiogroup" aria-label="Your goal">
+      <Rise className="grid grid-cols-1 gap-3 sm:grid-cols-2" itemClassName="flex" gap={0.05} role="radiogroup" aria-label="Your goal">
         {GOALS.map((g) => {
           const on = goal === g.value;
           const Icon = GOAL_ICON[g.value];
           return (
             <button key={g.value} type="button" role="radio" aria-checked={on}
               onClick={() => update({ ...answers, goal: { ...answers.goal, goal: g.value } })}
-              className={cn('flex cursor-pointer flex-col items-start gap-3 rounded-2xl border bg-background p-5 text-left transition-[border-color,box-shadow]',
+              className={cn('flex w-full cursor-pointer flex-col items-start gap-3 rounded-2xl border bg-background p-5 text-left transition-[border-color,box-shadow]',
                 on ? 'border-foreground shadow-[0_0_0_1px_var(--color-foreground)]' : 'border-border hover:border-foreground/40')}>
               <Icon className="h-6 w-6" aria-hidden />
               <span>
@@ -760,14 +761,14 @@ function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onEx
               </div>
             </div>
           ) : (
-            <Rise className="grid gap-4 md:grid-cols-2" gap={0.08}>
+            <Rise className="grid gap-4 md:grid-cols-2" itemClassName="flex" gap={0.08}>
               {state.ideas.map((idea, i) => {
                 const on = selected.has(idea.id);
                 const line = cost?.items?.[i];
                 return (
                   <div key={idea.id} role="checkbox" aria-checked={on} tabIndex={0}
                     onClick={() => toggle(idea.id)} onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(idea.id); } }}
-                    className={cn('flex cursor-pointer flex-col rounded-2xl border bg-background p-6 transition-[border-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    className={cn('flex w-full cursor-pointer flex-col rounded-2xl border bg-background p-6 transition-[border-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                       on ? 'border-foreground shadow-[0_0_0_1px_var(--color-foreground)]' : 'border-border hover:border-foreground/40')}>
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[13px] font-medium text-muted-foreground">{FIT_LABEL[idea.fit]}{idea.suggested_start && ` · starts ${new Date(`${idea.suggested_start}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}</span>
@@ -779,7 +780,9 @@ function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onEx
                     <h2 className="m-0 mt-2 text-[19px] font-semibold leading-snug tracking-tight">{idea.name}</h2>
                     <p className="m-0 mt-1 text-[15px] text-muted-foreground">{idea.target}</p>
                     {idea.fit !== 'own' && idea.reason && <p className="m-0 mt-3 text-[14px] leading-relaxed">{idea.reason}</p>}
-                    <dl className="m-0 mt-5 grid grid-cols-3 gap-3 border-t border-border pt-4">
+                    {/* Pushes the numbers to the bottom so cards side by side line up. */}
+                    <div className="min-h-5 flex-1" aria-hidden />
+                    <dl className="m-0 grid grid-cols-3 gap-3 border-t border-border pt-4">
                       <div>
                         <dt className="text-[12px] text-muted-foreground">Businesses</dt>
                         <dd className="m-0 mt-0.5 text-[15px] font-semibold tabular-nums">{idea.est_lo ?? '…'}–{idea.est_hi ?? '…'}</dd>
