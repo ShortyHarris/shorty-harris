@@ -83,3 +83,24 @@ export function startLabel(startDate: string | null, today = new Date()): string
   if (day <= t) return null;
   return `Starts ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 }
+
+/** The tabs of the campaign window. Old links used targeting/cadence/launch; they still work. */
+export type EditorTab = 'emails' | 'who' | 'launch';
+
+export function editorTab(requested: string | null, status: string): EditorTab {
+  if (requested === 'emails' || requested === 'cadence') return 'emails';
+  if (requested === 'who' || requested === 'targeting') return 'who';
+  if (requested === 'launch') return 'launch';
+  // A running campaign opens on how it's doing; a draft opens on its emails.
+  return hasLaunched(status) || status === 'archived' ? 'launch' : 'emails';
+}
+
+/** One plain sentence under the title saying what to do now. */
+export function nextStepHint(status: string, problemCount: number): string {
+  if (status === 'scheduled') return 'Scheduled. Nothing is found, sent or charged before the start date.';
+  if (status === 'archived') return 'Archived. Restore it to use it again.';
+  if (status === 'paused') return 'Paused. Nothing new is sent until you resume it.';
+  if (hasLaunched(status)) return 'Running. Edits apply to emails not written yet; sent emails never change.';
+  if (problemCount > 0) return `${problemCount} thing${problemCount === 1 ? '' : 's'} to fix, then launch. Nothing is sent or charged until you launch.`;
+  return 'Read the emails, then launch. Nothing is sent or charged until you launch.';
+}

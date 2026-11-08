@@ -1,6 +1,7 @@
 import { btn } from '../../lib/clientButtons';
 import { ModalClose } from '../../components/ModalClose';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -45,6 +46,12 @@ import { RequiredMark } from '../../components/RequiredMark';
 import { MobileFab } from '../../components/MobileFab';
 import { useClientHeader } from '../../hooks/useClientHeader';
 import { LaunchAllDialog } from './LaunchAllDialog';
+import { RowMenu } from '../../components/RowMenu';
+import { fetchOpenSession } from '../../hooks/useWizardSession';
+import { STEP_NAMES } from '../../lib/wizardPages';
+
+// The campaign window (emails, who & where, launch) for wizard-pilot clients; loaded on first open.
+const CampaignDialog = lazy(() => import('./CampaignEditor'));
 
 const HELP: HelpContent = {
   title: 'Campaigns',
@@ -119,7 +126,31 @@ export function Campaigns({
   const openWizard = (entry?: 'find_new' | 'onboarding') =>
     navigate(`${basePath}/campaigns/wizard${entry ? `?entry=${entry}` : ''}`);
   const startNew = () => (wizardEnabled ? openWizard() : setShowNew(true));
-  const openEditor = (id: string) => navigate(`${basePath}/campaigns/${id}/edit`);
+  // The campaign window is in the address (?open=<id>&tab=emails) so links and reloads land on it.
+  const openId = wizardEnabled && !readOnly ? searchParams.get('open') : null;
+  const openEditor = (id: string, tab?: string) => {
+    const next = new URLSearchParams(searchParams); next.set('open', id);
+    if (tab) next.set('tab', tab); else next.delete('tab');
+    setSearchParams(next);
+  };
+  const closeEditor = () => {
+    const next = new URLSearchParams(searchParams); next.delete('open'); next.delete('tab');
+    setSearchParams(next, { replace: true });
+  };
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  // An unfinished wizard setup is offered here, quietly; the wizard itself always starts fresh.
+  const unfinished = useQuery({
+    queryKey: ['wizard-open-session', clientId],
+    queryFn: () => fetchOpenSession(clientId, client),
+    enabled: wizardEnabled && !readOnly,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+  async function discardUnfinished() {
+    if (!unfinished.data) return;
+    await client.from('wizard_sessions').update({ status: 'abandoned' }).eq('id', unfinished.data.id);
+    void unfinished.refetch();
+  }
   const [showLaunchAll, setShowLaunchAll] = useState(false);
   // The wizard lands here with ?drafts=<id>,<id> so the new drafts can be listed with a link each.
   const [newDraftIds, setNewDraftIds] = useState<string[]>(() => (searchParams.get('drafts') ?? '').split(',').filter((x) => x.length > 30));
@@ -220,6 +251,22 @@ export function Campaigns({
         </p>
       )}
 
+      {unfinished.data && newDrafts.length === 0 && (
+        <div role="status" className="flex flex-col gap-2.5 rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="m-0 flex items-start gap-2 text-[13px] leading-relaxed text-(--ad-ink)">
+            <Sparkles size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
+            <span>
+              <strong className="font-semibold">You have an unfinished campaign setup.</strong>{' '}
+              Started {new Date(unfinished.data.updated_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}, at “{STEP_NAMES[unfinished.data.screen]}”.
+            </span>
+          </p>
+          <span className="flex shrink-0 gap-2">
+            <button className={btn('primary', 'sm')} onClick={() => navigate(`${basePath}/campaigns/wizard?resume=1`)}>Continue</button>
+            <button className={btn('secondary', 'sm')} onClick={() => void discardUnfinished()}>Discard</button>
+          </span>
+        </div>
+      )}
+
       {wizardEnabled && newDrafts.length > 0 && (
         <div role="status" className="flex flex-col gap-3 rounded-xl border border-(--ad-green-line) bg-(--ad-green-tint)/40 px-4 py-3.5">
           <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
@@ -239,7 +286,7 @@ export function Campaigns({
             {newDrafts.map((c) => (
               <li key={c.id} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
                 <span className="min-w-0 truncate text-[13px] font-semibold text-(--ad-ink)">{c.name}</span>
-                <Link to={`${basePath}/campaigns/${c.id}/edit?tab=emails`} className={`${btn('secondary', 'sm')} shrink-0`}>Review emails</Link>
+                <button onClick={() => openEditor(c.id, 'emails')} className={`${btn('secondary', 'sm')} shrink-0`}>Review emails</button>
               </li>
             ))}
           </ul>
@@ -356,7 +403,14 @@ export function Campaigns({
                               Edit
                             </button>
                           )}
-                          <ChevronRight size={15} className="text-(--ad-ink-ghost)" />
+                          {wizardEnabled && !readOnly && canDelete ? (
+                            <RowMenu label={`Actions for ${c.name}`} items={[
+                              { type: 'action', label: 'Open', onClick: () => openEditor(c.id) },
+                              { type: 'action', label: 'Review emails', onClick: () => openEditor(c.id, 'emails') },
+                              { type: 'separator' },
+                              { type: 'action', label: 'Delete campaign', destructive: true, onClick: () => setDeleteTarget({ id: c.id, name: c.name }) },
+                            ]} />
+                          ) : <ChevronRight size={15} className="text-(--ad-ink-ghost)" />}
                         </div>
                       </td>
                     </tr>
@@ -445,7 +499,6 @@ export function Campaigns({
             canDelete={canDelete}
             basePath={basePath}
             hold={findCountryHold(holds, openCampaign.country)}
-            onOpenEditor={wizardEnabled && !readOnly ? () => openEditor(openCampaign.id) : undefined}
             onClose={() => setOpenCampaign(null)}
             onUpdated={() => {
               reload();
@@ -453,6 +506,35 @@ export function Campaigns({
             }}
             onDeleted={() => {
               setOpenCampaign(null);
+              reload();
+              toast('Campaign deleted.');
+              queryClient.invalidateQueries({ queryKey: ['client-usage', clientId] });
+            }}
+          />
+        )}
+        {openId && (
+          <Suspense key={`editor-${openId}`} fallback={null}>
+            <CampaignDialog
+              campaignId={openId}
+              initialTab={searchParams.get('tab')}
+              clientId={clientId}
+              client={client}
+              basePath={basePath}
+              canDelete={canDelete}
+              onClose={closeEditor}
+              onOpenCampaign={(id) => { openEditor(id); toast('Copied as a new draft.'); }}
+              onDelete={setDeleteTarget}
+            />
+          </Suspense>
+        )}
+        {deleteTarget && (
+          <DeleteCampaignModal
+            key="delete-campaign-row"
+            campaign={deleteTarget}
+            onClose={() => setDeleteTarget(null)}
+            onDeleted={() => {
+              if (openId === deleteTarget.id) closeEditor();
+              setDeleteTarget(null);
               reload();
               toast('Campaign deleted.');
               queryClient.invalidateQueries({ queryKey: ['client-usage', clientId] });
@@ -1373,7 +1455,7 @@ function CampaignDetailModal({
    client can't undo this, so they should see the blast radius up front. */
 function DeleteCampaignModal({
   campaign, onClose, onDeleted,
-}: { campaign: ClientCampaignRow; onClose: () => void; onDeleted: () => void }) {
+}: { campaign: { id: string; name: string }; onClose: () => void; onDeleted: () => void }) {
   const [counts, setCounts] = useState<ClientCampaignDeleteCounts | null>(null);
   const [busy, setBusy]     = useState(false);
   const [err, setErr]       = useState<string | null>(null);

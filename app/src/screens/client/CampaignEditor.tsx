@@ -1,29 +1,31 @@
-// Campaign editor (docs/CAMPAIGN_WIZARD_BUILD_PLAN.md, M4): one page per campaign, four tabs.
-//   Targeting - name, business types, areas, maximum results, start date
-//   Emails    - the four-email template, editable, with 3 free AI rewrites per campaign
-//   Cadence   - today's follow-up rule, read-only
-//   Launch    - what still needs fixing, the estimate, Launch; lifecycle actions once launched
-// Works for wizard and manual campaigns alike. Launch goes through the existing WF0a gate.
+// Campaign window (docs/CAMPAIGN_WIZARD_BUILD_PLAN.md, M4): one calm pop-up per campaign, opened
+// from the Campaigns page (?open=<id>&tab=emails). Same principles as the campaign wizard: big
+// title, one sentence saying what to do next, one primary button, everything else tucked away.
+//   Emails       - the four-email template, editable, with free AI rewrites; when each one goes
+//   Who & where  - name, types of business, areas; more settings behind a disclosure
+//   Launch       - the estimate, what still needs fixing, Launch (Status once it is running)
+// Pause / resume / archive / copy / delete live in the "⋯" menu. Launch uses the existing WF0a gate.
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
 import { ThinkingOrb } from 'thinking-orbs';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { CalendarClock, Check, CircleAlert, Loader2, Rocket, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, CircleAlert, Loader2, Sparkles } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { Label } from '../../components/ui/label';
-import { Badge } from '../../components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { ModalClose } from '../../components/ModalClose';
+import { RowMenu, type MenuItem } from '../../components/RowMenu';
 import { TagInput } from '../../components/TagInput';
 import { LocationAreaInput } from '../../components/LocationAreaInput';
 import { LimitMessages } from '../../components/LimitCounter';
 import { useToast, ToastHost } from '../../components/Toast';
+import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { queryClient } from '../../lib/queryClient';
 import { confirmDiscard } from '../../lib/confirmDiscard';
 import { cn } from '../../lib/utils';
@@ -32,18 +34,21 @@ import { validateCampaignLimits } from '../../lib/campaignLimits';
 import { useCampaignLimits } from '../../hooks/useClientIcp';
 import { enqueueCampaign } from '../../lib/scrapeEnqueue';
 import {
-  CADENCE, EMAIL_LABELS, LIFECYCLE_LABEL, emailProblems, emailsFrom, hasLaunched, isLaunchable, lifecycleActions,
-  startLabel, type Email, type LifecycleAction,
+  LIFECYCLE_LABEL, editorTab, emailProblems, emailsFrom, hasLaunched, isLaunchable, lifecycleActions, nextStepHint,
+  startLabel, type EditorTab, type Email, type LifecycleAction,
 } from '../../lib/campaignEditor';
 import {
   callWizardAi, costForCampaigns, launchLine, wizardErrorMessage, type CostEstimate, type RewriteResult,
 } from '../../hooks/useWizardAi';
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
+const BRAND = '#7412ef';
 const STATUS_LABEL: Record<string, string> = {
-  pending_review: 'In review', draft: 'Draft', scheduled: 'Scheduled', active: 'Active', paused: 'Paused', completed: 'Completed', archived: 'Archived',
+  pending_review: 'Draft', draft: 'Draft', scheduled: 'Scheduled', active: 'Running', paused: 'Paused', completed: 'Finished', archived: 'Archived',
 };
 const LANGUAGES = ['English', 'Czech', 'French', 'Spanish', 'Portuguese', 'German', 'Italian', 'Dutch', 'Polish', 'Slovak'];
+const EMAIL_TITLES = ['Email 1', 'Email 2', 'Email 3', 'Email 4'];
+const EMAIL_WHEN = ['Sent first', '3 business days later', '5 business days later', '7 business days later'];
 
 interface CampaignRow {
   id: string; client_id: string; name: string; description: string | null; status: string; language: string; country: string | null;
@@ -70,11 +75,30 @@ function formFrom(c: CampaignRow): Form {
 interface Loaded { campaign: CampaignRow; rewriteLimit: number }
 interface Checks { problems: Problem[]; cost: CostEstimate | null }
 
-export function CampaignEditor({ clientId, client = supabase, basePath = '/app' }: { clientId: string; client?: SupabaseClient; basePath?: string }) {
+/** The old /campaigns/:id/edit address now opens the campaign window on the Campaigns page. */
+export function CampaignEditor({ basePath = '/app' }: { clientId?: string; basePath?: string }) {
   const { campaignId = '' } = useParams();
   const [params] = useSearchParams();
-  // ?tab=emails opens the emails straight away (the "Review emails" link after the wizard).
-  const [tab, setTab] = useState(() => (['targeting', 'emails', 'cadence', 'launch'].includes(params.get('tab') ?? '') ? params.get('tab')! : 'targeting'));
+  const tab = params.get('tab');
+  return <Navigate replace to={`${basePath}/campaigns?open=${campaignId}${tab ? `&tab=${tab}` : ''}`} />;
+}
+
+export interface CampaignDialogProps {
+  campaignId: string;
+  initialTab: string | null;
+  clientId: string;
+  client?: SupabaseClient;
+  basePath?: string;
+  canDelete?: boolean;
+  onClose: () => void;
+  /** Open another campaign in the window (after "Make a copy"). */
+  onOpenCampaign: (id: string) => void;
+  /** Ask the page to confirm and delete (it shows the "what gets deleted" dialog on top). */
+  onDelete?: (c: { id: string; name: string }) => void;
+}
+
+export default function CampaignDialog(props: CampaignDialogProps) {
+  const { campaignId, client = supabase } = props;
   const editor = useQuery({
     queryKey: ['campaign-editor', campaignId],
     queryFn: async (): Promise<Loaded> => {
@@ -99,45 +123,71 @@ export function CampaignEditor({ clientId, client = supabase, basePath = '/app' 
     enabled: !!editor.data,
   });
 
-  if (editor.error) {
+  if (!editor.data) {
     return (
-      <div style={FONT} className="content flex flex-col items-start gap-3">
-        <p className="m-0 text-[13px]">Couldn't open this campaign: {(editor.error as Error).message}</p>
-        <Button asChild variant="outline"><Link to={`${basePath}/campaigns`}>Back to campaigns</Link></Button>
-      </div>
+      <Shell label="Campaign" onClose={props.onClose}>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-10 text-center">
+          {editor.error ? (
+            <>
+              <p className="m-0 text-[16px] font-semibold">We couldn't open this campaign</p>
+              <p className="m-0 text-[14px] text-muted-foreground">{(editor.error as Error).message}</p>
+              <Button variant="outline" onClick={props.onClose}>Close</Button>
+            </>
+          ) : (
+            <>
+              <ThinkingOrb state="breathing" size={64} color={BRAND} aria-hidden />
+              <p className="m-0 text-[14px] text-muted-foreground">Opening campaign…</p>
+            </>
+          )}
+        </div>
+      </Shell>
     );
   }
-  if (!editor.data) return <div style={FONT} className="content text-[13px] text-(--ad-ink-soft)">Loading campaign…</div>;
   // A fresh load (after a save, launch or lifecycle action) starts the form again from the saved campaign.
   return (
-    <EditorBody key={editor.dataUpdatedAt} clientId={clientId} client={client} basePath={basePath}
+    <DialogBody key={editor.dataUpdatedAt} {...props} client={client}
       campaign={editor.data.campaign} rewriteLimit={editor.data.rewriteLimit}
-      problems={checks.data?.problems ?? []} cost={checks.data?.cost ?? null}
-      tab={tab} setTab={setTab} reload={async () => { await editor.refetch(); }} />
+      checked={checks.data ?? null} reload={async () => { await editor.refetch(); }} />
   );
 }
 
-function EditorBody({ clientId, client, basePath, campaign, rewriteLimit, problems: checkedProblems, cost, tab, setTab, reload }: {
-  clientId: string; client: SupabaseClient; basePath: string; campaign: CampaignRow; rewriteLimit: number;
-  problems: Problem[]; cost: CostEstimate | null; tab: string; setTab: (t: string) => void; reload: () => Promise<void>;
-}) {
-  const navigate = useNavigate();
+/** The window itself: a centred card on desktop, full screen on a phone. */
+function Shell({ label, onClose, children }: { label: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-[rgba(14,8,34,0.45)] md:p-6"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
+      {...useOverlayClose(onClose, { escape: true })}
+    >
+      <motion.div
+        style={FONT} role="dialog" aria-modal="true" aria-label={label}
+        className="flex h-full w-full flex-col overflow-hidden bg-background text-foreground md:h-[min(880px,calc(100vh-48px))] md:max-w-[760px] md:rounded-2xl md:border md:border-border"
+        initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }}
+        transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function DialogBody({ clientId, client, basePath = '/app', canDelete = true, campaign, rewriteLimit, checked, initialTab, onClose, onOpenCampaign, onDelete, reload }:
+  CampaignDialogProps & { client: SupabaseClient; campaign: CampaignRow; rewriteLimit: number; checked: Checks | null; reload: () => Promise<void> }) {
   const { toasts, toast, dismiss } = useToast();
   const limits = useCampaignLimits(clientId, client);
   const [saved] = useState<Form>(() => formFrom(campaign));
   const [form, setForm] = useState<Form>(saved);
+  const [tab, setTab] = useState<EditorTab>(() => editorTab(initialTab, campaign.status));
   const [rewritesUsed, setRewritesUsed] = useState(campaign.rewrites_used);
   const [launchProblems, setLaunchProblems] = useState<Problem[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [rewriting, setRewriting] = useState<number | 'all' | null>(null);
   const [launching, setLaunching] = useState(false);
   const [launchResult, setLaunchResult] = useState<{ tone: 'ok' | 'warn' | 'error'; text: string } | null>(null);
-  const problems = launchProblems ?? checkedProblems;
+  const [moreOpen, setMoreOpen] = useState(false);
 
-  const campaignsPath = `${basePath}/campaigns`;
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(saved), [form, saved]);
-
-  // Leaving the page with unsaved changes asks first.
   useEffect(() => {
     if (!dirty) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); };
@@ -149,18 +199,29 @@ function EditorBody({ clientId, client, basePath, campaign, rewriteLimit, proble
   const localEmailProblems = form.emails ? emailProblems(form.emails) : [];
   const rewritesLeft = Math.max(rewriteLimit - rewritesUsed, 0);
   const launched = hasLaunched(campaign.status);
+  const launchable = isLaunchable(campaign.status);
   const set = (patch: Partial<Form>) => setForm((f) => ({ ...f, ...patch }));
   const setEmail = (i: number, patch: Partial<Email>) =>
     setForm((f) => (f.emails ? { ...f, emails: f.emails.map((e, j) => (j === i ? { ...e, ...patch } : e)) } : f));
 
-  function leave() {
+  const problems = launchProblems ?? checked?.problems ?? [];
+  // Email problems are checked live from the form, so the saved check's are dropped.
+  const allProblems: Problem[] = [
+    ...problems.filter((p) => !(form.emails && (p.code === 'blank_email' || p.tab === 'emails'))),
+    ...localEmailProblems.map((p) => ({ code: 'email', tab: 'emails', message: p.message, step: p.step })),
+  ];
+  const whoProblems = allProblems.filter((p) => p.tab === 'targeting').length + (limitCheck.valid ? 0 : 1);
+  const starts = startLabel(form.start_date || null);
+  const line = checked?.cost?.items?.[0];
+
+  function close() {
     if (dirty && !confirmDiscard(true)) return;
-    navigate(campaignsPath);
+    onClose();
   }
 
   async function save(): Promise<boolean> {
-    if (!form.name.trim()) { toast('Give the campaign a name.', 'error'); setTab('targeting'); return false; }
-    if (!limitCheck.valid) { toast(limitCheck.errors.map((e) => e.message).join(' '), 'error'); setTab('targeting'); return false; }
+    if (!form.name.trim()) { toast('Give the campaign a name.', 'error'); setTab('who'); return false; }
+    if (!limitCheck.valid) { toast(limitCheck.errors.map((e) => e.message).join(' '), 'error'); setTab('who'); return false; }
     setSaving(true);
     const { error } = await client.from('campaigns').update({
       name: form.name.trim(),
@@ -196,21 +257,25 @@ function EditorBody({ clientId, client, basePath, campaign, rewriteLimit, proble
   }
 
   async function launch() {
+    // Anything left to fix is shown on the Launch tab rather than behind a disabled button.
+    if (allProblems.length > 0) { setTab('launch'); return; }
     if (dirty && !(await save())) return;
+    setTab('launch');
     setLaunching(true); setLaunchResult(null);
     const { data: prep, error } = await client.rpc('prepare_campaign_launch', { p_campaign_id: campaign.id });
     if (error || !prep?.ok) { setLaunching(false); setLaunchResult({ tone: 'error', text: `Couldn't launch: ${error?.message ?? prep?.error}` }); return; }
     if (prep.result === 'problems') { setLaunching(false); setLaunchProblems(prep.problems); return; }
     if (prep.result === 'scheduled') {
       setLaunching(false);
-      setLaunchResult({ tone: 'ok', text: `Scheduled. We'll start finding businesses on ${new Date(`${prep.start_date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. Nothing is charged until then.` });
+      toast(`Scheduled for ${new Date(`${prep.start_date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. Nothing is charged until then.`);
+      queryClient.invalidateQueries({ queryKey: ['my-campaigns', clientId] });
       await reload();
       return;
     }
     const r = await enqueueCampaign(campaign.id);
     setLaunching(false);
     if (r.kind === 'queued' || r.kind === 'already_queued') {
-      setLaunchResult({ tone: 'ok', text: 'Launched. We are finding businesses now. Their first emails will appear in Approvals for you to check before anything is sent.' });
+      toast('Launched. The first emails will appear in Approvals for you to check before anything is sent.');
     } else if (r.kind === 'launch_limit_reached' || r.kind === 'limit_reached') {
       setLaunchResult({ tone: 'warn', text: r.message });
     } else {
@@ -221,12 +286,12 @@ function EditorBody({ clientId, client, basePath, campaign, rewriteLimit, proble
   }
 
   async function lifecycle(action: LifecycleAction | 'clone') {
+    if (dirty && !confirmDiscard(true)) return;
     if (action === 'clone') {
       const { data } = await client.rpc('clone_campaign', { p_campaign_id: campaign.id });
       if (!data?.ok) { toast(data?.error === 'campaign_limit' ? "You've reached your campaign limit." : "Couldn't copy the campaign.", 'error'); return; }
-      toast('Copied as a new draft.');
       queryClient.invalidateQueries({ queryKey: ['my-campaigns', clientId] });
-      navigate(`${campaignsPath}/${data.campaign_id}/edit`);
+      onOpenCampaign(data.campaign_id);
       return;
     }
     const { data } = await client.rpc('set_campaign_lifecycle', { p_campaign_id: campaign.id, p_action: action });
@@ -236,228 +301,220 @@ function EditorBody({ clientId, client, basePath, campaign, rewriteLimit, proble
     await reload();
   }
 
-  const line = cost?.items?.[0];
-  const allProblems: Problem[] = [
-    ...problems.filter((p) => !(form.emails && p.code === 'blank_email')),
-    ...localEmailProblems.map((p) => ({ code: 'email', tab: 'emails', message: p.message, step: p.step })),
+  const menu: MenuItem[] = [
+    ...lifecycleActions(campaign.status).map((a): MenuItem => ({ type: 'action', label: LIFECYCLE_LABEL[a], onClick: () => void lifecycle(a) })),
+    { type: 'action', label: 'Make a copy', onClick: () => void lifecycle('clone') },
+    ...(canDelete && onDelete ? [{ type: 'separator' } as MenuItem, {
+      type: 'action', label: 'Delete campaign', destructive: true,
+      onClick: () => { if (!dirty || confirmDiscard(true)) onDelete({ id: campaign.id, name: campaign.name }); },
+    } as MenuItem] : []),
   ];
-  const starts = startLabel(form.start_date || null);
+
+  const tabCls = 'relative h-11 rounded-none border-0 bg-transparent px-0 text-[14px] font-semibold text-muted-foreground shadow-none data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:rounded-full after:bg-transparent data-[state=active]:after:bg-foreground';
+  const fieldCls = 'h-12 rounded-xl text-[15px]';
+  const dot = <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-(--ad-clay)" aria-label="needs attention" />;
 
   return (
-    <div style={FONT} className="content flex flex-col gap-5">
-      <header className="flex flex-col gap-2">
-        <button onClick={leave} className="cursor-pointer self-start border-0 bg-transparent p-0 text-[12px] font-semibold text-(--ad-green)">← Campaigns</button>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="m-0 text-[22px] font-extrabold tracking-tight text-(--ad-ink)">{campaign.name}</h1>
-          <Badge variant="secondary">{STATUS_LABEL[campaign.status] ?? campaign.status}</Badge>
-          {campaign.origin !== 'manual' && <Badge variant="outline" className="gap-1"><Sparkles className="h-3 w-3" aria-hidden />Campaign wizard</Badge>}
-          {campaign.status === 'scheduled' && starts && <Badge variant="outline" className="gap-1"><CalendarClock className="h-3 w-3" aria-hidden />{starts}</Badge>}
+    <Shell label={campaign.name} onClose={close}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as EditorTab)} className="flex min-h-0 flex-1 flex-col">
+        {/* Header: what this is and what to do now */}
+        <div className="shrink-0 px-6 pt-5 md:px-10 md:pt-7">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[13px] font-semibold text-muted-foreground">
+              {STATUS_LABEL[campaign.status] ?? campaign.status}
+              {campaign.status === 'scheduled' && starts && <> · {starts}</>}
+              {campaign.origin !== 'manual' && <> · From the campaign wizard</>}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <RowMenu items={menu} label="Campaign actions" className="h-9 w-9 rounded-full" />
+              <ModalClose onClick={close} />
+            </div>
+          </div>
+          <h2 className="m-0 mt-2 text-[24px] font-semibold leading-tight tracking-tight text-balance md:text-[28px]">{form.name || campaign.name}</h2>
+          <p className="m-0 mt-2 text-[15px] leading-relaxed text-muted-foreground">{nextStepHint(campaign.status, launchable ? allProblems.length : 0)}</p>
+          <TabsList className="mt-5 flex h-auto w-full justify-start gap-7 rounded-none border-b border-border bg-transparent p-0">
+            <TabsTrigger value="emails" className={tabCls}>Emails{localEmailProblems.length > 0 && dot}</TabsTrigger>
+            <TabsTrigger value="who" className={tabCls}>Who &amp; where{launchable && whoProblems > 0 && dot}</TabsTrigger>
+            <TabsTrigger value="launch" className={tabCls}>{launchable ? 'Launch' : 'Status'}</TabsTrigger>
+          </TabsList>
         </div>
-        <p className="m-0 text-[13px] text-(--ad-ink-soft)">
-          {launched ? 'This campaign is running. Changes apply to emails not written yet; emails already sent never change.' : 'Check the targeting and emails, then launch. Nothing is sent or charged until you launch.'}
-        </p>
-      </header>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-(--ad-surface-2)">
-          <TabsTrigger value="targeting">Targeting</TabsTrigger>
-          <TabsTrigger value="emails">Emails{localEmailProblems.length > 0 && <CircleAlert className="ml-1.5 h-3.5 w-3.5 text-(--ad-clay)" aria-label="needs attention" />}</TabsTrigger>
-          <TabsTrigger value="cadence">Cadence</TabsTrigger>
-          <TabsTrigger value="launch">{launched ? 'Status' : 'Launch'}</TabsTrigger>
-        </TabsList>
-
-        {/* ── Targeting ── */}
-        <TabsContent value="targeting" className="flex flex-col gap-4">
-          <Card>
-            <CardContent className="flex flex-col gap-4 pt-6">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="ed-name">Campaign name</Label>
-                <Input id="ed-name" value={form.name} onChange={(e) => set({ name: e.target.value })} />
+        <div className="modal-scroll min-h-0 flex-1 overflow-y-auto px-6 py-7 md:px-10">
+          {/* ── Emails ── */}
+          <TabsContent value="emails" className="m-0">
+            {!form.emails ? (
+              <div className="flex flex-col items-start gap-3 rounded-2xl border border-border p-6">
+                <p className="m-0 text-[16px] font-semibold">No email template yet</p>
+                <p className="m-0 text-[14px] leading-relaxed text-muted-foreground">We write each email from scratch for every business we find. Add a template to set the message yourself; we still personalise it for each business.</p>
+                <Button className="h-11 rounded-xl px-5" onClick={() => set({ emails: emailsFrom(null) })}>Add an email template</Button>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="ed-desc">Notes <span className="text-[11px] font-normal text-(--ad-ink-faint)">Optional</span></Label>
-                <Input id="ed-desc" value={form.description} onChange={(e) => set({ description: e.target.value })} />
+            ) : (
+              <div className="flex flex-col gap-10">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="m-0 max-w-[420px] text-[14px] leading-relaxed text-muted-foreground">
+                    Every business gets these four emails, personalised for them. Follow-ups stop when they reply.
+                  </p>
+                  <Button variant="outline" className="h-10 rounded-full px-4 text-[13px] font-semibold" disabled={rewritesLeft === 0 || rewriting !== null} onClick={() => void rewrite(null)}
+                    title={`${rewritesLeft} of ${rewriteLimit} free AI rewrites left`}>
+                    {rewriting === 'all' ? <ThinkingOrb state="composing" size={20} color={BRAND} className="mr-1.5" aria-hidden /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden />}
+                    Rewrite all with AI
+                  </Button>
+                </div>
+                {form.emails.map((e, i) => {
+                  const probs = localEmailProblems.filter((p) => p.step === i);
+                  return (
+                    <section key={i} aria-label={EMAIL_TITLES[i]} className="flex flex-col gap-3">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <h3 className="m-0 text-[17px] font-semibold tracking-tight">{EMAIL_TITLES[i]} <span className="ml-1 text-[13px] font-medium text-muted-foreground">{EMAIL_WHEN[i]}</span></h3>
+                        <button type="button" disabled={rewritesLeft === 0 || rewriting !== null} onClick={() => void rewrite(i)}
+                          className="inline-flex shrink-0 cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-[13px] font-semibold text-muted-foreground hover:text-foreground disabled:cursor-default disabled:opacity-40">
+                          {rewriting === i ? <ThinkingOrb state="composing" size={20} color={BRAND} aria-hidden /> : <Sparkles className="h-3.5 w-3.5" aria-hidden />}Rewrite
+                        </button>
+                      </div>
+                      <Input aria-label={`${EMAIL_TITLES[i]} subject`} placeholder="Subject" className={cn(fieldCls, 'font-semibold')} value={e.subject} onChange={(ev) => setEmail(i, { subject: ev.target.value })} />
+                      <Textarea aria-label={`${EMAIL_TITLES[i]} body`} rows={8} className="rounded-xl text-[15px] leading-relaxed" value={e.body} onChange={(ev) => setEmail(i, { body: ev.target.value })} />
+                      {probs.map((p) => <p key={p.message} className="m-0 flex items-start gap-1.5 text-[13px] text-(--ad-clay)"><CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />{p.message}</p>)}
+                    </section>
+                  );
+                })}
+                <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">
+                  {rewritesLeft > 0 ? `${rewritesLeft} of ${rewriteLimit} free AI rewrites left. ` : "You've used this campaign's free AI rewrites; editing yourself is always free. "}
+                  You can use {'{{first_name}}'}, {'{{company_name}}'} and {'{{sender_name}}'}. Weekends and public holidays are skipped, and we add your unsubscribe line and address.
+                </p>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ── Who & where ── */}
+          <TabsContent value="who" className="m-0">
+            <div className="flex flex-col gap-7">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="ed-name" className="text-[15px] font-semibold">Campaign name</Label>
+                <Input id="ed-name" className={fieldCls} value={form.name} onChange={(e) => set({ name: e.target.value })} />
               </div>
               {campaign.icp && typeof campaign.icp.target === 'string' && (
-                <p className="m-0 text-[12.5px] text-(--ad-ink-soft)"><b className="font-semibold text-(--ad-ink)">Who it reaches:</b> {campaign.icp.target}</p>
+                <p className="m-0 rounded-2xl bg-muted/60 px-5 py-4 text-[15px] leading-relaxed"><span className="text-muted-foreground">Who it reaches: </span>{campaign.icp.target}</p>
               )}
-              <TagInput sentenceLabel label="Types of business to search for" required placeholder="e.g. property management company"
+              <TagInput sentenceLabel label="Types of business" required placeholder="e.g. property management company"
                 helper="What we search for on maps. Businesses, not job titles." values={form.search_queries} onChange={(v) => set({ search_queries: v })} splitOn="," maxItems={limits.maxSearchTerms} capLabel="search term" />
               <LocationAreaInput sentenceLabel label="Areas" required helper="A city, a region, or a radius around a point."
                 values={form.areas} onChange={(v) => set({ areas: v })} maxItems={limits.maxLocations} capLabel="area" />
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="ed-max">Maximum businesses</Label>
-                  <Input id="ed-max" type="number" min={1} max={limits.maxResults} value={form.max_results}
-                    onChange={(e) => set({ max_results: Math.max(1, Number(e.target.value) || 1) })} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="ed-lang">Email language</Label>
-                  <select id="ed-lang" className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={form.language} onChange={(e) => set({ language: e.target.value })}>
-                    {[...new Set([form.language, ...LANGUAGES])].map((l) => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="ed-start">Start date <span className="text-[11px] font-normal text-(--ad-ink-faint)">Optional</span></Label>
-                  <Input id="ed-start" type="date" value={form.start_date} disabled={launched} onChange={(e) => set({ start_date: e.target.value })} />
-                </div>
-              </div>
-              <p className="m-0 text-[12px] text-(--ad-ink-faint)">With a future start date, launching schedules the campaign: nothing is found, sent or charged before that day.</p>
               <LimitMessages errors={limitCheck.errors} fields={['search_queries', 'target_locations', 'pairs', 'max_results']} />
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* ── Emails ── */}
-        <TabsContent value="emails" className="flex flex-col gap-4">
-          {!form.emails ? (
-            <Alert>
-              <AlertTitle>This campaign has no email template</AlertTitle>
-              <AlertDescription className="flex flex-col gap-2">
-                <span>We write each email from scratch for every business it finds. Add a template to set the message yourself; we still personalise it for each business.</span>
-                <Button size="sm" className="self-start" onClick={() => set({ emails: emailsFrom(null) })}>Add an email template</Button>
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className={cn('text-[13px] font-semibold', rewritesLeft > 0 ? 'text-(--ad-green)' : 'text-(--ad-ink-soft)')}>
-                  {rewritesLeft} of {rewriteLimit} free AI rewrites left
-                </span>
-                <Button variant="outline" size="sm" disabled={rewritesLeft === 0 || rewriting !== null} onClick={() => void rewrite(null)}>
-                  {rewriting === 'all' ? <ThinkingOrb state="composing" size={20} color="#7412ef" className="mr-1.5" aria-hidden /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden />}
-                  Rewrite all four (uses 1)
-                </Button>
+              <div className="border-t border-border pt-5">
+                <button type="button" onClick={() => setMoreOpen((o) => !o)} aria-expanded={moreOpen}
+                  className="flex w-full cursor-pointer items-center justify-between border-0 bg-transparent p-0 text-left text-[15px] font-semibold text-foreground">
+                  More settings <span className="flex items-center gap-1 text-[13px] font-medium text-muted-foreground">Size, language, start date<ChevronDown className={cn('h-4 w-4 transition-transform', moreOpen && 'rotate-180')} aria-hidden /></span>
+                </button>
+                {moreOpen && (
+                  <div className="mt-5 flex flex-col gap-5">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="ed-max">Maximum businesses</Label>
+                        <Input id="ed-max" type="number" min={1} max={limits.maxResults} className={fieldCls} value={form.max_results}
+                          onChange={(e) => set({ max_results: Math.max(1, Number(e.target.value) || 1) })} />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="ed-lang">Email language</Label>
+                        <select id="ed-lang" className="h-12 rounded-xl border border-input bg-background px-3 text-[15px]" value={form.language} onChange={(e) => set({ language: e.target.value })}>
+                          {[...new Set([form.language, ...LANGUAGES])].map((l) => <option key={l} value={l}>{l}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="ed-start">Start date <span className="font-normal text-muted-foreground">Optional</span></Label>
+                      <Input id="ed-start" type="date" className={cn(fieldCls, 'sm:max-w-[260px]')} value={form.start_date} disabled={launched} onChange={(e) => set({ start_date: e.target.value })} />
+                      <p className="m-0 text-[13px] text-muted-foreground">With a future date, launching schedules it: nothing is found, sent or charged before that day.</p>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="ed-desc">Notes <span className="font-normal text-muted-foreground">Optional, only you see these</span></Label>
+                      <Input id="ed-desc" className={fieldCls} value={form.description} onChange={(e) => set({ description: e.target.value })} />
+                    </div>
+                  </div>
+                )}
               </div>
-              {rewritesLeft === 0 && <p className="m-0 text-[12px] text-(--ad-ink-soft)">You've used this campaign's free AI rewrites. Editing the emails yourself is always free.</p>}
-              <p className="m-0 text-[12px] text-(--ad-ink-faint)">
-                Placeholders: {'{{first_name}}'}, {'{{company_name}}'}, {'{{sender_name}}'}. We personalise each email for every business, and add your unsubscribe line and address.
-              </p>
-              {form.emails.map((e, i) => {
-                const probs = localEmailProblems.filter((p) => p.step === i);
-                return (
-                  <Card key={i} className={cn(probs.length > 0 && 'border-(--ad-clay-line)')}>
-                    <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 pb-3">
-                      <div>
-                        <CardTitle className="text-[14px] font-bold">{EMAIL_LABELS[i]}</CardTitle>
-                        <CardDescription className="text-[12px]">{CADENCE[i].when}</CardDescription>
-                      </div>
-                      <Button variant="ghost" size="sm" disabled={rewritesLeft === 0 || rewriting !== null} onClick={() => void rewrite(i)}>
-                        {rewriting === i ? <ThinkingOrb state="composing" size={20} color="#7412ef" className="mr-1.5" aria-hidden /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden />}Rewrite
-                      </Button>
-                    </CardHeader>
-                    <CardContent className="flex flex-col gap-3">
-                      <div className="flex flex-col gap-1.5">
-                        <Label htmlFor={`ed-subj-${i}`}>Subject</Label>
-                        <Input id={`ed-subj-${i}`} value={e.subject} onChange={(ev) => setEmail(i, { subject: ev.target.value })} />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <Label htmlFor={`ed-body-${i}`}>Body</Label>
-                        <Textarea id={`ed-body-${i}`} rows={7} value={e.body} onChange={(ev) => setEmail(i, { body: ev.target.value })} />
-                      </div>
-                      {probs.map((p) => <p key={p.message} className="m-0 text-[12px] text-(--ad-clay)">{p.message}</p>)}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </>
-          )}
-        </TabsContent>
+            </div>
+          </TabsContent>
 
-        {/* ── Cadence ── */}
-        <TabsContent value="cadence">
-          <Card>
-            <CardHeader><CardTitle className="text-[14px] font-bold">When each email goes out</CardTitle>
-              <CardDescription>The same rule for every campaign. Weekends and public holidays are skipped.</CardDescription></CardHeader>
-            <CardContent>
-              <ol className="m-0 flex list-none flex-col gap-2 p-0">
-                {CADENCE.map((c, i) => (
-                  <li key={c.label} className="flex items-start gap-3 rounded-lg border border-(--ad-line) px-3 py-2.5 text-[13px]">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--ad-green-tint) text-[12px] font-bold text-(--ad-green)">{i + 1}</span>
-                    <span><b className="font-semibold text-(--ad-ink)">{c.label}</b><br /><span className="text-(--ad-ink-soft)">{c.when}</span></span>
-                  </li>
-                ))}
-              </ol>
-              <p className="m-0 mt-3 text-[12px] text-(--ad-ink-soft)">Follow-ups stop as soon as a business replies, unsubscribes or the email bounces.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
+          {/* ── Launch / status ── */}
+          <TabsContent value="launch" className="m-0">
+            <div className="flex flex-col gap-8">
+              <div className="flex flex-col gap-3">
+                <dl className="m-0 grid grid-cols-3 gap-3">
+                  {[
+                    { k: launched ? 'Businesses found' : 'Businesses', v: launched ? String(campaign.prospect_count) : (line ? `${line.prospects_lo}–${line.prospects_hi}` : '…') },
+                    { k: 'Hot leads', v: line ? `${line.hot_lo}–${line.hot_hi}` : '…' },
+                    { k: launched ? 'Each hot lead' : 'Launch', v: launched ? '1 credit' : (line ? (line.launch === 'free' ? 'Free' : '1 credit') : '…') },
+                  ].map((s) => (
+                    <div key={s.k} className="rounded-2xl border border-border px-4 py-4">
+                      <dt className="text-[12px] text-muted-foreground">{s.k}</dt>
+                      <dd className="m-0 mt-1 text-[20px] font-semibold tabular-nums tracking-tight">{s.v}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">
+                  Estimates, not promises; every campaign varies.{!launched && line && checked?.cost ? ` ${launchLine(line, checked.cost)}.` : ''}
+                  {checked?.cost && ` Your balance: ${checked.cost.balance} credit${checked.cost.balance === 1 ? '' : 's'}.`}
+                </p>
+              </div>
 
-        {/* ── Launch / status ── */}
-        <TabsContent value="launch" className="flex flex-col gap-4">
-          <Card>
-            <CardHeader><CardTitle className="text-[14px] font-bold">Estimate</CardTitle>
-              <CardDescription>Estimates, not promises. The real number of businesses is known only after we search.</CardDescription></CardHeader>
-            <CardContent className="flex flex-col gap-1.5 text-[13px]">
-              <span><b className="font-semibold">Est. prospects:</b> {line ? `${line.prospects_lo}–${line.prospects_hi} businesses` : '…'}</span>
-              <span className="flex flex-wrap items-center gap-1.5"><b className="font-semibold">Est. hot leads:</b> {line ? `${line.hot_lo}–${line.hot_hi}` : '…'}
-                <Badge variant="outline" className="px-1.5 py-0 text-[10px] uppercase tracking-wider">Every campaign varies</Badge></span>
-              {!launched && <span><b className="font-semibold">Launch:</b> {line ? launchLine(line, cost) : '…'}</span>}
-              {cost && <span className="text-(--ad-ink-soft)">Your balance: {cost.balance} credit{cost.balance === 1 ? '' : 's'}. Each hot lead we send you uses 1 credit.</span>}
-            </CardContent>
-          </Card>
-
-          {isLaunchable(campaign.status) && (
-            <Card>
-              <CardHeader><CardTitle className="text-[14px] font-bold">Before you launch</CardTitle></CardHeader>
-              <CardContent className="flex flex-col gap-3">
-                {allProblems.length === 0 ? (
-                  <p className="m-0 flex items-center gap-2 text-[13px] text-(--ad-green)"><Check className="h-4 w-4" aria-hidden />Everything is ready.</p>
-                ) : (
-                  <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-                    {allProblems.map((p) => (
-                      <li key={`${p.code}-${p.message}`} className="flex flex-wrap items-center gap-2 text-[13px] text-(--ad-ink)">
-                        <CircleAlert className="h-4 w-4 text-(--ad-clay)" aria-hidden />{p.message}
-                        {p.tab !== 'launch' && <Button variant="link" className="h-auto p-0 text-[12.5px]" onClick={() => setTab(p.tab === 'emails' ? 'emails' : 'targeting')}>Fix</Button>}
-                        {p.code === 'no_mailbox' && <Button asChild variant="link" className="h-auto p-0 text-[12.5px]"><Link to={`${basePath}/settings`}>Connect Gmail</Link></Button>}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {launchResult && (
-                  <Alert variant={launchResult.tone === 'error' ? 'destructive' : 'default'}><AlertDescription>
-                    {launchResult.text}
-                    {launchResult.tone === 'warn' && <> <Link className="font-semibold text-(--ad-green)" to={`${basePath}/billing`}>Add credits</Link></>}
-                  </AlertDescription></Alert>
-                )}
-                <div className="flex flex-wrap items-center gap-2">
-                  {campaign.status !== 'scheduled' && (
-                    <Button disabled={launching || allProblems.length > 0 || saving} onClick={() => void launch()}>
-                      {launching ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden /> : <Rocket className="mr-1.5 h-4 w-4" aria-hidden />}
-                      {starts ? 'Schedule campaign' : 'Launch campaign'}
-                    </Button>
+              {launchable && (
+                <section aria-label="Before you launch" className="flex flex-col gap-3">
+                  <h3 className="m-0 text-[17px] font-semibold tracking-tight">Before you launch</h3>
+                  {allProblems.length === 0 ? (
+                    <p className="m-0 flex items-center gap-2.5 rounded-2xl bg-(--ad-green-tint)/50 px-5 py-4 text-[15px] font-medium"><Check className="h-4 w-4 text-(--ad-green)" strokeWidth={3} aria-hidden />Everything is ready to launch.</p>
+                  ) : (
+                    <ul className="m-0 flex list-none flex-col divide-y divide-border overflow-hidden rounded-2xl border border-border p-0">
+                      {allProblems.map((p) => (
+                        <li key={`${p.code}-${p.message}`} className="flex items-center justify-between gap-3 px-5 py-3.5 text-[14px]">
+                          <span className="flex items-start gap-2.5"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-(--ad-clay)" aria-hidden />{p.message}</span>
+                          {p.code === 'no_mailbox'
+                            ? <Link className="shrink-0 text-[13px] font-semibold text-foreground underline underline-offset-4" to={`${basePath}/settings`}>Connect Gmail</Link>
+                            : p.tab !== 'launch' && <button type="button" className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-foreground underline underline-offset-4" onClick={() => setTab(p.tab === 'emails' ? 'emails' : 'who')}>Fix</button>}
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                  {dirty && <span className="text-[12px] text-(--ad-ink-soft)">Your changes are saved first.</span>}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </section>
+              )}
 
-          {launchResult && !isLaunchable(campaign.status) && (
-            <Alert variant={launchResult.tone === 'error' ? 'destructive' : 'default'}><AlertDescription>{launchResult.text}</AlertDescription></Alert>
-          )}
+              {launchResult && (
+                <p role="status" className={cn('m-0 rounded-2xl px-5 py-4 text-[14px] leading-relaxed', launchResult.tone === 'error' ? 'bg-destructive/10 text-destructive' : 'bg-muted/60')}>
+                  {launchResult.text}
+                  {launchResult.tone === 'warn' && <> <Link className="font-semibold underline underline-offset-4" to={`${basePath}/billing`}>Add credits</Link></>}
+                </p>
+              )}
 
-          <Card>
-            <CardHeader><CardTitle className="text-[14px] font-bold">Campaign actions</CardTitle>
-              <CardDescription>Pausing, resuming and restoring are free. A copy is a new campaign with its own launch.</CardDescription></CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              {lifecycleActions(campaign.status).map((a) => (
-                <Button key={a} variant="outline" onClick={() => void lifecycle(a)}>{LIFECYCLE_LABEL[a]}</Button>
-              ))}
-              <Button variant="outline" onClick={() => void lifecycle('clone')}>Make a copy</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-(--ad-line) bg-background py-3 max-md:bottom-[calc(72px+env(safe-area-inset-bottom,0px))]">
-        <span className="text-[12px] text-(--ad-ink-soft)" aria-live="polite">{dirty ? 'You have unsaved changes.' : 'All changes saved.'}</span>
-        <div className="flex gap-2">
-          <Button variant="outline" disabled={!dirty || saving} onClick={() => { if (confirmDiscard(true)) setForm(saved); }}>Discard</Button>
-          <Button disabled={!dirty || saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save changes'}</Button>
+              {!launchable && (
+                <p className="m-0 text-[14px] leading-relaxed text-muted-foreground">
+                  New emails appear in <Link className="font-semibold text-foreground underline underline-offset-4" to={`${basePath}/approvals`}>Approvals</Link> for you to check before they're sent.
+                  Pause, archive, copy or delete it from the ⋮ menu at the top.
+                </p>
+              )}
+            </div>
+          </TabsContent>
         </div>
-      </div>
+
+        {/* Footer: one clear next step */}
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-6 py-4 max-md:pb-[calc(16px+env(safe-area-inset-bottom,0px))] md:px-10">
+          <span className="text-[13px] text-muted-foreground" aria-live="polite">{dirty ? 'Unsaved changes' : 'All changes saved'}</span>
+          <div className="flex items-center gap-2">
+            {dirty && <Button variant="ghost" className="h-11 rounded-xl px-4 text-[14px] font-semibold" disabled={saving} onClick={() => { if (confirmDiscard(true)) setForm(saved); }}>Discard</Button>}
+            {launchable && campaign.status !== 'scheduled' ? (
+              <>
+                {dirty && <Button variant="outline" className="h-11 rounded-xl px-5 text-[14px] font-semibold" disabled={saving || launching} onClick={() => void save()}>{saving ? 'Saving…' : 'Save'}</Button>}
+                <Button className="h-11 rounded-xl px-6 text-[14px] font-semibold" disabled={saving || launching} onClick={() => void launch()}>
+                  {launching && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}
+                  {starts ? 'Schedule' : 'Launch campaign'}
+                </Button>
+              </>
+            ) : (
+              <Button className="h-11 rounded-xl px-6 text-[14px] font-semibold" disabled={!dirty || saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save changes'}</Button>
+            )}
+          </div>
+        </div>
+      </Tabs>
       <ToastHost toasts={toasts} onDismiss={dismiss} />
-    </div>
+    </Shell>
   );
 }

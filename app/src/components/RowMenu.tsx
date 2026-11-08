@@ -9,7 +9,7 @@ export type MenuItem =
 
 const MARGIN = 8;
 
-export function RowMenu({ items }: { items: MenuItem[] }) {
+export function RowMenu({ items, label = 'Row actions', className }: { items: MenuItem[]; label?: string; className?: string }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos]   = useState({ left: 0, top: undefined as number | undefined, bottom: undefined as number | undefined, maxHeight: 320 });
   const btnRef  = useRef<HTMLButtonElement>(null);
@@ -56,8 +56,8 @@ export function RowMenu({ items }: { items: MenuItem[] }) {
       <button
         ref={btnRef}
         onClick={handleOpen}
-        aria-label="Row actions"
-        className={`flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border text-[17px] leading-none transition-all ${
+        aria-label={label}
+        className={`${className ?? 'h-7 w-7'} flex cursor-pointer items-center justify-center rounded-lg border text-[17px] leading-none transition-all ${
           open
             ? 'border-(--ad-line-strong) bg-(--ad-fill) text-(--ad-ink)'
             : 'border-transparent bg-transparent text-(--ad-ink-ghost) hover:border-(--ad-line) hover:bg-(--ad-fill) hover:text-(--ad-ink-soft)'

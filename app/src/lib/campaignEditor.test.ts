@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  editorTab, nextStepHint,
   CADENCE, emailProblems, emailsFrom, hasLaunched, isLaunchable, lifecycleActions, startLabel, unknownPlaceholders,
 } from './campaignEditor';
 
@@ -54,5 +55,24 @@ describe('cadence and lifecycle', () => {
     expect(startLabel('2026-11-07', today)).toBeNull();
     expect(startLabel(null, today)).toBeNull();
     expect(startLabel('nonsense', today)).toBeNull();
+  });
+});
+
+describe('campaign window', () => {
+  it('opens drafts on their emails and running campaigns on their status', () => {
+    expect(editorTab(null, 'draft')).toBe('emails');
+    expect(editorTab(null, 'active')).toBe('launch');
+    expect(editorTab(null, 'archived')).toBe('launch');
+    expect(editorTab('targeting', 'draft')).toBe('who');
+    expect(editorTab('cadence', 'active')).toBe('emails');
+    expect(editorTab('nonsense', 'draft')).toBe('emails');
+  });
+
+  it('says what to do next in one sentence', () => {
+    expect(nextStepHint('draft', 0)).toMatch(/^Read the emails, then launch/);
+    expect(nextStepHint('draft', 2)).toMatch(/^2 things to fix/);
+    expect(nextStepHint('draft', 1)).toMatch(/^1 thing to fix/);
+    expect(nextStepHint('active', 0)).toMatch(/^Running/);
+    expect(nextStepHint('scheduled', 0)).toMatch(/^Scheduled/);
   });
 });

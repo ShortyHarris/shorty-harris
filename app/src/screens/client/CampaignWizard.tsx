@@ -123,8 +123,9 @@ function Working({ title, lines, orb = 'working' }: { title: string; lines: stri
   return (
     <div className="flex flex-col items-center py-14 text-center" aria-live="polite">
       <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="mb-8 flex h-28 w-28 items-center justify-center rounded-full bg-primary/5">
-        <ThinkingOrb state={orb} size={64} color={BRAND} dotSize={1.35} aria-hidden />
+        className="mb-6 flex items-center justify-center">
+        {/* The orb's largest tuned size is 64px; it is shown at 104px, like the old circle around it. */}
+        <ThinkingOrb state={orb} size={64} color={BRAND} dotSize={1.35} className="!h-[104px] !w-[104px]" aria-hidden />
       </motion.div>
       <h1 className="m-0 text-[26px] font-semibold tracking-tight md:text-[30px]">{title}</h1>
       <AITextLoading texts={lines} interval={2600} stopAtEnd className="mt-4 text-[16px] font-medium" />
@@ -184,7 +185,7 @@ function Pills({ id, values, onChange, placeholder, label }: {
   );
 }
 
-type Phase = { kind: 'loading' } | { kind: 'resume'; session: WizardSessionRow } | { kind: 'ready' } | { kind: 'error'; message: string };
+type Phase = { kind: 'loading' } | { kind: 'ready' } | { kind: 'error'; message: string };
 
 export function CampaignWizard({
   clientId, client = supabase, basePath = '/app',
@@ -233,8 +234,11 @@ export function CampaignWizard({
           setPhase({ kind: 'error', message: "The campaign wizard isn't switched on for your account yet. Contact us if you'd like to try it." });
           return;
         }
-        if (open) setPhase({ kind: 'resume', session: open });
-        else void begin(entry);
+        // "Continue" on the Campaigns page opens the unfinished setup (?resume=1). Anything else
+        // starts fresh, prefilled from the saved business profile; there is no "welcome back" step.
+        if (open && params.get('resume') === '1') {
+          setSession(open); setAnswers(open.answers ?? {}); setPage(firstPageOf(open.screen)); setPhase({ kind: 'ready' });
+        } else void begin(entry);
       })
       .catch((e) => !cancelled && setPhase({ kind: 'error', message: (e as Error).message }));
     return () => { cancelled = true; };
@@ -337,22 +341,6 @@ export function CampaignWizard({
       </Frame>
     );
   }
-  if (phase.kind === 'resume') {
-    const s = phase.session;
-    const when = new Date(s.updated_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-    return (
-      <Frame step={null} progress={[0, 0, 0]} onExit={() => navigate(campaignsPath)}>
-        <Title sub={`You started on ${when} and got to step ${s.screen} of 3, “${STEP_NAMES[s.screen]}”. Everything you entered is saved.`}>
-          Welcome back. Pick up where you left off?
-        </Title>
-        <div className="flex flex-wrap gap-3">
-          <NextButton onClick={() => { setSession(s); setAnswers(s.answers ?? {}); setPage(firstPageOf(s.screen)); setPhase({ kind: 'ready' }); }}>Continue</NextButton>
-          <Button variant="outline" className="h-12 rounded-xl px-6 text-[15px] font-semibold" onClick={() => void begin(entry)}>Start again</Button>
-        </div>
-      </Frame>
-    );
-  }
-
   // ── Step 3 has its own footer ─────────────────────────────────────────────────────────────
   if (page === 'ideas' && session) {
     return (

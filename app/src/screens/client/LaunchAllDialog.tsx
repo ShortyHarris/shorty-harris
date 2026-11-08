@@ -77,7 +77,7 @@ export function LaunchAllDialog({ open, onOpenChange, drafts, basePath, onDone, 
               <li key={o.id} className="flex items-start gap-2 rounded-lg border border-(--ad-line) px-3 py-2 text-[13px]">
                 {o.tone === 'ok' ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-(--ad-green)" aria-hidden /> : <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-(--ad-clay)" aria-hidden />}
                 <span><b className="font-semibold">{o.name}</b>: {o.text}{' '}
-                  {o.tone !== 'ok' && <Link className="font-semibold text-(--ad-green)" to={`${basePath}/campaigns/${o.id}/edit`}>Open</Link>}</span>
+                  {o.tone !== 'ok' && <Link className="font-semibold text-(--ad-green)" to={`${basePath}/campaigns?open=${o.id}`} onClick={() => onOpenChange(false)}>Open</Link>}</span>
               </li>
             ))}
           </ul>
