@@ -25,6 +25,9 @@ import { TagInput } from '../../components/TagInput';
 import { LocationAreaInput } from '../../components/LocationAreaInput';
 import { LimitMessages } from '../../components/LimitCounter';
 import { useToast, ToastHost } from '../../components/Toast';
+import { StatusPill } from '../../components/StatusPill';
+import { useClientCampaignProspects } from '../../hooks/useClientCampaigns';
+import { PIPELINE_STATUS_PILL, pipelineStatusLabel } from '../../lib/pipelineStatus';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { queryClient } from '../../lib/queryClient';
 import { confirmDiscard } from '../../lib/confirmDiscard';
@@ -234,6 +237,8 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
   const whoProblems = allProblems.filter((p) => p.tab === 'targeting').length + (limitCheck.valid ? 0 : 1);
   const starts = startLabel(form.start_date || null);
   const line = checked?.cost?.items?.[0];
+  // Drafts have nobody yet; the tab appears once a campaign has launched or found businesses.
+  const showProspects = !launchable || campaign.prospect_count > 0;
 
   function close() {
     if (dirty && !confirmDiscard(true)) return;
@@ -333,7 +338,7 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
     } as MenuItem] : []),
   ];
 
-  const tabCls = 'relative h-11 rounded-none border-0 bg-transparent px-0 text-[14px] font-semibold text-muted-foreground shadow-none data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:rounded-full after:bg-transparent data-[state=active]:after:bg-foreground';
+  const tabCls = 'relative h-11 rounded-none border-0 bg-transparent px-0 outline-none focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:text-foreground focus-visible:after:bg-foreground/50 text-[14px] font-semibold text-muted-foreground shadow-none data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:rounded-full after:bg-transparent data-[state=active]:after:bg-foreground';
   const fieldCls = 'h-12 rounded-xl text-[15px]';
   const dot = <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-(--ad-clay)" aria-label="needs attention" />;
 
@@ -355,9 +360,10 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
           </div>
           <h2 className="m-0 mt-2 text-[24px] font-semibold leading-tight tracking-tight text-balance md:text-[28px]">{form.name || campaign.name}</h2>
           <p className="m-0 mt-2 text-[15px] leading-relaxed text-muted-foreground">{nextStepHint(campaign.status, launchable ? allProblems.length : 0)}</p>
-          <TabsList className="mt-5 flex h-auto w-full justify-start gap-7 rounded-none border-b border-border bg-transparent p-0">
+          <TabsList className="mt-5 flex h-auto w-full justify-start gap-6 overflow-x-auto rounded-none md:gap-7 border-b border-border bg-transparent p-0">
             <TabsTrigger value="emails" className={tabCls}>Emails{localEmailProblems.length > 0 && dot}</TabsTrigger>
             <TabsTrigger value="who" className={tabCls}>Who &amp; where{launchable && whoProblems > 0 && dot}</TabsTrigger>
+            {showProspects && <TabsTrigger value="prospects" className={tabCls}>Prospects{campaign.prospect_count > 0 && <span className="ml-1.5 text-muted-foreground tabular-nums">{campaign.prospect_count}</span>}</TabsTrigger>}
             <TabsTrigger value="launch" className={tabCls}>{launchable ? 'Launch' : 'Status'}</TabsTrigger>
           </TabsList>
         </div>
@@ -459,6 +465,13 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
             </div>
           </TabsContent>
 
+          {/* ── Prospects ── */}
+          {showProspects && (
+            <TabsContent value="prospects" className="m-0">
+              <ProspectsTab campaignId={campaign.id} client={client} basePath={basePath} />
+            </TabsContent>
+          )}
+
           {/* ── Launch / status ── */}
           <TabsContent value="launch" className="m-0">
             <div className="flex flex-col gap-8">
@@ -539,5 +552,62 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
       </Tabs>
       <ToastHost toasts={toasts} onDismiss={dismiss} />
     </>
+  );
+}
+
+/** The businesses this campaign found, newest first, with where each one is in the pipeline. */
+function ProspectsTab({ campaignId, client, basePath }: { campaignId: string; client: SupabaseClient; basePath: string }) {
+  const { rows, loading } = useClientCampaignProspects(campaignId, client);
+  const [q, setQ] = useState('');
+  const term = q.trim().toLowerCase();
+  const shown = term
+    ? rows.filter((p) => [p.business_name, p.contact_name, p.category, p.location].some((v) => v?.toLowerCase().includes(term)))
+    : rows;
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-2" aria-busy="true">
+        {[0, 1, 2, 3].map((i) => <span key={i} className="h-16 animate-pulse rounded-2xl bg-muted" />)}
+      </div>
+    );
+  }
+  if (rows.length === 0) {
+    return (
+      <div className="flex flex-col items-start gap-2 rounded-2xl border border-border p-6">
+        <p className="m-0 text-[16px] font-semibold">No businesses yet</p>
+        <p className="m-0 text-[14px] leading-relaxed text-muted-foreground">We're still searching. Businesses appear here as we find them, and their first emails go to Approvals for you to check.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="m-0 text-[14px] text-muted-foreground">
+          {rows.length} business{rows.length === 1 ? '' : 'es'} found. <Link className="font-semibold text-foreground underline underline-offset-4" to={`${basePath}/prospects`}>Open Prospects</Link> for details and replies.
+        </p>
+        {rows.length > 8 && (
+          <Input aria-label="Search prospects" placeholder="Search by name, type or place" value={q} onChange={(e) => setQ(e.target.value)} className="h-10 w-full rounded-xl text-[14px] sm:w-[260px]" />
+        )}
+      </div>
+      {shown.length === 0 ? (
+        <p className="m-0 text-[14px] text-muted-foreground">No businesses match "{q}".</p>
+      ) : (
+        <ul className="m-0 flex list-none flex-col divide-y divide-border overflow-hidden rounded-2xl border border-border p-0">
+          {shown.map((p) => (
+            <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
+              <span className="min-w-0">
+                <span className="block truncate text-[15px] font-semibold" title={p.business_name}>{p.business_name}</span>
+                <span className="block truncate text-[13px] text-muted-foreground">
+                  {[p.contact_name, p.category, p.location].filter(Boolean).join(' · ') || 'No details yet'}
+                </span>
+              </span>
+              <StatusPill pill={PIPELINE_STATUS_PILL[p.pipeline_status] ?? PIPELINE_STATUS_PILL.new} className="shrink-0">
+                {pipelineStatusLabel(p.pipeline_status)}
+              </StatusPill>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

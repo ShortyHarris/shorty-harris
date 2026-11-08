@@ -66,6 +66,7 @@ describe('campaign window', () => {
     expect(editorTab('targeting', 'draft')).toBe('who');
     expect(editorTab('cadence', 'active')).toBe('emails');
     expect(editorTab('nonsense', 'draft')).toBe('emails');
+    expect(editorTab('prospects', 'active')).toBe('prospects');
   });
 
   it('says what to do next in one sentence', () => {

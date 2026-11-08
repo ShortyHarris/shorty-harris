@@ -85,12 +85,13 @@ export function startLabel(startDate: string | null, today = new Date()): string
 }
 
 /** The tabs of the campaign window. Old links used targeting/cadence/launch; they still work. */
-export type EditorTab = 'emails' | 'who' | 'launch';
+export type EditorTab = 'emails' | 'who' | 'prospects' | 'launch';
 
 export function editorTab(requested: string | null, status: string): EditorTab {
   if (requested === 'emails' || requested === 'cadence') return 'emails';
   if (requested === 'who' || requested === 'targeting') return 'who';
   if (requested === 'launch') return 'launch';
+  if (requested === 'prospects') return 'prospects';
   // A running campaign opens on how it's doing; a draft opens on its emails.
   return hasLaunched(status) || status === 'archived' ? 'launch' : 'emails';
 }

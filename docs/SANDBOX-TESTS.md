@@ -154,6 +154,7 @@ Run the K tests once in light mode and once in dark mode (moon icon at the top).
 | K24 | Have as many campaigns as your limit, open Campaigns. | "Campaign limit reached" note; **+ New campaign** is disabled. Same for 5 launches this month. |
 | K25 | A client without the pilot switch opens `/app/campaigns/wizard`. | "The campaign wizard isn't switched on for your account yet." **+ New campaign** opens the manual form. |
 | K26 | After the n8n step in `n8n/README.md`: launch a wizard campaign. | The first email in Approvals follows the template's subject and offer with names filled in. A manual campaign's emails look as before. |
+| K27 | Open a running campaign (or one that has found businesses), tab **Prospects**. | The businesses it found, newest first, each with contact, type, place and status (Emailed, They replied...). Over 8 businesses: a search box filters them. Drafts don't show this tab. |
 
 ## Not covered by this plan (by design or planned separately)
 
@@ -236,3 +237,4 @@ Run the K tests once in light mode and once in dark mode (moon icon at the top).
 | K24 | | |
 | K25 | | |
 | K26 | | |
+| K27 | | |
