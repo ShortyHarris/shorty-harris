@@ -121,9 +121,14 @@ const BRAND = '#7412ef';
 
 /** While the AI works: a thinking orb and shimmering text saying what is happening. */
 function Working({ title, lines, orb = 'working' }: { title: string; lines: string[]; orb?: OrbState }) {
+  const reduce = useReducedMotion();
   return (
     <div className="flex flex-col items-center py-14 text-center" aria-live="polite">
-      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, ease: 'easeOut' }}
+      {/* With reduced motion on, the orb library draws one still frame; a slow fade keeps the
+          screen from looking frozen while the AI works (opacity only, nothing moves). */}
+      <motion.div initial={{ opacity: 0, scale: 0.9 }}
+        animate={reduce ? { opacity: [1, 0.5, 1], scale: 1 } : { opacity: 1, scale: 1 }}
+        transition={reduce ? { duration: 1.8, ease: 'easeInOut', repeat: Number.POSITIVE_INFINITY } : { duration: 0.5, ease: 'easeOut' }}
         className="mb-6 flex items-center justify-center">
         {/* The orb's largest tuned size is 64px; it is shown at 104px, like the old circle around it. */}
         <ThinkingOrb state={orb} size={64} color={BRAND} dotSize={1.35} className="!h-[104px] !w-[104px]" aria-hidden />

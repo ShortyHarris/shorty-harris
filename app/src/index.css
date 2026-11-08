@@ -60,6 +60,19 @@ input, textarea, select { font-family: inherit; }
   * { animation: none !important; transition: none !important; }
 }
 
+/* Shimmering "AI is working" text (components/ui/ai-text-loading.tsx). A CSS animation so
+   iOS Safari keeps repainting it; -webkit-text-fill-color and will-change help WebKit too. */
+@keyframes ai-shimmer {
+  from { background-position: 200% center; }
+  to   { background-position: -200% center; }
+}
+.ai-shimmer {
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  will-change: background-position;
+  animation: ai-shimmer 2.5s linear infinite;
+}
+
 .theme-admin,
 .theme-client {
   min-height: 100%;

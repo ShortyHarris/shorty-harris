@@ -2,7 +2,12 @@
  * AI Text Loading — shimmering status text that cycles through what the AI is doing.
  * Adapted from kokonutui (MIT, https://kokonutui.com): uses framer-motion (the same library
  * as `motion/react`, already in this app), the theme's own colours so it works in light and
- * dark mode, and a static line for people who prefer reduced motion.
+ * dark mode. For people who prefer reduced motion the line does not move or shimmer; it fades
+ * gently instead, so it never looks frozen.
+ *
+ * The shimmer is a CSS animation (`.ai-shimmer` in index.css), not a framer-motion animation of
+ * background-position: iOS Safari often stops repainting text with `background-clip: text` when
+ * its background is moved from JavaScript, which made the line look frozen on iPhones.
  */
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState } from 'react';
@@ -35,11 +40,22 @@ export function AITextLoading({
 
   const text = texts[index] ?? '';
   const shimmer = cn(
-    'bg-[length:200%_100%] bg-gradient-to-r from-foreground via-muted-foreground/40 to-foreground bg-clip-text text-transparent',
+    'ai-shimmer bg-[length:200%_100%] bg-gradient-to-r from-foreground via-muted-foreground/40 to-foreground bg-clip-text text-transparent',
     className,
   );
 
-  if (reduce) return <p className={cn('m-0', className)} aria-live="polite">{text}</p>;
+  if (reduce) {
+    return (
+      <motion.p
+        className={cn('m-0', className)}
+        aria-live="polite"
+        animate={{ opacity: [1, 0.45, 1] }}
+        transition={{ duration: 1.8, ease: 'easeInOut', repeat: Number.POSITIVE_INFINITY }}
+      >
+        {text}
+      </motion.p>
+    );
+  }
 
   return (
     <div className="relative flex min-h-[1.5em] items-center justify-center" aria-live="polite">
@@ -48,13 +64,9 @@ export function AITextLoading({
           key={index}
           className={cn('m-0 whitespace-nowrap', shimmer)}
           initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0, backgroundPosition: ['200% center', '-200% center'] }}
+          animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
-          transition={{
-            opacity: { duration: 0.3 },
-            y: { duration: 0.3 },
-            backgroundPosition: { duration: 2.5, ease: 'linear', repeat: Number.POSITIVE_INFINITY },
-          }}
+          transition={{ duration: 0.3 }}
         >
           {text}
         </motion.p>
