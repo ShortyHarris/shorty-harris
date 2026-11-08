@@ -6,7 +6,7 @@
 //   Launch       - the estimate, what still needs fixing, Launch (Status once it is running)
 // Pause / resume / archive / copy / delete live in the "⋯" menu. Launch uses the existing WF0a gate.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { ThinkingOrb } from 'thinking-orbs';
@@ -123,31 +123,52 @@ export default function CampaignDialog(props: CampaignDialogProps) {
     enabled: !!editor.data,
   });
 
-  if (!editor.data) {
-    return (
-      <Shell label="Campaign" onClose={props.onClose}>
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-10 text-center">
-          {editor.error ? (
-            <>
-              <p className="m-0 text-[16px] font-semibold">We couldn't open this campaign</p>
-              <p className="m-0 text-[14px] text-muted-foreground">{(editor.error as Error).message}</p>
-              <Button variant="outline" onClick={props.onClose}>Close</Button>
-            </>
-          ) : (
-            <>
-              <ThinkingOrb state="breathing" size={64} color={BRAND} aria-hidden />
-              <p className="m-0 text-[14px] text-muted-foreground">Opening campaign…</p>
-            </>
-          )}
-        </div>
-      </Shell>
-    );
-  }
-  // A fresh load (after a save, launch or lifecycle action) starts the form again from the saved campaign.
+  // One window for the whole time it is open: it animates in once, and only what is inside it
+  // changes (loading outline -> campaign, or the campaign again after a save). The body tells
+  // the window how to close, so unsaved changes are still checked.
+  const closeRef = useRef(props.onClose);
   return (
-    <DialogBody key={editor.dataUpdatedAt} {...props} client={client}
-      campaign={editor.data.campaign} rewriteLimit={editor.data.rewriteLimit}
-      checked={checks.data ?? null} reload={async () => { await editor.refetch(); }} />
+    <Shell label={editor.data?.campaign.name ?? 'Campaign'} onClose={() => closeRef.current()}>
+      {editor.data ? (
+        // A fresh load (after a save, launch or lifecycle action) starts the form again from the saved campaign.
+        <DialogBody key={editor.dataUpdatedAt} {...props} client={client} closeRef={closeRef}
+          campaign={editor.data.campaign} rewriteLimit={editor.data.rewriteLimit}
+          checked={checks.data ?? null} reload={async () => { await editor.refetch(); }} />
+      ) : editor.error ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-10 text-center">
+          <p className="m-0 text-[16px] font-semibold">We couldn't open this campaign</p>
+          <p className="m-0 text-[14px] text-muted-foreground">{(editor.error as Error).message}</p>
+          <Button variant="outline" onClick={props.onClose}>Close</Button>
+        </div>
+      ) : <LoadingOutline onClose={props.onClose} />}
+    </Shell>
+  );
+}
+
+/** While the campaign loads: the same layout in grey, so nothing jumps when it arrives. */
+function LoadingOutline({ onClose }: { onClose: () => void }) {
+  const bar = 'rounded-md bg-muted animate-pulse';
+  return (
+    <div className="flex min-h-0 flex-1 flex-col" aria-busy="true" aria-label="Opening campaign">
+      <div className="shrink-0 px-6 pt-5 md:px-10 md:pt-7">
+        <div className="flex items-center justify-between gap-3">
+          <span className={cn(bar, 'h-4 w-40')} />
+          <ModalClose onClick={onClose} />
+        </div>
+        <span className={cn(bar, 'mt-3 block h-8 w-2/3')} />
+        <span className={cn(bar, 'mt-3 block h-4 w-4/5')} />
+        <div className="mt-5 flex gap-7 border-b border-border pb-3">
+          <span className={cn(bar, 'h-4 w-14')} /><span className={cn(bar, 'h-4 w-24')} /><span className={cn(bar, 'h-4 w-14')} />
+        </div>
+      </div>
+      <div className="flex flex-1 flex-col gap-4 px-6 py-7 md:px-10">
+        <span className={cn(bar, 'h-12 w-full rounded-xl')} />
+        <span className={cn(bar, 'h-40 w-full rounded-xl')} />
+      </div>
+      <div className="flex shrink-0 justify-end border-t border-border px-6 py-4 md:px-10">
+        <span className={cn(bar, 'h-11 w-40 rounded-xl')} />
+      </div>
+    </div>
   );
 }
 
@@ -172,8 +193,8 @@ function Shell({ label, onClose, children }: { label: string; onClose: () => voi
   );
 }
 
-function DialogBody({ clientId, client, basePath = '/app', canDelete = true, campaign, rewriteLimit, checked, initialTab, onClose, onOpenCampaign, onDelete, reload }:
-  CampaignDialogProps & { client: SupabaseClient; campaign: CampaignRow; rewriteLimit: number; checked: Checks | null; reload: () => Promise<void> }) {
+function DialogBody({ clientId, client, basePath = '/app', canDelete = true, campaign, rewriteLimit, checked, initialTab, onClose, onOpenCampaign, onDelete, reload, closeRef }:
+  CampaignDialogProps & { client: SupabaseClient; campaign: CampaignRow; rewriteLimit: number; checked: Checks | null; reload: () => Promise<void>; closeRef: React.RefObject<() => void> }) {
   const { toasts, toast, dismiss } = useToast();
   const limits = useCampaignLimits(clientId, client);
   const [saved] = useState<Form>(() => formFrom(campaign));
@@ -218,6 +239,8 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
     if (dirty && !confirmDiscard(true)) return;
     onClose();
   }
+  // The window's close button, backdrop and Escape all go through this check.
+  useEffect(() => { closeRef.current = close; });
 
   async function save(): Promise<boolean> {
     if (!form.name.trim()) { toast('Give the campaign a name.', 'error'); setTab('who'); return false; }
@@ -315,7 +338,7 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
   const dot = <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-(--ad-clay)" aria-label="needs attention" />;
 
   return (
-    <Shell label={campaign.name} onClose={close}>
+    <>
       <Tabs value={tab} onValueChange={(v) => setTab(v as EditorTab)} className="flex min-h-0 flex-1 flex-col">
         {/* Header: what this is and what to do now */}
         <div className="shrink-0 px-6 pt-5 md:px-10 md:pt-7">
@@ -515,6 +538,6 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
         </div>
       </Tabs>
       <ToastHost toasts={toasts} onDismiss={dismiss} />
-    </Shell>
+    </>
   );
 }

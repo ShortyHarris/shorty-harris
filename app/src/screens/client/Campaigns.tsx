@@ -140,6 +140,8 @@ export function Campaigns({
     setSearchParams(next, { replace: true });
   };
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  // Fetch the campaign window's code ahead of the first click, so it opens without a pause.
+  useEffect(() => { if (wizardEnabled && !readOnly) void import('./CampaignEditor'); }, [wizardEnabled, readOnly]);
   // An unfinished wizard setup is offered here, quietly; the wizard itself always starts fresh.
   const unfinished = useQuery({
     queryKey: ['wizard-open-session', clientId],
