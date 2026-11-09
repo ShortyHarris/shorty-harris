@@ -91,6 +91,23 @@
   .cstrip-short { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cstrip-text { overflow: hidden; }
 
+  /* Warm-up thermometer pill (desktop only; phones get its short text in the line instead). */
+  .cstrip-therm {
+    align-items: center;
+    gap: 7px;
+    padding: 3px 12px 3px 9px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.15);
+    white-space: nowrap;
+  }
+  .cstrip-therm strong { font-weight: 700; }
+  .cstrip-inline-icon { display: inline-block; vertical-align: -3px; }
+  .cstrip-gauge { display: inline-flex; gap: 2px; }
+  .cstrip-gauge i { width: 13px; height: 8px; border-radius: 2px; background: rgba(255, 255, 255, 0.28); }
+  /* Cool to warm, no red: full speed is good news, not a warning. Shared with the details dialog. */
+  .s1 { --warm: #84caff; } .s2 { --warm: #a6f4c5; } .s3 { --warm: #fef0c7; } .s4 { --warm: #fec84b; } .s5 { --warm: #fd853a; }
+  .cstrip-gauge i[class] { background: var(--warm); }
+
   /* Phones: one short line so the pinned strip costs ~40px. */
   .cstrip-long { display: none; }
   .cstrip-short { display: inline; font-weight: 600; }
@@ -100,6 +117,7 @@
     .cstrip-msg { flex: 0 1 auto; }
     .cstrip-text { text-align: center; }
     .cstrip-long { display: inline; }
+    .cstrip-therm.cstrip-long { display: inline-flex; }
     .cstrip-short { display: none; }
     .cstrip-cta { padding: 5px 8px 5px 12px; font-size: 12.5px; }
     .cstrip .cstrip-cta-sandbox { padding: 5px 12px; }

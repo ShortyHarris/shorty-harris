@@ -12,6 +12,7 @@
 // Pure: every input is passed in, so the order and wording are unit tested in statusStrip.test.ts.
 
 import { formatClock, formatDay, minutesIntoWindow, nextSendStart, pacingNow, type SendPacing } from './sendPacing';
+import { warmupView } from './warmup';
 
 export type StripTone = 'warning' | 'action' | 'good' | 'sandbox';
 export type StripIcon = 'gmail' | 'pause' | 'alert' | 'approve' | 'send' | 'check' | 'sandbox';
@@ -32,6 +33,8 @@ export interface StripMessage {
   /** The phone version: one short line, replaces title + detail. */
   short: string;
   cta: StripCta | null;
+  /** The warm-up thermometer, on "good" messages while a new mailbox ramps up (and a week after). */
+  warmup?: { title: string; detail: string; short: string; stage: number; stages: number; finished: boolean } | null;
 }
 
 export interface StripInput {
@@ -146,6 +149,11 @@ function activityMessage(p: SendPacing, now: Date): StripMessage | null {
   const { sent, cap } = p.today;
   const last = p.last_sent_at;
   const ready = p.queue.ready;
+  const w = warmupView(p, now);
+  const warmup = w
+    ? { title: w.pill.title, detail: w.pill.detail, short: w.pill.short, stage: w.stage, stages: w.stages, finished: w.finished }
+    : null;
+  // Phones get one line: with a thermometer, its short form (drawn after `short`) replaces "last sent".
 
   // Nothing has ever gone out yet.
   if (!last) {
@@ -158,24 +166,29 @@ function activityMessage(p: SendPacing, now: Date): StripMessage | null {
       icon: 'send',
       title: 'Your first emails are queued.',
       detail: `${plural(ready, 'approved email', 'approved emails')} ready, ${when}.`,
-      short: `${ready} queued, ${when.replace(/^sending /, '')}`,
+      short: `${ready} queued`,
       cta: { label: 'Details', to: 'details' },
+      warmup,
     };
   }
 
-  const warm = p.warmup.active ? ' (warming up)' : '';
-  const counts = `${sent} of ${cap} sent today${warm}`;
   const ago = timeAgo(last, now);
   const next = nextLine(p, now);
-  const detailParts = [counts, `last one ${ago}`, next ?? 'approve more prospects to keep sending'];
+  // Without a thermometer to show (no ladder), still say why the limit is low.
+  const warmNote = !w && p.warmup.active ? ' (warming up)' : '';
+  const detailParts = [`${sent} of ${cap} sent today${warmNote}`, `last one ${ago}`];
+  // With the thermometer showing, the routine "more going out today" is left out to keep one line.
+  if (next && !(w && next === 'more going out today')) detailParts.push(next);
+  if (!next) detailParts.push('approve more prospects to keep sending');
 
   return {
     tone: 'good',
     icon: ready > 0 ? 'send' : 'check',
     title: ready > 0 ? 'Sending is active.' : 'All approved emails have been sent.',
     detail: detailParts.join(' · '),
-    short: `${sent} sent today · last ${ago}`,
+    short: w ? `${sent} of ${cap} sent today` : `${sent} sent today · last ${ago}`,
     cta: { label: 'Details', to: 'details' },
+    warmup,
   };
 }
 

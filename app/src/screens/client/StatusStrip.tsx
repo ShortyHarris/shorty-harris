@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { AlertCircle, CheckCircle2, ChevronRight, ClipboardCheck, FlaskConical, PauseCircle, Send } from 'lucide-react';
+import { FireIcon, ThermometerIcon } from '../../components/WarmupIcons';
 import { GmailLogo } from '../../components/GmailLogo';
 import { SendingDetailsDialog } from '../../components/SendingPanel';
 import type { SendPacing } from '../../lib/sendPacing';
@@ -23,6 +24,15 @@ function Icon({ icon }: { icon: StripIcon }) {
     case 'sandbox': return <FlaskConical {...p} />;
     default: return <Send {...p} />;
   }
+}
+
+/** 5 segments filling cool blue to warm orange; colours live in Shell.css (.cstrip-gauge i.s1-s5). */
+export function WarmupGauge({ stage, stages, className = '' }: { stage: number; stages: number; className?: string }) {
+  return (
+    <span className={`cstrip-gauge ${className}`} role="img" aria-label={`Warm-up step ${stage} of ${stages}`}>
+      {Array.from({ length: stages }, (_, i) => <i key={i} className={i < stage ? `s${i + 1}` : undefined} />)}
+    </span>
+  );
 }
 
 export const StatusStrip = forwardRef<HTMLDivElement, { state: StripState; pacing: SendPacing | null }>(
@@ -47,9 +57,28 @@ export const StatusStrip = forwardRef<HTMLDivElement, { state: StripState; pacin
               <strong>{m.title}</strong>
               {m.detail && <span className="cstrip-detail"> {m.detail}</span>}
             </span>
-            <span className="cstrip-short">{m.short}</span>
+            <span className="cstrip-short">
+              {m.short}
+              {m.warmup && (
+                <>
+                  {' · '}
+                  {m.warmup.finished ? <FireIcon size={15} className="cstrip-inline-icon" /> : <ThermometerIcon size={15} className="cstrip-inline-icon" />}
+                  {' '}{m.warmup.short}
+                </>
+              )}
+            </span>
           </span>
         </span>
+        {m.warmup && (
+          <span className="cstrip-therm cstrip-long" data-testid="warmup-pill">
+            {m.warmup.finished
+              ? <FireIcon size={17} />
+              : <ThermometerIcon size={17} />}
+            <strong>{m.warmup.title}</strong>
+            <WarmupGauge stage={m.warmup.stage} stages={m.warmup.stages} />
+            <span>{m.warmup.detail}</span>
+          </span>
+        )}
         <span className="cstrip-actions">
           {cta && cta.to === 'details' && pacing && (
             <button type="button" className="cstrip-cta" onClick={() => setDetailsOpen(true)} aria-haspopup="dialog">

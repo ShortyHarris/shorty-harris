@@ -163,3 +163,28 @@ describe('timeAgo', () => {
     expect(t(4 * 24 * 60)).toBe('4 days ago');
   });
 });
+
+describe('resolveStatusStrip: warm-up thermometer', () => {
+  const ladder = [
+    { cap: 5, starts_on: '2026-10-28' }, { cap: 10, starts_on: '2026-11-04' }, { cap: 20, starts_on: '2026-11-11' },
+    { cap: 30, starts_on: '2026-11-18' }, { cap: 40, starts_on: '2026-11-25' },
+  ];
+  const warming = pacing({ warmup: { mode: 'ramp', active: true, day: 0, ladder } });
+
+  it('adds the thermometer to the activity line and keeps it to one line', () => {
+    const m = resolve({ pacing: warming })!.message;
+    expect(m.warmup).toEqual({ title: 'Warming up your mailbox', detail: 'Full speed (40 a day) by Nov 25', short: 'Full speed Nov 25', stage: 1, stages: 5, finished: false });
+    expect(m.detail).toBe('3 of 5 sent today · last one 40 min ago');
+    expect(m.short).toBe('3 of 5 sent today');
+  });
+
+  it('keeps useful timing next to the thermometer', () => {
+    const full = pacing({ warmup: { mode: 'ramp', active: true, day: 0, ladder }, today: { cap: 5, sent: 5, remaining: 0, in_window_now: true } });
+    expect(resolve({ pacing: full })!.message.detail).toContain("today's limit reached, sending resumes tomorrow at 9:00 AM");
+  });
+
+  it('has no thermometer on warnings or approvals, nor for a mailbox that never warms up', () => {
+    expect(resolve({ pacing: warming, awaitingProspects: 2 })!.message.warmup).toBeUndefined();
+    expect(resolve()!.message.warmup).toBeNull();
+  });
+});
