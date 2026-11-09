@@ -59,8 +59,8 @@ export function NotFound() {
         <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
           {[
             { to: '/#how', title: 'How it works', body: 'From prospecting to hot lead, step by step.' },
-            { to: '/#pricing', title: 'Pricing', body: 'Pay only when a hot lead comes in.' },
-            { to: '/#faq', title: 'FAQ', body: 'Gmail, approvals, credits and more.' },
+            { to: '/#pricing', title: 'Pricing', body: 'Pay as you go, no subscription.' },
+            { to: '/#faq', title: 'FAQ', body: 'Gmail, approvals, pricing and more.' },
           ].map((c) => (
             <a
               key={c.title}

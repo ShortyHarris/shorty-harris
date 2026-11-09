@@ -11,7 +11,7 @@ export const PUBLIC_PAGES = {
   pricing: {
     path: '/pricing',
     title: 'Pricing - Shorty Harris',
-    description: 'No subscription and no setup fee. You buy credits and only use one when a business replies with real interest and becomes a hot lead.',
+    description: 'Pay as you go, no subscription. See what is charged, what is always free, and the current packs.',
   },
   blog: {
     path: '/blog',

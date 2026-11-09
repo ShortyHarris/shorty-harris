@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
 import { useAuth } from '../auth/AuthProvider';
 import { BrandLockup } from './BrandLockup';
+import { CTA_LABEL } from "@/lib/marketing";
 
 // The one header for every public page (Home, Blog, BlogPost, legal pages,
 // 404). Same logo, same links, same buttons everywhere - only the active
@@ -180,7 +181,7 @@ export function PublicNav() {
                 to="/signup"
                 className="hidden md:inline-flex items-center h-10 px-5 rounded-full bg-brand text-white text-[14px] font-semibold no-underline hover:bg-brand-deep transition-colors whitespace-nowrap"
               >
-                Get started
+                {CTA_LABEL}
               </Link>
             </>
           )}
@@ -231,7 +232,7 @@ export function PublicNav() {
                   onClick={() => setMenuOpen(false)}
                   className="flex items-center justify-center h-12 rounded-full bg-brand text-[15px] font-semibold text-white no-underline hover:bg-brand-deep transition-colors"
                 >
-                  Get started
+                  {CTA_LABEL}
                 </Link>
                 <Link
                   to="/login"
