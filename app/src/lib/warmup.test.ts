@@ -30,7 +30,7 @@ describe('warmupView', () => {
     expect(v.pill).toEqual({
       title: 'Warming up your mailbox',
       detail: 'Full speed (40 a day) by Nov 25',
-      short: '🌡 Full speed Nov 25',
+      short: 'Full speed Nov 25',
     });
     expect(v.heading).toBe('Why only 5 emails a day?');
     expect(v.explainer).toBe(WARMUP_EXPLAINER);
@@ -54,7 +54,7 @@ describe('warmupView', () => {
     const done = warmupView(pacing(28), NOW)!;
     expect(done.finished).toBe(true);
     expect(done.stage).toBe(5);
-    expect(done.pill).toEqual({ title: 'Fully warmed up', detail: 'Up to 40 a day', short: '🔥 Full speed' });
+    expect(done.pill).toEqual({ title: 'Fully warmed up', detail: 'Up to 40 a day', short: 'Full speed' });
     expect(done.heading).toBe('Your mailbox is fully warmed up');
     expect(done.steps.every((s) => s.state !== 'next')).toBe(true);
     expect(warmupView(pacing(34), NOW)).not.toBeNull();

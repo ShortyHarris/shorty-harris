@@ -34,7 +34,7 @@ export interface StripMessage {
   short: string;
   cta: StripCta | null;
   /** The warm-up thermometer, on "good" messages while a new mailbox ramps up (and a week after). */
-  warmup?: { title: string; detail: string; stage: number; stages: number; finished: boolean } | null;
+  warmup?: { title: string; detail: string; short: string; stage: number; stages: number; finished: boolean } | null;
 }
 
 export interface StripInput {
@@ -151,10 +151,9 @@ function activityMessage(p: SendPacing, now: Date): StripMessage | null {
   const ready = p.queue.ready;
   const w = warmupView(p, now);
   const warmup = w
-    ? { title: w.pill.title, detail: w.pill.detail, stage: w.stage, stages: w.stages, finished: w.finished }
+    ? { title: w.pill.title, detail: w.pill.detail, short: w.pill.short, stage: w.stage, stages: w.stages, finished: w.finished }
     : null;
-  // Phones get one line: the thermometer's short form replaces "last sent" there.
-  const withPill = (s: string) => (w ? `${s} · ${w.pill.short}` : s);
+  // Phones get one line: with a thermometer, its short form (drawn after `short`) replaces "last sent".
 
   // Nothing has ever gone out yet.
   if (!last) {
@@ -167,7 +166,7 @@ function activityMessage(p: SendPacing, now: Date): StripMessage | null {
       icon: 'send',
       title: 'Your first emails are queued.',
       detail: `${plural(ready, 'approved email', 'approved emails')} ready, ${when}.`,
-      short: withPill(`${ready} queued`),
+      short: `${ready} queued`,
       cta: { label: 'Details', to: 'details' },
       warmup,
     };
@@ -187,7 +186,7 @@ function activityMessage(p: SendPacing, now: Date): StripMessage | null {
     icon: ready > 0 ? 'send' : 'check',
     title: ready > 0 ? 'Sending is active.' : 'All approved emails have been sent.',
     detail: detailParts.join(' · '),
-    short: w ? withPill(`${sent} of ${cap} sent today`) : `${sent} sent today · last ${ago}`,
+    short: w ? `${sent} of ${cap} sent today` : `${sent} sent today · last ${ago}`,
     cta: { label: 'Details', to: 'details' },
     warmup,
   };

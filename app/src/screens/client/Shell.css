@@ -101,6 +101,7 @@
     white-space: nowrap;
   }
   .cstrip-therm strong { font-weight: 700; }
+  .cstrip-inline-icon { display: inline-block; vertical-align: -3px; }
   .cstrip-gauge { display: inline-flex; gap: 2px; }
   .cstrip-gauge i { width: 13px; height: 8px; border-radius: 2px; background: rgba(255, 255, 255, 0.28); }
   /* Cool to warm, no red: full speed is good news, not a warning. Shared with the details dialog. */

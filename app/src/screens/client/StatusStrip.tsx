@@ -2,7 +2,8 @@ import { forwardRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { AlertCircle, CheckCircle2, ChevronRight, ClipboardCheck, FlaskConical, PauseCircle, Send, Thermometer, Flame } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronRight, ClipboardCheck, FlaskConical, PauseCircle, Send } from 'lucide-react';
+import { FireIcon, ThermometerIcon } from '../../components/WarmupIcons';
 import { GmailLogo } from '../../components/GmailLogo';
 import { SendingDetailsDialog } from '../../components/SendingPanel';
 import type { SendPacing } from '../../lib/sendPacing';
@@ -56,14 +57,23 @@ export const StatusStrip = forwardRef<HTMLDivElement, { state: StripState; pacin
               <strong>{m.title}</strong>
               {m.detail && <span className="cstrip-detail"> {m.detail}</span>}
             </span>
-            <span className="cstrip-short">{m.short}</span>
+            <span className="cstrip-short">
+              {m.short}
+              {m.warmup && (
+                <>
+                  {' · '}
+                  {m.warmup.finished ? <FireIcon size={15} className="cstrip-inline-icon" /> : <ThermometerIcon size={15} className="cstrip-inline-icon" />}
+                  {' '}{m.warmup.short}
+                </>
+              )}
+            </span>
           </span>
         </span>
         {m.warmup && (
           <span className="cstrip-therm cstrip-long" data-testid="warmup-pill">
             {m.warmup.finished
-              ? <Flame size={14} strokeWidth={2.2} aria-hidden />
-              : <Thermometer size={14} strokeWidth={2.2} aria-hidden />}
+              ? <FireIcon size={17} />
+              : <ThermometerIcon size={17} />}
             <strong>{m.warmup.title}</strong>
             <WarmupGauge stage={m.warmup.stage} stages={m.warmup.stages} />
             <span>{m.warmup.detail}</span>

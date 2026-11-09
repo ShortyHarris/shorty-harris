@@ -10,6 +10,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useSendPacing } from '../hooks/useSendPacing';
 import { warmupView, queueEta, type WarmupView } from '../lib/warmup';
+import { FireIcon } from './WarmupIcons';
 import {
   sendingCopy, compactSendingLine, sendingDetails, FOLLOW_UP_EXPLAINER, type SendPacing,
 } from '../lib/sendPacing';
@@ -282,8 +283,8 @@ export function WarmupSection({ view }: { view: WarmupView }) {
                 }}
               />
               </span>
-              <span className="text-[13px] font-bold text-(--ad-ink)">
-                {s.cap} a day{i === view.steps.length - 1 ? ' 🔥' : ''}
+              <span className="inline-flex items-center gap-1 text-[13px] font-bold text-(--ad-ink)">
+                {s.cap} a day{i === view.steps.length - 1 && <FireIcon size={15} />}
               </span>
               <span className="text-[11.5px] text-(--ad-ink-soft)">{s.when}</span>
               {now && (

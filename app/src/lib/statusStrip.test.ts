@@ -173,9 +173,9 @@ describe('resolveStatusStrip: warm-up thermometer', () => {
 
   it('adds the thermometer to the activity line and keeps it to one line', () => {
     const m = resolve({ pacing: warming })!.message;
-    expect(m.warmup).toEqual({ title: 'Warming up your mailbox', detail: 'Full speed (40 a day) by Nov 25', stage: 1, stages: 5, finished: false });
+    expect(m.warmup).toEqual({ title: 'Warming up your mailbox', detail: 'Full speed (40 a day) by Nov 25', short: 'Full speed Nov 25', stage: 1, stages: 5, finished: false });
     expect(m.detail).toBe('3 of 5 sent today · last one 40 min ago');
-    expect(m.short).toBe('3 of 5 sent today · 🌡 Full speed Nov 25');
+    expect(m.short).toBe('3 of 5 sent today');
   });
 
   it('keeps useful timing next to the thermometer', () => {

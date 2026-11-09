@@ -64,11 +64,11 @@ export function warmupView(p: SendPacing, nowIn: Date = new Date()): WarmupView 
   });
 
   const pill = finished
-    ? { title: 'Fully warmed up', detail: `Up to ${fullSpeedCap} a day`, short: '🔥 Full speed' }
+    ? { title: 'Fully warmed up', detail: `Up to ${fullSpeedCap} a day`, short: 'Full speed' }
     : {
         title: 'Warming up your mailbox',
         detail: fullSpeedOn ? `Full speed (${fullSpeedCap} a day) by ${fullSpeedOn}` : `Full speed is ${fullSpeedCap} a day`,
-        short: fullSpeedOn ? `🌡 Full speed ${fullSpeedOn}` : '🌡 Warming up',
+        short: fullSpeedOn ? `Full speed ${fullSpeedOn}` : 'Warming up',
       };
 
   return {
