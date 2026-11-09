@@ -351,7 +351,7 @@ export function sendingDetails(p: SendPacing, nowIn: Date = new Date()): Sending
 
   const rules: string[] = [];
   if (ramp) {
-    rules.push(`Your mailbox is new, so it is warming up: up to ${cap} emails a day right now (day ${p.warmup.day + 1} of warm-up). Sending slowly at first protects your deliverability.`);
+    rules.push(`While your mailbox warms up: up to ${cap} emails a day right now (day ${p.warmup.day + 1} of warm-up).`);
   } else {
     rules.push(`Up to ${cap} emails a day.`);
   }
@@ -385,9 +385,7 @@ export function sendingDetails(p: SendPacing, nowIn: Date = new Date()): Sending
   } else {
     next = 'The next email should go out within the next few minutes.';
   }
-  if (p.queue.ready > 0 && p.queue.estimated_clear_date) {
-    next += ` All ${p.queue.ready} queued should be sent by about ${formatDay(p.queue.estimated_clear_date, tz, now)}.`;
-  }
+  // The queue's finish date is its own section of the dialog (queueEta in lib/warmup).
 
   const today = now.toISOString().slice(0, 10);
   const ladder = ramp
