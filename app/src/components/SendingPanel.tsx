@@ -183,7 +183,7 @@ export function SendingLine({ clientId, client = supabase, settingsHref }: Conne
 
 /* "How sending works": the full picture behind the one-line summary, in a pop-up so the
    page itself stays short. */
-function SendingDetailsDialog({ pacing, onClose }: { pacing: SendPacing; onClose: () => void }) {
+export function SendingDetailsDialog({ pacing, onClose }: { pacing: SendPacing; onClose: () => void }) {
   const details = sendingDetails(pacing);
   const overlay = useOverlayClose(onClose, { escape: true });
   const label = 'block text-[11px] font-semibold uppercase tracking-wide text-(--ad-ink-ghost)';
