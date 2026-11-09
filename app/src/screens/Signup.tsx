@@ -59,8 +59,8 @@ export function Signup() {
 
           <Link to="/" style={{ textDecoration: 'none' }}><BrandLockup /></Link>
 
-          <h1 className="login-title">Create your account</h1>
-          <p className="login-sub">Start finding warm leads in minutes, no card required.</p>
+          <h1 className="login-title">Request your first leads</h1>
+          <p className="login-sub">Create your account, then tell us who you want to reach. No card needed.</p>
 
           <form onSubmit={submit}>
             <label className="login-field">
@@ -124,7 +124,7 @@ export function Signup() {
             {err && <div className="login-err">{err}</div>}
 
             <button className="login-btn" disabled={busy}>
-              {busy ? 'Creating account…' : 'Create account'}
+              {busy ? 'Setting up…' : 'Continue'}
             </button>
           </form>
 

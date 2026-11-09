@@ -10,6 +10,7 @@ import type { BlogCategory, LinkedPost } from '../hooks/useBlogPosts';
 import { responsiveImage } from '../lib/supabaseImage';
 import { expandInternalLinks, hasInternalLink } from '../lib/blogLinks';
 import { canonicalUrl } from '../lib/site';
+import { CTA_LABEL } from "@/lib/marketing";
 
 const CATEGORY_LABEL: Record<BlogCategory, string> = {
   family_business: 'Family Business',
@@ -194,7 +195,7 @@ export function BlogPost() {
               to="/signup"
               className="inline-flex items-center justify-center h-11 px-6 rounded-full bg-white text-[#0e0822] text-[14.5px] font-semibold no-underline hover:bg-[#f1e9ff] transition-colors"
             >
-              Get started
+              {CTA_LABEL}
             </Link>
             <a
               href="/#how"
