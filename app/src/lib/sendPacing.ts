@@ -212,6 +212,20 @@ export function nextSendStart(p: SendPacing, now: Date = new Date()): string | n
   return null;
 }
 
+/**
+ * Minutes since today's send window opened, on the client's wall clock. null when today is not a send
+ * day, the window hasn't opened yet or has closed, or the window can't be read.
+ */
+export function minutesIntoWindow(p: SendPacing, now: Date = new Date()): number | null {
+  const days = parseSendDays(p.window.days);
+  const start = clockMinutes(p.window.start);
+  const end = clockMinutes(p.window.end);
+  const clock = wallClock(now, p.time_zone);
+  if (!days || start === null || end === null || !clock || !days.has(clock.day)) return null;
+  if (clock.minutes < start || clock.minutes >= end) return null;
+  return clock.minutes - start;
+}
+
 /** The account's own "now": the server's (sandbox clock aware) time when sent, else the given one. */
 export function pacingNow(p: SendPacing, now: Date = new Date()): Date {
   const t = p.now ? new Date(p.now) : null;
