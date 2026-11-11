@@ -1,5 +1,6 @@
 // Must stay the first import - see the file for why.
 import './lib/authRedirectError';
+import { isChunkLoadError, reloadOnce } from './lib/chunkReloadGuard';
 import { StrictMode, Component, type ReactNode, type ErrorInfo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -11,7 +12,11 @@ import { queryClient } from './lib/queryClient';
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null };
   static getDerivedStateFromError(error: Error) { return { error }; }
-  componentDidCatch(error: Error, info: ErrorInfo) { console.error('App crash:', error, info); }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    // A stale tab after a deploy: reload to fetch the new bundle.
+    if (isChunkLoadError(error) && reloadOnce()) return;
+    console.error('App crash:', error, info);
+  }
   render() {
     if (this.state.error) {
       return (
