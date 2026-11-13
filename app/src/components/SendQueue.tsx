@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { Clock, Send, PencilLine, AlertCircle } from 'lucide-react';
+import { Clock, Send, PencilLine, AlertCircle, Undo2, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
   useSendQueue, SEND_WINDOWS, SEND_QUEUE_SORTS, skippedLine,
@@ -15,6 +15,7 @@ import { AnglePill, ObservationDetails, SignOffWarning } from './ApprovalCells';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ModalClose } from './ModalClose';
 import { SkeletonTable } from './Skeleton';
+import { actionBtn } from '../lib/actionButtons';
 import { formatPastTime, sendTimeText } from '../lib/sendQueueView';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
@@ -26,19 +27,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 const PAGE_SIZE = 10;
 const ALL = 'all';
-
-// Built on the shared --ad-* tokens so it looks right in both the client and the admin shell.
-type Variant = 'primary' | 'secondary' | 'danger';
-function qbtn(v: Variant, size: 'md' | 'lg' = 'md') {
-  const base = 'inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-  const sz = size === 'lg' ? 'px-4 py-2 text-[13px]' : 'px-3 py-1.5 text-[12.5px]';
-  const look = {
-    primary: 'border border-transparent bg-(--ad-green) font-bold text-(--ad-on-accent) hover:bg-(--ad-green-hover)',
-    secondary: 'border border-(--ad-line-strong) bg-(--ad-surface) text-(--ad-ink) hover:bg-(--ad-surface-2)',
-    danger: 'border border-(--ad-clay) bg-transparent font-bold text-(--ad-clay) hover:bg-(--ad-clay) hover:text-(--ad-on-accent)',
-  }[v];
-  return `${base} ${sz} ${look}`;
-}
 
 const TYPE_OPTIONS = [
   { value: ALL, label: 'All' },
@@ -249,7 +237,7 @@ export function SendQueue({
             key={w.value}
             onClick={() => { setWindowFilter(w.value); resetPage(); }}
             aria-pressed={windowFilter === w.value}
-            className={`cursor-pointer rounded-full border px-3 py-1 text-[12px] font-semibold transition-colors ${
+            className={`cursor-pointer rounded-full border px-3 py-1 text-[12px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ad-green) active:translate-y-px ${
               windowFilter === w.value
                 ? 'border-(--ad-green) bg-(--ad-green-tint) text-(--ad-green-hover)'
                 : 'border-(--ad-line) bg-(--ad-surface) text-(--ad-ink-soft) hover:bg-(--ad-surface-2)'
@@ -313,11 +301,11 @@ export function SendQueue({
               </span>
               {selected.size > 0 && (
                 <>
-                  <button onClick={() => ask('unapprove', Array.from(selected.values()))} disabled={busy} className={qbtn('secondary')}>
-                    Move back to pending
+                  <button onClick={() => ask('unapprove', Array.from(selected.values()))} disabled={busy} className={actionBtn('secondary')}>
+                    <Undo2 size={14} strokeWidth={2.2} aria-hidden /> Move back to pending
                   </button>
-                  <button onClick={() => ask('cancel', Array.from(selected.values()))} disabled={busy} className={qbtn('danger')}>
-                    Cancel selected
+                  <button onClick={() => ask('cancel', Array.from(selected.values()))} disabled={busy} className={actionBtn('dangerOutline')}>
+                    <XCircle size={14} strokeWidth={2.2} aria-hidden /> Cancel selected
                   </button>
                 </>
               )}
@@ -373,9 +361,9 @@ export function SendQueue({
                     <td className="text-[12.5px]"><SendTime item={item} /></td>
                     <td className="px-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-nowrap items-center justify-end gap-1.5">
-                        <button onClick={() => setOpenItem(item)} className={qbtn('secondary')}>Review</button>
-                        <button onClick={() => ask('cancel', [item])} disabled={item.sending} title={item.sending ? 'Being sent right now' : undefined} className={qbtn('danger')}>
-                          Cancel
+                        <button onClick={() => setOpenItem(item)} className={actionBtn('secondary', 'sm')}>Review</button>
+                        <button onClick={() => ask('cancel', [item])} disabled={item.sending} title={item.sending ? 'Being sent right now' : 'Cancel this email'} className={actionBtn('dangerGhost', 'sm')}>
+                          <XCircle size={14} strokeWidth={2.2} aria-hidden /> Cancel
                         </button>
                       </div>
                     </td>
@@ -413,8 +401,10 @@ export function SendQueue({
                   </div>
                 </div>
                 <div className="mt-3 flex items-center gap-2 border-t border-(--ad-surface-2) pt-3">
-                  <button onClick={() => setOpenItem(item)} className={`${qbtn('secondary')} flex-1`}>Review</button>
-                  <button onClick={() => ask('cancel', [item])} disabled={item.sending} className={`${qbtn('danger')} flex-1`}>Cancel</button>
+                  <button onClick={() => setOpenItem(item)} className={actionBtn('secondary', 'md', 'flex-1')}>Review</button>
+                  <button onClick={() => ask('cancel', [item])} disabled={item.sending} className={actionBtn('dangerGhost', 'md')}>
+                    <XCircle size={14} strokeWidth={2.2} aria-hidden /> Cancel
+                  </button>
                 </div>
               </div>
             ))}
@@ -424,8 +414,8 @@ export function SendQueue({
             <div className="flex items-center justify-between rounded-lg border border-(--ad-line) bg-(--ad-surface) px-4 py-3 text-[12.5px] text-(--ad-ink-soft)">
               <span>Page {Math.min(page, totalPages)} of {totalPages}</span>
               <div className="flex gap-2">
-                <button onClick={() => setPage(page - 1)} disabled={page <= 1} className={qbtn('secondary')}>Previous</button>
-                <button onClick={() => setPage(page + 1)} disabled={page >= totalPages} className={qbtn('secondary')}>Next</button>
+                <button onClick={() => setPage(page - 1)} disabled={page <= 1} className={actionBtn('secondary', 'sm')}>Previous</button>
+                <button onClick={() => setPage(page + 1)} disabled={page >= totalPages} className={actionBtn('secondary', 'sm')}>Next</button>
               </div>
             </div>
           )}
@@ -579,17 +569,22 @@ function QueuedMessageModal({ item, readOnly, showClient, onClose, onSave, onUna
           )}
         </div>
 
-        <div className="flex shrink-0 flex-wrap justify-end gap-2.5 border-t border-(--ad-line) px-5 py-4">
-          <button onClick={() => onCancel(item)} disabled={locked || saving} className={`${qbtn('danger', 'lg')} md:mr-auto`}>
-            Cancel email
-          </button>
-          <button onClick={() => onUnapprove(item)} disabled={locked || saving} className={qbtn('secondary', 'lg')}
-            title="Take it out of the send queue and put it back on the Pending tab">
-            Move back to pending
-          </button>
-          <button onClick={save} disabled={locked || !dirty || saving} className={qbtn('primary', 'lg')}
+        {/* Phone: one column, the expected action first and the destructive one last.
+            Desktop: destructive on the far left, away from Save; safe actions on the right. */}
+        <div className="flex shrink-0 flex-col gap-2 border-t border-(--ad-line) px-5 py-4 md:flex-row md:items-center md:gap-2.5">
+          <button onClick={save} disabled={locked || !dirty || saving}
+            className={actionBtn('primary', 'lg', 'w-full md:order-3 md:w-auto')}
             title={dirty ? 'Save the changes; the email stays approved' : 'Change the subject or message to save'}>
             {saving ? 'Saving…' : 'Save changes'}
+          </button>
+          <button onClick={() => onUnapprove(item)} disabled={locked || saving}
+            className={actionBtn('secondary', 'lg', 'w-full md:order-2 md:w-auto')}
+            title="Take it out of the send queue and put it back on the Pending tab">
+            <Undo2 size={15} strokeWidth={2.2} aria-hidden /> Move back to pending
+          </button>
+          <button onClick={() => onCancel(item)} disabled={locked || saving}
+            className={actionBtn('dangerGhost', 'lg', 'w-full md:order-1 md:mr-auto md:w-auto')}>
+            <XCircle size={15} strokeWidth={2.2} aria-hidden /> Cancel email
           </button>
         </div>
       </motion.div>

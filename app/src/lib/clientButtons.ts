@@ -8,15 +8,19 @@ export type BtnVariant = 'primary' | 'secondary' | 'danger' | 'alert' | 'quiet';
 export type BtnSize = 'sm' | 'md' | 'lg';
 
 const BASE =
-  'inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg font-semibold no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg font-semibold no-underline ' +
+  'transition-[background-color,border-color,color,transform] duration-150 active:translate-y-px ' +
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--leaf) ' +
+  'disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-50';
 
 const VARIANT: Record<BtnVariant, string> = {
   // The one thing to do on a screen.
-  primary: 'border border-transparent bg-(--leaf) font-bold text-(--ad-on-accent) hover:bg-(--leaf-hover)',
+  primary: 'border border-transparent bg-(--leaf) font-bold text-(--ad-on-accent) hover:bg-(--leaf-hover) active:brightness-90',
   // Everything else: Edit, Cancel, Back, Refresh, pagination.
-  secondary: 'border border-(--line-strong) bg-(--surface) text-(--ink) hover:bg-(--bg)',
-  // Reject, delete, stop: outlined until hovered so it never competes with primary.
-  danger: 'border border-(--clay) bg-transparent font-bold text-(--clay) hover:bg-(--clay) hover:text-(--ad-on-accent)',
+  secondary: 'border border-(--line-strong) bg-(--surface) text-(--ink) hover:border-(--ink-soft) hover:bg-(--bg) active:bg-(--ad-fill)',
+  // Reject, delete, stop: red outline, tinted on hover, so it is unmistakably destructive
+  // without competing with the primary action.
+  danger: 'border border-(--ad-danger-line) bg-(--surface) font-bold text-(--ad-danger) hover:border-(--ad-danger) hover:bg-(--ad-danger-tint) active:bg-(--ad-danger-tint-hover) focus-visible:outline-(--ad-danger)',
   // The action inside a red warning banner: solid in the banner's own colour
   // instead of green on red.
   alert: 'border border-transparent bg-(--clay) font-bold text-(--ad-on-accent) hover:bg-(--ad-clay-hover)',
