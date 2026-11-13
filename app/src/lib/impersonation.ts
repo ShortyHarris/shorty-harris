@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { withTimeout } from './fetchWithTimeout';
 
 const url = 'https://lxoeotyibsalbxgbjfxo.supabase.co';
 const anonKey = 'sb_publishable_CdK80AB1j_99hPPZGGS_jA_XYsNzrUs';
@@ -46,7 +47,7 @@ export async function startImpersonation(clientId: string): Promise<Impersonatio
 
   const rawClient = createClient(url, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
-    global: { headers: { Authorization: `Bearer ${data.token}` } },
+    global: { headers: { Authorization: `Bearer ${data.token}` }, fetch: withTimeout((...args) => fetch(...args)) },
   });
 
   return {

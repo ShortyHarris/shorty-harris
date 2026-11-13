@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   APPROVAL_TYPE_LABEL, APPROVAL_STEP_ORDER, approvalTypeLabel, APPROVAL_EXPLAINER,
   rejectedTotalsLine, bulkApproveBlockedReason, REJECTED_BY_PERSON, signOffMissingLine, SIGN_OFF_MISSING_BADGE,
+  campaignBreakdownLabel,
 } from './approvalLabels';
 
 describe('approval type labels', () => {
@@ -72,5 +73,31 @@ describe('sign-off without the sender name', () => {
     expect(signOffMissingLine(9)).toContain("9 drafts don't end with your name");
     expect(signOffMissingLine(9)).toContain(SIGN_OFF_MISSING_BADGE);
     expect(signOffMissingLine(1)).toContain("1 draft doesn't");
+  });
+});
+
+describe('campaignBreakdownLabel (reject modal said "1 draft in Unknown campaign")', () => {
+  const campaigns = [
+    { id: 'c1', name: 'Tutel - Komerční Fit-out - Architektonická a designová studia' },
+    { id: 'c2', name: 'Tutel - Služby pro SVJ' },
+  ];
+
+  it('names the one campaign', () => {
+    expect(campaignBreakdownLabel([{ campaign_id: 'c1' }], campaigns)).toBe(campaigns[0].name);
+  });
+
+  it('counts per campaign when there are several', () => {
+    expect(campaignBreakdownLabel([{ campaign_id: 'c1' }, { campaign_id: 'c2' }, { campaign_id: 'c2' }], campaigns))
+      .toBe(`${campaigns[0].name} (1), ${campaigns[1].name} (2)`);
+  });
+
+  it('returns "" rather than "Unknown campaign" when nothing can be named', () => {
+    expect(campaignBreakdownLabel([{ campaign_id: 'c1' }], [])).toBe('');
+    expect(campaignBreakdownLabel([{ campaign_id: null }], campaigns)).toBe('');
+  });
+
+  it('counts drafts it cannot name as other campaigns', () => {
+    expect(campaignBreakdownLabel([{ campaign_id: 'c1' }, { campaign_id: 'gone' }], campaigns))
+      .toBe(`${campaigns[0].name} (1), other campaigns (1)`);
   });
 });
