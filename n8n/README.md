@@ -26,3 +26,13 @@ reach n8n.shortyharris.com; the cloud sessions used for development cannot.
 whose single HTTP node uses the n8n "Supabase account" credential. Inputs: `action`
 (`claim` or `release`), `message_id`, `error`. Do not switch these calls back to the
 publishable key: they would fail with "permission denied".
+
+## WF3 sends the claimed copy (2026-11-13)
+
+`claim_message_for_send` only claims an email that is still `approved`, and returns its `subject`
+and `body`. WF3's **Build HTML Body** reads them from **Claim Send** (falling back to **Get Message**)
+and outputs `subject`, `body` and `html_body`; **Send Via Client Gmail** sends those. This is what
+makes edits, Move back to pending and Cancel in the send queue (Approvals > Approved, admin
+Send queue) take effect up to the moment of sending. Do not point the Gmail node back at
+**Get Message** for the subject or body.
+

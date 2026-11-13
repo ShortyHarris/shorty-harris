@@ -12,6 +12,7 @@ import { useClientCampaignList, myCampaignsKey } from '../../hooks/useClientCamp
 import { queryClient } from '../../lib/queryClient';
 import { followUpBar, blockedBreakdown, setFollowUpsNow, writingEta } from '../../lib/followUpsNow';
 import { isEuCountry } from '../../lib/countries';
+import { SendQueue } from '../../components/SendQueue';
 import { useGmailConnection } from '../../hooks/useGmailConnection';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { confirmDiscard } from '../../lib/confirmDiscard';
@@ -56,6 +57,7 @@ const HELP: HelpContent = {
       "Edit then approve - change the copy first, then send",
       "Reject - discards the draft and cancels that prospect's remaining follow-ups",
     ]},
+    { type: 'p', text: "Approved emails wait on the Approved tab until the daily sending limit lets them out. Until one shows \"Sending now\" you can still open it, correct the copy (it stays approved), move it back to Pending, or cancel it." },
   ],
 };
 
@@ -108,7 +110,7 @@ function Detail({ label, value, children }: { label: string; value?: string | nu
   );
 }
 
-const READ_ONLY_MSG = 'You\'re viewing read-only. Turn on "Edit as admin" in the banner to approve or reject.';
+const READ_ONLY_MSG = 'You\'re viewing read-only. Turn on "Edit as admin" in the banner to approve, edit or reject.';
 
 export function Approvals({
   clientId, client = supabase, readOnly = false, basePath = '/app',
@@ -118,11 +120,12 @@ export function Approvals({
   const [queueSort, setQueueSort] = useState<ApprovedQueueSort>(DEFAULT_QUEUE_SORT);
   const [typeFilter, setTypeFilter] = useState<ApprovalTypeFilter>('all');
   const [page, setPage] = useState(1);
-  // Approved and Blocked are paged on the server; Pending is still sorted and paged here.
+  // Blocked is paged on the server by approved_queue, Approved by send_queue (<SendQueue>);
+  // Pending is still sorted and paged here.
   const {
     items, stats, approvedQueue, timeZone, loading, isFetching, dataUpdatedAt, error,
     approve: approveRaw, saveEdits, reject: rejectRaw, bulkReject: bulkRejectRaw, reload,
-  } = useClientApprovals(clientId, client, tab === 'pending' ? null : {
+  } = useClientApprovals(clientId, client, tab !== 'blocked' ? null : {
     tab, page, pageSize: PAGE_SIZE, sort: queueSort,
     messageType: typeFilter === 'all' ? null : typeFilter, reason: null,
   });
@@ -499,6 +502,13 @@ export function Approvals({
         </div>
       )}
 
+      {tab === 'approved' && (
+        <p className="m-0 text-[12.5px] leading-relaxed text-(--ad-ink-soft)" data-testid="approved-explainer">
+          Approved emails waiting to go out, soonest first. Open one to check or correct it: saving keeps it approved and in its place.
+          You can also move it back to Pending or cancel it, until it shows <strong className="text-(--ad-ink)">Sending now</strong>.
+        </p>
+      )}
+
       {tab === 'blocked' && blockedCount > 0 && (
         <div className="flex flex-col gap-1.5" data-testid="blocked-breakdown">
           <p className="m-0 text-[12.5px] text-(--ad-ink-soft)">
@@ -516,7 +526,7 @@ export function Approvals({
       )}
 
       {/* Sort + type filter */}
-      {!loading && (isPendingTab ? items.length : tabTotal) > 0 && (
+      {!loading && tab !== 'approved' && (isPendingTab ? items.length : tabTotal) > 0 && (
         <div className="flex flex-wrap items-center gap-2.5 md:flex-nowrap rounded-xl border border-(--ad-line) bg-(--ad-surface) p-2.5">
           <FilterSelect
             label="Type"
@@ -549,7 +559,16 @@ export function Approvals({
       )}
 
       {/* Table / Cards */}
-      {loading || !queueReady ? (
+      {tab === 'approved' && !loading ? (
+        <SendQueue
+          clientId={clientId}
+          client={client}
+          readOnly={readOnly}
+          readOnlyMessage={READ_ONLY_MSG}
+          toast={toast}
+          compact
+        />
+      ) : loading || !queueReady ? (
         <SkeletonTable rows={PAGE_SIZE} cols={5} />
       ) : rowCount === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">

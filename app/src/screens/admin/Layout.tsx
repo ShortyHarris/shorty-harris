@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, LogOut, Bell, ChevronDown,
   ClipboardCheck, Flame, Newspaper,
-  Building2, Users, Megaphone, BarChart2, Activity, BookOpen, ShieldAlert, Filter, Ban,
+  Building2, Users, Megaphone, BarChart2, Activity, BookOpen, ShieldAlert, Filter, Ban, Send,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { BrandLockup } from '../../components/BrandLockup';
@@ -27,6 +27,7 @@ import { AdminResults } from './AdminResults';
 import { DocsAdmin } from './DocsAdmin';
 import { Domains } from './Domains';
 import { HeldDrafts } from './HeldDrafts';
+import { SendQueuePage } from './SendQueuePage';
 import '../../styles/theme-admin.css';
 import '../../styles/admin-tables.css';
 import './Layout.css';
@@ -56,6 +57,7 @@ export function AdminLayout() {
 
   const NAV_DAILY: NavItem[] = [
     { to: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck, badge: approvalStats.pending, badgeColor: 'var(--ad-orange)' },
+    { to: '/admin/send-queue', label: 'Send queue', icon: Send },
     { to: '/admin/hot-leads', label: 'Hot Leads', icon: Flame,          badge: newHotLeadCount,        badgeColor: 'var(--ad-orange)' },
     { to: '/admin/blog',      label: 'Blog',      icon: Newspaper,      badge: pendingPosts.length,    badgeColor: 'var(--ad-orange)' },
   ];
@@ -126,6 +128,7 @@ export function AdminLayout() {
           <main className="apage">
             <Routes>
               <Route path="approvals"  element={<ApprovalQueue />} />
+              <Route path="send-queue" element={<SendQueuePage />} />
               <Route path="blog"       element={<Blog />} />
               <Route path="clients"    element={<Clients />} />
               <Route path="held-drafts" element={<HeldDrafts />} />
