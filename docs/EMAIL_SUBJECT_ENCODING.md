@@ -35,6 +35,20 @@ the recipient's and the sender's mailbox. Follow-ups to them already go out with
 `Re: <subject>` taken from the database, so no data repair is needed: the stored subject is the clean
 template subject. 38 follow-ups for these threads are still pending or approved.
 
+## Verified end to end (13 Nov 2026)
+
+Sandbox client "Sandbox (Marcus Chongwani)", campaign language Czech, one prospect. The first email's
+subject was set to "Realizace vašich interiérů v Praze – příliš žluťoučký kůň (š é ů ý á ř č)", then
+the first email and both follow-ups were sent through the real WF2 > WF3 > WF5 path with sandbox time
+travel. Reading the mailbox back through `gmail-client` (`read_replies`, which returns the Subject as
+Gmail decoded it) gave one thread (`1a1d5e1c8146d300`) with:
+
+- first email: `Realizace vašich interiérů v Praze – příliš žluťoučký kůň (š é ů ý á ř č)`
+- follow-up 1: `Re: Realizace vašich interiérů v Praze – příliš žluťoučký kůň (š é ů ý á ř č)`
+- follow-up 2: `Re: Realizace vašich interiérů v Praze – příliš žluťoučký kůň (š é ů ý á ř č)`
+
+Still to look at by eye: the same thread in the Gmail web and mobile apps.
+
 ## Acceptance test
 
 Sandbox client, a campaign with Czech subjects (for example "Realizace vašich interiérů v Praze",
