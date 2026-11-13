@@ -1,85 +1,39 @@
 # Email subject encoding (Czech and other non-ASCII subjects)
 
-## The bug
+## What was reported
 
-Czech subjects reached Gmail double-mangled, for example
-"Realizace vašich interiérů v Praze" showed as "Realizace vaÃ…Â¡ich interiÃƒÂ©rÃ…Â¯ v Praze".
-Follow-ups in the same thread showed the same broken subject. The body was fine.
+Czech subjects showed as mojibake in Gmail, for example "Realizace vašich interiérů v Praze" as
+"Realizace vaÃ…Â¡ich interiÃƒÂ©rÃ…Â¯ v Praze". Follow-ups in the same thread showed the same broken
+subject. The body was fine.
 
-`š` is the bytes `C5 A1`. Read as Windows-1252 they become `Å¡`, and doing the same again gives
-`Ã…Â¡`. So the subject was turned into bytes and back into text twice, then written into the
-`Subject:` header as raw 8-bit bytes rather than as an RFC 2047 encoded word.
+## What was actually wrong (checked against production, 13 Nov 2026)
 
-## Where it is (and is not)
+- **Stored subjects are clean.** No row in `messages` contains mojibake. WF2 (first email) and WF19
+  (follow-ups) write plain Unicode, and WF3 passes it unchanged to `gmail-client`.
+- **`gmail-client` has encoded subjects correctly since 25 Oct 2026, 08:38 UTC** (version 12). Its
+  `encodeHeader` writes RFC 2047 `=?UTF-8?B?...?=` words, and threaded follow-ups use
+  `Re: <stored subject of the first email>` from the database, never a header read back from Gmail.
+- **Every broken thread started before that fix.** 75 Czech first emails went out between 22 and
+  24 Oct with the old, broken header. All the examples in the report ("Terronská 871", "Rekonstrukce
+  bytů pro vaše klienty", "Realizace vašich interiérů", "Spolehlivý dodavatel") were sent on 22 or 23 Oct.
+- **Why the follow-ups look broken too.** They are sent with a correct `Re: …` subject into the same
+  Gmail thread. Gmail's inbox list titles a conversation by its first message, so in the sender's
+  mailbox the whole thread keeps the old broken title. Opening the thread shows the follow-ups with
+  the correct subject.
 
-| Stage | Status |
-| --- | --- |
-| WF2 (first email) and WF19 (follow-ups) write `messages.subject` | Clean. Plain JS strings, no byte handling. |
-| WF3 sends `subject: messages.subject` to `gmail-client` as JSON | Clean. |
-| `gmail-client` edge function builds the MIME message | **The bug is here.** The Subject header is not RFC 2047 encoded, and a threaded follow-up reuses the thread's (broken) subject instead of the stored one. |
+## Source and tests
 
-`gmail-client` is deployed on the production Supabase project but its source is not in this
-repository, so the fix below has to be applied there.
+- `supabase/functions/gmail-client/index.ts`: the deployed source (version 12), now in the repo.
+- `app/src/n8n/gmail-client-subject.test.ts`: lifts `encodeHeader` and the follow-up subject rule
+  out of that file and checks š é ů ý á ř č, the reported subjects, 75-character word limits,
+  header injection, and a first email plus two follow-ups.
 
-## The fix: `supabase/functions/_shared/emailSubject.ts`
+## Existing broken threads
 
-Tested in `app/src/lib/emailSubject.test.ts` (š é ů ý á ř č, the exact strings from the report,
-one initial email and two follow-ups end to end).
-
-- `encodeSubjectHeader(subject)`: ASCII unchanged, otherwise `=?UTF-8?B?...?=` words of at most
-  75 characters, never splitting a character, folded with CRLF + space. Strips CR/LF.
-- `threadFollowUpSubject({ threadOriginalSubject, templateSubject, gmailThreadSubject, ownSubject })`:
-  `Re: <clean original>`. It trusts the stored subject of the thread's first email over anything
-  read back from Gmail, and repairs mojibake if that is all it has.
-- `repairMojibake(text)`: undoes 1 to 3 levels of this corruption. Correct text is returned unchanged.
-
-### Changes to make in `gmail-client` (action `send`)
-
-```ts
-import { cleanSubject, encodeSubjectHeader, threadFollowUpSubject } from '../_shared/emailSubject.ts';
-
-// 1. Pick the subject. For an email going into an existing thread, use the clean stored
-//    subject of the prospect's first sent email, never the Subject header fetched from Gmail.
-let subject = cleanSubject(body.subject);
-if (threadId) {
-  const { data: first } = await admin
-    .from('messages')
-    .select('subject')
-    .eq('prospect_id', message.prospect_id)
-    .eq('message_type', 'initial')
-    .eq('send_status', 'sent')
-    .order('sent_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  subject = threadFollowUpSubject({
-    threadOriginalSubject: first?.subject,
-    gmailThreadSubject: subjectReadFromGmailThread, // whatever is used today, if anything
-    ownSubject: body.subject,
-  });
-}
-
-// 2. Encode once, here, and nowhere else.
-headers.push(`Subject: ${encodeSubjectHeader(subject)}`);
-```
-
-Also remove from the subject path any of these, if present: `unescape(encodeURIComponent(...))`,
-`Buffer.from(..., 'latin1' | 'binary')`, `TextDecoder('latin1')`, or a second encoding of an
-already encoded value. The whole raw MIME message should be turned into bytes once with
-`TextEncoder` and then base64url-encoded for the Gmail API `raw` field. Keep `threadId`,
-`In-Reply-To` and `References` as they are, so threading still works.
-
-## Existing threads that already have a broken subject
-
-Recommended: future follow-ups use the clean subject (`Re: <stored original subject>`), repaired
-from the template or from Gmail if the stored one is missing.
-
-Trade-off: the Gmail API only adds a message to a thread when the subjects match. For threads
-whose first email went out broken, a follow-up with the clean subject will usually appear as a new
-conversation for the recipient, not under the broken one. A readable subject in a cold email
-matters more than keeping the thread together. Threads started after the fix are not affected.
-
-The alternative is to keep sending the old broken subject into those threads only, which keeps
-them together but sends the recipient more mojibake.
+A message that has already been delivered cannot be changed, so those first emails stay broken in
+the recipient's and the sender's mailbox. Follow-ups to them already go out with the clean
+`Re: <subject>` taken from the database, so no data repair is needed: the stored subject is the clean
+template subject. 38 follow-ups for these threads are still pending or approved.
 
 ## Acceptance test
 
