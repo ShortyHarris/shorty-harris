@@ -20,10 +20,9 @@ describe('TagInput caps', () => {
       />,
     );
 
-    const input = screen.getByPlaceholderText(/limit reached/i);
+    const input = screen.getByPlaceholderText(/limit reached \(5 search terms\)/i);
     expect(input).toBeDisabled();
     expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getByText(/reached the 5 search term limit/i)).toBeInTheDocument();
   });
 
   it('blocks a 4th location when maxItems=3', async () => {
@@ -39,8 +38,7 @@ describe('TagInput caps', () => {
       />,
     );
 
-    expect(screen.getByPlaceholderText(/limit reached/i)).toBeDisabled();
-    expect(screen.getByText(/reached the 3 location limit/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/limit reached \(3 locations\)/i)).toBeDisabled();
   });
 
   it('allows adding up to the limit and stops exactly at it, not one past, in a single paste', async () => {
@@ -77,5 +75,38 @@ describe('TagInput caps', () => {
       />,
     );
     expect(screen.getByPlaceholderText('type a term')).not.toBeDisabled();
+  });
+});
+
+describe('TagInput long lists', () => {
+  const many = Array.from({ length: 21 }, (_, i) => `term ${i + 1}`);
+
+  it('collapses past collapseAfter and expands on demand', () => {
+    render(<TagInput label="Search terms" placeholder="x" values={many} onChange={() => {}} collapseAfter={8} />);
+    expect(screen.getByText('term 8')).toBeInTheDocument();
+    expect(screen.queryByText('term 9')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '+13 more' }));
+    expect(screen.getByText('term 21')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show fewer' }));
+    expect(screen.queryByText('term 21')).not.toBeInTheDocument();
+  });
+
+  it('removes the right chip from a collapsed list', () => {
+    const onChange = vi.fn();
+    render(<TagInput label="Search terms" placeholder="x" values={many} onChange={onChange} collapseAfter={8} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove term 3' }));
+    expect(onChange).toHaveBeenCalledWith(many.filter((t) => t !== 'term 3'));
+  });
+
+  it('offers Clear all once over the cap', () => {
+    const onChange = vi.fn();
+    render(<TagInput label="Search terms" placeholder="x" values={many.slice(0, 7)} onChange={onChange} maxItems={5} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it('does not offer Clear all for a short list within the cap', () => {
+    render(<TagInput label="Search terms" placeholder="x" values={['a', 'b']} onChange={() => {}} maxItems={5} />);
+    expect(screen.queryByRole('button', { name: 'Clear all' })).not.toBeInTheDocument();
   });
 });

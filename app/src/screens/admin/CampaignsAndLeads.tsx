@@ -3,7 +3,7 @@ import { SandboxBadge } from './SandboxBadge';
 import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
 import { motion, AnimatePresence } from 'framer-motion';
 import { describeReplyMatch, WEAK_MATCH_WARNING } from '../../lib/replyMatch';
-import { ChevronRight, Info, X, Clock, MapPin, Building2, Sparkles, ArrowRight, MessageSquare, Trophy, XCircle } from 'lucide-react';
+import { ChevronRight, Info, X, Clock, MapPin, Building2, Sparkles, ArrowRight, MessageSquare, Trophy, XCircle, Bell, Check, RotateCw } from 'lucide-react';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import {
   useCampaigns, useAdminHotLeads, useClientsList,
@@ -20,10 +20,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
 import { SkeletonTable } from '../../components/Skeleton';
-import { RowMenu } from '../../components/RowMenu';
+import { RowMenu, type MenuItem } from '../../components/RowMenu';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { LocationAreaInput } from '../../components/LocationAreaInput';
-import { TargetAreaChips } from '../../components/TargetAreaChips';
+import { TargetingSummary } from '../../components/TargetingSummary';
 import { campaignStatusLabel } from '../../lib/campaignStatus';
 import { SuggestForMe } from '../client/Campaigns';
 import { TagInput } from '../../components/TagInput';
@@ -207,7 +207,7 @@ function ScrapeResultChip({ campaign, onOpenDetail }: { campaign: CampaignRow; o
   const hasDetail = campaign.scrape_status === 'complete' && !!campaign.last_scrape_summary;
   const toneCls = sr.tone === 'positive' ? 'bg-(--ad-green-tint) text-(--ad-green)' : 'bg-(--ad-fill) text-(--ad-ink-soft)';
   if (!hasDetail) {
-    return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${toneCls}`}>{scrapeChipLabel(campaign)}</span>;
+    return <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${toneCls}`}>{scrapeChipLabel(campaign)}</span>;
   }
   return (
     <button
@@ -215,7 +215,7 @@ function ScrapeResultChip({ campaign, onOpenDetail }: { campaign: CampaignRow; o
       // and stack that modal under the scrape breakdown.
       onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
       title="View full scrape breakdown"
-      className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-semibold transition-opacity hover:opacity-75 ${toneCls}`}
+      className={`inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold transition-opacity hover:opacity-75 ${toneCls}`}
     >
       {scrapeChipLabel(campaign)}
       <Info size={11} strokeWidth={2.5} className="opacity-60" />
@@ -249,7 +249,7 @@ function ScrapeSummaryModal({
       <CampModalShell onClose={onClose}>
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
           <h2 className="m-0 text-[16px] font-semibold text-(--ad-ink)">Scrape failed</h2>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
+          <button onClick={onClose} aria-label="Close" className="flex cursor-pointer items-center border-0 bg-transparent p-1 text-(--ad-ink-faint) hover:text-(--ad-ink)"><X size={20} /></button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
           <div>
@@ -307,7 +307,7 @@ function ScrapeSummaryModal({
     <CampModalShell onClose={onClose}>
       <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
         <h2 className="m-0 text-[16px] font-semibold text-(--ad-ink)">Scrape results</h2>
-        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
+        <button onClick={onClose} aria-label="Close" className="flex cursor-pointer items-center border-0 bg-transparent p-1 text-(--ad-ink-faint) hover:text-(--ad-ink)"><X size={20} /></button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
         <div>
@@ -356,6 +356,23 @@ export function Campaigns() {
     const { error: err } = await setStatus(c.id, status);
     if (err) { toast(`Couldn't update "${c.name}": ${err}`, 'error'); return; }
     toast(wasReview ? `"${c.name}" approved and activated.` : status === 'paused' ? `"${c.name}" paused.` : `"${c.name}" activated.`);
+  }
+  // Everything a row can do besides its one inline action (Approve / Queue
+  // scrape) - the same list on desktop and mobile.
+  function campaignMenu(c: CampaignRow): MenuItem[] {
+    const active = c.status === 'active';
+    const paused = c.status === 'paused';
+    return [
+      { type: 'action', label: 'Edit campaign', onClick: () => setEditCampaign(c) },
+      ...(c.needsReview ? [{ type: 'action' as const, label: 'Approve and activate', onClick: () => changeStatus(c, 'active') }] : []),
+      ...(active || paused ? [{
+        type: 'action' as const,
+        label: active ? 'Pause campaign' : 'Activate campaign',
+        onClick: () => changeStatus(c, active ? 'paused' : 'active'),
+      }] : []),
+      { type: 'separator' },
+      { type: 'action', label: 'Delete campaign', destructive: true, onClick: () => setDeleteCampaignTarget(c) },
+    ];
   }
   const [showNew, setShowNew]         = useState(false);
   const [editCampaign, setEditCampaign]     = useState<CampaignRow | null>(null);
@@ -502,103 +519,77 @@ export function Campaigns() {
         </div>
       ) : (
         <>
-          {/* Desktop table - hidden on mobile */}
+          {/* Desktop table - hidden on mobile. Every row is the same height
+              however many search terms or areas a campaign has: targeting is a
+              two-line summary (full list in a popover), each row has at most
+              one inline action, and the rest live in the row menu. */}
           <div className="atbl hidden md:block">
             <table className="table-fixed">
+              {/* Prospects / Status / Scrape hold pills and a button, so they get
+                  fixed widths that never wrap; Campaign and Client share the rest.
+                  Below xl the Client column folds into the Campaign cell. */}
               <colgroup>
-                <col className="w-[30%]" />
-                <col className="w-[20%]" />
-                <col className="w-[16%]" />
-                <col className="w-[11%]" />
-                <col className="w-[13%]" />
-                <col className="w-[10%]" />
+                <col className="w-[60%]" />
+                <col className="hidden w-[40%] xl:table-column" />
+                <col className="w-[130px]" />
+                <col className="w-[156px]" />
+                <col className="w-[164px]" />
+                <col className="w-[52px]" />
               </colgroup>
               <thead>
                 <tr>
-                  {['Campaign', 'Client', 'Prospects', 'Status', 'Scrape', ''].map((h) => (
-                    <th key={h}>{h}</th>
-                  ))}
+                  <th>Campaign</th>
+                  <th className="hidden xl:table-cell">Client</th>
+                  <th>Prospects</th>
+                  <th>Status</th>
+                  <th>Scrape</th>
+                  <th aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
-                {paged.map((c) => {
-                  const pill       = CAMP_PILL[c.status] ?? CAMP_PILL.draft;
-                  const active     = c.status === 'active';
-                  const paused     = c.status === 'paused';
-                  const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
-                  const draft      = c.status === 'draft' || c.status === 'pending_review';
-                  return (
-                    <tr key={c.id} onClick={() => setEditCampaign(c)} className="group cursor-pointer">
-                      <td className="min-w-0">
-                        <div className="line-clamp-2 font-semibold leading-snug text-(--ad-ink) group-hover:underline" title={c.name}>{c.name}</div>
-                        {isEuCountry(c.country) && <div className="mt-1"><EuBadge /></div>}
-                        {c.needsReview && (
-                          <span className="atbl-pill mt-1" style={{ background: 'var(--ad-purple-tint)', color: 'var(--ad-purple)' }}>
-                            🔔 Awaiting approval
-                          </span>
-                        )}
-                        {needsSetup && (
-                          <StatusPill pill={{ ...PILL.waiting, icon: 'alert' }} className="mt-1">Needs setup</StatusPill>
-                        )}
-                        <div className="mt-1 text-[11px] text-(--ad-ink-faint)">{lastScrapedLabel(c)}</div>
-                        {c.target_areas && (
-                          <TargetAreaChips areas={c.target_areas} radiusOnly className="mt-1.5 flex flex-wrap gap-1" chipClassName="px-2 py-0.5 text-[11px]" />
-                        )}
-                      </td>
-                      <td className="min-w-0 text-(--ad-ink-soft)">
-                        <div className="truncate" title={c.client?.business_name ?? undefined}>{c.client?.business_name ?? '-'}</div>
-                      </td>
-                      <td className="min-w-0">
-                        <ScrapeResultChip campaign={c} onOpenDetail={() => setScrapeDetailCampaign(c)} />
-                      </td>
-                      <td>
-                        <StatusPill pill={pill}>
+                {paged.map((c) => (
+                  <tr key={c.id} onClick={() => setEditCampaign(c)} className="group cursor-pointer">
+                    <td className="min-w-0">
+                      <div className="truncate font-semibold leading-snug text-(--ad-ink) group-hover:underline" title={c.name}>{c.name}</div>
+                      <div className="truncate text-[12px] text-(--ad-ink-soft) xl:hidden">{c.client?.business_name ?? '-'}</div>
+                      <CampaignBadges campaign={c} />
+                      <div className="mt-1.5">
+                        <TargetingSummary terms={c.search_queries} areas={campaignAreas(c)} />
+                      </div>
+                    </td>
+                    <td className="hidden min-w-0 text-(--ad-ink-soft) xl:table-cell">
+                      <div className="truncate" title={c.client?.business_name ?? undefined}>{c.client?.business_name ?? '-'}</div>
+                    </td>
+                    <td className="min-w-0">
+                      <ScrapeResultChip campaign={c} onOpenDetail={() => setScrapeDetailCampaign(c)} />
+                    </td>
+                    <td onClick={c.needsReview ? (e) => e.stopPropagation() : undefined}>
+                      {c.needsReview ? (
+                        <ApproveButton onClick={() => changeStatus(c, 'active')} />
+                      ) : (
+                        <StatusPill pill={CAMP_PILL[c.status] ?? CAMP_PILL.draft}>
                           {campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}
                         </StatusPill>
-                      </td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <ScrapeCell
-                          campaign={c}
-                          queueState={queue[c.id]}
-                          ahead={ahead[c.id]}
-                          busy={submitting.has(c.id)}
-                          onScrape={() => handleScrape(c.id)}
-                          onOpenDetail={() => setScrapeDetailCampaign(c)}
-                        />
-                      </td>
-                      <td className="px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex flex-wrap items-center justify-end gap-1">
-                          {draft && (
-                            <button
-                              onClick={() => setEditCampaign(c)}
-                              className="cursor-pointer whitespace-nowrap rounded-lg border border-(--ad-line) bg-(--ad-surface) px-2 py-1 text-[11px] font-semibold text-(--ad-ink) transition-colors hover:bg-(--ad-fill)"
-                            >
-                              Edit
-                            </button>
-                          )}
-                          {c.needsReview && (
-                            <button
-                              onClick={() => changeStatus(c, 'active')}
-                              className="cursor-pointer whitespace-nowrap rounded-lg border-0 bg-(--ad-green) px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover)"
-                            >
-                              Approve
-                            </button>
-                          )}
-                          <RowMenu items={[
-                            { type: 'action', label: 'Edit campaign',  onClick: () => setEditCampaign(c) },
-                            ...(active || paused ? [{
-                              type: 'action' as const,
-                              label: active ? 'Pause campaign' : 'Activate campaign',
-                              onClick: () => changeStatus(c, active ? 'paused' : 'active'),
-                            }] : []),
-                            { type: 'separator' },
-                            { type: 'action', label: 'Delete campaign', destructive: true, onClick: () => setDeleteCampaignTarget(c) },
-                          ]} />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                      )}
+                    </td>
+                    <td className="min-w-0" onClick={(e) => e.stopPropagation()}>
+                      <ScrapeCell
+                        campaign={c}
+                        queueState={queue[c.id]}
+                        ahead={ahead[c.id]}
+                        busy={submitting.has(c.id)}
+                        onScrape={() => handleScrape(c.id)}
+                        onOpenDetail={() => setScrapeDetailCampaign(c)}
+                      />
+                      <div className="mt-1 truncate text-[11px] text-(--ad-ink-faint)">{lastScrapedLabel(c)}</div>
+                    </td>
+                    <td className="px-2 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end">
+                        <RowMenu items={campaignMenu(c)} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -606,10 +597,7 @@ export function Campaigns() {
           {/* Mobile cards - shown below md */}
           <div className="md:hidden flex flex-col gap-3">
             {paged.map((c) => {
-              const pill       = CAMP_PILL[c.status] ?? CAMP_PILL.draft;
-              const active     = c.status === 'active';
-              const paused     = c.status === 'paused';
-              const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
+              const pill = CAMP_PILL[c.status] ?? CAMP_PILL.draft;
               return (
                 <div
                   key={c.id}
@@ -617,60 +605,24 @@ export function Campaigns() {
                   className="cursor-pointer rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <span className="line-clamp-2 block font-semibold leading-snug text-(--ad-ink) text-[14px]" title={c.name}>{c.name}</span>
-                      {isEuCountry(c.country) && <div className="mt-1"><EuBadge /></div>}
-                      {c.needsReview && (
-                        <div className="mt-1">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-(--ad-purple-tint) px-2 py-0.5 text-[10.5px] font-semibold text-(--ad-purple)">
-                            🔔 Awaiting approval
-                          </span>
-                        </div>
-                      )}
-                      {needsSetup && (
-                        <div className="mt-1">
-                          <StatusPill pill={{ ...PILL.waiting, icon: 'alert' }}>Needs setup</StatusPill>
-                        </div>
-                      )}
-                      <div className="mt-1 text-[11px] text-(--ad-ink-faint)">{lastScrapedLabel(c)}</div>
-                      {c.target_areas && (
-                        <TargetAreaChips areas={c.target_areas} radiusOnly className="mt-1.5 flex flex-wrap gap-1" chipClassName="px-2 py-0.5 text-[11px]" />
-                      )}
-                    </div>
-                    <span style={{ background: pill.bg, color: pill.text, border: pill.border ?? 'none' }}
-                      className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.04em]">
+                    <span className="line-clamp-2 min-w-0 font-semibold leading-snug text-(--ad-ink) text-[14px]" title={c.name}>{c.name}</span>
+                    <StatusPill pill={pill} className="shrink-0">
                       {campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}
-                    </span>
+                    </StatusPill>
                   </div>
-                  <p className="mt-1.5 text-[12px] text-(--ad-ink-soft)">
+                  <CampaignBadges campaign={c} />
+                  <p className="m-0 mt-1.5 truncate text-[12px] text-(--ad-ink-soft)">
                     {c.client?.business_name ?? '-'} · {c.channel} · {c.language}
                   </p>
-                  <div className="mt-1.5">
-                    <ScrapeResultChip campaign={c} onOpenDetail={() => setScrapeDetailCampaign(c)} />
+                  <div className="mt-2">
+                    <TargetingSummary terms={c.search_queries} areas={campaignAreas(c)} />
                   </div>
-                  <div className="border-t border-(--ad-fill) pt-3 mt-2 flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    {c.needsReview && (
-                      <button
-                        onClick={() => changeStatus(c, 'active')}
-                        className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover)"
-                      >
-                        Approve
-                      </button>
-                    )}
-                    {(active || paused) && (
-                      <button
-                        onClick={() => changeStatus(c, active ? 'paused' : 'active')}
-                        title={active ? 'Pause campaign' : 'Activate campaign'}
-                        className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[.04em] transition-colors ${
-                          active
-                            ? 'border-(--ad-green) bg-(--ad-green) text-white hover:bg-(--ad-green-hover)'
-                            : 'border-(--ad-line-strong) bg-(--ad-surface) text-(--ad-ink-soft) hover:border-(--ad-amber) hover:text-(--ad-amber)'
-                        }`}
-                      >
-                        <span className={`h-2 w-2 rounded-full ${active ? 'bg-(--ad-surface)' : 'bg-(--ad-ink-ghost)'}`} />
-                        {active ? 'Active' : 'Paused'}
-                      </button>
-                    )}
+                  <div className="mt-2 flex items-center gap-2">
+                    <ScrapeResultChip campaign={c} onOpenDetail={() => setScrapeDetailCampaign(c)} />
+                    <span className="truncate text-[11px] text-(--ad-ink-faint)">{lastScrapedLabel(c)}</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 border-t border-(--ad-fill) pt-3" onClick={(e) => e.stopPropagation()}>
+                    {c.needsReview && <ApproveButton onClick={() => changeStatus(c, 'active')} />}
                     <ScrapeCell
                       campaign={c}
                       queueState={queue[c.id]}
@@ -679,18 +631,9 @@ export function Campaigns() {
                       onScrape={() => handleScrape(c.id)}
                       onOpenDetail={() => setScrapeDetailCampaign(c)}
                     />
-                    <button
-                      onClick={() => setEditCampaign(c)}
-                      className="cursor-pointer rounded-lg border border-(--ad-line) bg-(--ad-surface) px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green)"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setDeleteCampaignTarget(c)}
-                      className="cursor-pointer rounded-lg border border-transparent bg-transparent px-3 py-1.5 text-[12px] font-semibold text-(--ad-ink-ghost) transition-colors hover:border-(--ad-clay)/30 hover:bg-(--ad-clay-tint) hover:text-(--ad-clay)"
-                    >
-                      Delete
-                    </button>
+                    <div className="ml-auto">
+                      <RowMenu items={campaignMenu(c)} />
+                    </div>
                   </div>
                 </div>
               );
@@ -743,6 +686,38 @@ export function Campaigns() {
 
       <ToastHost toasts={toasts} onDismiss={dismiss} />
     </div>
+  );
+}
+
+/* ── Row badges ────────────────────────────────────────────────────── */
+// EU / awaiting approval / needs setup on one wrapping line under the name,
+// instead of one stacked line each.
+function CampaignBadges({ campaign: c }: { campaign: CampaignRow }) {
+  const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
+  if (!isEuCountry(c.country) && !c.needsReview && !needsSetup) return null;
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-1">
+      {isEuCountry(c.country) && <EuBadge />}
+      {c.needsReview && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-(--ad-purple-tint) px-2 py-0.5 text-[11px] font-semibold text-(--ad-purple)">
+          <Bell size={11} strokeWidth={2.5} />
+          Awaiting approval
+        </span>
+      )}
+      {needsSetup && <StatusPill pill={{ ...PILL.waiting, icon: 'alert' }}>Needs setup</StatusPill>}
+    </div>
+  );
+}
+
+function ApproveButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-lg border-0 bg-(--ad-green) px-2.5 py-1 text-[12px] font-semibold text-white transition-colors hover:bg-(--ad-green-hover)"
+    >
+      <Check size={12} strokeWidth={2.75} />
+      Approve
+    </button>
   );
 }
 
@@ -833,7 +808,8 @@ function ScrapeCell({
       title="Adds this campaign to the scrape queue. Counts as a launch: 5 free a month, then a credit."
       className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-(--ad-line) bg-(--ad-surface) px-2.5 py-1 text-[11px] font-semibold text-(--ad-ink-soft) transition-colors hover:border-(--ad-green) hover:text-(--ad-green) whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {busy ? 'Queuing…' : '↻ Queue scrape'}
+      <RotateCw size={11} strokeWidth={2.5} className={busy ? 'animate-spin' : ''} />
+      {busy ? 'Queuing…' : 'Queue scrape'}
     </button>
   );
 }
@@ -893,7 +869,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:border md:border-(--ad-line)"
+        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[720px] md:rounded-md md:border md:border-(--ad-line)"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -903,7 +879,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
           <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">New campaign</h2>
-          <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
+          <button onClick={onClose} aria-label="Close" className="flex cursor-pointer items-center border-0 bg-transparent p-1 text-(--ad-ink-faint) hover:text-(--ad-ink)"><X size={20} /></button>
         </div>
 
         {/* Scrollable form body */}
@@ -925,8 +901,6 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Austin gyms - Q3" style={FONT} className={inputCls} />
           </div>
 
-          <LanguageField value={language} onChange={setLanguage} listId="new-campaign-languages" />
-
           <div>
             <label className={fieldLbl}>Target country<RequiredMark /></label>
             <Select value={country} onValueChange={setPickedCountry}>
@@ -940,22 +914,25 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
             <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Can't be changed after the campaign is created. EU countries have extra outreach rules.</p>
           </div>
 
-          <div>
-            <label className={fieldLbl}>Channel</label>
-            <Select value={channel} onValueChange={setChannel}>
-              <SelectTrigger style={FONT} className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
-                <SelectItem value="email">Email</SelectItem>
-                <SelectItem value="sms">SMS</SelectItem>
-                <SelectItem value="whatsapp">WhatsApp</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <LanguageField value={language} onChange={setLanguage} listId="new-campaign-languages" />
+            <div>
+              <label className={fieldLbl}>Channel</label>
+              <Select value={channel} onValueChange={setChannel}>
+                <SelectTrigger style={FONT} className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="sms">SMS</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="border-t border-(--ad-fill) pt-3">
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[.08em] text-(--ad-ink-faint)">Prospect discovery (Apify)</p>
+            <p className={campSectionLbl}>Targeting</p>
             <div className="flex flex-col gap-3">
               {clientId ? (
                 <SuggestForMe
@@ -1032,7 +1009,7 @@ function NewCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreat
 }
 
 /* ── Modal shell ───────────────────────────────────────────────────── */
-function CampModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function CampModalShell({ onClose, children, wide = false }: { onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <motion.div
       className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/40 md:p-6"
@@ -1042,7 +1019,7 @@ function CampModalShell({ onClose, children }: { onClose: () => void; children: 
     >
       <motion.div
         style={FONT}
-        className="modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:max-w-[540px] md:rounded-md md:border md:border-(--ad-line)"
+        className={`modal-card flex w-full flex-col bg-(--ad-surface) overflow-hidden h-full md:h-auto md:max-h-[calc(100vh-48px)] md:rounded-md md:border md:border-(--ad-line) ${wide ? 'md:max-w-[720px]' : 'md:max-w-[540px]'}`}
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
@@ -1053,6 +1030,7 @@ function CampModalShell({ onClose, children }: { onClose: () => void; children: 
   );
 }
 
+const campSectionLbl = 'm-0 mb-3 text-[11px] font-semibold uppercase tracking-[.08em] text-(--ad-ink-faint)';
 const campFieldLbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-(--ad-ink-faint)';
 const campInputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
 
@@ -1101,10 +1079,10 @@ function EditCampaignModal({
   }
 
   return (
-    <CampModalShell onClose={onClose}>
+    <CampModalShell onClose={onClose} wide>
       <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
         <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Edit campaign</h2>
-        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
+        <button onClick={onClose} aria-label="Close" className="flex cursor-pointer items-center border-0 bg-transparent p-1 text-(--ad-ink-faint) hover:text-(--ad-ink)"><X size={20} /></button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
         {hold && <CountryHoldBanner reason={hold.reason} />}
@@ -1112,46 +1090,12 @@ function EditCampaignModal({
           <label className={campFieldLbl}>Campaign name<RequiredMark /></label>
           <input value={name} onChange={(e) => setName(e.target.value)} style={FONT} className={campInputCls} />
         </div>
-        <div>
-          <label className={campFieldLbl}>Description</label>
-          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" style={FONT} className={campInputCls} />
-        </div>
 
-        <LanguageField value={language} onChange={setLanguage} listId="edit-campaign-languages" />
-
-        {/* Saves on its own, separately from the form below. */}
-        <FollowUpsNowToggle
-          campaignId={campaign.id}
-          clientId={campaign.client_id}
-          on={campaign.upfront_sequence}
-          campaignActive={campaign.status === 'active'}
-          onChanged={() => queryClient.invalidateQueries({ queryKey: QK.campaigns })}
-        />
-
-        {/* Country is set on creation only - shown read-only here. */}
-        <div>
-          <label className={campFieldLbl}>Target country</label>
-          <div className="flex items-center gap-2 rounded-lg border border-(--ad-line) bg-(--ad-fill) px-3.5 py-2.5 text-[13px] text-(--ad-ink-soft)">
-            <span>{campaign.country ? countryName(campaign.country) : 'Not set'}</span>
-            {isEuCountry(campaign.country) && <EuBadge />}
-          </div>
-          <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Set when the campaign is created and can't be changed.</p>
-        </div>
-
-        <div>
-          <label className={campFieldLbl}>Channel</label>
-          <Select value={channel} onValueChange={setChannel}>
-            <SelectTrigger style={FONT} className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)"><SelectValue /></SelectTrigger>
-            <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
-              <SelectItem value="email">Email</SelectItem>
-              <SelectItem value="sms">SMS</SelectItem>
-              <SelectItem value="whatsapp">WhatsApp</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="border-t border-(--ad-fill) pt-3">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[.08em] text-(--ad-ink-faint)">Prospect discovery (Apify)</p>
-          <div className="flex flex-col gap-3">
+        {/* Targeting first: it's what gets edited most, and the part that can
+            grow long - settings below are short and rarely touched. */}
+        <section className="border-t border-(--ad-fill) pt-4">
+          <p className={campSectionLbl}>Targeting</p>
+          <div className="flex flex-col gap-4">
             <SuggestForMe
               clientId={campaign.client_id}
               queries={queries}
@@ -1170,7 +1114,6 @@ function EditCampaignModal({
                 capLabel="search term"
               />
               <LimitCounter count={queries.length} max={limits.maxSearchTerms} noun="search terms" />
-              <LimitMessages errors={check.errors} fields={['search_queries']} />
             </div>
             <div>
               <LocationAreaInput
@@ -1182,22 +1125,63 @@ function EditCampaignModal({
                 capLabel="location"
               />
               <LimitCounter count={areas.length} max={limits.maxLocations} noun="locations" />
-              <LimitMessages errors={check.errors} fields={['target_locations', 'pairs']} />
+              <LimitMessages errors={check.errors} fields={['pairs']} />
             </div>
-            <div className="flex items-end gap-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end">
               <div className="flex-1">
                 <label className={campFieldLbl}>Max results per run</label>
                 <input type="number" min={1} max={limits.maxResults} value={maxResults} onChange={(e) => setMaxResults(Number(e.target.value))} style={FONT} className={campInputCls} />
                 <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Higher counts tend to yield more replies. Capped at {limits.maxResults.toLocaleString()} per campaign.</p>
                 <LimitMessages errors={check.errors} fields={['max_results']} />
               </div>
-              <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[13px] text-(--ad-ink-soft)">
+              <label className="flex cursor-pointer items-center gap-2 text-[13px] text-(--ad-ink-soft) md:mb-6">
                 <input type="checkbox" checked={scrapeEnabled} onChange={(e) => setScrapeEnabled(e.target.checked)} className="accent-(--ad-green)" />
                 Enable scraping
               </label>
             </div>
           </div>
-        </div>
+        </section>
+
+        <section className="border-t border-(--ad-fill) pt-4">
+          <p className={campSectionLbl}>Campaign settings</p>
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className={campFieldLbl}>Description</label>
+              <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" style={FONT} className={campInputCls} />
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <LanguageField value={language} onChange={setLanguage} listId="edit-campaign-languages" />
+              <div>
+                <label className={campFieldLbl}>Channel</label>
+                <Select value={channel} onValueChange={setChannel}>
+                  <SelectTrigger style={FONT} className="h-10 rounded-lg border-(--ad-line) bg-(--ad-surface-2) text-[13px] text-(--ad-ink) focus:ring-0 focus:ring-offset-0 focus:border-(--ad-green)"><SelectValue /></SelectTrigger>
+                  <SelectContent style={FONT} className="bg-(--ad-surface) text-[13px] text-(--ad-ink)">
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="sms">SMS</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {/* Country is set on creation only - shown read-only here. */}
+            <div>
+              <label className={campFieldLbl}>Target country</label>
+              <div className="flex items-center gap-2 rounded-lg border border-(--ad-line) bg-(--ad-fill) px-3.5 py-2.5 text-[13px] text-(--ad-ink-soft)">
+                <span>{campaign.country ? countryName(campaign.country) : 'Not set'}</span>
+                {isEuCountry(campaign.country) && <EuBadge />}
+              </div>
+              <p className="mt-1 text-[11px] text-(--ad-ink-faint)">Set when the campaign is created and can't be changed.</p>
+            </div>
+            {/* Saves on its own, separately from the form. */}
+            <FollowUpsNowToggle
+              campaignId={campaign.id}
+              clientId={campaign.client_id}
+              on={campaign.upfront_sequence}
+              campaignActive={campaign.status === 'active'}
+              onChanged={() => queryClient.invalidateQueries({ queryKey: QK.campaigns })}
+            />
+          </div>
+        </section>
         {err && <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-3 text-[13px] text-(--ad-clay)">{err}</div>}
       </div>
       <div className="shrink-0 border-t border-(--ad-line) px-5 py-4 flex justify-end gap-2.5">
@@ -1238,7 +1222,7 @@ function DeleteCampaignModal({
     <CampModalShell onClose={onClose}>
       <div className="flex shrink-0 items-center justify-between border-b border-(--ad-line) px-5 py-4">
         <h2 className="m-0 text-[18px] font-semibold text-(--ad-ink)">Delete campaign</h2>
-        <button onClick={onClose} className="cursor-pointer border-0 bg-transparent text-[24px] leading-none text-(--ad-ink-faint) hover:text-(--ad-ink)">×</button>
+        <button onClick={onClose} aria-label="Close" className="flex cursor-pointer items-center border-0 bg-transparent p-1 text-(--ad-ink-faint) hover:text-(--ad-ink)"><X size={20} /></button>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
         <div className="rounded-xl border border-(--ad-clay)/20 bg-(--ad-clay-tint) px-4 py-4">

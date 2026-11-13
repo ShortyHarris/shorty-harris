@@ -1,4 +1,5 @@
 import { useState, type KeyboardEvent } from 'react';
+import { X } from 'lucide-react';
 import { RequiredMark } from './RequiredMark';
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
@@ -22,7 +23,11 @@ export const CHIP_TONE: Record<ChipTone, { chip: string; remove: string }> = {
 
 export function TagInput({
   label, placeholder, helper, values, onChange, splitOn = ',', maxItems, capLabel, required, tone = 'brand', sentenceLabel = false,
+  collapseAfter = 12,
 }: {
+  /** Long lists show this many chips plus a "Show all" toggle, so a field
+   *  with dozens of entries doesn't push the rest of the form off screen. */
+  collapseAfter?: number;
   tone?: ChipTone;
   sentenceLabel?: boolean;
   label: string;
@@ -39,7 +44,12 @@ export function TagInput({
   capLabel?: string;
 }) {
   const [draft, setDraft] = useState('');
+  const [expanded, setExpanded] = useState(false);
   const atCap = maxItems != null && values.length >= maxItems;
+  const overCap = maxItems != null && values.length > maxItems;
+  const collapsible = values.length > collapseAfter;
+  const visible = collapsible && !expanded ? values.slice(0, collapseAfter) : values;
+  const hidden = values.length - visible.length;
 
   function commitDraft(raw: string) {
     const parts = raw.split(splitOn).map((s) => s.trim()).filter(Boolean);
@@ -67,35 +77,49 @@ export function TagInput({
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={() => commitDraft(draft)}
-        placeholder={atCap ? `Limit reached. Remove one to add another` : placeholder}
+        placeholder={atCap ? `Limit reached${capLabel ? ` (${maxItems} ${capLabel}s)` : ''}. Remove one to add another` : placeholder}
         disabled={atCap}
         style={FONT}
         className={inputCls}
       />
       {values.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {values.map((v, i) => (
-            <span key={`${v}-${i}`} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${CHIP_TONE[tone].chip}`}>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {visible.map((v, i) => (
+            <span key={`${v}-${i}`} className={`inline-flex items-center gap-1 rounded-full py-1 pl-2.5 pr-1.5 text-[12px] font-semibold ${CHIP_TONE[tone].chip}`}>
               {v}
               <button
                 type="button"
                 onClick={() => onChange(values.filter((_, idx) => idx !== i))}
                 aria-label={`Remove ${v}`}
-                className={`cursor-pointer border-0 bg-transparent p-0 text-[13px] leading-none ${CHIP_TONE[tone].remove}`}
+                className={`flex cursor-pointer items-center border-0 bg-transparent p-0 ${CHIP_TONE[tone].remove}`}
               >
-                ×
+                <X size={12} strokeWidth={2.5} />
               </button>
             </span>
           ))}
+          {collapsible && (
+            <button
+              type="button"
+              onClick={() => setExpanded((e) => !e)}
+              className="cursor-pointer rounded-full border border-dashed border-(--ad-line-strong) bg-transparent px-2.5 py-1 text-[12px] font-semibold text-(--ad-ink-soft) hover:text-(--ad-ink)"
+            >
+              {expanded ? 'Show fewer' : `+${hidden} more`}
+            </button>
+          )}
+          {(overCap || collapsible) && (
+            <button
+              type="button"
+              onClick={() => { onChange([]); setExpanded(false); }}
+              className="cursor-pointer border-0 bg-transparent px-1 py-1 text-[12px] font-semibold text-(--ad-ink-faint) underline-offset-2 hover:text-(--ad-clay) hover:underline"
+            >
+              Clear all
+            </button>
+          )}
         </div>
       )}
-      {atCap ? (
-        <p className="mt-1 text-[11px] text-(--ad-amber)">
-          You've reached the {maxItems}{capLabel ? ` ${capLabel}` : ''} limit. Remove one to add another.
-        </p>
-      ) : (
-        helper && <p className="mt-1 text-[11px] text-(--ad-ink-faint)">{helper}</p>
-      )}
+      {/* The cap itself is reported once, by the LimitCounter every capped
+          field renders under this input - not repeated here. */}
+      {helper && !atCap && <p className="mt-1 text-[11px] text-(--ad-ink-faint)">{helper}</p>}
     </div>
   );
 }
