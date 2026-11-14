@@ -8,7 +8,8 @@
 //   rewrite        { campaign_id, step (0-3 or null for all), emails[], instruction? }
 //                  -> rewritten emails; uses one of the campaign's free rewrites only on success
 //
-// Only clients with the wizard switched on (clients.wizard_enabled) may call it. Calls are
+// Only clients with the wizard on (wizard_on_for: the sandbox-only rollout switch plus
+// clients.wizard_enabled) may call it. Calls are
 // rate-limited per client (wizard_settings.ai_calls_per_hour) and logged in wizard_ai_calls.
 // Secrets: GEMINI_API_KEY (already used by docs-search). WIZARD_AI_MOCK=1 returns sample output
 // without calling Gemini (local development only).
@@ -247,8 +248,9 @@ Deno.serve(async (req: Request) => {
   const { data: profile } = await db.from('profiles').select('role, client_id').eq('id', user.id).maybeSingle()
   const clientId = profile?.client_id as string | undefined
   if (!clientId) return json({ ok: false, error: 'not_a_client' }, 403)
-  const { data: client } = await db.from('clients').select('wizard_enabled').eq('id', clientId).single()
-  if (!client?.wizard_enabled) return json({ ok: false, error: 'wizard_not_enabled' }, 403)
+  // The same rule the app uses: the sandbox-only rollout switch plus the per-client off-switch.
+  const { data: wizardOn } = await db.rpc('wizard_on_for', { p_client_id: clientId })
+  if (wizardOn !== true) return json({ ok: false, error: 'wizard_not_enabled' }, 403)
 
   let body: Record<string, any>
   try { body = await req.json() } catch { return json({ ok: false, error: 'bad_json' }, 400) }

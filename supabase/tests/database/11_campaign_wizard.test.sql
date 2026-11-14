@@ -9,6 +9,9 @@ select tests.user(:'client_a') as user_a \gset
 select tests.client('CZ', 'Europe/Prague', true, 'Client B') as client_b \gset
 select tests.user(:'client_b') as user_b \gset
 select tests.user(null, 'admin') as admin_user \gset
+-- These tests cover the wizard once it is out for everyone; the sandbox-only rollout switch
+-- (wizard_settings.sandbox_only) has its own file, 13_campaign_wizard_sandbox_gate.
+update public.wizard_settings set sandbox_only = false where id = 1;
 
 -- ── Tables are protected ─────────────────────────────────────────────────────────────────
 select ok((select relrowsecurity from pg_class where oid = 'public.wizard_sessions'::regclass), 'wizard_sessions has row level security');

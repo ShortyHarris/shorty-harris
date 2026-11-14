@@ -26,9 +26,12 @@ Martin need to agree to.
   "Day 0 / 3 / 5 / 7".
 - **No staff approval on launch** (Ian, Oct 30).
 - Design is settled after the functionality works.
-- **On for everyone at release, no pilot** (November 8). Merging makes the wizard available to
-  every client without an admin ticking anything. The admin checkbox stays as an off-switch
-  for one client (`20261108120000_campaign_wizard_for_everyone.sql`, applied at merge).
+- **On for everyone at release, no pilot** (November 8). The admin checkbox stays as an
+  off-switch for one client.
+- **Sandbox first, then everyone, with one switch** (November 14). `wizard_settings.sandbox_only`
+  (Admin > Campaigns) shows the wizard to sandbox accounts only until an admin turns it off;
+  then every client has it. `wizard_on_for()` combines it with the per-client switch
+  (`20261114130000_campaign_wizard_sandbox_gate.sql`).
 
 Ground rules (unchanged):
 

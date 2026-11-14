@@ -24,6 +24,7 @@ import { RowMenu, type MenuItem } from '../../components/RowMenu';
 import { HelpButton, type HelpContent } from '../../components/HelpButton';
 import { LocationAreaInput } from '../../components/LocationAreaInput';
 import { TargetingSummary } from '../../components/TargetingSummary';
+import { WizardRolloutToggle } from '../../components/WizardRolloutToggle';
 import { campaignStatusLabel } from '../../lib/campaignStatus';
 import { SuggestForMe } from '../client/Campaigns';
 import { TagInput } from '../../components/TagInput';
@@ -502,6 +503,8 @@ export function Campaigns() {
           <button onClick={() => setShowNew(true)} className={`${primaryCls} hidden md:inline-flex`}>+ New campaign</button>
         </div>
       </header>
+
+      <WizardRolloutToggle onChanged={(message, tone) => toast(message, tone)} />
 
       {heldGroups.map(({ hold, campaigns }) => (
         <CountryHoldBanner

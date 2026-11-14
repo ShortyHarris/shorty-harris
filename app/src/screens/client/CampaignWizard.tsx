@@ -44,6 +44,7 @@ import {
   callWizardAi, costForIdeas, estimateProspects, wizardErrorMessage,
   type AnalyzeResult, type DraftsResult, type IdeasResult, type WizardIdea,
 } from '../../hooks/useWizardAi';
+import { fetchWizardOn } from '../../hooks/useWizardRollout';
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 const field = 'h-14 rounded-xl border-border bg-background px-4 text-[16px] shadow-none focus-visible:ring-2 focus-visible:ring-offset-0';
@@ -231,13 +232,13 @@ export function CampaignWizard({
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      client.from('clients').select('wizard_enabled').eq('id', clientId).single(),
+      fetchWizardOn(clientId, client),
       fetchOpenSession(clientId, client),
     ])
-      .then(([flag, open]) => {
+      .then(([wizardOn, open]) => {
         if (cancelled) return;
-        if (flag.data?.wizard_enabled !== true) {
-          setPhase({ kind: 'error', message: "The campaign wizard is switched off for your account. Contact us if you'd like it back." });
+        if (!wizardOn) {
+          setPhase({ kind: 'error', message: "The campaign wizard isn't available on your account yet. Contact us if you'd like to use it." });
           return;
         }
         // "Continue" on the Campaigns page opens the unfinished setup (?resume=1). Anything else

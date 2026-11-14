@@ -1094,7 +1094,7 @@ function EditClientModal({
           />
           <span>
             <span className="block font-semibold text-(--ad-ink)">Campaign wizard</span>
-            <span className="block text-[11px] text-(--ad-ink-faint)">On for every client. They find and launch campaigns themselves with no admin review. Untick to hide the wizard and send their campaigns back through review.</span>
+            <span className="block text-[11px] text-(--ad-ink-faint)">On by default. While the wizard is set to sandbox accounts only (the switch on the Campaigns page), only sandbox accounts actually see it. Untick to hide it from this client even when it's on for everyone.</span>
           </span>
         </label>
         <label className="flex cursor-pointer items-start gap-2 text-[13px] text-(--ad-ink-soft)">
