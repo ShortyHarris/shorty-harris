@@ -1,8 +1,8 @@
-import { Component, lazy, Suspense, useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { X, MapPin, Search } from 'lucide-react';
 import { geocodePlace, reverseGeocode, type GeocodeResult } from '../lib/mapboxGeocode';
 import {
-  type TargetArea, areaDisplayLabel, clampMiles, milesToKm, MAX_RADIUS_MILES, MIN_RADIUS_MILES,
+  type TargetArea, areaDisplayLabel, areaShortLabel, radiusMiles, clampMiles, milesToKm, MAX_RADIUS_MILES, MIN_RADIUS_MILES,
 } from '../lib/targetAreas';
 import type { MapCircle } from './RadiusMap';
 import { RequiredMark } from './RequiredMark';
@@ -23,6 +23,26 @@ const fieldLbl = 'mb-1.5 block text-[11px] font-bold uppercase tracking-[.06em] 
 // Client screens use sentence-case labels; the admin keeps the caps style.
 const fieldLblSentence = 'mb-1.5 block text-[13px] font-semibold text-(--ad-ink)';
 const inputCls = 'w-full rounded-lg border border-(--ad-line) bg-(--ad-surface-2) px-3.5 py-2.5 text-[13px] text-(--ad-ink) outline-none placeholder:text-(--ad-ink-ghost) transition-colors focus:border-(--ad-green) focus:bg-(--ad-surface)';
+
+/* Place suggestions while typing (Mapbox), so people pick a real place instead of typing one
+   freely. Waits 250ms after the last key; without a token it returns nothing and plain typing
+   still works. Older answers never overwrite newer ones. */
+function usePlaceSuggestions(query: string, enabled: boolean): GeocodeResult[] {
+  const q = query.trim();
+  const [found, setFound] = useState<GeocodeResult[]>([]);
+  useEffect(() => {
+    if (!enabled || q.length < 2) return;
+    let live = true;
+    const t = setTimeout(() => {
+      geocodePlace(q).then(({ data }) => { if (live) setFound(data); });
+    }, 250);
+    return () => { live = false; clearTimeout(t); };
+  }, [q, enabled]);
+  return enabled && q.length >= 2 ? found : [];
+}
+
+const optionCls = (active: boolean) =>
+  `flex w-full cursor-pointer items-center gap-2 border-0 border-b border-(--ad-fill) px-3.5 py-2.5 text-left text-[13px] text-(--ad-ink) last:border-0 ${active ? 'bg-(--ad-green-tint)' : 'bg-(--ad-surface) hover:bg-(--ad-surface-2)'}`;
 
 /* Target locations - either a plain place name, or a radius around a
    geocoded point. The 3-location cap counts both kinds together, so this
@@ -52,8 +72,15 @@ export function LocationAreaInput({
   const [mapFailed, setMapFailed] = useState(false);
   const [labelNote, setLabelNote] = useState<string | null>(null);
   const reverseSeq = useRef(0);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [active, setActive] = useState(0);
 
   const mapEnabled = !!import.meta.env.VITE_MAPBOX_TOKEN && !mapFailed;
+  const placeSearch = !!import.meta.env.VITE_MAPBOX_TOKEN;
+  const textSuggestions = usePlaceSuggestions(textDraft, placeSearch && mode === 'text' && suggestOpen);
+  const radiusSuggestions = usePlaceSuggestions(query, placeSearch && mode === 'radius' && !picked);
+  // An explicit search (Enter / the search button) wins over the as-you-type list.
+  const radiusList = results.length ? results : radiusSuggestions;
   const atCap = maxItems != null && values.length >= maxItems;
   // At the cap you can still adjust an existing area - that's a replace, not an add.
   const showEditor = !atCap || editingIndex !== null;
@@ -71,11 +98,25 @@ export function LocationAreaInput({
     onChange([...values, area]);
   }
 
-  function addTextArea() {
-    const v = textDraft.trim();
+  function addTextArea(label = textDraft) {
+    const v = label.trim();
     if (!v) return;
     addArea({ mode: 'text', label: v });
     setTextDraft('');
+    setSuggestOpen(false);
+    setActive(0);
+  }
+
+  function onTextKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    const open = suggestOpen && textSuggestions.length > 0;
+    if (open && e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => Math.min(i + 1, textSuggestions.length - 1)); }
+    else if (open && e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
+    else if (open && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setSuggestOpen(false); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      // Enter takes the highlighted suggestion; with none showing it adds what was typed.
+      addTextArea(open ? textSuggestions[Math.min(active, textSuggestions.length - 1)].label : textDraft);
+    }
   }
 
   async function runSearch() {
@@ -161,41 +202,48 @@ export function LocationAreaInput({
       <label className={sentenceLabel ? fieldLblSentence : fieldLbl}>{label}{required && <RequiredMark />}</label>
 
       {values.length > 0 && (
-        <div className="mb-2 flex flex-col gap-1.5">
-          {values.map((v, i) => (
-            <div
-              key={`${v.label}-${i}`}
-              className={`flex items-center justify-between gap-2 rounded-lg border bg-(--ad-surface-2) px-3 py-2 text-[12.5px] text-(--ad-ink) ${editingIndex === i ? 'border-(--ad-green)' : 'border-(--ad-line)'}`}
-            >
-              {v.mode === 'radius' ? (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {values.map((v, i) => {
+            const miles = radiusMiles(v);
+            const selected = editingIndex === i;
+            const chipCls = `inline-flex max-w-full items-center gap-1 rounded-full border py-1 pl-2.5 pr-1.5 text-[12px] font-semibold ${
+              selected ? 'border-(--ad-green) bg-(--ad-green-tint) text-(--ad-green)' : 'border-(--ad-line) bg-(--ad-surface-2) text-(--ad-ink)'
+            }`;
+            return (
+              <span key={`${v.label}-${i}`} className={chipCls} title={areaDisplayLabel(v)}>
+                {v.mode === 'radius' ? (
+                  <button
+                    type="button"
+                    onClick={() => selectArea(i)}
+                    aria-label={`Adjust ${areaDisplayLabel(v)}`}
+                    className="flex min-w-0 cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-left font-semibold text-inherit"
+                  >
+                    <MapPin size={12} className="shrink-0 text-(--ad-green)" />
+                    <span className="truncate">{areaShortLabel(v)}</span>
+                    <span className="shrink-0 rounded-full bg-(--ad-fill) px-1.5 text-[10.5px] leading-[16px] text-(--ad-ink-soft)">{miles} mi</span>
+                  </button>
+                ) : (
+                  <span className="truncate">{v.label}</span>
+                )}
                 <button
                   type="button"
-                  onClick={() => selectArea(i)}
-                  title="Adjust this area"
-                  className={`flex min-w-0 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-[12.5px] text-(--ad-ink) ${editingIndex === i ? 'font-bold' : ''}`}
+                  onClick={() => removeArea(i)}
+                  aria-label={`Remove ${v.label}`}
+                  className="flex shrink-0 cursor-pointer items-center border-0 bg-transparent p-0 text-(--ad-ink-faint) hover:text-(--ad-ink)"
                 >
-                  <MapPin size={12} className="shrink-0 text-(--ad-green)" />
-                  <span className="truncate">{areaDisplayLabel(v)}</span>
+                  <X size={12} strokeWidth={2.5} />
                 </button>
-              ) : (
-                <span className="flex items-center gap-1.5 truncate">{areaDisplayLabel(v)}</span>
-              )}
-              <button
-                type="button"
-                onClick={() => removeArea(i)}
-                aria-label={`Remove ${v.label}`}
-                className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-(--ad-ink-faint) hover:text-(--ad-ink)"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ))}
+              </span>
+            );
+          })}
         </div>
       )}
 
       {!showEditor ? (
-        <p className="m-0 text-[11px] text-(--ad-amber)">
-          You've reached the {maxItems}{capLabel ? ` ${capLabel}` : ''} limit. Remove one to add another.
+        // Over the cap the LimitCounter under this field already says how many
+        // to remove, so this explanation only shows at exactly the cap.
+        values.length === maxItems && <p className="m-0 text-[11px] text-(--ad-ink-faint)">
+          You've reached the {maxItems}{capLabel ? ` ${capLabel}` : ''} limit. Remove one to add another, or tap a radius area to adjust it.
         </p>
       ) : (
         <>
@@ -217,16 +265,35 @@ export function LocationAreaInput({
           </div>
 
           {mode === 'text' && (
-            <div className="flex gap-2">
-              <input
-                value={textDraft}
-                onChange={(e) => setTextDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTextArea(); } }}
-                placeholder="e.g. Prague, Czech Republic"
-                style={FONT}
-                className={`${inputCls} flex-1`}
-              />
-              <button type="button" onClick={addTextArea} className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-3.5 py-2.5 text-[12.5px] font-bold text-white">Add</button>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex gap-2">
+                <input
+                  value={textDraft}
+                  onChange={(e) => { setTextDraft(e.target.value); setSuggestOpen(true); setActive(0); }}
+                  onKeyDown={onTextKey}
+                  onBlur={() => setSuggestOpen(false)}
+                  placeholder={placeSearch ? 'Start typing a city or region' : 'e.g. Prague, Czech Republic'}
+                  aria-label={`Add ${label.toLowerCase()}`}
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={suggestOpen && textSuggestions.length > 0}
+                  aria-controls="place-suggestions"
+                  style={FONT}
+                  className={`${inputCls} flex-1`}
+                />
+                <button type="button" onClick={() => addTextArea()} className="cursor-pointer rounded-lg border-0 bg-(--ad-green) px-3.5 py-2.5 text-[12.5px] font-bold text-(--ad-on-accent)">Add</button>
+              </div>
+              {suggestOpen && textSuggestions.length > 0 && (
+                <div id="place-suggestions" role="listbox" aria-label="Places" className="overflow-hidden rounded-lg border border-(--ad-line)">
+                  {textSuggestions.map((r, i) => (
+                    <button key={`${r.lat},${r.lng}`} type="button" role="option" aria-selected={i === active}
+                      onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setActive(i)} onClick={() => addTextArea(r.label)}
+                      className={optionCls(i === active)}>
+                      <MapPin size={13} className="shrink-0 text-(--ad-green)" aria-hidden />{r.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -237,7 +304,7 @@ export function LocationAreaInput({
                   <div className="flex gap-2">
                     <input
                       value={query}
-                      onChange={(e) => setQuery(e.target.value)}
+                      onChange={(e) => { setQuery(e.target.value); setResults([]); }}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runSearch(); } }}
                       placeholder="Search for a city or address"
                       style={FONT}
@@ -249,16 +316,11 @@ export function LocationAreaInput({
                   </div>
                   {searching && <p className="m-0 text-[11.5px] text-(--ad-ink-faint)">Searching…</p>}
                   {searchErr && <p className="m-0 text-[11.5px] text-(--ad-clay)">{searchErr}</p>}
-                  {results.length > 0 && (
-                    <div className="overflow-hidden rounded-lg border border-(--ad-line)">
-                      {results.map((r) => (
-                        <button
-                          key={`${r.lat},${r.lng}`}
-                          type="button"
-                          onClick={() => pickResult(r)}
-                          className="block w-full cursor-pointer border-0 border-b border-(--ad-fill) bg-(--ad-surface) px-3 py-2 text-left text-[12.5px] last:border-0 hover:bg-(--ad-surface-2)"
-                        >
-                          {r.label}
+                  {radiusList.length > 0 && (
+                    <div role="listbox" aria-label="Places" className="overflow-hidden rounded-lg border border-(--ad-line)">
+                      {radiusList.map((r) => (
+                        <button key={`${r.lat},${r.lng}`} type="button" role="option" aria-selected={false} onClick={() => pickResult(r)} className={optionCls(false)}>
+                          <MapPin size={13} className="shrink-0 text-(--ad-green)" aria-hidden />{r.label}
                         </button>
                       ))}
                     </div>

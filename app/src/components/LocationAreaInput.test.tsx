@@ -119,3 +119,35 @@ describe('LocationAreaInput map', () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('LocationAreaInput place suggestions', () => {
+  it('suggests real places while typing and adds the picked one', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    await user.type(screen.getByRole('combobox'), 'prag');
+    await user.click(await screen.findByRole('option', { name: PRAGUE.label }));
+    expect(onChange).toHaveBeenLastCalledWith([{ mode: 'text', label: PRAGUE.label }]);
+    expect(screen.getByRole('combobox')).toHaveValue('');
+  });
+
+  it('Enter takes the highlighted suggestion', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    await user.type(screen.getByRole('combobox'), 'prag');
+    await screen.findByRole('option', { name: PRAGUE.label });
+    await user.keyboard('{Enter}');
+    expect(onChange).toHaveBeenLastCalledWith([{ mode: 'text', label: PRAGUE.label }]);
+  });
+
+  it('still adds typed text when place search is not set up', async () => {
+    vi.stubEnv('VITE_MAPBOX_TOKEN', '');
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    await user.type(screen.getByRole('combobox'), 'Lusaka, Zambia{Enter}');
+    expect(onChange).toHaveBeenLastCalledWith([{ mode: 'text', label: 'Lusaka, Zambia' }]);
+    expect(geocode.geocodePlace).not.toHaveBeenCalled();
+  });
+});

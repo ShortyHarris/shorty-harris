@@ -964,6 +964,7 @@ function EditClientModal({
   const [monthlyProspectLimit, setMonthlyProspectLimit] = useState(client.monthly_prospect_limit);
   const [maxCampaigns, setMaxCampaigns] = useState(client.max_campaigns);
   const [autoApprove, setAutoApprove] = useState(client.auto_approve_campaigns);
+  const [wizardEnabled, setWizardEnabled] = useState(client.wizard_enabled ?? true);
   const [allowGeneric, setAllowGeneric] = useState(client.allow_generic_mailboxes ?? false);
   const [usage, setUsage] = useState<ClientUsage | null>(null);
   const [busy, setBusy] = useState(false);
@@ -990,6 +991,7 @@ function EditClientModal({
       country, send_timezone: sendTimezone,
       monthly_prospect_limit: monthlyProspectLimit, max_campaigns: maxCampaigns,
       auto_approve_campaigns: autoApprove,
+      wizard_enabled: wizardEnabled,
       allow_generic_mailboxes: allowGeneric,
     });
     setBusy(false);
@@ -1081,6 +1083,18 @@ function EditClientModal({
           <span>
             <span className="block font-semibold text-(--ad-ink)">Auto-approve this client's campaigns</span>
             <span className="block text-[11px] text-(--ad-ink-faint)">Skips the "Awaiting approval" step - campaigns they create go active immediately, no admin review.</span>
+          </span>
+        </label>
+        <label className="flex cursor-pointer items-start gap-2 text-[13px] text-(--ad-ink-soft)">
+          <input
+            type="checkbox"
+            checked={wizardEnabled}
+            onChange={(e) => setWizardEnabled(e.target.checked)}
+            className="mt-0.5 accent-(--ad-green)"
+          />
+          <span>
+            <span className="block font-semibold text-(--ad-ink)">Campaign wizard</span>
+            <span className="block text-[11px] text-(--ad-ink-faint)">On by default. While the wizard is set to sandbox accounts only (the switch on the Campaigns page), only sandbox accounts actually see it. Untick to hide it from this client even when it's on for everyone.</span>
           </span>
         </label>
         <label className="flex cursor-pointer items-start gap-2 text-[13px] text-(--ad-ink-soft)">

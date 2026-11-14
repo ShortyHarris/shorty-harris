@@ -25,3 +25,4 @@ npm-debug.log*
 # misc
 *.local
 test-results/
+docs/campaign-wizard/

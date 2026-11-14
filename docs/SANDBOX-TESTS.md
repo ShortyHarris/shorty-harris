@@ -117,12 +117,21 @@ Use a different prospect for each, after its first email has been sent.
 
 ---
 
-## Not covered by this plan (by design or planned separately)
+## K. Campaign Wizard
 
-- **Automated regression checks** on every pull request and nightly (spec 2.5): planned separately.
-- **Testing database changes on a copy** before release (spec 2.3): the process is in `SANDBOX.md`; not run per change yet.
-- **Future BDR agent access** (spec 2.4): designed for, not built.
-- The sandbox clock moves dates and time of day, but the follow-up writer runs on the real calendar's weekdays (E6).
+The wizard has its own test list: `docs/CAMPAIGN_WIZARD_TESTS.md`.
+
+## Automated checks, and what this plan does not cover
+
+Checked 2026-11-08 against the repository and the campaign wizard's pull request.
+
+| Spec | What | Status |
+| --- | --- | --- |
+| 2.5 | **Regression checks on every pull request** | **Done.** "Release checks" (`.github/workflows/release-checks.yml`) runs the type check, unit and component tests (530), the production build, lint and the database tests (265) on every pull request into `main`, and is required before merging. The campaign wizard pull request passes them. |
+| 2.5 | Nightly full run and browser (end-to-end) tests on previews | Not built yet. Phase 2 of `docs/REGRESSION-TESTING-PLAN.md`; needs a dedicated test sandbox account and mailbox. |
+| 2.3 | **Testing database changes on a copy before release** | **Done for every pull request.** The checks build a fresh database from `supabase/baseline` plus the pull request's migrations and run the database tests on it; production is changed only after merge, from the same file. Trying a risky change on a copy of live data (a Supabase preview branch) is still a manual step (`SANDBOX.md`). |
+| 2.4 | Future BDR agent access | Designed for (`docs/REGRESSION-TESTING-PLAN.md` section 8), not built. |
+| | Sandbox clock and weekends | The clock moves dates and time of day, but the follow-up writer runs on the real calendar's weekdays (E6, a known limit). |
 
 ## Results sheet
 
@@ -151,6 +160,7 @@ Use a different prospect for each, after its first email has been sent.
 | E3 | | |
 | E4 | | |
 | E5 | | |
+| E6 | Note only | |
 | F1 | | |
 | F2 | | |
 | F3 | | |

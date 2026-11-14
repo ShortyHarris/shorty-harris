@@ -1,10 +1,11 @@
 import { btn } from '../../lib/clientButtons';
 import { ModalClose } from '../../components/ModalClose';
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ChevronRight, TriangleAlert, Pencil, Trash2, Megaphone, X } from 'lucide-react';
+import { ChevronRight, Pencil, Trash2, Megaphone, X, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import {
@@ -43,6 +44,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { COUNTRY_OPTIONS, countryName, defaultCampaignCountry, findCountryHold, isEuCountry } from '../../lib/countries';
 import { RequiredMark } from '../../components/RequiredMark';
 import { MobileFab } from '../../components/MobileFab';
+import { useClientHeader } from '../../hooks/useClientHeader';
+import { LaunchAllDialog } from './LaunchAllDialog';
+import { RowMenu } from '../../components/RowMenu';
+import { fetchOpenSession } from '../../hooks/useWizardSession';
+import { STEP_NAMES } from '../../lib/wizardPages';
+
+// The campaign window (emails, who & where, launch) for wizard-pilot clients; loaded on first open.
+const CampaignDialog = lazy(() => import('./CampaignEditor'));
 
 const HELP: HelpContent = {
   title: 'Campaigns',
@@ -63,6 +72,8 @@ const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif
 const CAMP_PILL: Record<string, StatusPillStyle> = {
   pending_review: { ...PILL.waiting, icon: 'clock' },
   draft:          { ...PILL.closed,  icon: 'minus' },
+  scheduled:      { ...PILL.waiting, icon: 'clock' },
+  archived:       { ...PILL.closed,  icon: 'minus' },
   active:         { ...PILL.sent,    icon: 'send' },
   paused:         { ...PILL.ahead,   icon: 'clock' },
   completed:      { ...PILL.closed,  icon: 'check' },
@@ -77,6 +88,8 @@ function lastScrapedLabel(iso: string | null): string {
 const CAMP_STATUS_LABEL: Record<string, string> = {
   pending_review: 'In review',
   draft: 'Draft',
+  scheduled: 'Scheduled',
+  archived: 'Archived',
   active: 'Active',
   paused: 'Paused',
   completed: 'Completed',
@@ -104,7 +117,53 @@ export function Campaigns({
   const { holds } = useCountrySendHolds(client);
   const { toasts, toast, dismiss } = useToast();
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh campaigns.');
-  const [showNew, setShowNew] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The wizard's "Skip wizard & create manually" lands here with ?new=manual.
+  const [showNew, setShowNew] = useState(() => searchParams.get('new') === 'manual' && !readOnly);
+  // Campaign Wizard pilot: "New campaign" opens the wizard, "Create manually" opens the form.
+  const { wizardEnabled } = useClientHeader(clientId, client);
+  const navigate = useNavigate();
+  const openWizard = (entry?: 'find_new' | 'onboarding') =>
+    navigate(`${basePath}/campaigns/wizard${entry ? `?entry=${entry}` : ''}`);
+  // One "New campaign" button; pilot clients then choose the wizard or setting it up themselves.
+  const [choosing, setChoosing] = useState(false);
+  const startNew = () => (wizardEnabled ? setChoosing(true) : setShowNew(true));
+  // The campaign window is in the address (?open=<id>&tab=emails) so links and reloads land on it.
+  const openId = wizardEnabled && !readOnly ? searchParams.get('open') : null;
+  const openEditor = (id: string, tab?: string) => {
+    const next = new URLSearchParams(searchParams); next.set('open', id);
+    if (tab) next.set('tab', tab); else next.delete('tab');
+    setSearchParams(next);
+  };
+  const closeEditor = () => {
+    const next = new URLSearchParams(searchParams); next.delete('open'); next.delete('tab');
+    setSearchParams(next, { replace: true });
+  };
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  // Fetch the campaign window's code ahead of the first click, so it opens without a pause.
+  useEffect(() => { if (wizardEnabled && !readOnly) void import('./CampaignEditor'); }, [wizardEnabled, readOnly]);
+  // An unfinished wizard setup is offered here, quietly; the wizard itself always starts fresh.
+  const unfinished = useQuery({
+    queryKey: ['wizard-open-session', clientId],
+    queryFn: () => fetchOpenSession(clientId, client),
+    enabled: wizardEnabled && !readOnly,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+  async function discardUnfinished() {
+    if (!unfinished.data) return;
+    await client.from('wizard_sessions').update({ status: 'abandoned' }).eq('id', unfinished.data.id);
+    void unfinished.refetch();
+  }
+  const [showLaunchAll, setShowLaunchAll] = useState(false);
+  // The wizard lands here with ?drafts=<id>,<id> so the new drafts can be listed with a link each.
+  const [newDraftIds, setNewDraftIds] = useState<string[]>(() => (searchParams.get('drafts') ?? '').split(',').filter((x) => x.length > 30));
+  // Drop ?new=manual once the form is open, so a reload doesn't reopen it.
+  useEffect(() => {
+    if (searchParams.get('new') !== 'manual' && !searchParams.get('drafts')) return;
+    const next = new URLSearchParams(searchParams); next.delete('new'); next.delete('drafts');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [openCampaign, setOpenCampaignRaw] = useState<ClientCampaignRow | null>(null);
   // The table's Edit button opens the same window already in edit mode.
   const [openInEdit, setOpenInEdit] = useState(false);
@@ -122,6 +181,11 @@ export function Campaigns({
   const newCampaignDisabled = atLimit || atLaunchLimit;
   const newCampaignTitle = atLaunchLimit ? launchLimitTitle : (atLimit ? limitTitle : undefined);
 
+  const launchableDrafts = rows.filter((c) => c.status === 'draft' || c.status === 'pending_review').map((c) => ({ id: c.id, name: c.name }));
+  const newDrafts = rows.filter((c) => newDraftIds.includes(c.id));
+  // Pilot clients go straight to the campaign's own page (targeting, emails, launch).
+  const openRow = (c: ClientCampaignRow) => (wizardEnabled && !readOnly ? openEditor(c.id) : setOpenCampaign(c));
+
   // One banner per held country that at least one of this client's campaigns targets.
   const heldGroups = holds
     .map((h) => ({ hold: h, campaigns: rows.filter((c) => findCountryHold([h], c.country)) }))
@@ -135,19 +199,21 @@ export function Campaigns({
             <Megaphone size={24} strokeWidth={2} className="text-(--ad-green)" aria-hidden />
             Campaigns
           </h1>
-          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">{rows.length} campaign{rows.length !== 1 ? 's' : ''}
-            <span className="md:hidden" title={launchLimitTitle}> · {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used</span>
+          {/* Two separate limits, both spelled out: how many campaigns you can have, and how many
+              you can launch this month. */}
+          <p className="m-0 mt-1 text-[13px] text-(--ad-ink-soft)">
+            {usage
+              ? <span title={limitTitle}>{usage.campaign_count} of {usage.max_campaigns} campaigns</span>
+              : <span>{rows.length} campaign{rows.length !== 1 ? 's' : ''}</span>}
+            <span title={launchLimitTitle}> · {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used this month</span>
           </p>
         </div>
-        <div className="flex items-center gap-2 md:gap-2.5 shrink-0">
-          <span className="hidden md:inline text-[12px] font-semibold text-(--ad-ink-soft)" title={launchLimitTitle}>
-            {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches used
-          </span>
+        <div className="flex flex-wrap items-center justify-end gap-2 md:gap-2.5">
           <HelpButton content={HELP} />
           <RefreshButton onRefresh={handleRefresh} isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} className={ghostCls} />
           {!readOnly && (
             <button
-              onClick={() => setShowNew(true)}
+              onClick={startNew}
               disabled={newCampaignDisabled}
               title={newCampaignTitle}
               className={`${primaryCls} max-md:hidden`}
@@ -159,26 +225,66 @@ export function Campaigns({
         </div>
       </header>
 
+      {/* Notices use the same quiet bar as the Approvals page. */}
       {atLaunchLimit && (
-        <div className="flex items-start gap-3 rounded-xl border border-(--ad-green-line) bg-(--ad-green-tint) px-4 py-3.5">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--ad-green-line)">
-            <TriangleAlert size={15} strokeWidth={2.2} className="text-(--ad-green-hover)" />
-          </span>
-          <p className="m-0 pt-0.5 text-[13px] leading-snug text-(--ad-green-hover)">
-            <strong className="font-semibold">Launch limit reached</strong> - you've used {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches this month. Contact us to increase it before creating another campaign.
-          </p>
-        </div>
+        <p role="status" className="m-0 flex items-start gap-2 rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3 text-[13px] leading-relaxed text-(--ad-ink)">
+          <AlertCircle size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
+          <span><strong className="font-semibold">Launch limit reached.</strong> You've used {launchesUsed} of {MONTHLY_LAUNCH_LIMIT} launches this month. Contact us if you need more.</span>
+        </p>
       )}
 
       {atLimit && (
-        <div className="flex items-start gap-3 rounded-xl border border-(--ad-green-line) bg-(--ad-green-tint) px-4 py-3.5">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--ad-green-line)">
-            <TriangleAlert size={15} strokeWidth={2.2} className="text-(--ad-green-hover)" />
-          </span>
-          <p className="m-0 pt-0.5 text-[13px] leading-snug text-(--ad-green-hover)">
-            <strong className="font-semibold">Campaign limit reached</strong> - you've used {usage!.campaign_count} of {usage!.max_campaigns} slots. Contact us to increase it before creating another one.
+        <p role="status" className="m-0 flex items-start gap-2 rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3 text-[13px] leading-relaxed text-(--ad-ink)">
+          <AlertCircle size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
+          <span><strong className="font-semibold">Campaign limit reached.</strong> You're using {usage!.campaign_count} of {usage!.max_campaigns} campaign slots. Contact us if you need more.</span>
+        </p>
+      )}
+
+      {unfinished.data && newDrafts.length === 0 && (
+        <div role="status" className="flex flex-col gap-2.5 rounded-xl border border-(--ad-line) bg-(--ad-surface-2) px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="m-0 flex items-start gap-2 text-[13px] leading-relaxed text-(--ad-ink)">
+            <Sparkles size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
+            <span>
+              <strong className="font-semibold">You have an unfinished campaign setup.</strong>{' '}
+              Started {new Date(unfinished.data.updated_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}, at “{STEP_NAMES[unfinished.data.screen]}”.
+            </span>
           </p>
+          <span className="flex shrink-0 gap-2">
+            <button className={btn('primary', 'sm')} onClick={() => navigate(`${basePath}/campaigns/wizard?resume=1`)}>Continue</button>
+            <button className={btn('secondary', 'sm')} onClick={() => void discardUnfinished()}>Discard</button>
+          </span>
         </div>
+      )}
+
+      {wizardEnabled && newDrafts.length > 0 && (
+        <div role="status" className="flex flex-col gap-3 rounded-xl border border-(--ad-green-line) bg-(--ad-green-tint)/40 px-4 py-3.5">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="m-0 flex items-start gap-2 text-[13px] leading-relaxed text-(--ad-ink)">
+              <Sparkles size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-(--ad-green)" aria-hidden />
+              <span>
+                <strong className="font-semibold">{newDrafts.length} new draft{newDrafts.length === 1 ? '' : 's'} ready.</strong> Nothing has been sent or charged.
+                Open each one to read and edit its four emails, then launch it.
+              </span>
+            </p>
+            <span className="flex shrink-0 gap-2">
+              {newDrafts.length > 1 && <button className={btn('primary', 'md')} onClick={() => setShowLaunchAll(true)}>Launch all</button>}
+              <button className={btn('secondary', 'md')} onClick={() => setNewDraftIds([])}>Dismiss</button>
+            </span>
+          </div>
+          <ul className="m-0 flex list-none flex-col divide-y divide-(--ad-line) overflow-hidden rounded-lg border border-(--ad-line) bg-(--ad-surface) p-0">
+            {newDrafts.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                <span className="min-w-0 truncate text-[13px] font-semibold text-(--ad-ink)">{c.name}</span>
+                <button onClick={() => openEditor(c.id, 'emails')} className={`${btn('secondary', 'sm')} shrink-0`}>Review emails</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {showLaunchAll && (
+        <LaunchAllDialog open={showLaunchAll} onOpenChange={setShowLaunchAll} drafts={launchableDrafts} basePath={basePath} client={client}
+          onDone={() => { void reload(); setNewDraftIds([]); queryClient.invalidateQueries({ queryKey: ['client-usage', clientId] }); }} />
       )}
 
       {heldGroups.map(({ hold, campaigns }) => (
@@ -198,16 +304,17 @@ export function Campaigns({
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-(--ad-line) bg-(--ad-surface) p-10 text-center">
           <strong className="text-[15px] font-semibold text-(--ad-ink)">No campaigns yet.</strong>
-          <span className="text-[13px] text-(--ad-ink-soft)">Create your first campaign to tell us who to target.</span>
+          <span className="text-[13px] text-(--ad-ink-soft)">
+            {wizardEnabled
+              ? 'Tell us about your business and we\'ll suggest who to target, or set a campaign up yourself.'
+              : 'Create your first campaign to tell us who to target.'}
+          </span>
           {!readOnly && (
-            <button
-              onClick={() => setShowNew(true)}
-              disabled={newCampaignDisabled}
-              title={newCampaignTitle}
-              className={`${primaryCls} mt-2`}
-            >
-              + New campaign
-            </button>
+            <div className="mt-2 flex flex-wrap justify-center gap-2">
+              <button onClick={startNew} disabled={newCampaignDisabled} title={newCampaignTitle} className={primaryCls}>
+                + New campaign
+              </button>
+            </div>
           )}
         </div>
       ) : (
@@ -232,9 +339,9 @@ export function Campaigns({
                 {rows.map((c) => {
                   const pill = CAMP_PILL[c.status] ?? CAMP_PILL.draft;
                   const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
-                  const isDraft = c.status === 'draft' || c.status === 'pending_review';
+                  const isDraft = c.status === 'draft' || c.status === 'pending_review' || c.status === 'scheduled';
                   return (
-                    <tr key={c.id} onClick={() => setOpenCampaign(c)} className="group cursor-pointer">
+                    <tr key={c.id} onClick={() => openRow(c)} className="group cursor-pointer">
                       <td className="min-w-0">
                         <div className="line-clamp-2 font-semibold leading-snug text-(--ad-ink) group-hover:underline" title={c.name}>{c.name}</div>
                         {isEuCountry(c.country) && <div className="mt-1"><EuBadge /></div>}
@@ -260,7 +367,14 @@ export function Campaigns({
                       </td>
                       <td className="px-3">
                         <div className="flex items-center justify-end gap-2">
-                          {isDraft && !readOnly && (
+                          {wizardEnabled && !readOnly ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openEditor(c.id); }}
+                              className={btn(isDraft ? 'primary' : 'secondary', 'sm')}
+                            >
+                              {isDraft ? 'Edit & launch' : 'Open'}
+                            </button>
+                          ) : isDraft && !readOnly && (
                             <button
                               onClick={(e) => { e.stopPropagation(); setOpenCampaign(c, true); }}
                               className={btn('secondary', 'sm')}
@@ -268,7 +382,14 @@ export function Campaigns({
                               Edit
                             </button>
                           )}
-                          <ChevronRight size={15} className="text-(--ad-ink-ghost)" />
+                          {wizardEnabled && !readOnly && canDelete ? (
+                            <RowMenu label={`Actions for ${c.name}`} items={[
+                              { type: 'action', label: 'Open', onClick: () => openEditor(c.id) },
+                              { type: 'action', label: 'Review emails', onClick: () => openEditor(c.id, 'emails') },
+                              { type: 'separator' },
+                              { type: 'action', label: 'Delete campaign', destructive: true, onClick: () => setDeleteTarget({ id: c.id, name: c.name }) },
+                            ]} />
+                          ) : <ChevronRight size={15} className="text-(--ad-ink-ghost)" />}
                         </div>
                       </td>
                     </tr>
@@ -285,7 +406,7 @@ export function Campaigns({
               return (
                 <button
                   key={c.id}
-                  onClick={() => setOpenCampaign(c)}
+                  onClick={() => openRow(c)}
                   className="cursor-pointer rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4 text-left"
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -316,7 +437,7 @@ export function Campaigns({
       {/* Mobile FAB */}
       {!readOnly && (
         <MobileFab
-          onClick={() => setShowNew(true)}
+          onClick={startNew}
           label="New campaign"
           disabled={newCampaignDisabled}
           title={newCampaignTitle}
@@ -327,6 +448,16 @@ export function Campaigns({
       )}
 
       <AnimatePresence>
+        {choosing && (
+          <NewCampaignChooser
+            key="new-campaign-chooser"
+            onClose={() => setChoosing(false)}
+            onWizard={() => { setChoosing(false); openWizard(rows.length > 0 ? 'find_new' : undefined); }}
+            onManual={() => { setChoosing(false); setShowNew(true); }}
+            draftCount={launchableDrafts.length}
+            onLaunchAll={() => { setChoosing(false); setShowLaunchAll(true); }}
+          />
+        )}
         {showNew && (
           <NewCampaignModal
             key="new-campaign-modal"
@@ -364,6 +495,35 @@ export function Campaigns({
             }}
             onDeleted={() => {
               setOpenCampaign(null);
+              reload();
+              toast('Campaign deleted.');
+              queryClient.invalidateQueries({ queryKey: ['client-usage', clientId] });
+            }}
+          />
+        )}
+        {openId && (
+          <Suspense key={`editor-${openId}`} fallback={null}>
+            <CampaignDialog
+              campaignId={openId}
+              initialTab={searchParams.get('tab')}
+              clientId={clientId}
+              client={client}
+              basePath={basePath}
+              canDelete={canDelete}
+              onClose={closeEditor}
+              onOpenCampaign={(id) => { openEditor(id); toast('Copied as a new draft.'); }}
+              onDelete={setDeleteTarget}
+            />
+          </Suspense>
+        )}
+        {deleteTarget && (
+          <DeleteCampaignModal
+            key="delete-campaign-row"
+            campaign={deleteTarget}
+            onClose={() => setDeleteTarget(null)}
+            onDeleted={() => {
+              if (openId === deleteTarget.id) closeEditor();
+              setDeleteTarget(null);
               reload();
               toast('Campaign deleted.');
               queryClient.invalidateQueries({ queryKey: ['client-usage', clientId] });
@@ -885,9 +1045,12 @@ function ReviewRow({ label, value, tags }: { label: string; value?: string; tags
 /* ── Campaign Detail Modal ─────────────────────────────────────────── */
 function CampaignDetailModal({
   campaign, startInEdit = false, clientId, onClose, onUpdated, onDeleted, client = supabase, readOnly = false, canDelete = true, basePath = '/app', hold = null,
+  onOpenEditor,
 }: {
   campaign: ClientCampaignRow; startInEdit?: boolean; clientId: string; onClose: () => void; onUpdated: () => void; onDeleted: () => void;
   client?: SupabaseClient; readOnly?: boolean; canDelete?: boolean; basePath?: string; hold?: { country: string; reason: string } | null;
+  /** Campaign Wizard pilot: the pencil opens the full campaign editor instead of the inline form. */
+  onOpenEditor?: () => void;
 }) {
   const { rows: prospects, loading } = useClientCampaignProspects(campaign.id, client);
 
@@ -1015,7 +1178,7 @@ function CampaignDetailModal({
             {!editing && !readOnly && (
               <>
                 <button
-                  onClick={startEdit}
+                  onClick={onOpenEditor ?? startEdit}
                   aria-label="Edit campaign"
                   title="Edit campaign"
                   className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-(--ad-ink-soft) transition-colors hover:bg-(--ad-surface-2) hover:text-(--ad-green)"
@@ -1079,7 +1242,6 @@ function CampaignDetailModal({
             capLabel="search term"
           />
           <LimitCounter count={queries.length} max={limits.maxSearchTerms} noun="search terms" />
-          <LimitMessages errors={check.errors} fields={['search_queries']} />
 
           <LocationAreaInput
             sentenceLabel
@@ -1092,7 +1254,7 @@ function CampaignDetailModal({
             capLabel="location"
           />
           <LimitCounter count={areas.length} max={limits.maxLocations} noun="locations" />
-          <LimitMessages errors={check.errors} fields={['target_locations', 'pairs']} />
+          <LimitMessages errors={check.errors} fields={['pairs']} />
 
           <div>
             <label className={fieldLbl}>Max results</label>
@@ -1275,13 +1437,65 @@ function CampaignDetailModal({
   );
 }
 
+/* ── New campaign: choose how to start ────────────────────────────────
+   One button on the page; this small window offers the two ways in. */
+function NewCampaignChooser({ onClose, onWizard, onManual, draftCount, onLaunchAll }: {
+  onClose: () => void; onWizard: () => void; onManual: () => void; draftCount: number; onLaunchAll: () => void;
+}) {
+  const option = 'flex w-full cursor-pointer items-start gap-4 rounded-2xl border border-(--ad-line) bg-(--ad-surface) p-5 text-left transition-colors hover:border-(--ad-ink-soft)';
+  return (
+    <motion.div
+      className="fixed inset-0 z-60 flex items-end justify-center bg-[rgba(14,8,34,0.45)] md:items-center md:p-6"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
+      {...useOverlayClose(onClose, { escape: true })}
+    >
+      <motion.div
+        style={FONT} role="dialog" aria-modal="true" aria-label="New campaign"
+        className="w-full max-w-[520px] rounded-t-2xl bg-(--ad-surface) p-6 md:rounded-2xl md:border md:border-(--ad-line)"
+        initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }}
+        transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="m-0 text-[22px] font-bold tracking-tight text-(--ad-ink)">New campaign</h2>
+            <p className="m-0 mt-1 text-[14px] text-(--ad-ink-soft)">How would you like to start?</p>
+          </div>
+          <ModalClose onClick={onClose} />
+        </div>
+        <div className="mt-5 flex flex-col gap-3">
+          <button type="button" className={option} onClick={onWizard} autoFocus>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--ad-green-tint) text-(--ad-green)"><Sparkles size={18} aria-hidden /></span>
+            <span>
+              <span className="block text-[15px] font-semibold text-(--ad-ink)">Find campaigns for me <span className="ml-1 rounded-full bg-(--ad-green-tint) px-2 py-0.5 text-[11px] font-semibold text-(--ad-green)">Recommended</span></span>
+              <span className="mt-0.5 block text-[13.5px] leading-relaxed text-(--ad-ink-soft)">We read your website, suggest who to target and write the emails. About 2 minutes.</span>
+            </span>
+          </button>
+          <button type="button" className={option} onClick={onManual}>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--ad-surface-2) text-(--ad-ink)"><Pencil size={17} aria-hidden /></span>
+            <span>
+              <span className="block text-[15px] font-semibold text-(--ad-ink)">Set it up myself</span>
+              <span className="mt-0.5 block text-[13.5px] leading-relaxed text-(--ad-ink-soft)">Choose the types of business and areas yourself.</span>
+            </span>
+          </button>
+        </div>
+        {draftCount > 1 && (
+          <p className="m-0 mt-4 text-[13px] text-(--ad-ink-soft)">
+            Or <button type="button" onClick={onLaunchAll} className="cursor-pointer border-0 bg-transparent p-0 font-semibold text-(--ad-ink) underline underline-offset-4">launch your {draftCount} drafts</button>.
+          </p>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
 /* ── Delete Campaign confirmation ─────────────────────────────────────
    Same "show what gets deleted first" pattern as the admin's own delete
    flow (getCampaignDeleteCounts/deleteCampaign in useAdminData.ts) - a
    client can't undo this, so they should see the blast radius up front. */
 function DeleteCampaignModal({
   campaign, onClose, onDeleted,
-}: { campaign: ClientCampaignRow; onClose: () => void; onDeleted: () => void }) {
+}: { campaign: { id: string; name: string }; onClose: () => void; onDeleted: () => void }) {
   const [counts, setCounts] = useState<ClientCampaignDeleteCounts | null>(null);
   const [busy, setBusy]     = useState(false);
   const [err, setErr]       = useState<string | null>(null);

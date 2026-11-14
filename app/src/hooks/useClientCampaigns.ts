@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useApprovedQueueCounts, awaitingInCampaign } from './useClientApprovals';
 import { buildAreaColumns, type TargetArea } from '../lib/targetAreas';
 import { campaignLimitsError } from '../lib/campaignLimits';
+import { fetchWizardOn } from './useWizardRollout';
 
 export const myCampaignsKey = (clientId: string) => ['my-campaigns', clientId] as const;
 const myCampaignProspectsKey = (campaignId: string) => ['my-campaign-prospects', campaignId] as const;
@@ -108,11 +109,10 @@ export async function createClientCampaign(
   // request can never write a pre-activated row itself. A database trigger
   // (auto_approve_client_campaign) elevates it to 'active' right after, as a
   // separate, privileged update.
-  const { data: clientRow } = await supabase
-    .from('clients')
-    .select('auto_approve_campaigns')
-    .eq('id', input.client_id)
-    .single();
+  const [{ data: clientRow }, wizardOn] = await Promise.all([
+    supabase.from('clients').select('auto_approve_campaigns').eq('id', input.client_id).single(),
+    fetchWizardOn(input.client_id),
+  ]);
 
   const { error } = await supabase
     .from('campaigns')
@@ -131,7 +131,9 @@ export async function createClientCampaign(
       scrape_enabled: true,
     });
 
-  return { autoApproved: clientRow?.auto_approve_campaigns ?? false, error };
+  // Clients with the wizard on skip the review too (the same rule as the database trigger,
+  // auto_approve_client_campaign): no staff approval on launch.
+  return { autoApproved: (clientRow?.auto_approve_campaigns ?? false) || wizardOn, error };
 }
 
 export interface UpdateClientCampaignInput {

@@ -1,11 +1,15 @@
 import type { LimitError } from '../lib/campaignLimits';
 
-/* "3 of 5 search terms" - amber at the cap, clay once over it. */
+/* "3 of 5 search terms" - amber at the cap, clay once over it. At the cap the
+   input itself explains why it went grey; over the cap this line also says how
+   many to remove, so the field doesn't need a second, separate error line. */
 export function LimitCounter({ count, max, noun }: { count: number; max: number; noun: string }) {
-  const tone = count > max ? 'text-(--ad-clay)' : count === max ? 'text-(--ad-amber)' : 'text-(--ad-ink-faint)';
+  const over = count - max;
+  const tone = over > 0 ? 'text-(--ad-clay)' : over === 0 ? 'text-(--ad-amber)' : 'text-(--ad-ink-faint)';
   return (
     <p className={`m-0 mt-1 text-[11px] font-semibold ${tone}`} aria-live="polite">
-      {count} of {max} {noun}{count === max ? ' (limit reached)' : ''}
+      {count} of {max} {noun}
+      {over > 0 && ` - remove ${over} to save`}
     </p>
   );
 }

@@ -50,6 +50,8 @@ const Dashboard      = lazy(() => import('./screens/client/Dashboard').then((m) 
 const Billing        = lazy(() => import('./screens/client/Billing').then((m) => ({ default: m.Billing })));
 const Approvals      = lazy(() => import('./screens/client/Approvals').then((m) => ({ default: m.Approvals })));
 const ClientCampaigns = lazy(() => import('./screens/client/Campaigns').then((m) => ({ default: m.Campaigns })));
+const CampaignWizard = lazy(() => import('./screens/client/CampaignWizard').then((m) => ({ default: m.CampaignWizard })));
+const CampaignEditor = lazy(() => import('./screens/client/CampaignEditor').then((m) => ({ default: m.CampaignEditor })));
 const Settings       = lazy(() => import('./screens/client/Settings').then((m) => ({ default: m.Settings })));
 const ClientAnalytics = lazy(() => import('./screens/client/Analytics').then((m) => ({ default: m.Analytics })));
 const TargetingProfile = lazy(() => import('./screens/client/TargetingProfile').then((m) => ({ default: m.TargetingProfile })));
@@ -193,6 +195,9 @@ function ClientZone() {
           <Routes>
             <Route index element={<Dashboard clientId={clientId} />} />
             <Route path="campaigns" element={<ClientCampaigns clientId={clientId} />} />
+            {/* The wizard checks the pilot switch itself, so a reload on this URL works before the header loads. */}
+            <Route path="campaigns/wizard" element={<CampaignWizard clientId={clientId} />} />
+            <Route path="campaigns/:campaignId/edit" element={<CampaignEditor clientId={clientId} />} />
             <Route path="prospects" element={<Prospects clientId={clientId} />} />
             <Route path="approvals" element={<Approvals clientId={clientId} />} />
             <Route path="analytics" element={<ClientAnalytics clientId={clientId} />} />
