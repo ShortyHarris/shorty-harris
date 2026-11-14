@@ -70,3 +70,28 @@ export function signOffMissingLine(n: number): string | null {
   if (n <= 0) return null;
   return `${n} draft${n === 1 ? " doesn't" : "s don't"} end with your name in the sign-off. They're marked "${SIGN_OFF_MISSING_BADGE}" below: edit to add it, or reject.`;
 }
+
+/**
+ * "Prague Restaurants (12), Berlin Cafes (3)" for a set of drafts. Returns '' when no draft's
+ * campaign can be named (the campaign list hasn't loaded, or the drafts aren't loaded) so the
+ * caller can leave the line out, rather than showing "Unknown campaign". Drafts whose campaign
+ * isn't in the list are counted as "other campaigns" next to the ones that are.
+ */
+export function campaignBreakdownLabel(
+  drafts: { campaign_id?: string | null }[],
+  campaigns: { id: string; name: string }[],
+): string {
+  const names = new Map(campaigns.map((c) => [c.id, c.name]));
+  const counts = new Map<string, number>();
+  let unknown = 0;
+  drafts.forEach((d) => {
+    const name = d.campaign_id ? names.get(d.campaign_id) : undefined;
+    if (name === undefined) { unknown += 1; return; }
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  });
+  if (counts.size === 0) return '';
+  const showCounts = counts.size > 1 || unknown > 0;
+  const parts = Array.from(counts, ([name, n]) => (showCounts ? `${name} (${n})` : name));
+  if (unknown > 0) parts.push(`other campaigns (${unknown})`);
+  return parts.join(', ');
+}

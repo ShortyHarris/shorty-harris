@@ -1,6 +1,12 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { settleWithin } from '../lib/fetchWithTimeout';
+import { isServerBusyError } from '../lib/approvalErrors';
+
+// The whole bootstrap (session from storage, maybe a token refresh, then the profile row) gets one
+// deadline. Past it the splash turns into an error with Try again, never an endless spinner.
+export const AUTH_BOOT_TIMEOUT_MS = 20_000;
 
 interface Profile {
   id: string;
@@ -13,6 +19,10 @@ interface AuthState {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  /** Set when the session or profile couldn't be loaded; the app shows it with Try again. */
+  bootError: string | null;
+  /** Re-runs the bootstrap after bootError. */
+  retry: () => void;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
@@ -24,14 +34,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [bootError, setBootError] = useState<string | null>(null);
   const loadedProfileId = useRef<string | null>(null);
+  // One profile request per user at a time: getSession() and the INITIAL_SESSION event both ask.
+  const profileInFlight = useRef<{ userId: string; promise: Promise<void> } | null>(null);
+
+  async function loadProfile(userId: string) {
+    // Already have this exact user's profile loaded - skip the redundant
+    // setLoading(true)/refetch cycle entirely.
+    if (loadedProfileId.current === userId) return;
+    if (profileInFlight.current?.userId === userId) return profileInFlight.current.promise;
+
+    setLoading(true);
+    const promise = (async () => {
+      try {
+        const { data, error } = await settleWithin(
+          supabase.from('profiles').select('id, role, full_name, client_id').eq('id', userId).maybeSingle(),
+          AUTH_BOOT_TIMEOUT_MS,
+        );
+        // A failed request is not "no profile": treating it as one bounced a signed-in user to
+        // /login. Show it as an error the user can retry instead.
+        if (error) throw new Error(error.message);
+        setProfile((data as Profile | null) ?? null);
+        loadedProfileId.current = userId;
+        setBootError(null);
+      } catch (e) {
+        setBootError(bootErrorMessage(e));
+      } finally {
+        profileInFlight.current = null;
+        setLoading(false);
+      }
+    })();
+    profileInFlight.current = { userId, promise };
+    return promise;
+  }
+
+  // Reads the stored session (supabase-js may refresh the token first), then the profile.
+  // Bounded by AUTH_BOOT_TIMEOUT_MS; any failure lands in bootError.
+  function boot(): Promise<void> {
+    return settleWithin(supabase.auth.getSession(), AUTH_BOOT_TIMEOUT_MS).then(onSession, onBootFailure);
+  }
+
+  async function onSession({ data, error }: Awaited<ReturnType<typeof supabase.auth.getSession>>) {
+    if (error) return onBootFailure(error);
+    setSession(data.session);
+    if (data.session) await loadProfile(data.session.user.id);
+    else setLoading(false);
+  }
+
+  function onBootFailure(e: unknown) {
+    setBootError(bootErrorMessage(e));
+    setLoading(false);
+  }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (data.session) loadProfile(data.session.user.id);
-      else setLoading(false);
-    });
+    boot();
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
@@ -52,28 +109,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      loadProfile(s.user.id);
+      // Supabase's guidance: never call the client from inside this callback (it can run while
+      // the auth client is mid-update). Defer the profile request to the next task.
+      const userId = s.user.id;
+      setTimeout(() => { loadProfile(userId); }, 0);
     });
 
     return () => sub.subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadProfile(userId: string) {
-    // Already have this exact user's profile loaded - skip the redundant
-    // setLoading(true)/refetch cycle entirely.
-    if (loadedProfileId.current === userId) return;
-
+  const retry = () => {
+    loadedProfileId.current = null;
+    setBootError(null);
     setLoading(true);
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, role, full_name, client_id')
-      .eq('id', userId)
-      .single();
-    setProfile((data as Profile) ?? null);
-    loadedProfileId.current = userId;
-    setLoading(false);
-  }
+    boot();
+  };
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -91,6 +142,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setSession(null);
       setProfile(null);
+      setBootError(null);
+      setLoading(false);
       loadedProfileId.current = null;
     }
   };
@@ -103,10 +156,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthCtx.Provider value={{ session, profile, loading, signIn, signOut, resetPassword }}>
+    <AuthCtx.Provider value={{ session, profile, loading, bootError, retry, signIn, signOut, resetPassword }}>
       {children}
     </AuthCtx.Provider>
   );
+}
+
+function bootErrorMessage(e: unknown): string {
+  const message = e instanceof Error ? e.message : String(e ?? '');
+  if (isServerBusyError(message) || /AbortError|aborted/i.test(message)) {
+    return "The server didn't answer in time. It may be busy - try again in a moment.";
+  }
+  if (/Failed to fetch|Load failed|NetworkError|network connection was lost|offline/i.test(message)) {
+    return "Couldn't reach the server. Check your internet connection and try again.";
+  }
+  return message ? `Couldn't load your account: ${message}` : "Couldn't load your account.";
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

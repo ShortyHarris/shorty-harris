@@ -20,6 +20,7 @@ import { initSmartlook, identifySmartlookUser } from './lib/smartlook';
 import { queryClient } from './lib/queryClient';
 import { getConsent, onConsentChange, applyStoredConsent } from './lib/consent';
 import { CookieConsent } from './components/CookieConsent';
+import { BootSplash as Spinner } from './components/BootSplash';
 import { loadGoogleAnalytics, trackPageView } from './lib/googleAnalytics';
 import './styles/admin-palette.css';
 import './styles/theme-admin.css';
@@ -62,16 +63,18 @@ const Docs           = lazy(() => import('./screens/docs/Docs').then((m) => ({ d
 // ── Guards ──────────────────────────────────────────────────────────────────
 
 function RequireAdmin({ children }: { children: ReactNode }) {
-  const { session, profile, loading } = useAuth();
-  if (loading) return <Spinner />;
+  const { session, profile, loading, bootError } = useAuth();
+  // A failed bootstrap is shown (with Try again) by the splash, never read as "signed out".
+  if (loading || bootError) return <Spinner />;
   if (!session || !profile) return <Navigate to="/login" replace />;
   if (profile.role !== 'admin') return <Navigate to="/app" replace />;
   return <>{children}</>;
 }
 
 function RequireClient({ children }: { children: ReactNode }) {
-  const { session, profile, loading } = useAuth();
-  if (loading) return <Spinner />;
+  const { session, profile, loading, bootError } = useAuth();
+  // A failed bootstrap is shown (with Try again) by the splash, never read as "signed out".
+  if (loading || bootError) return <Spinner />;
   if (!session || !profile) return <Navigate to="/login" replace />;
   if (!profile.client_id) return <NoClientAccount />;
   return <>{children}</>;
@@ -81,8 +84,9 @@ function RequireClient({ children }: { children: ReactNode }) {
 // both zones link into and that scope their own content via RLS instead of
 // a route-level role check.
 function RequireAuth({ children }: { children: ReactNode }) {
-  const { session, profile, loading } = useAuth();
-  if (loading) return <Spinner />;
+  const { session, profile, loading, bootError } = useAuth();
+  // A failed bootstrap is shown (with Try again) by the splash, never read as "signed out".
+  if (loading || bootError) return <Spinner />;
   if (!session || !profile) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -90,7 +94,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 // ── Login route: redirect away if already signed in ──────────────────────────
 
 function LoginRoute() {
-  const { session, profile, loading, signOut } = useAuth();
+  const { session, profile, loading, bootError, signOut } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -101,14 +105,14 @@ function LoginRoute() {
     else signOut();
   }, [loading, session, profile, navigate, signOut]);
 
-  if (loading || (session && profile)) return <Spinner />;
+  if (loading || (session && (profile || bootError))) return <Spinner />;
   return <Login />;
 }
 
 // ── Signup route: same already-signed-in redirect as LoginRoute ──────────────
 
 function SignupRoute() {
-  const { session, profile, loading, signOut } = useAuth();
+  const { session, profile, loading, bootError, signOut } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -118,7 +122,7 @@ function SignupRoute() {
     else signOut();
   }, [loading, session, profile, navigate, signOut]);
 
-  if (loading || (session && profile)) return <Spinner />;
+  if (loading || (session && (profile || bootError))) return <Spinner />;
   return <Signup />;
 }
 
@@ -348,52 +352,6 @@ function ImpersonateZone() {
 }
 
 // ── Shared UI ────────────────────────────────────────────────────────────────
-
-function Spinner() {
-  return (
-    <div style={{
-      position: 'fixed', inset: 0,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--ad-surface-2, #f9f6ff)',
-      fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
-    }}>
-      <style>{`@keyframes sh-spin { to { transform: rotate(360deg); } }`}</style>
-
-      {/* Wordmark */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-        <span style={{
-          fontSize: 10.5,
-          fontWeight: 700,
-          letterSpacing: '0.26em',
-          textTransform: 'uppercase',
-          color: 'var(--ad-green, #7412ef)',
-        }}>
-          Shorty
-        </span>
-        <span style={{
-          fontSize: 40,
-          fontWeight: 800,
-          letterSpacing: '-0.045em',
-          lineHeight: 1,
-          color: 'var(--ad-ink, #0e0822)',
-        }}>
-          Harris
-        </span>
-      </div>
-
-      {/* Spinner */}
-      <div style={{
-        marginTop: 28,
-        width: 18,
-        height: 18,
-        borderRadius: '50%',
-        border: '2px solid var(--ad-line-mid, #cfc9e8)',
-        borderTopColor: 'var(--ad-green, #7412ef)',
-        animation: 'sh-spin 0.7s linear infinite',
-      }} />
-    </div>
-  );
-}
 
 function NoClientAccount() {
   const { signOut } = useAuth();

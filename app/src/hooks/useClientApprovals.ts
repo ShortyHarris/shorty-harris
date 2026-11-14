@@ -8,6 +8,7 @@ import type { ClientMessageItem } from '../types';
 import { MAX_LOADED_ROWS } from '../lib/fetchAllRows';
 import { runInChunks, type ChunkedResult } from '../lib/chunkedBulk';
 import { saveDraftEdits } from '../lib/draftEdits';
+import { describeWriteError } from '../lib/approvalErrors';
 import { browserTimeZone } from '../lib/approvalsView';
 import { approvalsScheduleKey } from './useApprovalsSchedule';
 import { sendPacingKey } from './useSendPacing';
@@ -23,12 +24,50 @@ export const clientPendingCountKey = (clientId: string) => ['client-approvals-pe
 // single prefix invalidates all of them. The request params are a trailing element.
 export const clientApprovedKey = (clientId: string) => ['client-approved-drafts', clientId] as const;
 
+function approvalKeys(clientId: string): readonly (readonly unknown[])[] {
+  return [
+    clientApprovalsKey(clientId),
+    clientPendingCountKey(clientId),
+    approvalsScheduleKey(clientId),
+    clientApprovedKey(clientId),
+    sendPacingKey(clientId),
+  ];
+}
+
+/** How long a burst of writes (fast taps, realtime events, n8n updates) is gathered into one refetch. */
+export const APPROVAL_REFRESH_DEBOUNCE_MS = 600;
+const pendingRefresh = new Map<string, ReturnType<typeof setTimeout>>();
+
+/**
+ * Refreshes everything the Approvals screens read, coalesced.
+ *
+ * Each approve or reject used to invalidate five keys at once, and the realtime listener did
+ * it again for the same write. invalidateQueries' default cancelRefetch drops the in-flight
+ * request in the browser only: the database keeps running it. On 13 Nov 2026 a client
+ * approving follow-ups one tap per second stacked approvals_schedule (3.5 s even when idle)
+ * and approved_queue calls until they hit the 8 s statement timeout and PostgREST ran out of
+ * pooled connections: 294 failed calls in 12 minutes, and every other request queued behind them.
+ *
+ * Now a burst becomes one refetch per key, and a key whose last fetch is still running waits
+ * for it to finish before fetching again, so at most one request per key is ever in flight.
+ */
 export function invalidateApprovalQueries(clientId: string) {
-  queryClient.invalidateQueries({ queryKey: clientApprovalsKey(clientId) });
-  queryClient.invalidateQueries({ queryKey: clientPendingCountKey(clientId) });
-  queryClient.invalidateQueries({ queryKey: approvalsScheduleKey(clientId) });
-  queryClient.invalidateQueries({ queryKey: clientApprovedKey(clientId) });
-  queryClient.invalidateQueries({ queryKey: sendPacingKey(clientId) });
+  const prev = pendingRefresh.get(clientId);
+  if (prev !== undefined) clearTimeout(prev);
+  pendingRefresh.set(clientId, setTimeout(() => flushApprovalRefresh(clientId), APPROVAL_REFRESH_DEBOUNCE_MS));
+}
+
+function flushApprovalRefresh(clientId: string) {
+  pendingRefresh.delete(clientId);
+  const keys = approvalKeys(clientId);
+  if (keys.some((queryKey) => queryClient.isFetching({ queryKey }) > 0)) {
+    // Something from the last round is still running: try again once it has had time to land.
+    invalidateApprovalQueries(clientId);
+    return;
+  }
+  keys.forEach((queryKey) => {
+    queryClient.invalidateQueries({ queryKey }, { cancelRefetch: false });
+  });
 }
 
 // Head count only - what the sidebar badge needs, without loading any drafts. It comes from
@@ -277,6 +316,25 @@ export function awaitingInCampaign(counts: Pick<ApprovedQueueCounts, 'awaitingPr
   return counts.awaitingProspectsByCampaign[campaignId] ?? 0;
 }
 
+type WriteResult = PromiseLike<{ data: { id: string }[] | null; error: { message: string } | null }>;
+
+/**
+ * Runs a single-draft write and always settles with `{ error }`: a thrown error (timeout,
+ * network) becomes a message instead of escaping, and the lists are refreshed either way so a
+ * draft removed optimistically comes back if the write didn't land.
+ */
+export async function settleWrite(clientId: string, run: () => WriteResult): Promise<{ error: string | null }> {
+  try {
+    const { data, error } = await run();
+    if (error) return { error: describeWriteError(error.message) };
+    return { error: (data?.length ?? 0) === 0 ? ALREADY_HANDLED : null };
+  } catch (e) {
+    return { error: describeWriteError(e instanceof Error ? e.message : '') };
+  } finally {
+    invalidateApprovalQueries(clientId);
+  }
+}
+
 /**
  * `queue` selects the Approved/Blocked page to load; pass null while another tab is open
  * (counts and stats still load, with a single row).
@@ -344,11 +402,8 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
     if (editedBody !== undefined) patch.body = editedBody;
     if (editedSubject !== undefined) patch.subject = editedSubject;
 
-    const { data, error } = await supabase
-      .from('messages').update(patch).eq('id', id).eq('approval_status', 'pending').select('id');
-    const missed = !error && (data?.length ?? 0) === 0;
-    invalidateApprovalQueries(clientId);
-    return { error: error?.message ?? (missed ? ALREADY_HANDLED : null) };
+    return settleWrite(clientId, () => supabase
+      .from('messages').update(patch).eq('id', id).eq('approval_status', 'pending').select('id'));
   }, [clientId, profile?.id, removeFromCache]);
 
   // Same edit patch as approve(), minus the approval fields - the draft stays pending.
@@ -366,16 +421,13 @@ export function useClientApprovals(clientId: string, client: SupabaseClient = su
   const reject = useCallback(async (id: string): Promise<{ error: string | null }> => {
     await removeFromCache([id]);
     // Approved-but-blocked drafts can be rejected too, as long as nothing has gone out.
-    const { data, error } = await supabase
+    return settleWrite(clientId, () => supabase
       .from('messages')
       .update({ approval_status: 'rejected', reject_reason: 'manual', updated_at: new Date().toISOString() })
       .eq('id', id)
       .in('approval_status', ['pending', 'approved'])
       .eq('send_status', 'not_sent')
-      .select('id');
-    const missed = !error && (data?.length ?? 0) === 0;
-    invalidateApprovalQueries(clientId);
-    return { error: error?.message ?? (missed ? ALREADY_HANDLED : null) };
+      .select('id'));
   }, [clientId, removeFromCache]);
 
   // Bulk writes only ever touch drafts that are still pending and unsent, and
