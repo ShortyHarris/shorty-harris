@@ -132,15 +132,17 @@ select is((:'due_row'::jsonb ->> 'due')::boolean, true, 'The queue marks it as d
 select ok((:'due_row'::jsonb ->> 'estimated_send_at')::timestamptz >= now() - interval '1 minute', 'It shows the next send slot, not a time already gone');
 
 -- ── A daily cap: more approved emails than one day's sending ────────────────────────────
--- 41 approved first emails on a 40-a-day mailbox: some wait for a later day, and one due
--- today can still be edited or cancelled before it is sent.
+-- 41 approved first emails on a 40-a-day mailbox: some wait for a later day, and the ones next
+-- in line can still be edited or cancelled before they are sent. "Next in line" is the start of
+-- the queue (soonest first), not the 'today' window: on a weekend or holiday nothing is
+-- scheduled today, the 'today' page is empty, and the test used to fail on Saturdays.
 select tests.client(p_name => 'Capped Client') as cap_client \gset
 select tests.user(:'cap_client') as cap_user \gset
 select tests.campaign(:'cap_client') as cap_campaign \gset
 select count(tests.message(tests.prospect(:'cap_campaign'), 'initial', 'approved')) from generate_series(1, 41);
 select tests.claims_client(:'cap_user');
 set local session authorization authenticated;
-select public.send_queue(:'cap_client', p_window => 'today', p_limit => 1) as capq \gset
+select public.send_queue(:'cap_client', p_limit => 1) as capq \gset
 reset session authorization;
 select is((select mailbox_daily_cap from public.mailbox_daily_cap(:'cap_client')), 40, 'Fixture: the mailbox sends 40 a day');
 select ok((:'capq'::jsonb #>> '{windows,tomorrow}')::int + (:'capq'::jsonb #>> '{windows,later}')::int >= 1,
@@ -152,11 +154,11 @@ set local session authorization authenticated;
 select public.cancel_queued_messages(array[:'first_today']::uuid[]) ->> 'done' as cap_cancel \gset
 select public.edit_queued_message(:'second_today', 'Opraveno', null) ->> 'ok' as cap_edit \gset
 reset session authorization;
-select is(:'cap_cancel'::text, '1', 'An email in today''s cap window can be cancelled before it is sent');
+select is(:'cap_cancel'::text, '1', 'The next email in the capped queue can be cancelled before it is sent');
 select ok(not tests.sendable(:'first_today'), '...and the sender no longer picks it up');
 select tests.claims_service();
 set local session authorization service_role;
-select is(public.claim_message_for_send(:'second_today') ->> 'subject', 'Opraveno', 'An email edited inside today''s window is sent with the edit');
+select is(public.claim_message_for_send(:'second_today') ->> 'subject', 'Opraveno', 'An email edited while queued is sent with the edit');
 reset session authorization;
 
 select tests.claims_anon();

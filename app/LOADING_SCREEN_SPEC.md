@@ -4,7 +4,8 @@ How the full-screen branded loading screen (wordmark + small spinner) works in t
 
 Source files:
 
-- `src/App.tsx`: the `Spinner` component, the route guards that show it, and the root `<Suspense>` that shows it
+- `src/components/BootSplash.tsx`: the splash itself (imported into `App.tsx` as `Spinner`)
+- `src/App.tsx`: the route guards that show it, and the root `<Suspense>` that shows it
 - `src/auth/AuthProvider.tsx`: the `loading` flag that drives it
 - `src/main.tsx`: provider order
 - `index.html`: loads the Plus Jakarta Sans font the wordmark uses
@@ -34,6 +35,7 @@ A fixed, full-viewport screen covering everything, with the content centered:
 | Animation | `@keyframes sh-spin { to { transform: rotate(360deg); } }`, `0.7s linear infinite` |
 | Fade in / out | none, it appears and disappears instantly |
 | Minimum display time | none, it shows only as long as something is actually loading |
+| Never spins forever | if the auth bootstrap fails or passes `AUTH_BOOT_TIMEOUT_MS` (20 s), the spinner is replaced by the reason plus **Try again**, **Reload page** and **Sign out**. If the splash is up for `SPLASH_STALL_MS` (15 s) for any other reason, it adds "This is taking longer than usual" with **Reload page**. Added after 13 Nov 2026, when a reload in mobile Safari sat on the bare spinner while the server was overloaded. |
 | Image logo | none, the "logo" is the typographic wordmark |
 
 Everything is inline styles plus one inline `<style>` tag for the keyframes. There are no CSS files or Tailwind classes involved, so it renders correctly before any app stylesheet loads.
@@ -51,7 +53,7 @@ Every protected route is wrapped in a guard. While `loading` from `useAuth()` is
 ```tsx
 function RequireClient({ children }) {
   const { session, profile, loading } = useAuth();
-  if (loading) return <Spinner />;                                   // still checking
+  if (loading || bootError) return <Spinner />;                      // still checking, or failed (splash shows Try again)
   if (!session || !profile) return <Navigate to="/login" replace />; // not signed in
   if (!profile.client_id) return <NoClientAccount />;                // signed in, wrong account type
   return <>{children}</>;                                            // allowed
@@ -143,7 +145,7 @@ All of these phases render the identical component in the identical position, so
 
 ### 4.1 `LoadingScreen.tsx`
 
-Copied from `Spinner` in `src/App.tsx`. Change the two words and the colors in `BRAND` for another product.
+Copied from `BootSplash` in `src/components/BootSplash.tsx` (minus its error and stall states). Change the two words and the colors in `BRAND` for another product.
 
 ```tsx
 const BRAND = {

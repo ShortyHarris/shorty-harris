@@ -94,3 +94,40 @@ jobs:
           name: test-results
           path: test-results/
           if-no-files-found: ignore
+
+  # Browser tests: the Approvals flows (approve, reject, reload after an approvals error) on
+  # mobile Safari (WebKit, iPhone 15) and desktop Chromium, against the production build with
+  # Supabase mocked (app/e2e). Separate job, so it is not part of the required "Release checks"
+  # status until branch protection is updated to require it.
+  browser-tests:
+    name: Browser tests (mobile Safari)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Install browsers
+        run: npx playwright install --with-deps webkit chromium
+
+      - name: Playwright
+        run: npx playwright test --trace off
+
+      - name: Keep Playwright report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: app/test-results/
+          if-no-files-found: ignore

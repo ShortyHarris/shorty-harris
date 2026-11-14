@@ -11,3 +11,7 @@ dist/
 # editor / OS
 .DS_Store
 *.local
+
+# Playwright output
+test-results/
+playwright-report/

@@ -25,10 +25,11 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { previewSequenceApproval, approveSequences, type ApprovalPreview } from '../../hooks/useSequenceActions';
 import { BlockBadge } from '../../components/BlockBadge';
 import { partialFailureMessage } from '../../lib/chunkedBulk';
+import { describeApprovalsLoadError } from '../../lib/approvalErrors';
 import type { ClientMessageItem } from '../../types';
 import {
   approvalTypeLabel, APPROVAL_STEP_ORDER, APPROVAL_EXPLAINER, rejectedTotalsLine, REJECTED_TOTALS_HINT,
-  bulkApproveBlockedReason, signOffMissingLine,
+  bulkApproveBlockedReason, signOffMissingLine, campaignBreakdownLabel,
 } from '../../lib/approvalLabels';
 import {
   applyApprovalView, DEFAULT_APPROVAL_SORT, APPROVAL_SORT_OPTIONS,
@@ -139,8 +140,11 @@ export function Approvals({
   const { toasts, toast, dismiss } = useToast();
   const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh approvals.');
   const [editItem, setEditItem] = useState<ClientMessageItem | null>(null);
-  // Drafts waiting on the reject confirmation - one row, or the bulk selection.
-  const [rejectIds, setRejectIds] = useState<string[] | null>(null);
+  // Drafts waiting on the reject confirmation - one row, or the bulk selection. The campaign line
+  // is worked out when the modal opens: reject() takes the draft out of the cached list before the
+  // request goes out, and looking it up again then is what showed "Unknown campaign".
+  const [rejectPlan, setRejectPlan] = useState<{ ids: string[]; campaignsLabel: string } | null>(null);
+  const rejectIds = rejectPlan?.ids ?? null;
   const [rejecting, setRejecting] = useState(false);
 
   // View-as-client is read-only; every action says so instead of silently doing nothing.
@@ -154,7 +158,8 @@ export function Approvals({
   // A single row can be rejected from any tab (incl. approved-but-blocked).
   function askReject(ids: string[]) {
     if (readOnly) { toast(READ_ONLY_MSG, 'warning'); return; }
-    if (ids.length > 0) setRejectIds(ids);
+    if (ids.length === 0) return;
+    setRejectPlan({ ids, campaignsLabel: campaignBreakdown(ids.map((id) => draftById.get(id) ?? { campaign_id: null })) });
   }
 
   // Bulk reject only ever covers drafts that are loaded and still pending.
@@ -164,22 +169,28 @@ export function Approvals({
   }
 
   async function confirmReject() {
-    if (!rejectIds) return;
+    if (!rejectIds || rejecting) return;
     setRejecting(true);
     const n = rejectIds.length;
     let err: string | null = null;
     let done = n;
     let failed = false;
-    if (n === 1) {
-      ({ error: err } = await rejectRaw(rejectIds[0]));
-    } else {
-      const res = await bulkRejectRaw(rejectIds);
-      done = res.affected;
-      failed = res.failedBatches > 0;
-      if (failed) err = partialFailureMessage(res, 'rejected', 'reject');
+    // Whatever happens (timeout, network error, a bug), the modal must leave "Working…".
+    try {
+      if (n === 1) {
+        ({ error: err } = await rejectRaw(rejectIds[0]));
+      } else {
+        const res = await bulkRejectRaw(rejectIds);
+        done = res.affected;
+        failed = res.failedBatches > 0;
+        if (failed) err = partialFailureMessage(res, 'rejected', 'reject');
+      }
+    } catch (e) {
+      err = e instanceof Error ? e.message : 'the request failed';
+    } finally {
+      setRejecting(false);
+      setRejectPlan(null);
     }
-    setRejecting(false);
-    setRejectIds(null);
     if (failed) {
       // Partial progress is real: the rows that did go through are gone from the list.
       toast(err as string, 'error');
@@ -260,18 +271,8 @@ export function Approvals({
   const totalPending = Math.max(stats.pending, items.length);
   const pendingCapped = stats.pending > items.length;
 
-  const campaignName = (id: string | null | undefined) =>
-    (id ? campaigns.find((c) => c.id === id)?.name : null) ?? 'Unknown campaign';
-  // "Prague Restaurants (12), Berlin Cafes (3)" for the given loaded drafts.
-  function campaignBreakdown(drafts: { campaign_id?: string | null }[]): string {
-    const counts = new Map<string, number>();
-    drafts.forEach((d) => {
-      const name = campaignName(d.campaign_id);
-      counts.set(name, (counts.get(name) ?? 0) + 1);
-    });
-    const parts = Array.from(counts, ([name, n]) => (counts.size === 1 ? name : `${name} (${n})`));
-    return parts.join(', ');
-  }
+  // "Prague Restaurants (12), Berlin Cafes (3)" for the given loaded drafts; '' while campaigns load.
+  const campaignBreakdown = (drafts: { campaign_id?: string | null }[]) => campaignBreakdownLabel(drafts, campaigns);
   const draftById = new Map([...items, ...queueRows].map((d) => [d.id, d]));
 
   function switchTab(next: ApprovalTab) {
@@ -338,9 +339,15 @@ export function Approvals({
     const campaignsLabel = campaignBreakdown(source);
 
     setBulkBusy(true);
-    const res = await previewSequenceApproval(clientId, prospectIds);
-    setBulkBusy(false);
-    if (res.data === null) { toast(res.error, 'error'); return; }
+    let res: Awaited<ReturnType<typeof previewSequenceApproval>>;
+    try {
+      res = await previewSequenceApproval(clientId, prospectIds);
+    } catch (e) {
+      res = { data: null, error: e instanceof Error ? e.message : 'the request failed' };
+    } finally {
+      setBulkBusy(false);
+    }
+    if (res.data === null) { toast(`Couldn't check what would be approved: ${res.error}`, 'error'); return; }
     if (res.data.emails === 0) {
       toast('Nothing to approve - these prospects have replied or are no longer active.', 'warning');
       return;
@@ -349,12 +356,21 @@ export function Approvals({
   }
 
   async function confirmBulkApprove() {
-    if (!approvalPlan) return;
+    if (!approvalPlan || approving) return;
     setApproving(true);
-    const res = await approveSequences(clientId, approvalPlan.prospectIds);
-    setApproving(false);
-    setApprovalPlan(null);
-    if (res.data === null) { toast(res.error, 'error'); return; }
+    let res: Awaited<ReturnType<typeof approveSequences>>;
+    try {
+      res = await approveSequences(clientId, approvalPlan.prospectIds);
+    } catch (e) {
+      res = { data: null, error: e instanceof Error ? e.message : 'the request failed' };
+    } finally {
+      setApproving(false);
+      setApprovalPlan(null);
+    }
+    if (res.data === null) {
+      toast(`Couldn't approve ${approvalPlan.preview.emails} email${approvalPlan.preview.emails === 1 ? '' : 's'}${approvalPlan.campaignsLabel ? ` in ${approvalPlan.campaignsLabel}` : ''}: ${res.error}. Nothing was approved - try again.`, 'error');
+      return;
+    }
     setSelected(new Set());
     const { emails_approved: e, prospects: p } = res.data;
     toast(`${e} email${e === 1 ? '' : 's'} approved across ${p} prospect${p === 1 ? '' : 's'}`);
@@ -429,7 +445,7 @@ export function Approvals({
 
       {error && (
         <div className="rounded-xl border border-(--ad-ink)/20 bg-(--ad-surface-2) px-4 py-3 text-[13px] text-(--ad-ink)">
-          Couldn't load your approvals: {error}
+          {describeApprovalsLoadError(error)}
         </div>
       )}
 
@@ -668,6 +684,7 @@ export function Approvals({
                 {paged.map((item) => (
                   <tr
                     key={item.id}
+                    data-testid="approval-row"
                     onClick={isPendingTab ? () => setEditItem(item) : undefined}
                     className={isPendingTab ? 'cursor-pointer' : undefined}
                   >
@@ -735,7 +752,7 @@ export function Approvals({
           {/* Mobile cards */}
           <div className="md:hidden flex flex-col gap-3">
             {paged.map((item) => (
-              <div key={item.id} className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
+              <div key={item.id} data-testid="approval-row" className="rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-2 min-w-0">
                     {isPendingTab && (
@@ -851,10 +868,10 @@ export function Approvals({
             danger
             busy={rejecting}
             onConfirm={confirmReject}
-            onCancel={() => setRejectIds(null)}
+            onCancel={() => setRejectPlan(null)}
           >
             <p className="m-0 mb-2 font-semibold text-(--ad-ink)">
-              {rejectIds.length} draft{rejectIds.length === 1 ? '' : 's'} in {campaignBreakdown(rejectIds.map((id) => draftById.get(id) ?? { campaign_id: null }))}
+              {rejectIds.length} draft{rejectIds.length === 1 ? '' : 's'}{rejectPlan?.campaignsLabel ? ` in ${rejectPlan.campaignsLabel}` : ''}
             </p>
             {rejectIds.length === 1 ? 'It' : 'They'} won't be sent, and any follow-ups still planned for {rejectIds.length === 1 ? 'that prospect' : 'those prospects'} are cancelled too. This can't be undone.
           </ConfirmDialog>
@@ -871,7 +888,7 @@ export function Approvals({
             onConfirm={confirmBulkApprove}
             onCancel={() => setApprovalPlan(null)}
           >
-            <p className="m-0 mb-2 font-semibold text-(--ad-ink)">Campaign: {approvalPlan.campaignsLabel}</p>
+            {approvalPlan.campaignsLabel && <p className="m-0 mb-2 font-semibold text-(--ad-ink)">Campaign: {approvalPlan.campaignsLabel}</p>}
             <ul className="m-0 mb-3 list-none p-0">
               {APPROVAL_STEP_ORDER.filter((k) => (approvalPlan.preview.by_step[k] ?? 0) > 0).map((k) => (
                 <li key={k} className="flex justify-between border-b border-(--ad-surface-2) py-1 last:border-0">

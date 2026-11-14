@@ -1,9 +1,4 @@
 {
-  "src/auth/AuthProvider.tsx": {
-    "react-hooks/immutability": {
-      "count": 1
-    }
-  },
   "src/components/ApprovalCells.tsx": {
     "react-refresh/only-export-components": {
       "count": 1
