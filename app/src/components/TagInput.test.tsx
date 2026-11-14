@@ -23,6 +23,7 @@ describe('TagInput caps', () => {
     const input = screen.getByPlaceholderText(/limit reached \(5 search terms\)/i);
     expect(input).toBeDisabled();
     expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByText(/reached the 5 search term limit/i)).toBeInTheDocument();
   });
 
   it('blocks a 4th location when maxItems=3', async () => {
@@ -39,6 +40,7 @@ describe('TagInput caps', () => {
     );
 
     expect(screen.getByPlaceholderText(/limit reached \(3 locations\)/i)).toBeDisabled();
+    expect(screen.getByText(/reached the 3 location limit/i)).toBeInTheDocument();
   });
 
   it('allows adding up to the limit and stops exactly at it, not one past, in a single paste', async () => {
@@ -103,6 +105,11 @@ describe('TagInput long lists', () => {
     render(<TagInput label="Search terms" placeholder="x" values={many.slice(0, 7)} onChange={onChange} maxItems={5} />);
     fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
     expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it('leaves the over-cap message to the screen, not the input', () => {
+    render(<TagInput label="Search terms" placeholder="x" values={many.slice(0, 7)} onChange={() => {}} maxItems={5} capLabel="search term" />);
+    expect(screen.queryByText(/reached the 5 search term limit/i)).not.toBeInTheDocument();
   });
 
   it('does not offer Clear all for a short list within the cap', () => {

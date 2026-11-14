@@ -117,9 +117,17 @@ export function TagInput({
           )}
         </div>
       )}
-      {/* The cap itself is reported once, by the LimitCounter every capped
-          field renders under this input - not repeated here. */}
-      {helper && !atCap && <p className="mt-1 text-[11px] text-(--ad-ink-faint)">{helper}</p>}
+      {/* At exactly the cap, say why the input went grey - not every screen
+          pairs this with a LimitCounter. Over the cap, the screen's own
+          LimitCounter / LimitMessages say how many to remove, so this stays
+          quiet rather than repeating it. */}
+      {values.length === maxItems ? (
+        <p className="mt-1 text-[11px] text-(--ad-ink-faint)">
+          You've reached the {maxItems}{capLabel ? ` ${capLabel}` : ''} limit. Remove one to add another.
+        </p>
+      ) : (
+        helper && !atCap && <p className="mt-1 text-[11px] text-(--ad-ink-faint)">{helper}</p>
+      )}
     </div>
   );
 }
