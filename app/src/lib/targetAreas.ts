@@ -69,3 +69,16 @@ export function joinedLocationsError(areas: TargetArea[]): string | null {
   if (!looksLikeMultipleLocationsJoined(typed)) return null;
   return `"${typed[0]}" looks like more than one location joined together - press Enter (or use a semicolon) after each city so they save as separate entries.`;
 }
+
+export function radiusMiles(area: TargetArea): number | null {
+  return area.mode === 'radius' ? Math.round(Number(area.radius_km) / 1.60934) : null;
+}
+
+// Compact form for dense lists: a radius area's Mapbox label ("Brno, South
+// Moravian Region, Czechia") shortened to its first part, with the radius
+// carried separately so callers can show it as "Brno · 40 mi". Typed places
+// are shown exactly as entered.
+export function areaShortLabel(area: TargetArea): string {
+  if (area.mode === 'text') return area.label;
+  return area.label.split(',')[0].trim() || area.label;
+}

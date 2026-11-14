@@ -1242,7 +1242,6 @@ function CampaignDetailModal({
             capLabel="search term"
           />
           <LimitCounter count={queries.length} max={limits.maxSearchTerms} noun="search terms" />
-          <LimitMessages errors={check.errors} fields={['search_queries']} />
 
           <LocationAreaInput
             sentenceLabel
@@ -1255,7 +1254,7 @@ function CampaignDetailModal({
             capLabel="location"
           />
           <LimitCounter count={areas.length} max={limits.maxLocations} noun="locations" />
-          <LimitMessages errors={check.errors} fields={['target_locations', 'pairs']} />
+          <LimitMessages errors={check.errors} fields={['pairs']} />
 
           <div>
             <label className={fieldLbl}>Max results</label>
