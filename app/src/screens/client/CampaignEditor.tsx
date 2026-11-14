@@ -424,17 +424,25 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
               {campaign.icp && typeof campaign.icp.target === 'string' && (
                 <p className="m-0 rounded-2xl bg-muted/60 px-5 py-4 text-[15px] leading-relaxed"><span className="text-muted-foreground">Who it reaches: </span>{campaign.icp.target}</p>
               )}
-              <TagInput sentenceLabel label="Types of business" required placeholder="e.g. property management company"
-                helper="What we search for on maps. Businesses, not job titles." values={form.search_queries} onChange={(v) => set({ search_queries: v })} splitOn="," maxItems={limits.maxSearchTerms} capLabel="search term" />
-              <LocationAreaInput sentenceLabel label="Areas" required helper="A city, a region, or a radius around a point."
-                values={form.areas} onChange={(v) => set({ areas: v })} maxItems={limits.maxLocations} capLabel="area" />
-              <LimitMessages errors={limitCheck.errors} fields={['search_queries', 'target_locations', 'pairs', 'max_results']} />
+              {/* Each limit message sits under the field it is about, not in one block after both. */}
+              <div>
+                <TagInput sentenceLabel label="Types of business" required placeholder="e.g. property management company"
+                  helper="What we search for on maps. Businesses, not job titles." values={form.search_queries} onChange={(v) => set({ search_queries: v })} splitOn="," maxItems={limits.maxSearchTerms} capLabel="search term" />
+                <LimitMessages errors={limitCheck.errors} fields={['search_queries']} />
+              </div>
+              <div>
+                <LocationAreaInput sentenceLabel label="Areas" required helper="A city, a region, or a radius around a point."
+                  values={form.areas} onChange={(v) => set({ areas: v })} maxItems={limits.maxLocations} capLabel="area" />
+                <LimitMessages errors={limitCheck.errors} fields={['target_locations', 'pairs']} />
+              </div>
 
               <div className="border-t border-border pt-5">
                 <button type="button" onClick={() => setMoreOpen((o) => !o)} aria-expanded={moreOpen}
                   className="flex w-full cursor-pointer items-center justify-between border-0 bg-transparent p-0 text-left text-[15px] font-semibold text-foreground">
                   More settings <span className="flex items-center gap-1 text-[13px] font-medium text-muted-foreground">Size, language, start date<ChevronDown className={cn('h-4 w-4 transition-transform', moreOpen && 'rotate-180')} aria-hidden /></span>
                 </button>
+                {/* A too-large size is reported here while the settings are folded away, so it isn't hidden. */}
+                {!moreOpen && <LimitMessages errors={limitCheck.errors} fields={['max_results']} />}
                 {moreOpen && (
                   <div className="mt-5 flex flex-col gap-5">
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -442,6 +450,7 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
                         <Label htmlFor="ed-max">Maximum businesses</Label>
                         <Input id="ed-max" type="number" min={1} max={limits.maxResults} className={fieldCls} value={form.max_results}
                           onChange={(e) => set({ max_results: Math.max(1, Number(e.target.value) || 1) })} />
+                        <LimitMessages errors={limitCheck.errors} fields={['max_results']} />
                       </div>
                       <div className="flex flex-col gap-2">
                         <Label htmlFor="ed-lang">Email language</Label>
