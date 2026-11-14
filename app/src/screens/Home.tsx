@@ -1,11 +1,14 @@
 import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Play, Plus } from "lucide-react";
+import { Check, Play, Plus, Mail, Sparkles, ArrowRight } from "lucide-react";
 import { PublicNav } from "@/components/PublicNav";
 import { PublicFooter } from "@/components/PublicFooter";
 import { useSeo } from "@/hooks/useSeo";
-import { PACKS } from "@/lib/pricing";
+import { PRICING_MODEL } from "@/lib/pricing";
+import { PackCards, StarterOffer, WhatYouPayFor } from "@/components/PricingBlocks";
+import { PRICING_FAQ, pricingSubhead } from "@/lib/pricingCopy";
+import { CTA_LABEL } from "@/lib/marketing";
 import "./Home.css";
 
 const FONT: React.CSSProperties = {
@@ -22,19 +25,20 @@ const VIEW = { once: true, margin: "-60px" } as const;
 /* One button language for the whole public site - matches the nav pills. */
 const BTN_PRIMARY =
   "inline-flex items-center justify-center h-12 px-7 rounded-full bg-brand text-white text-[15px] font-semibold no-underline hover:bg-brand-deep transition-colors whitespace-nowrap";
-const BTN_SECONDARY =
-  "inline-flex items-center justify-center h-12 px-7 rounded-full border border-[#8f8aa8] bg-white text-[#0e0822] text-[15px] font-semibold no-underline hover:bg-[#f9f6ff] transition-colors whitespace-nowrap";
 
-const H2 = "font-semibold tracking-[-0.03em] leading-[1.1] text-[#0e0822] m-0 mb-4";
+const H2 = "font-semibold tracking-[-0.03em] leading-[1.1] text-[#0e0822] m-0 mb-4 text-balance";
 const H2_SIZE: React.CSSProperties = { fontSize: "clamp(30px, 3.6vw, 46px)" };
-const LEAD = "text-[16px] text-[#605978] max-w-[520px] leading-[1.6] m-0";
+const LEAD = "text-[16px] text-[#605978] max-w-[540px] leading-[1.6] m-0";
+
+/* Shown twice at most: under the hero and next to pricing. */
+const TRUST = ["No subscription", "No set-up fee", "You approve every email"];
 
 // ── Root ─────────────────────────────────────────────────────────────────────
 
 export function Home() {
   useSeo({
-    title: 'Shorty Harris - AI-Powered Outbound for Small & Family Businesses',
-    description: "Shorty Harris finds ideal customers, writes outreach, follows up, and routes hot leads to your team - outbound prospecting on autopilot for small and family businesses.",
+    title: "Shorty Harris - Skip outreach. Talk to hot leads.",
+    description: "We find local businesses, write to them and follow up. You talk to the ones who reply interested. You approve every email.",
     path: '/',
   });
 
@@ -43,8 +47,8 @@ export function Home() {
       <PublicNav />
       <main>
         <Hero />
-        <Story />
-        <Facts />
+        <HowItWorks />
+        <HotLeadExample />
         <Pricing />
         <Faq />
         <DataUse />
@@ -55,6 +59,18 @@ export function Home() {
   );
 }
 
+function TrustLine({ className = "" }: { className?: string }) {
+  return (
+    <ul className={`m-0 p-0 list-none flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[13px] text-[#605978] ${className}`}>
+      {TRUST.map((t) => (
+        <li key={t} className="inline-flex items-center gap-1.5">
+          <Check size={14} strokeWidth={2.6} className="text-[#7412ef]" aria-hidden />
+          {t}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 // ── Hero ─────────────────────────────────────────────────────────────────────
 
@@ -63,7 +79,7 @@ const VIDEO_SRC = "/videos/product.mp4";
 
 function Hero() {
   return (
-    <section className="relative pt-20 lg:pt-32 pb-8">
+    <section className="relative pt-16 lg:pt-28 pb-8">
       <motion.div
         className="flex flex-col items-center text-center max-w-[1160px] mx-auto px-6 lg:px-12"
         initial={{ opacity: 0, y: 24 }}
@@ -71,30 +87,29 @@ function Hero() {
         transition={{ duration: 0.6, ease: "easeOut" }}
       >
         <h1
-          className="font-semibold tracking-[-0.035em] leading-[1.04] text-[#0e0822] m-0 mb-6 max-w-[820px]"
-          style={{ fontSize: "clamp(40px, 6vw, 76px)" }}
+          className="font-semibold tracking-[-0.035em] leading-[1.04] text-[#0e0822] m-0 mb-6 max-w-[880px] text-balance"
+          style={{ fontSize: "clamp(40px, 6.4vw, 80px)" }}
         >
-          <span className="text-[#0e0822]">We do the outreach.</span>{" "}
-          <span className="text-brand">You close the deals.</span>
+          <span className="block text-[#0e0822]">Skip outreach.</span>
+          <span className="block text-brand">Talk to <span className="whitespace-nowrap">hot leads.</span></span>
         </h1>
 
-        <p className="text-[17px] lg:text-[18px] leading-[1.6] text-[#605978] max-w-[440px] m-0 mb-9">
-          We find local businesses that fit, write to them for you, and follow up.
-          You only hear from the ones who want to talk.
+        <p className="text-[17px] lg:text-[19px] leading-[1.6] text-[#605978] max-w-[520px] m-0 mb-9 text-balance">
+          We find, email and follow up with local businesses. You talk to the interested ones.
         </p>
 
-        <div className="flex items-center gap-3 flex-wrap justify-center mb-5">
-          <Link to="/signup" className={BTN_PRIMARY}>Get started</Link>
-          <a href="/#how" className={BTN_SECONDARY}>How it works</a>
+        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 mb-6">
+          <Link to="/signup" className={BTN_PRIMARY}>{CTA_LABEL}</Link>
+          <a href="/#how" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-[#0e0822] no-underline hover:text-[#7412ef]">
+            See how it works <ArrowRight size={16} strokeWidth={2.4} aria-hidden />
+          </a>
         </div>
 
-        <p className="text-[13px] text-[#605978] m-0">
-          No card to sign up · You approve every email · Pay only for hot leads
-        </p>
+        <TrustLine />
       </motion.div>
 
       <motion.div
-        className="max-w-[1040px] mx-auto px-6 lg:px-12 mt-14 lg:mt-20"
+        className="max-w-[1040px] mx-auto px-6 lg:px-12 mt-12 lg:mt-20"
         initial={{ opacity: 0, y: 32 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.15, ease: "easeOut" }}
@@ -119,10 +134,10 @@ function VideoFrame() {
       <video
         ref={ref}
         src={VIDEO_SRC}
-        poster="/images/video-poster.png"
+        poster="/images/video-poster.webp"
         className="absolute inset-0 h-full w-full object-cover"
         controls={playing}
-        preload="metadata"
+        preload="none"
         playsInline
       />
       {!playing && (
@@ -144,169 +159,201 @@ function VideoFrame() {
   );
 }
 
-// ── Story sections ────────────────────────────────────────────────────────────
-// One idea per block, image on alternating sides. Photos live in
-// public/images/; until one exists the frame stays a quiet warm-grey panel.
+// ── How it works ─────────────────────────────────────────────────────────────
+// Three steps, nothing more. The mechanics (how many emails, when follow-ups
+// go out) live in the FAQ below.
 
-const STORY = [
+const STEPS = [
   {
-    id: "how",
-    img: "/images/problem.jpg",
-    title: "You're busy doing the work.",
-    body: "You're great at what you do. Finding new customers is the job that never gets done. We take it off your plate, so your calendar fills while you stay on the job.",
+    title: "Tell us who you want to win",
+    body: "The kind of businesses you want as customers, the area you cover and what you offer. It takes a couple of minutes, and there's no call to book.",
   },
   {
-    img: "/images/find.jpg",
-    title: "We find the right people.",
-    body: "We look up local businesses that fit who you want to work with, by type, size and area. No lists to buy and no hours of searching.",
+    title: "We do the outreach",
+    body: "We find the businesses, write to each one personally and follow up. Nothing is sent until you've read it and said yes.",
   },
   {
-    img: "/images/write.jpg",
-    title: "We write to them for you.",
-    body: "Each message is written for that business, not copied from a template. Nothing goes out until you've read it and said yes.",
-  },
-  {
-    img: "/images/follow-up.jpg",
-    title: "We follow up so you don't have to.",
-    body: "If they don't answer, we try again a few days later, up to four emails in all. The moment someone replies, we stop.",
-  },
-  {
-    img: "/images/reply.jpg",
-    title: "You only talk to people who want to talk.",
-    body: "When a business says \"tell me more\", it lands on your dashboard with what they said and what to do next. You only pay for these.",
+    title: "You get hot leads",
+    body: "When a business replies wanting to talk, you get their message, who they are and what to do next.",
   },
 ];
 
-function StoryImage({ src }: { src: string }) {
-  const [failed, setFailed] = useState(false);
+/* Process facts only: no promises about how many leads or how soon. */
+const PROCESS_NOTES =
+  PRICING_MODEL === "credits"
+    ? ["You see an estimate and approve it before any credits are spent.", "Nothing is sent until you've approved it."]
+    : ["Nothing is sent until you've approved it.", "Pause or stop any campaign at any time."];
+
+function HowItWorks() {
   return (
-    <div className="aspect-[4/3] w-full overflow-hidden rounded-[28px] bg-paper-deep">
-      {!failed && (
-        <img
-          src={src}
-          alt=""
-          loading="lazy"
-          className="h-full w-full object-cover"
-          onError={() => setFailed(true)}
-        />
-      )}
-    </div>
+    <section id="how" className="max-w-[1100px] mx-auto w-full px-6 lg:px-12 py-16 lg:py-24 scroll-mt-20">
+      <motion.div
+        className="text-center flex flex-col items-center mb-12"
+        initial="hidden" whileInView="show" viewport={VIEW} variants={stagger}
+      >
+        <motion.h2 variants={fadeUp} className={H2} style={H2_SIZE}>How it works</motion.h2>
+        <motion.p variants={fadeUp} className={LEAD}>You set it up and approve. We do the rest.</motion.p>
+      </motion.div>
+
+      <motion.ol
+        className="m-0 p-0 list-none grid grid-cols-1 md:grid-cols-3 gap-4"
+        initial="hidden" whileInView="show" viewport={VIEW} variants={stagger}
+      >
+        {STEPS.map((s, i) => (
+          <motion.li key={s.title} variants={fadeUp} className="rounded-2xl border border-[#e8e3f7] bg-white p-7">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lilac text-brand text-[15px] font-semibold mb-5">
+              {i + 1}
+            </div>
+            <h3 className="text-[20px] font-semibold tracking-[-0.02em] leading-[1.25] text-[#0e0822] m-0 mb-2.5">{s.title}</h3>
+            <p className="text-[15.5px] leading-[1.6] text-[#605978] m-0">{s.body}</p>
+          </motion.li>
+        ))}
+      </motion.ol>
+
+      <motion.ul
+        className="m-0 mt-6 list-none rounded-2xl bg-paper-deep px-7 py-5 flex flex-col md:flex-row md:justify-center gap-3 md:gap-10"
+        initial="hidden" whileInView="show" viewport={VIEW} variants={fadeUp}
+      >
+        {PROCESS_NOTES.map((t) => (
+          <li key={t} className="flex items-start gap-2 text-[15.5px] leading-[1.55] text-[#0e0822]">
+            <Check size={17} strokeWidth={2.5} className="mt-[3px] shrink-0 text-[#7412ef]" aria-hidden />
+            {t}
+          </li>
+        ))}
+      </motion.ul>
+    </section>
   );
 }
 
-function Story() {
+// ── What a hot lead looks like ───────────────────────────────────────────────
+// Shows exactly what the money buys. Clearly marked as an example: this is
+// not a customer quote.
+
+function HotLeadExample() {
   return (
-    <div>
-      {STORY.map((s, i) => (
-        <section
-          key={s.title}
-          id={s.id}
-          className="max-w-[1100px] mx-auto w-full px-6 lg:px-12 py-8 lg:py-14 scroll-mt-20"
-        >
-          <motion.div
-            className={`grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-20 items-center ${i % 2 === 1 ? "md:[&>*:first-child]:order-2" : ""}`}
-            initial="hidden" whileInView="show" viewport={VIEW} variants={stagger}
-          >
-            <motion.div variants={fadeUp} className="max-w-[420px]">
-              <h2
-                className="font-semibold tracking-[-0.03em] leading-[1.08] text-[#0e0822] m-0 mb-5"
-                style={{ fontSize: "clamp(30px, 3.6vw, 46px)" }}
-              >
-                {s.title}
-              </h2>
-              <p className="text-[17px] leading-[1.65] text-[#605978] m-0">{s.body}</p>
-            </motion.div>
-            <motion.div variants={fadeUp} className="max-w-[540px] w-full md:justify-self-center">
-              <StoryImage src={s.img} />
-            </motion.div>
-          </motion.div>
-        </section>
-      ))}
-    </div>
-  );
-}
-
-// ── Facts band ────────────────────────────────────────────────────────────────
-// What the product actually does - every line here is true of the system
-// today (4-step sequence, approval queue, auto-stop rules, credit model).
-
-const FACTS = [
-  { n: "4", l: "Emails per business", sub: "A first touch, then follow-ups on day 3, 7 and 14" },
-  { n: "100%", l: "Reviewed by you", sub: "Nothing sends until you approve it - or turn on auto-approve" },
-  { n: "1", l: "Credit per hot lead", sub: "Cold replies, bounces and unsubscribes cost nothing" },
-];
-
-function Facts() {
-  return (
-    <motion.section
-      className="grid grid-cols-1 md:grid-cols-3 bg-paper-deep divide-y md:divide-y-0 md:divide-x divide-[#e8e3f7]"
-      initial="hidden" whileInView="show" viewport={VIEW} variants={stagger}
-    >
-      {FACTS.map((s) => (
-        <motion.div key={s.l} variants={fadeUp} className="py-14 px-10 text-center">
-          <div className="font-semibold tracking-[-0.04em] leading-none text-brand mb-2.5" style={{ fontSize: "clamp(40px, 4.2vw, 54px)" }}>
-            {s.n}
-          </div>
-          <div className="text-[15px] text-[#0e0822] font-semibold">{s.l}</div>
-          <div className="mt-1.5 text-[13.5px] text-[#605978] leading-[1.5] max-w-[260px] mx-auto">{s.sub}</div>
+    <section className="max-w-[1100px] mx-auto w-full px-6 lg:px-12 pb-16 lg:pb-24">
+      <motion.div
+        className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 items-center"
+        initial="hidden" whileInView="show" viewport={VIEW} variants={stagger}
+      >
+        <motion.div variants={fadeUp}>
+          <h2 className={H2} style={H2_SIZE}>What a hot lead looks like</h2>
+          <p className={`${LEAD} mb-5`}>
+            A hot lead is a business that replied wanting to talk: asking about price, availability
+            or a meeting. You get their reply, a short summary and a suggested next step, so you can
+            call them back the same day.
+          </p>
+          <p className={LEAD}>
+            Out-of-office messages, "no thanks", bounces and unsubscribes are filtered out. You never pay for them.
+          </p>
         </motion.div>
-      ))}
-    </motion.section>
+
+        <motion.figure variants={fadeUp} className="m-0 rounded-2xl border border-[#e8e3f7] bg-white p-6 shadow-[0_18px_50px_-30px_rgba(46,16,101,0.35)]">
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e9f9ef] px-2.5 py-1 text-[12px] font-semibold text-[#137a3b]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#1fa855]" aria-hidden /> Hot lead
+            </span>
+            <span className="rounded-full border border-[#e8e3f7] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#8f8aa8]">
+              Example
+            </span>
+          </div>
+          <div className="text-[17px] font-semibold text-[#0e0822]">Brightside Dental Studio</div>
+          <div className="text-[13.5px] text-[#605978] mb-4">Practice manager · in your area</div>
+
+          <div className="rounded-xl bg-paper px-4 py-3.5 mb-4">
+            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#8f8aa8] mb-1.5">
+              <Mail size={13} strokeWidth={2.2} aria-hidden /> Their reply
+            </div>
+            <p className="m-0 text-[15px] leading-[1.55] text-[#0e0822]">
+              "Thanks for reaching out. We've been meaning to sort this. Could you send prices for
+              our two locations? Thursday afternoon works for a quick call."
+            </p>
+          </div>
+
+          <div className="flex items-start gap-2.5 text-[14px] leading-[1.5] text-[#605978]">
+            <Sparkles size={16} strokeWidth={2.2} className="mt-0.5 shrink-0 text-[#7412ef]" aria-hidden />
+            <span><span className="font-semibold text-[#0e0822]">Next step:</span> send pricing for two sites and offer a call on Thursday afternoon.</span>
+          </div>
+        </motion.figure>
+      </motion.div>
+    </section>
   );
 }
 
-// ── Pricing teaser ────────────────────────────────────────────────────────────
-// Full details live on /pricing.
+// ── Pricing ──────────────────────────────────────────────────────────────────
+// Numbers come from lib/pricing.ts via the shared PricingBlocks.
 
 function Pricing() {
-  const from = Math.min(...PACKS.map((p) => Math.round(p.priceUsd / p.credits)));
   return (
     <motion.section
-      className="max-w-[760px] mx-auto w-full px-6 lg:px-12 py-16 lg:py-24 text-center flex flex-col items-center"
+      id="pricing"
+      className="max-w-[1000px] mx-auto w-full px-6 lg:px-12 py-16 lg:py-24 scroll-mt-20"
       initial="hidden" whileInView="show" viewport={VIEW} variants={stagger}
     >
-      <motion.h2 variants={fadeUp} className={H2} style={H2_SIZE}>
-        <span className="text-brand">Pay only when it works.</span>{" "}
-        No subscription, no setup fee.
-      </motion.h2>
-      <motion.p variants={fadeUp} className={`${LEAD} mb-8`}>
-        You buy credits, and one is used only when a business replies with real interest.
-        Hot leads start at about ${from} each.
-      </motion.p>
-      <motion.div variants={fadeUp}>
-        <Link to="/pricing" className={BTN_SECONDARY}>See pricing</Link>
+      <div className="text-center flex flex-col items-center mb-10">
+        <motion.h2 variants={fadeUp} className={H2} style={H2_SIZE}>
+          <span className="text-brand">Pay as you go.</span>
+          <br />
+          No subscription.
+        </motion.h2>
+        <motion.p variants={fadeUp} className={`${LEAD} text-balance`}>{pricingSubhead()}</motion.p>
+      </div>
+
+      <motion.div variants={fadeUp} className="flex flex-col gap-4">
+        <StarterOffer />
+        <PackCards />
+        <WhatYouPayFor />
+        <div className="rounded-2xl border border-[#e8e3f7] bg-white px-7 py-6">
+          <div className="text-[15px] font-semibold text-[#0e0822] mb-1.5">What we need from you</div>
+          <p className="m-0 text-[15px] leading-[1.6] text-[#605978]">
+            The kind of businesses you want to reach, the area you cover, what you sell, and an email
+            address for your hot leads. That's it.
+          </p>
+        </div>
+      </motion.div>
+
+      <motion.div variants={fadeUp} className="mt-10 flex flex-col items-center gap-5">
+        <Link to="/signup" className={BTN_PRIMARY}>{CTA_LABEL}</Link>
+        <TrustLine />
+        <Link to="/pricing" className="text-[14px] font-semibold text-[#7412ef] no-underline hover:underline">
+          Full pricing details
+        </Link>
       </motion.div>
     </motion.section>
   );
 }
 
 // ── FAQ ───────────────────────────────────────────────────────────────────────
+// Answers the worries people have before they buy. The mechanics live here,
+// not at the top of the page.
 
-const FAQS: { q: string; a: string }[] = [
+const GMAIL_ANSWER = (
+  <>
+    No, it's optional. Connecting Gmail means outreach goes out from your real business address,
+    which usually gets better replies. We use it only to send your approved emails and spot replies
+    to them. We never read unrelated mail or share your data, and you can disconnect it any time
+    from Settings.{" "}
+    <Link to="/gmail-data-use" className="font-semibold text-[#7412ef] no-underline hover:underline">How we use Gmail</Link>
+  </>
+);
+
+const FAQS: { q: string; a: React.ReactNode }[] = [
+  { q: "What if I don't get any hot leads?", a: PRICING_FAQ.noLeads },
+  { q: "What if a \"hot lead\" isn't really interested?", a: PRICING_FAQ.notInterested },
+  { q: PRICING_FAQ.howItWorksQ, a: PRICING_FAQ.howItWorksA },
   {
-    q: "What counts as a hot lead?",
-    a: "A business that replies to your outreach with genuine interest - asking about pricing, availability, or a meeting. Our AI reads every reply; out-of-office messages, unsubscribes and \"no thanks\" replies are filtered out and never cost a credit.",
+    q: "Will this look like spam, or hurt my reputation?",
+    a: "Each email is written for that one business, not copied from a template, and nothing goes out until you approve it. When someone replies, we stop writing to them. Anyone who asks not to be contacted is never emailed again.",
   },
   {
-    q: "Who writes the emails?",
-    a: "Our AI drafts a personal message for each business based on what it does and where it is. Every email lands in your approval queue first - you can edit, approve or reject it. If you'd rather not review, auto-approve can be turned on.",
+    q: "Which businesses will you contact?",
+    a: "Only the kind you ask for: the business types, area and decision-makers you set. You can see every business before anything is sent to them.",
   },
   {
-    q: "Do I need to connect my Gmail?",
-    a: "No, it's optional. Connecting Gmail means outreach goes out from your real business address, which usually gets better replies. You can disconnect it at any time from Settings.",
+    q: "How does the follow-up work?",
+    a: "Each business gets a first email, then up to three follow-ups on days 3, 7 and 14, sent on business days only. The moment someone replies, the follow-ups to them stop.",
   },
-  {
-    q: "What happens when someone replies?",
-    a: "Automated follow-ups to that person stop immediately. If the reply shows interest, it appears on your dashboard as a hot lead with what they said, a suggested next step and their contact details, and we notify you.",
-  },
-  {
-    q: "Can I pause or stop a campaign?",
-    a: "Yes. You can pause or cancel any campaign or individual sequence from your dashboard. Replies, unsubscribes and bounces always stop sending automatically.",
-  },
-  {
-    q: "Do credits cost anything if I get no hot leads?",
-    a: "No. Credits are only used when a hot lead is routed to you. Prospecting, writing and follow-ups don't use credits.",
-  },
+  { q: "Do I need to connect my Gmail?", a: GMAIL_ANSWER },
 ];
 
 function Faq() {
@@ -343,7 +390,7 @@ function Faq() {
                     transition={{ duration: 0.2 }}
                     className="overflow-hidden"
                   >
-                    <p className="m-0 px-6 pb-5 text-[15px] leading-[1.7] text-[#605978]">{f.a}</p>
+                    <div className="m-0 px-6 pb-5 text-[15px] leading-[1.7] text-[#605978]">{f.a}</div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -363,14 +410,14 @@ function Faq() {
 }
 
 // ── Gmail note ────────────────────────────────────────────────────────────────
-// A short, plain-language disclosure kept visible on the public homepage for
-// Google OAuth verification of the Gmail scope; the full text lives on
-// /gmail-data-use.
+// The full Gmail explanation is in the FAQ answer above. This one visible line
+// stays on the homepage because Google's OAuth verification of the Gmail scope
+// expects the homepage to say how Gmail data is used and link to the details.
 
 function DataUse() {
   return (
-    <p className="max-w-[640px] mx-auto w-full px-6 pb-16 m-0 text-center text-[14px] leading-[1.7] text-[#605978]">
-      Connecting Gmail is optional. We use it only to send your approved emails and spot replies to them. We never read unrelated mail or share your data.{" "}
+    <p className="max-w-[640px] mx-auto w-full px-6 pb-16 -mt-14 m-0 text-center text-[13.5px] leading-[1.7] text-[#605978]">
+      Connecting Gmail is optional, and we only use it to send your approved emails and spot replies.{" "}
       <Link to="/gmail-data-use" className="font-semibold text-[#7412ef] no-underline hover:underline">
         How we use Gmail
       </Link>
@@ -385,34 +432,31 @@ const CTA_BG =
 
 function CtaBand() {
   return (
-    <section className="max-w-300 mx-auto w-full px-6 lg:px-12 pb-24">
+    <section className="max-w-300 mx-auto w-full px-6 lg:px-12 pb-20">
+      {/* No overflow clipping and a trigger that always fires (amount, not a
+          negative margin): the button used to show up cut off when the slide-up
+          animation was caught part-way or never started on short screens. */}
       <motion.div
-        className="relative overflow-hidden rounded-[28px] px-8 py-24 md:py-36 text-center"
+        className="rounded-[28px] px-8 py-14 md:py-20 text-center"
         style={{ background: CTA_BG }}
-        initial="hidden" whileInView="show" viewport={VIEW} variants={stagger}
+        initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.2 }} variants={stagger}
       >
         <motion.h2
           variants={fadeUp}
-          className="font-semibold tracking-[-0.035em] leading-[1.05] text-white m-0 mb-4"
+          className="font-semibold tracking-[-0.035em] leading-[1.05] text-white m-0 mb-4 text-balance"
           style={{ fontSize: "clamp(34px, 4.6vw, 60px)" }}
         >
-          Your next client is out there.
+          Your next client is already out there.
         </motion.h2>
-        <motion.p variants={fadeUp} className="text-[17px] text-white/80 max-w-[440px] mx-auto leading-[1.6] m-0 mb-9">
-          Tell us about your business and we'll build your first campaign. You only pay when a hot lead comes in.
+        <motion.p variants={fadeUp} className="text-[17px] text-white/80 max-w-[460px] mx-auto leading-[1.6] m-0 mb-9">
+          Tell us who you want to reach. We'll do the outreach and hand you the ones ready to talk.
         </motion.p>
-        <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-center gap-3">
+        <motion.div variants={fadeUp} className="flex flex-col items-center">
           <Link
             to="/signup"
             className="inline-flex items-center justify-center h-12 px-7 rounded-full bg-white text-[#0e0822] text-[15px] font-semibold no-underline hover:bg-[#f1e9ff] transition-colors"
           >
-            Get started
-          </Link>
-          <Link
-            to="/pricing"
-            className="inline-flex items-center justify-center h-12 px-7 rounded-full border border-white/40 text-white text-[15px] font-semibold no-underline hover:bg-white/10 transition-colors"
-          >
-            See pricing
+            {CTA_LABEL}
           </Link>
         </motion.div>
       </motion.div>

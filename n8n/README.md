@@ -48,3 +48,13 @@ copies of WF2 and WF5 first (see `docs/SANDBOX.md`), test, then copy to the live
 Sandbox check: create a wizard campaign for a sandbox client, launch it, and confirm the first
 email in Approvals follows the template's subject and offer, with names filled in. Then do
 the same for a manual campaign and confirm its emails look as they did before.
+
+## WF3 sends the claimed copy (2026-11-13)
+
+`claim_message_for_send` only claims an email that is still `approved`, and returns its `subject`
+and `body`. WF3's **Build HTML Body** reads them from **Claim Send** (falling back to **Get Message**)
+and outputs `subject`, `body` and `html_body`; **Send Via Client Gmail** sends those. This is what
+makes edits, Move back to pending and Cancel in the send queue (Approvals > Approved, admin
+Send queue) take effect up to the moment of sending. Do not point the Gmail node back at
+**Get Message** for the subject or body.
+

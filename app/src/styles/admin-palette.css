@@ -40,6 +40,16 @@
   --ad-clay-line:    #e8e3f7;
   --ad-red:          #0e0822;
 
+  /* Destructive actions (cancel, reject, delete): a real red, so they never read like a
+     neutral button. Solid for the final confirm, outline or text elsewhere. */
+  --ad-danger:            #d92d20;
+  --ad-danger-hover:      #b42318;
+  --ad-danger-active:     #912018;
+  --ad-danger-tint:       #fef3f2;
+  --ad-danger-tint-hover: #fee4e2;
+  --ad-danger-line:       #fda29b;
+  --ad-on-danger:         #ffffff;
+
   /* warning / scheduled / pending: purple tint, status carried by word + icon */
   --ad-amber:        #7412ef;
   --ad-orange:       #7412ef;
@@ -121,6 +131,14 @@ html[data-theme="dark"] {
 
   --ad-on-accent:    #0a0a0a;
   --ad-line-mid:     #333333;
+
+  --ad-danger:            #f97066;
+  --ad-danger-hover:      #fda29b;
+  --ad-danger-active:     #fecdca;
+  --ad-danger-tint:       #2a1210;
+  --ad-danger-tint-hover: #3d1713;
+  --ad-danger-line:       #7a271a;
+  --ad-on-danger:         #0a0a0a;
 
   /* page background behind the admin shell */
   background: #0a0a0a;

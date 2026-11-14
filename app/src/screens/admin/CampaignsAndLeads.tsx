@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { SandboxBadge } from './SandboxBadge';
 import { StatusPill, PILL, type StatusPillStyle } from '../../components/StatusPill';
 import { motion, AnimatePresence } from 'framer-motion';
 import { describeReplyMatch, WEAK_MATCH_WARNING } from '../../lib/replyMatch';
@@ -1417,7 +1418,9 @@ export function HotLeads() {
                             </p>
                           )}
                           {lead.client?.business_name && (
-                            <p className="mt-0.5 text-[12px] text-(--ad-ink-soft)">{lead.client.business_name}</p>
+                            <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-(--ad-ink-soft)">
+                              {lead.client.business_name}{lead.client.is_sandbox && <SandboxBadge />}
+                            </p>
                           )}
                           {lead.ai_summary && (
                             <p className="mt-1.5 line-clamp-2 text-[13px] text-(--ad-ink-soft)">{lead.ai_summary}</p>
@@ -1488,7 +1491,11 @@ export function HotLeads() {
                               </div>
                             )}
                           </td>
-                          <td className="align-top text-(--ad-ink-soft)">{lead.client?.business_name ?? '-'}</td>
+                          <td className="align-top text-(--ad-ink-soft)">
+                            <span className="inline-flex items-center gap-1.5">
+                              {lead.client?.business_name ?? '-'}{lead.client?.is_sandbox && <SandboxBadge />}
+                            </span>
+                          </td>
                           <td className="max-w-[340px] align-top">
                             <p className="m-0 line-clamp-1 text-(--ad-ink-soft)">{lead.ai_summary ?? '-'}</p>
                           </td>

@@ -11,81 +11,119 @@
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 
-  /* ── Approvals banner - full-bleed, above the topbar/sidebar, same slot
-     the impersonation "Viewing as…" bar occupies. ──────────────────────── */
-  /* Sandbox banner: fixed red rather than a theme token, so it reads the
-     same in light and dark and can't be mistaken for the green approvals bar. */
-  .csandbox-banner {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 6px 12px;
-    padding: 10px 16px;
-    background: #b42318;
-    color: #ffffff;
-    text-decoration: none;
-    font-size: 13px;
-    line-height: 1.35;
-    /* Pinned, unlike the approvals bar: a tester must never scroll into what
-       looks like a live account. Its height is published as --csbx-h by
-       Shell.tsx so the top bars and sidebar can sit below it. */
+  /* ── Status strip - one full-bleed, pinned strip above the top bar and sidebar. It replaces the
+     separate sandbox / approvals / Gmail banners; lib/statusStrip picks the message. Tone colours are
+     fixed rather than theme tokens so warning, action and good read the same in light and dark.
+     Its measured height is published as --cstrip-h by Shell.tsx. ──────────────────────────────── */
+  .cstrip {
+    --cstrip-bg: var(--ad-green);
+    --cstrip-cta-ink: var(--ad-green-hover);
     position: sticky;
     top: 0;
     z-index: 40;
-  }
-  .csandbox-banner:hover { background: #912018; }
-  .csandbox-banner:focus-visible { outline: 2px solid #ffffff; outline-offset: -4px; }
-  .csandbox-banner-cta.capproval-banner-cta { background: #ffffff; color: #b42318; }
-  /* Phones: one line, so the pinned bar costs ~40px rather than three lines. */
-  .csandbox-long { display: none; }
-  .csandbox-banner { flex-wrap: nowrap; padding: 7px 12px; gap: 8px; }
-  .csandbox-banner .capproval-banner-text { text-align: left; }
-  .csandbox-banner-cta.capproval-banner-cta { padding: 4px 6px 4px 10px; font-size: 12px; }
-  @media (min-width: 768px) {
-    .csandbox-long { display: inline; }
-    .csandbox-short { display: none; }
-    .csandbox-banner { flex-wrap: wrap; padding: 10px 16px; gap: 6px 12px; }
-    .csandbox-banner .capproval-banner-text { text-align: center; }
-    .csandbox-banner-cta.capproval-banner-cta { padding: 5px 8px 5px 12px; font-size: 12.5px; }
-  }
-  .capproval-banner {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: center;
-    gap: 6px 12px;
-    padding: 10px 16px;
-    background: var(--ad-green);
-    color: var(--ad-on-accent);
-    text-decoration: none;
+    gap: 8px;
+    padding: 7px 12px;
+    background: var(--cstrip-bg);
+    color: #ffffff;
     font-size: 13px;
     line-height: 1.35;
-    transition: background 0.12s;
   }
-  .capproval-banner:hover { background: var(--ad-green-hover); }
-  .capproval-banner:focus-visible { outline: 2px solid var(--ad-on-accent); outline-offset: -4px; }
-  .capproval-banner-text { min-width: 0; text-align: center; }
-  .capproval-banner-note { display: none; }
-  .capproval-banner-cta {
+  .cstrip-action  { --cstrip-bg: var(--ad-green); --cstrip-cta-ink: var(--ad-green-hover); color: var(--ad-on-accent); }
+  /* Action keeps the brand accent; its button follows the theme surface, like the old approvals bar. */
+  .cstrip-action .cstrip-cta { background: var(--ad-surface); }
+  .cstrip-good    { --cstrip-bg: #067647; --cstrip-cta-ink: #067647; }
+  .cstrip-warning { --cstrip-bg: #b54708; --cstrip-cta-ink: #93370d; }
+  .cstrip-sandbox { --cstrip-bg: #b42318; --cstrip-cta-ink: #b42318; }
+  /* A sandbox account keeps a red edge whatever the message, so it never passes for a live one. */
+  .cstrip.is-sandbox { box-shadow: inset 0 -3px 0 #b42318; }
+
+  .cstrip-msg { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+  .cstrip-text { min-width: 0; }
+  .cstrip-text strong { font-weight: 700; }
+  .cstrip-detail { opacity: 0.92; }
+  .cstrip-gmail {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 20px; height: 20px; border-radius: 5px; background: #ffffff;
+  }
+  .cstrip-tag {
+    flex-shrink: 0;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: #b42318;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    color: #ffffff;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .cstrip-sandbox .cstrip-tag { background: #ffffff; color: #b42318; border-color: #ffffff; }
+  .cstrip-actions { display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; }
+  .cstrip-cta {
     display: inline-flex;
     flex-shrink: 0;
     align-items: center;
     gap: 3px;
-    padding: 5px 8px 5px 12px;
+    padding: 4px 6px 4px 10px;
+    border: 0;
     border-radius: 6px;
-    background: var(--ad-surface);
-    color: var(--ad-green-hover);
-    font-size: 12.5px;
+    background: #ffffff;
+    color: var(--cstrip-cta-ink);
+    font: inherit;
+    font-size: 12px;
     font-weight: 700;
     white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
   }
+  .cstrip-cta:hover { filter: brightness(0.95); }
+  .cstrip-cta:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }
+  /* Two-class selectors so these win over the per-tone button colours above. */
+  .cstrip .cstrip-cta-sandbox { gap: 5px; padding: 5px 7px; background: #b42318; color: #ffffff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.85); }
+  .cstrip.cstrip-sandbox .cstrip-cta-sandbox { background: #ffffff; color: #b42318; box-shadow: none; }
+  /* Phones: the sandbox button is icon-only and the message icon is dropped, so the strip stays one line. */
+  .cstrip-cta-sandbox .cstrip-long, .cstrip-cta-sandbox .cstrip-short { display: none; }
+  .cstrip.is-sandbox .cstrip-msg > svg, .cstrip.is-sandbox .cstrip-msg > .cstrip-gmail { display: none; }
+  .cstrip-short { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cstrip-text { overflow: hidden; }
+
+  /* Warm-up thermometer pill (desktop only; phones get its short text in the line instead). */
+  .cstrip-therm {
+    align-items: center;
+    gap: 7px;
+    padding: 3px 12px 3px 9px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.15);
+    white-space: nowrap;
+  }
+  .cstrip-therm strong { font-weight: 700; }
+  .cstrip-inline-icon { display: inline-block; vertical-align: -3px; }
+  .cstrip-gauge { display: inline-flex; gap: 2px; }
+  .cstrip-gauge i { width: 13px; height: 8px; border-radius: 2px; background: rgba(255, 255, 255, 0.28); }
+  /* Cool to warm, no red: full speed is good news, not a warning. Shared with the details dialog. */
+  .s1 { --warm: #84caff; } .s2 { --warm: #a6f4c5; } .s3 { --warm: #fef0c7; } .s4 { --warm: #fec84b; } .s5 { --warm: #fd853a; }
+  .cstrip-gauge i[class] { background: var(--warm); }
+
+  /* Phones: one short line so the pinned strip costs ~40px. */
+  .cstrip-long { display: none; }
+  .cstrip-short { display: inline; font-weight: 600; }
+  .cstrip-msg { flex: 1; }
   @media (min-width: 768px) {
-    .capproval-banner-note { display: inline; }
-    /* Desktop: pinned under the sandbox banner, like the top bar, so the sticky sidebar
-       never ends up shortened by a banner that has scrolled away. Its measured height is
-       published as --cappr-h by Shell.tsx. Phones keep it scrolling (no sidebar there). */
-    .capproval-banner { position: sticky; top: var(--csbx-h, 0px); z-index: 35; }
+    .cstrip { flex-wrap: wrap; gap: 6px 12px; padding: 9px 16px; }
+    .cstrip-msg { flex: 0 1 auto; }
+    .cstrip-text { text-align: center; }
+    .cstrip-long { display: inline; }
+    .cstrip-therm.cstrip-long { display: inline-flex; }
+    .cstrip-short { display: none; }
+    .cstrip-cta { padding: 5px 8px 5px 12px; font-size: 12.5px; }
+    .cstrip .cstrip-cta-sandbox { padding: 5px 12px; }
+    .cstrip-cta-sandbox .cstrip-long { display: inline; }
+    .cstrip.is-sandbox .cstrip-msg > svg, .cstrip.is-sandbox .cstrip-msg > .cstrip-gmail { display: inline-flex; }
+    .cstrip-text { overflow: visible; }
   }
 
   /* Desktop top bar hidden on mobile in favor of .ctopbar below */
@@ -97,7 +135,7 @@
   /* ── Mobile topbar ─────────────────────────────────────────────────── */
   .ctopbar {
     position: sticky;
-    top: var(--csbx-h, 0px);
+    top: var(--cstrip-h, 0px);
     z-index: 10;
     display: flex;
     align-items: center;
@@ -260,7 +298,7 @@
       background: var(--ad-surface);
       border-bottom: 1px solid var(--line);
       position: sticky;
-      top: calc(var(--csbx-h, 0px) + var(--cappr-h, 0px));
+      top: var(--cstrip-h, 0px);
       z-index: 30;
     }
     .ctopbar-desktop-right {
@@ -289,9 +327,9 @@
       flex-shrink: 0;
       background: var(--ad-surface);
       border-right: 1px solid var(--line);
-      height: calc(100vh - var(--ctopbar-h) - var(--csbx-h, 0px) - var(--cappr-h, 0px));
+      height: calc(100vh - var(--ctopbar-h) - var(--cstrip-h, 0px));
       position: sticky;
-      top: calc(var(--ctopbar-h) + var(--csbx-h, 0px) + var(--cappr-h, 0px));
+      top: calc(var(--ctopbar-h) + var(--cstrip-h, 0px));
       overflow: hidden;
       padding: 18px 12px 16px;
     }

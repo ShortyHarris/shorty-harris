@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import { useOverlayClose } from '../hooks/useOverlayClose';
+import { actionBtn } from '../lib/actionButtons';
 
 /* Small centred confirm modal. Render inside <AnimatePresence> so it animates out. */
 export function ConfirmDialog({
@@ -38,22 +39,18 @@ export function ConfirmDialog({
       >
         <h2 className="m-0 text-[16px] font-bold text-(--ad-ink)">{title}</h2>
         {children && <div className="mt-2 text-[13px] leading-relaxed text-(--ad-ink-soft)">{children}</div>}
-        <div className="mt-5 flex justify-end gap-2.5">
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-2.5">
           <button
             onClick={onCancel}
             disabled={busy}
-            className="cursor-pointer rounded-lg border border-(--ad-line) bg-transparent px-4 py-2 text-[13px] font-semibold text-(--ad-ink-soft) transition-colors hover:bg-(--ad-surface-2) disabled:opacity-50"
+            className={actionBtn('secondary', 'lg')}
           >
             {cancelLabel}
           </button>
           <button
             onClick={onConfirm}
             disabled={busy}
-            className={`cursor-pointer rounded-lg px-4 py-2 text-[13px] font-bold transition-colors disabled:opacity-50 ${
-              danger
-                ? 'border border-(--ad-clay) bg-(--ad-clay) text-(--ad-surface) hover:bg-(--ad-clay-hover)'
-                : 'border-0 bg-(--ad-green) text-white hover:bg-(--ad-green-hover)'
-            }`}
+            className={danger ? actionBtn('danger', 'lg') : actionBtn('primary', 'lg')}
           >
             {busy ? 'Working…' : confirmLabel}
           </button>

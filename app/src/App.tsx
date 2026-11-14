@@ -12,6 +12,7 @@ import { useClientDashboard, dashboardKey } from './hooks/useClientDashboard';
 import { billingKey } from './hooks/useBilling';
 import { usePendingApprovalCount, useApprovedQueueCounts } from './hooks/useClientApprovals';
 import { useGmailConnection } from './hooks/useGmailConnection';
+import { useSendPacing } from './hooks/useSendPacing';
 import { useClientNotifications } from './hooks/useClientNotifications';
 import { useClientRealtimeSync } from './hooks/useClientRealtimeSync';
 import { TourProvider } from './tour/TourProvider';
@@ -131,6 +132,7 @@ function ClientZone() {
   const pendingApprovals = usePendingApprovalCount(clientId);
   const { awaitingProspects } = useApprovedQueueCounts(clientId);
   const { connection: gmailConnection } = useGmailConnection(clientId);
+  const { pacing } = useSendPacing(clientId);
   const { leads } = useClientDashboard(clientId);
   const newHotLeads = leads.filter((l) => l.status === 'new').length;
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useClientNotifications(clientId);
@@ -184,6 +186,7 @@ function ClientZone() {
           onMarkAllAsRead={markAllAsRead}
           onSignOut={signOut}
           isSandbox={isSandbox}
+          pacing={pacing}
         >
           <Routes>
             <Route index element={<Dashboard clientId={clientId} />} />
@@ -241,6 +244,7 @@ function ImpersonateZone() {
   // Wait for the impersonation session: falling back to the admin's own client here would count
   // drafts only an admin can see.
   const { awaitingProspects } = useApprovedQueueCounts(session ? clientId ?? '' : '', session?.client ?? supabase);
+  const { pacing } = useSendPacing(session ? clientId ?? null : null, session?.client ?? supabase);
 
   useEffect(() => {
     if (!clientId) return;
@@ -308,6 +312,7 @@ function ImpersonateZone() {
         onSignOut={exit}
         basePath={basePath}
         isSandbox={isSandbox}
+        pacing={pacing}
       >
         <Routes>
           <Route index element={<Dashboard clientId={clientId} client={client} readOnly={readOnly} markViewedOnOpen={false} basePath={basePath} />} />

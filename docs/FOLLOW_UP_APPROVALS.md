@@ -38,7 +38,7 @@ Cost: three Gemini drafts per prospect, written up front. Some of these won't be
 | Tab | What is in it | Who acts |
 |---|---|---|
 | **Pending** | Drafts waiting for the client's approval: first emails, and follow-ups once they exist | Client approves, edits or rejects |
-| **Approved** | Approved and not sent yet: *Sendable* (goes out within the daily cap) or *Scheduled* (a follow-up waiting for its send date) | Nobody. They send on their own |
+| **Approved** | The send queue: approved and not sent yet, with the time each one is expected to go out (daily cap, warm-up, follow-up dates, send days) | Nobody needs to, but anyone can open one to correct it, move it back to Pending, or cancel it until it shows *Sending now* |
 | **Blocked** | Approved but held back for a reason that must be cleared first | Fix the reason, or reject the draft |
 
 The top of the **Approvals** page, above the tabs, always shows a follow-ups bar while a campaign is live, whichever tab is open. This is the main place to switch it:
@@ -60,8 +60,24 @@ The Blocked tab lists how many drafts are held for each reason, using the same w
 Drafts held by the shared-address and personal-address rules are **hidden from the client**: they don't appear on any tab or in any count. Only admins see them.
 For example, TUTEL currently has 99 approved first emails to shared addresses. An admin sees them as Blocked; the client sees nothing for them.
 
+## Correcting or pulling back an approved email (the send queue)
+
+The **Approved** tab is the send queue. Admins have the same list across every client under **Send queue** in the admin sidebar, with a client filter.
+
+- **Filters:** campaign, email type, and send window: *Today*, *Tomorrow*, *Later*, *Not scheduled*. Each row shows when it goes out, in the client's time zone. An email that is already due shows the next send run (for example Monday 09:00 when it is Friday evening).
+- **Review:** click a row to read the full subject and body.
+- **Save changes:** corrects the copy and keeps the email approved, in the same place in the queue. The row is tagged *Edited*.
+- **Move back to pending:** takes it out of the queue and puts it on the Pending tab, to edit and approve again later.
+- **Cancel:** it never sends. As with Reject, that prospect's remaining follow-ups are cancelled too.
+- Several rows can be selected to move back to Pending or cancel together, for example every off-topic TUTEL SVJ follow-up at once.
+
+**When a change takes effect.** Immediately, including for emails inside today's cap window. The sender (WF3) re-reads each email when it sends it: the database claim only takes an email that is still approved, and WF3 sends the subject and body as they are at that moment. Once a row shows *Sending now* it is being handed to Gmail and can no longer be changed; edits and cancellations are refused, never silently lost.
+
+View as client is read-only here as everywhere else. Turn on *Edit as admin* to make changes.
+
 ## Quick answers
 
 - **"Pending is empty but I expected follow-ups."** The first emails haven't been sent yet, so their follow-ups don't exist. Use **Write follow-ups now**, or wait for the first emails to send.
 - **"I approved follow-ups. Why haven't they sent?"** They are Scheduled: each waits for the email before it to send, plus 3, 5 or 7 business days.
+- **"An approved email has the wrong copy."** Open it on the Approved tab, fix it and Save changes. It stays approved. Or move it back to Pending, or cancel it.
 - **"Why are drafts Blocked?"** Open the Blocked tab. The list at the top gives the count for each reason, and each row has a badge.

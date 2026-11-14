@@ -9,6 +9,8 @@ import { useOverlayClose } from '../hooks/useOverlayClose';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useSendPacing } from '../hooks/useSendPacing';
+import { warmupView, queueEta, type WarmupView } from '../lib/warmup';
+import { FireIcon } from './WarmupIcons';
 import {
   sendingCopy, compactSendingLine, sendingDetails, FOLLOW_UP_EXPLAINER, type SendPacing,
 } from '../lib/sendPacing';
@@ -183,8 +185,10 @@ export function SendingLine({ clientId, client = supabase, settingsHref }: Conne
 
 /* "How sending works": the full picture behind the one-line summary, in a pop-up so the
    page itself stays short. */
-function SendingDetailsDialog({ pacing, onClose }: { pacing: SendPacing; onClose: () => void }) {
+export function SendingDetailsDialog({ pacing, onClose }: { pacing: SendPacing; onClose: () => void }) {
   const details = sendingDetails(pacing);
+  const warm = warmupView(pacing);
+  const eta = queueEta(pacing);
   const overlay = useOverlayClose(onClose, { escape: true });
   const label = 'block text-[11px] font-semibold uppercase tracking-wide text-(--ad-ink-ghost)';
   return (
@@ -215,7 +219,18 @@ function SendingDetailsDialog({ pacing, onClose }: { pacing: SendPacing; onClose
           <ModalClose onClick={onClose} />
         </div>
 
-        <div className="rounded-lg border border-(--ad-green-line) bg-(--ad-green-tint)/40 px-4 py-3">
+        {warm && <WarmupSection view={warm} />}
+
+        {eta && (
+          <section>
+            <h3 className="m-0 mb-1.5 text-[14px] font-bold text-(--ad-ink)">When will all my emails be sent?</h3>
+            <p className="m-0 rounded-lg border border-(--ad-green-line) bg-(--ad-green-tint)/40 px-4 py-3 text-[13.5px] leading-relaxed text-(--ad-ink)" data-testid="queue-eta">
+              {eta.text}
+            </p>
+          </section>
+        )}
+
+        <div>
           <span className={label}>Next email</span>
           <p className="m-0 mt-0.5 text-[13.5px] font-semibold leading-relaxed text-(--ad-ink)">{details.next}</p>
         </div>
@@ -226,15 +241,6 @@ function SendingDetailsDialog({ pacing, onClose }: { pacing: SendPacing; onClose
             {details.rules.map((r) => <li key={r}>{r}</li>)}
           </ul>
         </div>
-
-        {details.ladder.length > 0 && (
-          <div>
-            <span className={label}>Daily limit grows</span>
-            <ul className="m-0 mt-1 flex list-disc flex-col gap-1 pl-4 text-[13px] leading-relaxed text-(--ad-ink-soft)">
-              {details.ladder.map((l) => <li key={l}>{l}</li>)}
-            </ul>
-          </div>
-        )}
 
         <div className="flex justify-end">
           <button
@@ -247,5 +253,49 @@ function SendingDetailsDialog({ pacing, onClose }: { pacing: SendPacing; onClose
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+/* Warm-up colours, cool blue to warm orange: no red, because full speed is good news. Same scale as
+   the strip's thermometer (Shell.css .s1-.s5); inline here so the dialog works on any page. */
+const WARM_COLOURS = ['#84caff', '#a6f4c5', '#fef0c7', '#fec84b', '#fd853a'];
+
+/** "Why only 5 emails a day?": the plain explanation and the staircase with "You're here". */
+export function WarmupSection({ view }: { view: WarmupView }) {
+  const max = Math.max(...view.steps.map((s) => s.cap), 1);
+  return (
+    <section data-testid="warmup-section">
+      <h3 className="m-0 mb-1.5 text-[14px] font-bold text-(--ad-ink)">{view.heading}</h3>
+      <p className="m-0 text-[13.5px] leading-relaxed text-(--ad-ink-soft)">{view.explainer}</p>
+      <ol className="m-0 mt-3 flex list-none items-start gap-2 p-0" aria-label="Daily limit, week by week">
+        {view.steps.map((s, i) => {
+          const now = s.state === 'now';
+          return (
+            <li key={i} className="flex flex-1 flex-col items-center text-center">
+              <span aria-hidden className="mb-1.5 flex h-[84px] w-full items-end">
+              <span
+                className="block w-full rounded-t-md rounded-b-sm"
+                style={{
+                  height: Math.max(12, Math.round((s.cap / max) * 84)),
+                  background: WARM_COLOURS[i % WARM_COLOURS.length],
+                  opacity: s.state === 'next' ? 0.45 : 1,
+                  boxShadow: now ? '0 0 0 2px var(--ad-ink)' : undefined,
+                }}
+              />
+              </span>
+              <span className="inline-flex items-center gap-1 text-[13px] font-bold text-(--ad-ink)">
+                {s.cap} a day{i === view.steps.length - 1 && <FireIcon size={15} />}
+              </span>
+              <span className="text-[11.5px] text-(--ad-ink-soft)">{s.when}</span>
+              {now && (
+                <span className="mt-1 rounded bg-(--ad-ink) px-1.5 py-px text-[10.5px] font-bold text-(--ad-surface)">
+                  You're here
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }

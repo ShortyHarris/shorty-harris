@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone, BookOpen, BarChart3, Target, Filter, Users, Mail, Menu, ChevronDown, FlaskConical } from 'lucide-react';
+import { Inbox, CreditCard, LogOut, ClipboardCheck, Settings, ChevronRight, Bell, Megaphone, BookOpen, BarChart3, Target, Filter, Users, Menu, ChevronDown, FlaskConical } from 'lucide-react';
 import type { ClientNotification } from '../../hooks/useClientNotifications';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import { ModalClose } from '../../components/ModalClose';
@@ -9,6 +9,9 @@ import { BrandLockup } from '../../components/BrandLockup';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import { useAppTheme } from '../../hooks/useAdminTheme';
 import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
+import type { SendPacing } from '../../lib/sendPacing';
+import { resolveStatusStrip } from '../../lib/statusStrip';
+import { StatusStrip } from './StatusStrip';
 import '../../styles/admin-tables.css';
 import './Shell.css';
 
@@ -31,6 +34,7 @@ export function Shell({
   signOutLabel = 'Sign out',
   basePath = '/app',
   isSandbox = false,
+  pacing = null,
   children,
 }: {
   businessName: string;
@@ -50,13 +54,23 @@ export function Shell({
   basePath?: string;
   /** clients.is_sandbox: shows the red sandbox banner and the Sandbox nav entry. */
   isSandbox?: boolean;
+  /** send_pacing for the status strip's sending activity; null while loading or in previews. */
+  pacing?: SendPacing | null;
   children: ReactNode;
 }) {
   const nameInitial = (displayName  || 'U')[0].toUpperCase();
   const location = useLocation();
-  const showGmailBanner = !gmailConnected && location.pathname !== `${basePath}/settings`;
-  // Shown on every page except Approvals itself, where it would just repeat what's already there.
-  const showApprovalsBanner = awaitingProspects > 0 && location.pathname !== `${basePath}/approvals`;
+  // One status strip instead of separate sandbox / approvals / Gmail banners: it shows the single
+  // most important message (see lib/statusStrip for the order).
+  const strip = resolveStatusStrip({
+    isSandbox,
+    gmailConnected,
+    awaitingProspects,
+    pacing,
+    basePath,
+    pathname: location.pathname,
+    settingsHref: hideSettings ? null : `${basePath}/settings`,
+  });
 
   const [moreOpen, setMoreOpen] = useState(false);
   const moreItems: SideNavItem[] = [
@@ -105,67 +119,24 @@ export function Shell({
 
   const { theme, toggle: toggleTheme } = useAppTheme('client');
 
-  // Publish the pinned sandbox banner's height (it wraps on narrow screens)
-  // so the sticky top bars and sidebar sit below it instead of under it.
-  const sandboxBannerRef = useRef<HTMLAnchorElement>(null);
+  // Publish the pinned strip's height (it wraps on narrow screens) so the sticky top bars and
+  // sidebar sit below it instead of under it.
+  const stripRef = useRef<HTMLDivElement>(null);
+  const hasStrip = !!strip;
   useEffect(() => {
-    const el = sandboxBannerRef.current;
-    if (!isSandbox || !el) return;
+    const el = stripRef.current;
+    if (!hasStrip || !el) return;
     const root = document.documentElement;
-    const ro = new ResizeObserver(() => root.style.setProperty('--csbx-h', `${el.offsetHeight}px`));
+    const ro = new ResizeObserver(() => root.style.setProperty('--cstrip-h', `${el.offsetHeight}px`));
     ro.observe(el);
-    return () => { ro.disconnect(); root.style.removeProperty('--csbx-h'); };
-  }, [isSandbox]);
-
-  // Same for the approvals banner, which is pinned on desktop only; on phones it
-  // scrolls away and nothing reads --cappr-h.
-  const approvalsBannerRef = useRef<HTMLAnchorElement>(null);
-  useEffect(() => {
-    const el = approvalsBannerRef.current;
-    if (!showApprovalsBanner || !el) return;
-    const root = document.documentElement;
-    const ro = new ResizeObserver(() => root.style.setProperty('--cappr-h', `${el.offsetHeight}px`));
-    ro.observe(el);
-    return () => { ro.disconnect(); root.style.removeProperty('--cappr-h'); };
-  }, [showApprovalsBanner]);
+    return () => { ro.disconnect(); root.style.removeProperty('--cstrip-h'); };
+  }, [hasStrip]);
 
   return (
     <div className="cpage">
 
-      {/* ═══ SANDBOX BANNER - fixed red, always on for a sandbox client so a
-           tester can never mistake it for a live account. ═══ */}
-      {isSandbox && (
-        <Link ref={sandboxBannerRef} to={`${basePath}/sandbox`} className="csandbox-banner">
-          <FlaskConical size={16} strokeWidth={2} className="shrink-0" aria-hidden />
-          <span className="capproval-banner-text">
-            <strong className="font-bold">Sandbox.</strong>
-            <span className="csandbox-long"> Test account: emails only go to your own connected mailbox.</span>
-            <span className="csandbox-short"> Emails only reach you.</span>
-          </span>
-          <span className="capproval-banner-cta csandbox-banner-cta">
-            <span className="csandbox-long">Sandbox controls</span>
-            <span className="csandbox-short">Controls</span>
-            <ChevronRight size={14} strokeWidth={2.5} aria-hidden />
-          </span>
-        </Link>
-      )}
-
-      {/* ═══ APPROVALS BANNER - full-bleed, above the topbar and sidebar
-           both, same slot the impersonation "Viewing as…" bar uses. Shown
-           on every page except Approvals itself. ═══ */}
-      {showApprovalsBanner && (
-        <Link ref={approvalsBannerRef} to={`${basePath}/approvals`} className="capproval-banner">
-          <ClipboardCheck size={16} strokeWidth={2} className="shrink-0" aria-hidden />
-          <span className="capproval-banner-text">
-            <strong className="font-bold">{awaitingProspects} prospect{awaitingProspects === 1 ? '' : 's'}</strong> waiting for your approval.
-            <span className="capproval-banner-note"> Nothing sends until you approve.</span>
-          </span>
-          <span className="capproval-banner-cta">
-            Review now
-            <ChevronRight size={14} strokeWidth={2.5} aria-hidden />
-          </span>
-        </Link>
-      )}
+      {/* ═══ STATUS STRIP - full-bleed and pinned above the top bar and sidebar. ═══ */}
+      {strip && <StatusStrip ref={stripRef} state={strip} pacing={pacing} />}
 
       {/* ═══ DESKTOP TOP BAR - spans the full width above the sidebar and
            content, business name left, notifications + signed-in user
@@ -255,19 +226,6 @@ export function Shell({
 
       {/* ═══ CONTENT ═══ */}
       <div className="cpage-body">
-        {showGmailBanner && (
-          <Link
-            to={`${basePath}/settings`}
-            className="flex items-center bg-(--ad-green-tint) text-(--ad-ink) border border-(--ad-green-line) gap-2.5 no-underline px-4 py-3 md:mx-7 md:mt-6 md:rounded-md"
-
-          >
-            <Mail size={17} strokeWidth={2} className="shrink-0" aria-hidden />
-            <span className="flex-1 text-[13px] leading-snug">
-              <strong className="font-semibold">Connect your Gmail</strong> to start sending outreach - approvals are disabled until it's set up.
-            </span>
-            <ChevronRight size={16} style={{ color: 'var(--amber)', flexShrink: 0 }} />
-          </Link>
-        )}
         {children}
       </div>
 

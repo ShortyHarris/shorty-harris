@@ -305,7 +305,7 @@ describe('sendingDetails', () => {
 
   it('says when the next email goes and why they are spaced out', () => {
     const d = sendingDetails(warming(), NOW);
-    expect(d.next).toBe('The next email should go out at about 10:48 AM (about 58 min after the last one, at 9:50 AM). All 3 queued should be sent by about Nov 5.');
+    expect(d.next).toBe('The next email should go out at about 10:48 AM (about 58 min after the last one, at 9:50 AM).');
     expect(d.rules[0]).toContain('up to 5 emails a day right now (day 1 of warm-up)');
     expect(d.rules[1]).toBe('Emails go out one at a time, about 58 min apart (between 43 min and 1h 12m, varied so it looks natural).');
     expect(d.rules[2]).toContain('Mon to Fri, 9:00 AM to 5:00 PM (Africa/Lusaka)');

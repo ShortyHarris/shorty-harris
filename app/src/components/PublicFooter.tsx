@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { openConsentPreferences } from '../lib/consent';
 import { BrandLockup } from './BrandLockup';
+import { CTA_LABEL } from "@/lib/marketing";
 
 // Shared footer for every public-facing page (Home, Blog, BlogPost, legal,
 // 404). Home-page sections are linked as "/#id" (not a bare "#id") so they
@@ -55,7 +56,7 @@ export function PublicFooter() {
                 to="/signup"
                 className="inline-flex items-center justify-center h-10 px-5 rounded-full bg-brand text-white text-[14px] font-semibold no-underline hover:bg-brand-deep transition-colors"
               >
-                Get started
+                {CTA_LABEL}
               </Link>
               <a href={`mailto:${CONTACT_EMAIL}`} className="text-[14px] font-semibold text-[#7412ef] no-underline hover:underline">
                 {CONTACT_EMAIL}
