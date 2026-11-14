@@ -63,17 +63,16 @@ Do these in order.
      `20261107182520_campaign_wizard_trigger_fn_not_callable.sql`. The second one schedules an
      hourly pg_cron job, `release-scheduled-campaigns`, which sends a scheduled campaign to
      `wf0-enqueue` on its start date.
-   - **Any time (safe before merge):** apply `20261114130000_campaign_wizard_sandbox_gate.sql`.
+   - ✅ Done Nov 14: `20261114091122_campaign_wizard_sandbox_gate.sql` (safe before merge).
      It adds the rollout switch (`wizard_settings.sandbox_only`, on = sandbox accounts only) and
      `wizard_on_for()`, which the app, `wizard-ai` and the auto-approve trigger all use. It also
      turns the per-client switch on for everyone, which is safe because the rollout switch keeps
      real clients out (and their campaigns in staff review) until an admin turns sandbox-only
      off. It replaces `20261108120000_campaign_wizard_for_everyone.sql`, which was never applied.
-     Then rename the file to the version the database records (`supabase/migrations/README.md`).
 2. **Edge function.** ✅ Done Nov 7: `supabase/functions/wizard-ai` (imports `../_shared/wizard.ts`),
    using the existing `GEMINI_API_KEY`. Do **not** set `WIZARD_AI_MOCK` in production.
-   Redeploy it with the sandbox gate migration: it now asks `wizard_on_for()` instead of reading
-   `clients.wizard_enabled`.
+   ✅ Redeployed Nov 14 (version 2) with the sandbox gate: it asks `wizard_on_for()` instead of
+   reading `clients.wizard_enabled`.
 3. **App.** Merge pull request #12 (Release checks must be green) and deploy as usual. Check that
    `VITE_MAPBOX_TOKEN` is set in Vercel production, for place suggestions.
 4. **n8n (manual).** Follow "Campaign Wizard: emails follow the campaign template" in

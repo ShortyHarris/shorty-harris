@@ -31,7 +31,7 @@ Martin need to agree to.
 - **Sandbox first, then everyone, with one switch** (November 14). `wizard_settings.sandbox_only`
   (Admin > Campaigns) shows the wizard to sandbox accounts only until an admin turns it off;
   then every client has it. `wizard_on_for()` combines it with the per-client switch
-  (`20261114130000_campaign_wizard_sandbox_gate.sql`).
+  (`20261114091122_campaign_wizard_sandbox_gate.sql`).
 
 Ground rules (unchanged):
 
