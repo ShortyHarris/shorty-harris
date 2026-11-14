@@ -1,5 +1,5 @@
 -- message_block_reasons and approvals_schedule work per client (migration
--- 20261114090000_approvals_schedule_client_scoped_held_check). The view's "is it sendable?" check
+-- 20261114054851_approvals_schedule_client_scoped_held_check). The view's "is it sendable?" check
 -- now also matches on client_id, so a client-filtered read only evaluates that client's drafts,
 -- and approvals_schedule reads the client's held drafts once instead of per row. Results must be
 -- exactly what they were: a held draft is held, a sendable one is not, another client's drafts
