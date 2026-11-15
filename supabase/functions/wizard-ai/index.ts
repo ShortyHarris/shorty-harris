@@ -9,7 +9,8 @@
 //                  -> rewritten emails; uses one of the campaign's free rewrites only on success
 //
 // Only clients with the wizard on (wizard_on_for: the sandbox-only rollout switch plus
-// clients.wizard_enabled) may call it. Calls are
+// clients.wizard_enabled) may call it, or an admin acting for such a client (body.client_id,
+// used when an admin runs the wizard while viewing the client in edit mode). Calls are
 // rate-limited per client (wizard_settings.ai_calls_per_hour) and logged in wizard_ai_calls.
 // Secrets: GEMINI_API_KEY (already used by docs-search). WIZARD_AI_MOCK=1 returns sample output
 // without calling Gemini (local development only).
@@ -244,16 +245,23 @@ Deno.serve(async (req: Request) => {
   const { data: { user } } = await caller.auth.getUser()
   if (!user) return json({ ok: false, error: 'unauthorized' }, 401)
 
+  let body: Record<string, any>
+  try { body = await req.json() } catch { return json({ ok: false, error: 'bad_json' }, 400) }
+
   const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
   const { data: profile } = await db.from('profiles').select('role, client_id').eq('id', user.id).maybeSingle()
-  const clientId = profile?.client_id as string | undefined
+  // A client's login always acts for that client; body.client_id is ignored for them. An admin
+  // (using the wizard while viewing a client, in edit mode) names the client in body.client_id.
+  let clientId = profile?.client_id as string | undefined
+  if (!clientId && profile?.role === 'admin' && typeof body.client_id === 'string') {
+    const { data: named } = await db.from('clients').select('id').eq('id', body.client_id).maybeSingle()
+    clientId = named?.id as string | undefined
+  }
   if (!clientId) return json({ ok: false, error: 'not_a_client' }, 403)
   // The same rule the app uses: the sandbox-only rollout switch plus the per-client off-switch.
   const { data: wizardOn } = await db.rpc('wizard_on_for', { p_client_id: clientId })
   if (wizardOn !== true) return json({ ok: false, error: 'wizard_not_enabled' }, 403)
 
-  let body: Record<string, any>
-  try { body = await req.json() } catch { return json({ ok: false, error: 'bad_json' }, 400) }
   const action = String(body.action ?? '')
   const handler = ACTIONS[action]
   if (!handler) return json({ ok: false, error: 'unknown_action' }, 400)
