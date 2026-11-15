@@ -7,8 +7,10 @@ import type { TargetArea } from '../lib/targetAreas';
 
 export type AiResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
-export async function callWizardAi<T>(action: string, payload: Record<string, unknown>, client: SupabaseClient = supabase): Promise<AiResult<T>> {
-  const { data, error } = await client.functions.invoke('wizard-ai', { body: { action, ...payload } });
+/** `clientId` says which client the call is for. wizard-ai only uses it when the caller is an
+ *  admin (viewing as the client); a client's own login always acts for that client. */
+export async function callWizardAi<T>(action: string, payload: Record<string, unknown>, client: SupabaseClient = supabase, clientId?: string): Promise<AiResult<T>> {
+  const { data, error } = await client.functions.invoke('wizard-ai', { body: { action, ...payload, ...(clientId ? { client_id: clientId } : {}) } });
   if (error) {
     // Non-2xx: the function still sends { ok: false, error } in the body.
     const ctx = (error as { context?: Response }).context;

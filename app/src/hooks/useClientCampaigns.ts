@@ -251,6 +251,8 @@ export function useClientUsage(clientId: string, client: SupabaseClient = supaba
     },
     enabled: !!clientId,
     staleTime: 60 * 1000,
+    // Slots change outside this page (the wizard creates drafts), so re-read on every visit.
+    refetchOnMount: 'always',
   });
 
   return { usage };
@@ -283,6 +285,8 @@ export function useClientLaunchUsage(clientId: string, client: SupabaseClient = 
     },
     enabled: !!clientId,
     staleTime: 60 * 1000,
+    // Slots change outside this page (the wizard creates drafts), so re-read on every visit.
+    refetchOnMount: 'always',
   });
 
   return { usage };

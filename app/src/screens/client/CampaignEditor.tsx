@@ -273,7 +273,7 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
   async function rewrite(step: number | null) {
     if (!form.emails) return;
     setRewriting(step === null ? 'all' : step);
-    const r = await callWizardAi<RewriteResult>('rewrite', { campaign_id: campaign.id, step, emails: form.emails }, client);
+    const r = await callWizardAi<RewriteResult>('rewrite', { campaign_id: campaign.id, step, emails: form.emails }, client, campaign.client_id);
     setRewriting(null);
     if (!r.ok) { toast(wizardErrorMessage(r.error), 'error'); return; }
     const next = [...form.emails];

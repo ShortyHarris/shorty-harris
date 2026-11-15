@@ -109,8 +109,13 @@ const ghostCls   = btn('secondary', 'lg');
 const primaryCls = btn('primary', 'lg');
 
 export function Campaigns({
-  clientId, client = supabase, readOnly = false, canDelete = true, basePath = '/app',
-}: { clientId: string; client?: SupabaseClient; readOnly?: boolean; canDelete?: boolean; basePath?: string }) {
+  clientId, client = supabase, readOnly = false, canDelete = true, basePath = '/app', wizardAvailable = true,
+}: {
+  clientId: string; client?: SupabaseClient; readOnly?: boolean; canDelete?: boolean; basePath?: string;
+  /** False where there is no wizard page to go to (an admin viewing as the client): "New
+   *  campaign" then opens the manual form, and the unfinished-setup banner is not offered. */
+  wizardAvailable?: boolean;
+}) {
   const { rows, loading, isFetching, dataUpdatedAt, error, reload } = useClientCampaignList(clientId, client);
   const { usage } = useClientUsage(clientId, client);
   const { usage: launchUsage } = useClientLaunchUsage(clientId, client);
@@ -127,7 +132,8 @@ export function Campaigns({
     navigate(`${basePath}/campaigns/wizard${entry ? `?entry=${entry}` : ''}`);
   // One "New campaign" button; pilot clients then choose the wizard or setting it up themselves.
   const [choosing, setChoosing] = useState(false);
-  const startNew = () => (wizardEnabled ? setChoosing(true) : setShowNew(true));
+  const canStartWizard = wizardEnabled && wizardAvailable && !readOnly;
+  const startNew = () => (canStartWizard ? setChoosing(true) : setShowNew(true));
   // The campaign window is in the address (?open=<id>&tab=emails) so links and reloads land on it.
   const openId = wizardEnabled && !readOnly ? searchParams.get('open') : null;
   const openEditor = (id: string, tab?: string) => {
@@ -146,7 +152,7 @@ export function Campaigns({
   const unfinished = useQuery({
     queryKey: ['wizard-open-session', clientId],
     queryFn: () => fetchOpenSession(clientId, client),
-    enabled: wizardEnabled && !readOnly,
+    enabled: canStartWizard,
     staleTime: 0,
     refetchOnMount: 'always',
   });

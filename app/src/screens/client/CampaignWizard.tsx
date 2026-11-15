@@ -192,7 +192,19 @@ function Pills({ id, values, onChange, placeholder, label }: {
   );
 }
 
-type Phase = { kind: 'loading' } | { kind: 'ready' } | { kind: 'error'; message: string };
+type Phase = { kind: 'loading' } | { kind: 'ready' } | { kind: 'error'; message: string }
+  | { kind: 'full'; used: number; max: number };
+
+/** Campaign slots as wizard-ai counts them (every campaign except archived ones, against
+ *  clients.max_campaigns), so the wizard can say "no room" before the steps, not after. */
+async function campaignSlots(clientId: string, client: SupabaseClient): Promise<{ used: number; max: number } | null> {
+  const [{ data: c }, { count, error }] = await Promise.all([
+    client.from('clients').select('max_campaigns').eq('id', clientId).maybeSingle(),
+    client.from('campaigns').select('id', { count: 'exact', head: true }).eq('client_id', clientId).neq('status', 'archived'),
+  ]);
+  if (error || count === null || c?.max_campaigns == null) return null; // unknown: let the wizard run
+  return { used: count, max: c.max_campaigns as number };
+}
 
 export function CampaignWizard({
   clientId, client = supabase, basePath = '/app',
@@ -234,8 +246,9 @@ export function CampaignWizard({
     Promise.all([
       fetchWizardOn(clientId, client),
       fetchOpenSession(clientId, client),
+      campaignSlots(clientId, client),
     ])
-      .then(([wizardOn, open]) => {
+      .then(([wizardOn, open, slots]) => {
         if (cancelled) return;
         if (!wizardOn) {
           setPhase({ kind: 'error', message: "The campaign wizard isn't available on your account yet. Contact us if you'd like to use it." });
@@ -243,6 +256,10 @@ export function CampaignWizard({
         }
         // "Continue" on the Campaigns page opens the unfinished setup (?resume=1). Anything else
         // starts fresh, prefilled from the saved business profile; there is no "welcome back" step.
+        if (slots && slots.used >= slots.max) {
+          setPhase({ kind: 'full', used: slots.used, max: slots.max });
+          return;
+        }
         if (open && params.get('resume') === '1') {
           setSession(open); setAnswers(open.answers ?? {}); setPage(firstPageOf(open.screen)); setPhase({ kind: 'ready' });
         } else void begin(entry);
@@ -293,7 +310,7 @@ export function CampaignWizard({
       payload = { url };
     }
     setWorking(describe ? 'describe' : 'website');
-    const r = await callWizardAi<AnalyzeResult>('analyze', payload, client);
+    const r = await callWizardAi<AnalyzeResult>('analyze', payload, client, clientId);
     setWorking(null);
     if (!r.ok) {
       if (describe) {
@@ -339,6 +356,16 @@ export function CampaignWizard({
   // ── Before the wizard is ready ────────────────────────────────────────────────────────────
   if (phase.kind === 'loading') {
     return <Frame step={null} progress={[0, 0, 0]} onExit={() => navigate(campaignsPath)}><Working title="Getting things ready" lines={['Loading your details…']} orb="breathing" /></Frame>;
+  }
+  if (phase.kind === 'full') {
+    return (
+      <Frame step={null} progress={[0, 0, 0]} onExit={() => navigate(campaignsPath)}>
+        <Title sub={`You have ${phase.used} of ${phase.max} campaigns. Delete or archive one you don't need, or contact us to raise your limit, then come back to find new ones.`}>
+          You've used all your campaign slots
+        </Title>
+        <NextButton onClick={() => navigate(campaignsPath)}>Back to campaigns</NextButton>
+      </Frame>
+    );
   }
   if (phase.kind === 'error') {
     return (
@@ -661,7 +688,7 @@ function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onEx
     queryKey: ['wizard-ideas', session.id],
     queryFn: async (): Promise<IdeasState> => {
       if (savedIdeas.length > 0) return { ideas: savedIdeas, duplicates: [], slotsLeft: null };
-      const r = await callWizardAi<IdeasResult>('ideas', { session_id: session.id }, client);
+      const r = await callWizardAi<IdeasResult>('ideas', { session_id: session.id }, client, clientId);
       if (!r.ok) throw new Error(r.error);
       onAnswers({ ...answers, ideas_fp: fp });
       return { ideas: r.data.ideas, duplicates: r.data.duplicates, slotsLeft: r.data.slots_left };
@@ -684,7 +711,7 @@ function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onEx
 
   const generate = useCallback(async () => {
     setRegenerating(true); setErr(null);
-    const r = await callWizardAi<IdeasResult>('ideas', { session_id: session.id }, client);
+    const r = await callWizardAi<IdeasResult>('ideas', { session_id: session.id }, client, clientId);
     setRegenerating(false);
     if (!r.ok) { setErr(wizardErrorMessage(r.error)); return; }
     const own = state.ideas.filter((i) => i.fit === 'own');
@@ -692,7 +719,7 @@ function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onEx
     setOverride({ ideas, duplicates: r.data.duplicates, slotsLeft: r.data.slots_left });
     setSelected((sel) => new Set([...sel].filter((id) => ideas.some((i) => i.id === id))));
     onAnswers({ ...answers, ideas_fp: fp });
-  }, [session.id, client, state.ideas, answers, fp, onAnswers]);
+  }, [session.id, client, clientId, state.ideas, answers, fp, onAnswers]);
 
   async function addOwn(idea: { name: string; service: string; who: string }) {
     const areas = (answers.area?.areas ?? []).slice(0, 3);
@@ -714,10 +741,12 @@ function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onEx
     const ids = state.ideas.filter((i) => selected.has(i.id)).map((i) => i.id);
     if (ids.length === 0) return;
     setCreating(true); setErr(null);
-    const r = await callWizardAi<DraftsResult>('create_drafts', { session_id: session.id, idea_ids: ids }, client);
+    const r = await callWizardAi<DraftsResult>('create_drafts', { session_id: session.id, idea_ids: ids }, client, clientId);
     setCreating(false);
     if (!r.ok) { setErr(wizardErrorMessage(r.error)); return; }
     queryClient.invalidateQueries({ queryKey: ['my-campaigns', clientId] });
+    // The new drafts use campaign slots: the Campaigns page's count must not show the old number.
+    queryClient.invalidateQueries({ queryKey: ['client-usage', clientId] });
     onCreated(r.data.created.map((c) => c.campaign_id));
   }
 

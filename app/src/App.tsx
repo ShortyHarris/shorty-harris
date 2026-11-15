@@ -321,7 +321,9 @@ function ImpersonateZone() {
         <Routes>
           <Route index element={<Dashboard clientId={clientId} client={client} readOnly={readOnly} markViewedOnOpen={false} basePath={basePath} />} />
           {/* Deleting a campaign wipes its prospects and messages - never from here. */}
-          <Route path="campaigns" element={<ClientCampaigns clientId={clientId} client={client} readOnly={readOnly} canDelete={false} basePath={basePath} />} />
+          {/* The wizard runs in edit mode only (it creates drafts); in view-only mode "New campaign" is hidden anyway. */}
+          <Route path="campaigns" element={<ClientCampaigns clientId={clientId} client={client} readOnly={readOnly} canDelete={false} basePath={basePath} wizardAvailable={editMode} />} />
+          {editMode && <Route path="campaigns/wizard" element={<CampaignWizard clientId={clientId} client={client} basePath={basePath} />} />}
           <Route path="prospects" element={<Prospects clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} />} />
           <Route path="approvals" element={<Approvals clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} />} />
           <Route path="analytics" element={<ClientAnalytics clientId={clientId} client={client} />} />
