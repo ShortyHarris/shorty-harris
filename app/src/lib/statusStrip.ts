@@ -8,8 +8,7 @@
 //   5. Sending activity           (good)     "5 of 5 sent today, last one 40 min ago"
 //
 // A sandbox account adds a quiet "Test account" label and a "Sandbox controls" button to whatever is
-// showing (a red edge under the strip keeps it from passing for a live account), and when there is
-// nothing else to say the strip explains the sandbox itself.
+// showing, and when there is nothing else to say the strip explains the sandbox itself.
 // Pure: every input is passed in, so the order and wording are unit tested in statusStrip.test.ts.
 
 import { formatClock, formatDay, minutesIntoWindow, nextSendStart, pacingNow, type SendPacing } from './sendPacing';

@@ -39,8 +39,6 @@
   .cstrip-warning { --cstrip-bg: #b54708; --cstrip-cta-ink: #93370d; }
   /* Nothing to say but "this is a test account": a neutral slate bar, not a red one. */
   .cstrip-sandbox { --cstrip-bg: #344054; --cstrip-cta-ink: #344054; }
-  /* A sandbox account keeps a red edge whatever the message, so it never passes for a live one. */
-  .cstrip.is-sandbox { box-shadow: inset 0 -3px 0 #b42318; }
 
   .cstrip-msg { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
   .cstrip-text { min-width: 0; }

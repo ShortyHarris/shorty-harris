@@ -11,7 +11,7 @@ import type { StripIcon, StripState } from '../../lib/statusStrip';
 
 /* The one full-width status strip above the client app. lib/statusStrip decides what it says; this
    only lays it out. Colour follows the message (warning / action / good), and a sandbox account gets
-   a quiet "Test account" label, a "Sandbox controls" button and a red edge whatever the message is. */
+   a quiet "Test account" label and a "Sandbox controls" button whatever the message is. */
 
 function Icon({ icon }: { icon: StripIcon }) {
   const p = { size: 16, strokeWidth: 2, className: 'shrink-0', 'aria-hidden': true } as const;
