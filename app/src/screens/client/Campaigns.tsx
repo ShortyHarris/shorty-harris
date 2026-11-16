@@ -1,4 +1,5 @@
 import { btn } from '../../lib/clientButtons';
+import { gmailConnectUrl } from '../../hooks/useGmailConnection';
 import { ModalClose } from '../../components/ModalClose';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -109,12 +110,14 @@ const ghostCls   = btn('secondary', 'lg');
 const primaryCls = btn('primary', 'lg');
 
 export function Campaigns({
-  clientId, client = supabase, readOnly = false, canDelete = true, basePath = '/app', wizardAvailable = true,
+  clientId, client = supabase, readOnly = false, canDelete = true, basePath = '/app', wizardAvailable = true, canConnectGmail = true,
 }: {
   clientId: string; client?: SupabaseClient; readOnly?: boolean; canDelete?: boolean; basePath?: string;
   /** False where there is no wizard page to go to (an admin viewing as the client): "New
    *  campaign" then opens the manual form, and the unfinished-setup banner is not offered. */
   wizardAvailable?: boolean;
+  /** The client's own login: "Connect Gmail" starts Google's sign-in. Off for view-as-client. */
+  canConnectGmail?: boolean;
 }) {
   const { rows, loading, isFetching, dataUpdatedAt, error, reload } = useClientCampaignList(clientId, client);
   const { usage } = useClientUsage(clientId, client);
@@ -516,6 +519,7 @@ export function Campaigns({
               client={client}
               basePath={basePath}
               canDelete={canDelete}
+              gmailConnectHref={canConnectGmail ? gmailConnectUrl(clientId) : null}
               onClose={closeEditor}
               onOpenCampaign={(id) => { openEditor(id); toast('Copied as a new draft.'); }}
               onDelete={setDeleteTarget}

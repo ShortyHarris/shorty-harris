@@ -67,6 +67,10 @@ describe('prompts', () => {
     expect(sp).toContain('The ask: Reply for a free quote');
     expect(sp).toContain('{{first_name}}');
     expect(rewritePrompt({ emails: [{ subject: 's', body: 'b' }], step: 0, campaignName: 'C', instruction: 'shorter' })).toContain('email 1 only');
+    // The client's instruction reaches the AI as one quoted line it can't break out of.
+    const withAsk = rewritePrompt({ emails: [{ subject: 's', body: 'b' }], step: null, campaignName: 'C', instruction: 'Shorter,\n"more formal"' });
+    expect(withAsk).toContain(`The sender asks: "Shorter, 'more formal'".`);
+    expect(rewritePrompt({ emails: [{ subject: 's', body: 'b' }], step: null, campaignName: 'C', instruction: '   ' })).not.toContain('The sender asks');
   });
 });
 

@@ -135,7 +135,7 @@ function ClientZone() {
   // Head count only - the badge must not load the whole queue on every page.
   const pendingApprovals = usePendingApprovalCount(clientId);
   const { awaitingProspects } = useApprovedQueueCounts(clientId);
-  const { connection: gmailConnection } = useGmailConnection(clientId);
+  const { connection: gmailConnection, connectUrl: gmailConnectHref } = useGmailConnection(clientId);
   const { pacing } = useSendPacing(clientId);
   const { leads } = useClientDashboard(clientId);
   const newHotLeads = leads.filter((l) => l.status === 'new').length;
@@ -184,6 +184,7 @@ function ClientZone() {
           awaitingProspects={awaitingProspects}
           newHotLeads={newHotLeads}
           gmailConnected={gmailConnection.connected}
+          gmailConnectHref={gmailConnectHref}
           notifications={notifications}
           unreadCount={unreadCount}
           onMarkAsRead={markAsRead}
@@ -322,7 +323,7 @@ function ImpersonateZone() {
           <Route index element={<Dashboard clientId={clientId} client={client} readOnly={readOnly} markViewedOnOpen={false} basePath={basePath} />} />
           {/* Deleting a campaign wipes its prospects and messages - never from here. */}
           {/* The wizard runs in edit mode only (it creates drafts); in view-only mode "New campaign" is hidden anyway. */}
-          <Route path="campaigns" element={<ClientCampaigns clientId={clientId} client={client} readOnly={readOnly} canDelete={false} basePath={basePath} wizardAvailable={editMode} />} />
+          <Route path="campaigns" element={<ClientCampaigns clientId={clientId} client={client} readOnly={readOnly} canDelete={false} basePath={basePath} wizardAvailable={editMode} canConnectGmail={false} />} />
           {editMode && <Route path="campaigns/wizard" element={<CampaignWizard clientId={clientId} client={client} basePath={basePath} />} />}
           <Route path="prospects" element={<Prospects clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} />} />
           <Route path="approvals" element={<Approvals clientId={clientId} client={client} readOnly={readOnly} basePath={basePath} />} />

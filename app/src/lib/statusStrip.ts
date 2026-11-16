@@ -7,8 +7,8 @@
 //   4. Prospects awaiting approval (action)   nothing sends until they approve
 //   5. Sending activity           (good)     "5 of 5 sent today, last one 40 min ago"
 //
-// A sandbox account adds a red SANDBOX tag and a "Sandbox controls" button to whatever is showing, and
-// when there is nothing else to say the strip explains the sandbox itself.
+// A sandbox account adds a quiet "Test account" label and a "Sandbox controls" button to whatever is
+// showing, and when there is nothing else to say the strip explains the sandbox itself.
 // Pure: every input is passed in, so the order and wording are unit tested in statusStrip.test.ts.
 
 import { formatClock, formatDay, minutesIntoWindow, nextSendStart, pacingNow, type SendPacing } from './sendPacing';
@@ -21,6 +21,8 @@ export interface StripCta {
   label: string;
   /** A route to go to, or 'details' to open the "How sending works" dialog. */
   to: string | 'details';
+  /** `to` is a full web address (Google's sign-in), not a route in the app. */
+  external?: boolean;
 }
 
 export interface StripMessage {
@@ -42,11 +44,17 @@ export interface StripInput {
   /** From the Gmail connection hook. Used only until send_pacing has loaded. */
   gmailConnected: boolean;
   awaitingProspects: number;
+  /** Emails waiting for approval: the number on the Approvals menu badge and the Approvals page.
+   *  When given, the strip counts these too, so the strip and the badge never disagree. */
+  pendingApprovals?: number | null;
   pacing: SendPacing | null;
   basePath: string;
   pathname: string;
   /** null where the client can't reach Settings (admin view-as-client). */
   settingsHref: string | null;
+  /** Starts Google's Gmail sign-in straight away. Only the client's own login gets one: an admin
+   *  viewing as the client must never connect their own Google account to it. */
+  gmailConnectHref?: string | null;
   now?: Date;
 }
 
@@ -74,14 +82,14 @@ export function timeAgo(iso: string, now: Date): string {
   return d === 1 ? 'yesterday' : `${d} days ago`;
 }
 
-function gmailMessage(settingsHref: string | null): StripMessage {
+function gmailMessage(cta: StripCta | null): StripMessage {
   return {
     tone: 'warning',
     icon: 'gmail',
     title: 'Connect your Gmail to start sending.',
     detail: 'Nothing can go out until it is connected.',
     short: 'Connect Gmail to start sending',
-    cta: settingsHref ? { label: 'Connect Gmail', to: settingsHref } : null,
+    cta,
   };
 }
 
@@ -124,12 +132,12 @@ function sentTodayNote(p: SendPacing | null): string | null {
   return `${p.today.sent} sent today`;
 }
 
-function approvalsMessage(n: number, p: SendPacing | null, approvalsHref: string): StripMessage {
+function approvalsMessage(n: number, unit: 'email' | 'prospect', p: SendPacing | null, approvalsHref: string): StripMessage {
   const note = sentTodayNote(p);
   return {
     tone: 'action',
     icon: 'approve',
-    title: `${plural(n, 'prospect', 'prospects')} waiting for your approval.`,
+    title: `${plural(n, unit, `${unit}s`)} waiting for your approval.`,
     detail: `Nothing sends until you approve.${note ? ` ${note[0].toUpperCase()}${note.slice(1)}.` : ''}`,
     short: `${n} to approve`,
     cta: { label: 'Review now', to: approvalsHref },
@@ -196,7 +204,7 @@ function sandboxMessage(): StripMessage {
   return {
     tone: 'sandbox',
     icon: 'sandbox',
-    title: 'Test account.',
+    title: 'Sending is in test mode.',
     detail: 'Emails only go to your own connected mailbox.',
     short: 'Emails only reach you',
     cta: null,
@@ -214,15 +222,22 @@ export function resolveStatusStrip(input: StripInput): StripState | null {
   const gmailMissing = p ? !p.mailbox_connected : !input.gmailConnected;
 
   if (gmailMissing) {
-    // On Settings itself the message stays (it is still true) but the button would go nowhere new.
-    message = gmailMessage(onPage(settingsHref) ? null : settingsHref);
+    // The button starts Google's sign-in directly; without that, it goes to Settings. On Settings
+    // itself the message stays (it is still true) but Settings has its own Connect button.
+    const connect = input.gmailConnectHref && settingsHref
+      ? { label: 'Connect Gmail', to: input.gmailConnectHref, external: true }
+      : settingsHref ? { label: 'Connect Gmail', to: settingsHref } : null;
+    message = gmailMessage(onPage(settingsHref) ? null : connect);
   } else if (p?.paused_until) {
     message = pausedMessage(p, now);
   } else if (p && isStuck(p, now)) {
     message = stuckMessage(p, now);
-  } else if (input.awaitingProspects > 0 && !onPage(approvalsHref)) {
+  } else if ((input.pendingApprovals ?? input.awaitingProspects) > 0 && !onPage(approvalsHref)) {
     // Approvals has its own list and Sending line, so the strip falls through to activity there.
-    message = approvalsMessage(input.awaitingProspects, p, approvalsHref);
+    // Counts emails, like the menu badge, when that number is known (the client's own login).
+    message = input.pendingApprovals != null
+      ? approvalsMessage(input.pendingApprovals, 'email', p, approvalsHref)
+      : approvalsMessage(input.awaitingProspects, 'prospect', p, approvalsHref);
   } else if (p) {
     message = activityMessage(p, now);
   }

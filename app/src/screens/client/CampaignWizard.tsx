@@ -29,7 +29,7 @@ import { AITextLoading } from '../../components/ui/ai-text-loading';
 import { queryClient } from '../../lib/queryClient';
 import { cn } from '../../lib/utils';
 import {
-  COMPANY_SIZES, GOALS, MONTH_LABELS, addService, carryDescription, ideasFingerprint, mergeAnalysis,
+  COMPANY_SIZES, MONTH_LABELS, addService, goalsInOrder, carryDescription, ideasFingerprint, mergeAnalysis,
   missingFields, missingMessage, normalizeWebsite, profileComplete, seasonLabel, toggleMonth,
   type WizardAnswers, type WizardEntry, type WizardGoal, type WizardService,
 } from '../../lib/wizardSession';
@@ -45,6 +45,7 @@ import {
   type AnalyzeResult, type DraftsResult, type IdeasResult, type WizardIdea,
 } from '../../hooks/useWizardAi';
 import { fetchWizardOn } from '../../hooks/useWizardRollout';
+import { estimateRange } from '../../lib/estimateRange';
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 const field = 'h-14 rounded-xl border-border bg-background px-4 text-[16px] shadow-none focus-visible:ring-2 focus-visible:ring-offset-0';
@@ -637,11 +638,15 @@ function AreaPage({ answers, update }: PageProps) {
 
 function GoalPage({ answers, update }: PageProps) {
   const goal = answers.goal?.goal;
+  // The goal already on the profile leads the list and stays selected. It is read once, so
+  // the cards don't jump around while the client clicks between them.
+  const [saved] = useState(() => (answers.unconfirmed?.includes('goal') ? undefined : answers.goal?.goal || undefined));
+  const goals = goalsInOrder(saved);
   return (
     <>
       <Title sub="We'll write your emails to ask for this.">What should a new customer do?</Title>
       <Rise className="grid grid-cols-1 gap-3 sm:grid-cols-2" itemClassName="flex" gap={0.05} role="radiogroup" aria-label="Your goal">
-        {GOALS.map((g) => {
+        {goals.map((g) => {
           const on = goal === g.value;
           const Icon = GOAL_ICON[g.value];
           return (
@@ -652,6 +657,7 @@ function GoalPage({ answers, update }: PageProps) {
               <Icon className="h-6 w-6" aria-hidden />
               <span>
                 <span className="block text-[16px] font-semibold">{g.label}</span>
+                {g.value === saved && <span className="mt-0.5 block text-[12px] font-semibold text-primary">Your saved goal</span>}
                 <span className="block text-[14px] text-muted-foreground">{g.hint}</span>
               </span>
             </button>
@@ -820,11 +826,11 @@ function IdeasStep({ clientId, client, session, answers, onAnswers, onBack, onEx
                     <dl className="m-0 grid grid-cols-3 gap-3 border-t border-border pt-4">
                       <div>
                         <dt className="text-[12px] text-muted-foreground">Businesses</dt>
-                        <dd className="m-0 mt-0.5 text-[15px] font-semibold tabular-nums">{idea.est_lo ?? '…'}–{idea.est_hi ?? '…'}</dd>
+                        <dd className="m-0 mt-0.5 text-[15px] font-semibold tabular-nums">{estimateRange(idea.est_lo, idea.est_hi, idea.max_results)}</dd>
                       </div>
                       <div>
                         <dt className="text-[12px] text-muted-foreground">Hot leads</dt>
-                        <dd className="m-0 mt-0.5 text-[15px] font-semibold tabular-nums">{line ? `${line.hot_lo}–${line.hot_hi}` : '…'}</dd>
+                        <dd className="m-0 mt-0.5 text-[15px] font-semibold tabular-nums">{line ? estimateRange(line.hot_lo, line.hot_hi) : '…'}</dd>
                       </div>
                       <div>
                         <dt className="text-[12px] text-muted-foreground">Launch</dt>

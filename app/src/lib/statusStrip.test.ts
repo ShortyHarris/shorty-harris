@@ -88,6 +88,13 @@ describe('resolveStatusStrip: priority', () => {
     expect(s.message.cta).toEqual({ label: 'Connect Gmail', to: '/app/settings' });
   });
 
+  it('starts Gmail sign-in directly when the client can connect it', () => {
+    const s = resolve({ pacing: pacing({ mailbox_connected: false }), gmailConnectHref: 'https://example.test/connect' })!;
+    expect(s.message.cta).toEqual({ label: 'Connect Gmail', to: 'https://example.test/connect', external: true });
+    // An admin viewing as the client has no Settings and gets no button, even with a link.
+    expect(resolve({ pacing: pacing({ mailbox_connected: false }), gmailConnectHref: 'https://example.test/connect', settingsHref: null })!.message.cta).toBeNull();
+  });
+
   it('falls back to the Gmail hook before send_pacing loads', () => {
     expect(resolve({ pacing: null, gmailConnected: false })!.message.icon).toBe('gmail');
   });
@@ -109,6 +116,13 @@ describe('resolveStatusStrip: priority', () => {
     expect(s.message.title).toBe('12 prospects waiting for your approval.');
     expect(s.message.detail).toBe('Nothing sends until you approve. 3 sent today.');
     expect(s.message.cta).toEqual({ label: 'Review now', to: '/app/approvals' });
+  });
+
+  it('counts the same emails as the Approvals menu badge when it has that number', () => {
+    const s = resolve({ awaitingProspects: 3, pendingApprovals: 5 })!;
+    expect(s.message.title).toBe('5 emails waiting for your approval.');
+    expect(s.message.short).toBe('5 to approve');
+    expect(resolve({ awaitingProspects: 3, pendingApprovals: 1 })!.message.title).toBe('1 email waiting for your approval.');
   });
 
   it('shows activity instead of approvals on the Approvals page', () => {
