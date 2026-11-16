@@ -37,7 +37,8 @@
   .cstrip-action .cstrip-cta { background: var(--ad-surface); }
   .cstrip-good    { --cstrip-bg: #067647; --cstrip-cta-ink: #067647; }
   .cstrip-warning { --cstrip-bg: #b54708; --cstrip-cta-ink: #93370d; }
-  .cstrip-sandbox { --cstrip-bg: #b42318; --cstrip-cta-ink: #b42318; }
+  /* Nothing to say but "this is a test account": a neutral slate bar, not a red one. */
+  .cstrip-sandbox { --cstrip-bg: #344054; --cstrip-cta-ink: #344054; }
   /* A sandbox account keeps a red edge whatever the message, so it never passes for a live one. */
   .cstrip.is-sandbox { box-shadow: inset 0 -3px 0 #b42318; }
 
@@ -49,19 +50,19 @@
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
     width: 20px; height: 20px; border-radius: 5px; background: #ffffff;
   }
+  /* "Test account": information, not an alert, so an outline in the strip's own colour rather than
+     a filled red badge that reads like a count or an error next to the message. */
   .cstrip-tag {
     flex-shrink: 0;
-    padding: 2px 7px;
-    border-radius: 4px;
-    background: #b42318;
-    border: 1px solid rgba(255, 255, 255, 0.85);
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.6);
     color: #ffffff;
-    font-size: 10.5px;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
   }
-  .cstrip-sandbox .cstrip-tag { background: #ffffff; color: #b42318; border-color: #ffffff; }
   .cstrip-actions { display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; }
   .cstrip-cta {
     display: inline-flex;
@@ -83,8 +84,8 @@
   .cstrip-cta:hover { filter: brightness(0.95); }
   .cstrip-cta:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }
   /* Two-class selectors so these win over the per-tone button colours above. */
-  .cstrip .cstrip-cta-sandbox { gap: 5px; padding: 5px 7px; background: #b42318; color: #ffffff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.85); }
-  .cstrip.cstrip-sandbox .cstrip-cta-sandbox { background: #ffffff; color: #b42318; box-shadow: none; }
+  /* A secondary button: outline only, so the message's own button stays the one that stands out. */
+  .cstrip .cstrip-cta-sandbox { gap: 5px; padding: 5px 7px; background: transparent; color: #ffffff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6); }
   /* Phones: the sandbox button is icon-only and the message icon is dropped, so the strip stays one line. */
   .cstrip-cta-sandbox .cstrip-long, .cstrip-cta-sandbox .cstrip-short { display: none; }
   .cstrip.is-sandbox .cstrip-msg > svg, .cstrip.is-sandbox .cstrip-msg > .cstrip-gmail { display: none; }

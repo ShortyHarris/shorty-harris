@@ -118,6 +118,13 @@ describe('resolveStatusStrip: priority', () => {
     expect(s.message.cta).toEqual({ label: 'Review now', to: '/app/approvals' });
   });
 
+  it('counts the same emails as the Approvals menu badge when it has that number', () => {
+    const s = resolve({ awaitingProspects: 3, pendingApprovals: 5 })!;
+    expect(s.message.title).toBe('5 emails waiting for your approval.');
+    expect(s.message.short).toBe('5 to approve');
+    expect(resolve({ awaitingProspects: 3, pendingApprovals: 1 })!.message.title).toBe('1 email waiting for your approval.');
+  });
+
   it('shows activity instead of approvals on the Approvals page', () => {
     expect(resolve({ awaitingProspects: 12, pathname: '/app/approvals' })!.message.tone).toBe('good');
   });

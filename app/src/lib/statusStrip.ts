@@ -7,8 +7,9 @@
 //   4. Prospects awaiting approval (action)   nothing sends until they approve
 //   5. Sending activity           (good)     "5 of 5 sent today, last one 40 min ago"
 //
-// A sandbox account adds a red SANDBOX tag and a "Sandbox controls" button to whatever is showing, and
-// when there is nothing else to say the strip explains the sandbox itself.
+// A sandbox account adds a quiet "Test account" label and a "Sandbox controls" button to whatever is
+// showing (a red edge under the strip keeps it from passing for a live account), and when there is
+// nothing else to say the strip explains the sandbox itself.
 // Pure: every input is passed in, so the order and wording are unit tested in statusStrip.test.ts.
 
 import { formatClock, formatDay, minutesIntoWindow, nextSendStart, pacingNow, type SendPacing } from './sendPacing';
@@ -44,6 +45,9 @@ export interface StripInput {
   /** From the Gmail connection hook. Used only until send_pacing has loaded. */
   gmailConnected: boolean;
   awaitingProspects: number;
+  /** Emails waiting for approval: the number on the Approvals menu badge and the Approvals page.
+   *  When given, the strip counts these too, so the strip and the badge never disagree. */
+  pendingApprovals?: number | null;
   pacing: SendPacing | null;
   basePath: string;
   pathname: string;
@@ -129,12 +133,12 @@ function sentTodayNote(p: SendPacing | null): string | null {
   return `${p.today.sent} sent today`;
 }
 
-function approvalsMessage(n: number, p: SendPacing | null, approvalsHref: string): StripMessage {
+function approvalsMessage(n: number, unit: 'email' | 'prospect', p: SendPacing | null, approvalsHref: string): StripMessage {
   const note = sentTodayNote(p);
   return {
     tone: 'action',
     icon: 'approve',
-    title: `${plural(n, 'prospect', 'prospects')} waiting for your approval.`,
+    title: `${plural(n, unit, `${unit}s`)} waiting for your approval.`,
     detail: `Nothing sends until you approve.${note ? ` ${note[0].toUpperCase()}${note.slice(1)}.` : ''}`,
     short: `${n} to approve`,
     cta: { label: 'Review now', to: approvalsHref },
@@ -201,7 +205,7 @@ function sandboxMessage(): StripMessage {
   return {
     tone: 'sandbox',
     icon: 'sandbox',
-    title: 'Test account.',
+    title: 'Sending is in test mode.',
     detail: 'Emails only go to your own connected mailbox.',
     short: 'Emails only reach you',
     cta: null,
@@ -229,9 +233,12 @@ export function resolveStatusStrip(input: StripInput): StripState | null {
     message = pausedMessage(p, now);
   } else if (p && isStuck(p, now)) {
     message = stuckMessage(p, now);
-  } else if (input.awaitingProspects > 0 && !onPage(approvalsHref)) {
+  } else if ((input.pendingApprovals ?? input.awaitingProspects) > 0 && !onPage(approvalsHref)) {
     // Approvals has its own list and Sending line, so the strip falls through to activity there.
-    message = approvalsMessage(input.awaitingProspects, p, approvalsHref);
+    // Counts emails, like the menu badge, when that number is known (the client's own login).
+    message = input.pendingApprovals != null
+      ? approvalsMessage(input.pendingApprovals, 'email', p, approvalsHref)
+      : approvalsMessage(input.awaitingProspects, 'prospect', p, approvalsHref);
   } else if (p) {
     message = activityMessage(p, now);
   }

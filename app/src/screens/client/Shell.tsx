@@ -69,6 +69,8 @@ export function Shell({
     isSandbox,
     gmailConnected,
     awaitingProspects,
+    // Only the client's own login has the badge's email count; view-as-client counts prospects.
+    pendingApprovals: hideSettings ? null : pendingApprovals,
     pacing,
     basePath,
     pathname: location.pathname,
