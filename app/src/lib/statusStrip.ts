@@ -21,6 +21,8 @@ export interface StripCta {
   label: string;
   /** A route to go to, or 'details' to open the "How sending works" dialog. */
   to: string | 'details';
+  /** `to` is a full web address (Google's sign-in), not a route in the app. */
+  external?: boolean;
 }
 
 export interface StripMessage {
@@ -47,6 +49,9 @@ export interface StripInput {
   pathname: string;
   /** null where the client can't reach Settings (admin view-as-client). */
   settingsHref: string | null;
+  /** Starts Google's Gmail sign-in straight away. Only the client's own login gets one: an admin
+   *  viewing as the client must never connect their own Google account to it. */
+  gmailConnectHref?: string | null;
   now?: Date;
 }
 
@@ -74,14 +79,14 @@ export function timeAgo(iso: string, now: Date): string {
   return d === 1 ? 'yesterday' : `${d} days ago`;
 }
 
-function gmailMessage(settingsHref: string | null): StripMessage {
+function gmailMessage(cta: StripCta | null): StripMessage {
   return {
     tone: 'warning',
     icon: 'gmail',
     title: 'Connect your Gmail to start sending.',
     detail: 'Nothing can go out until it is connected.',
     short: 'Connect Gmail to start sending',
-    cta: settingsHref ? { label: 'Connect Gmail', to: settingsHref } : null,
+    cta,
   };
 }
 
@@ -214,8 +219,12 @@ export function resolveStatusStrip(input: StripInput): StripState | null {
   const gmailMissing = p ? !p.mailbox_connected : !input.gmailConnected;
 
   if (gmailMissing) {
-    // On Settings itself the message stays (it is still true) but the button would go nowhere new.
-    message = gmailMessage(onPage(settingsHref) ? null : settingsHref);
+    // The button starts Google's sign-in directly; without that, it goes to Settings. On Settings
+    // itself the message stays (it is still true) but Settings has its own Connect button.
+    const connect = input.gmailConnectHref && settingsHref
+      ? { label: 'Connect Gmail', to: input.gmailConnectHref, external: true }
+      : settingsHref ? { label: 'Connect Gmail', to: settingsHref } : null;
+    message = gmailMessage(onPage(settingsHref) ? null : connect);
   } else if (p?.paused_until) {
     message = pausedMessage(p, now);
   } else if (p && isStuck(p, now)) {

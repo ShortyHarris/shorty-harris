@@ -94,6 +94,8 @@ export interface CampaignDialogProps {
   client?: SupabaseClient;
   basePath?: string;
   canDelete?: boolean;
+  /** Starts Google's Gmail sign-in. null where the viewer isn't the client (view-as-client). */
+  gmailConnectHref?: string | null;
   onClose: () => void;
   /** Open another campaign in the window (after "Make a copy"). */
   onOpenCampaign: (id: string) => void;
@@ -197,7 +199,7 @@ function Shell({ label, onClose, children }: { label: string; onClose: () => voi
   );
 }
 
-function DialogBody({ clientId, client, basePath = '/app', canDelete = true, campaign, rewriteLimit, checked, initialTab, onClose, onOpenCampaign, onDelete, reload, closeRef }:
+function DialogBody({ clientId, client, basePath = '/app', canDelete = true, gmailConnectHref = null, campaign, rewriteLimit, checked, initialTab, onClose, onOpenCampaign, onDelete, reload, closeRef }:
   CampaignDialogProps & { client: SupabaseClient; campaign: CampaignRow; rewriteLimit: number; checked: Checks | null; reload: () => Promise<void>; closeRef: React.RefObject<() => void> }) {
   const { toasts, toast, dismiss } = useToast();
   const limits = useCampaignLimits(clientId, client);
@@ -478,7 +480,9 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
                       {noMailbox && !launched ? (
                         <p className="m-0 flex items-start gap-1.5 text-[13px] text-(--ad-clay)">
                           <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-                          <span>To schedule, <Link className="font-semibold underline underline-offset-4" to={`${basePath}/settings`}>connect your Gmail</Link> first. We send from your address on the start date.</span>
+                          <span>To schedule, {gmailConnectHref
+                            ? <a className="font-semibold underline underline-offset-4" href={gmailConnectHref}>connect your Gmail</a>
+                            : 'the client needs to connect their Gmail'} first. We send from that address on the start date.</span>
                         </p>
                       ) : (
                         <p className="m-0 text-[13px] text-muted-foreground">With a future date, launching schedules it: nothing is found, sent or charged before that day.</p>
@@ -532,7 +536,7 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
                         <span className="block text-[15px] font-semibold">First, connect your Gmail</span>
                         <span className="block text-[14px] text-muted-foreground">{starts ? 'Scheduling' : 'Launching'} needs it: every email is sent from your own address.</span>
                       </span>
-                      <Button asChild className="h-10 shrink-0 rounded-xl px-4 font-semibold"><Link to={`${basePath}/settings`}>Connect Gmail</Link></Button>
+                      {gmailConnectHref && <Button asChild className="h-10 shrink-0 rounded-xl px-4 font-semibold"><a href={gmailConnectHref}>Connect Gmail</a></Button>}
                     </div>
                   )}
                   {allProblems.length === 0 ? (

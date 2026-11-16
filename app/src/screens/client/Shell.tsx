@@ -25,6 +25,7 @@ export function Shell({
   awaitingProspects = 0,
   newHotLeads = 0,
   gmailConnected = true,
+  gmailConnectHref = null,
   notifications = [],
   unreadCount = 0,
   onMarkAsRead,
@@ -44,6 +45,8 @@ export function Shell({
   awaitingProspects?: number;
   newHotLeads?: number;
   gmailConnected?: boolean;
+  /** Starts Google's Gmail sign-in (client's own login only; never for view-as-client). */
+  gmailConnectHref?: string | null;
   notifications?: ClientNotification[];
   unreadCount?: number;
   onMarkAsRead?: (id: string) => void;
@@ -70,6 +73,7 @@ export function Shell({
     basePath,
     pathname: location.pathname,
     settingsHref: hideSettings ? null : `${basePath}/settings`,
+    gmailConnectHref,
   });
 
   const [moreOpen, setMoreOpen] = useState(false);

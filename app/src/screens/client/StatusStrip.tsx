@@ -85,8 +85,9 @@ export const StatusStrip = forwardRef<HTMLDivElement, { state: StripState; pacin
               {cta.label}{chevron}
             </button>
           )}
-          {cta && cta.to !== 'details' && (
-            <Link to={cta.to} className="cstrip-cta">{cta.label}{chevron}</Link>
+          {cta && cta.to !== 'details' && (cta.external
+            ? <a href={cta.to} className="cstrip-cta">{cta.label}{chevron}</a>
+            : <Link to={cta.to} className="cstrip-cta">{cta.label}{chevron}</Link>
           )}
           {sandbox && (
             <Link to={sandbox.controlsHref} className="cstrip-cta cstrip-cta-sandbox" aria-label="Sandbox controls">
