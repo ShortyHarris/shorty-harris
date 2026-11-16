@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  editorTab, nextStepHint,
+  editorTab, mailboxFirst, nextStepHint,
   CADENCE, emailProblems, emailsFrom, hasLaunched, isLaunchable, lifecycleActions, startLabel, unknownPlaceholders,
 } from './campaignEditor';
 
@@ -75,5 +75,15 @@ describe('campaign window', () => {
     expect(nextStepHint('draft', 1)).toMatch(/^1 thing to fix/);
     expect(nextStepHint('active', 0)).toMatch(/^Running/);
     expect(nextStepHint('scheduled', 0)).toMatch(/^Scheduled/);
+  });
+});
+
+describe('mailboxFirst', () => {
+  it('puts the Gmail problem first and keeps the rest in order', () => {
+    const out = mailboxFirst([{ code: 'no_area' }, { code: 'no_mailbox' }, { code: 'limits' }]);
+    expect(out.map((p) => p.code)).toEqual(['no_mailbox', 'no_area', 'limits']);
+  });
+  it('leaves the list alone when Gmail is connected', () => {
+    expect(mailboxFirst([{ code: 'a' }, { code: 'b' }]).map((p) => p.code)).toEqual(['a', 'b']);
   });
 });

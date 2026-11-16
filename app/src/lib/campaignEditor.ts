@@ -105,3 +105,8 @@ export function nextStepHint(status: string, problemCount: number): string {
   if (problemCount > 0) return `${problemCount} thing${problemCount === 1 ? '' : 's'} to fix, then launch. Nothing is sent or charged until you launch.`;
   return 'Read the emails, then launch. Nothing is sent or charged until you launch.';
 }
+
+/** Launch problems with "connect Gmail" first: nothing can be launched or scheduled without it. */
+export function mailboxFirst<T extends { code: string }>(problems: T[]): T[] {
+  return [...problems.filter((p) => p.code === 'no_mailbox'), ...problems.filter((p) => p.code !== 'no_mailbox')];
+}

@@ -37,12 +37,13 @@ import { validateCampaignLimits } from '../../lib/campaignLimits';
 import { useCampaignLimits } from '../../hooks/useClientIcp';
 import { enqueueCampaign } from '../../lib/scrapeEnqueue';
 import {
-  LIFECYCLE_LABEL, editorTab, emailProblems, emailsFrom, hasLaunched, isLaunchable, lifecycleActions, nextStepHint,
+  LIFECYCLE_LABEL, editorTab, emailProblems, emailsFrom, hasLaunched, isLaunchable, lifecycleActions, mailboxFirst, nextStepHint,
   startLabel, type EditorTab, type Email, type LifecycleAction,
 } from '../../lib/campaignEditor';
 import {
   callWizardAi, costForCampaigns, launchLine, wizardErrorMessage, type CostEstimate, type RewriteResult,
 } from '../../hooks/useWizardAi';
+import { estimateRange } from '../../lib/estimateRange';
 
 const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 const BRAND = '#7412ef';
@@ -207,6 +208,8 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
   const [launchProblems, setLaunchProblems] = useState<Problem[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [rewriting, setRewriting] = useState<number | 'all' | null>(null);
+  // Optional words for the AI ("shorter", "mention our 24h response"); used by every Rewrite button.
+  const [instruction, setInstruction] = useState('');
   const [launching, setLaunching] = useState(false);
   const [launchResult, setLaunchResult] = useState<{ tone: 'ok' | 'warn' | 'error'; text: string } | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -230,10 +233,11 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
 
   const problems = launchProblems ?? checked?.problems ?? [];
   // Email problems are checked live from the form, so the saved check's are dropped.
-  const allProblems: Problem[] = [
+  const allProblems: Problem[] = mailboxFirst([
     ...problems.filter((p) => !(form.emails && (p.code === 'blank_email' || p.tab === 'emails'))),
     ...localEmailProblems.map((p) => ({ code: 'email', tab: 'emails', message: p.message, step: p.step })),
-  ];
+  ]);
+  const noMailbox = allProblems.some((p) => p.code === 'no_mailbox');
   const whoProblems = allProblems.filter((p) => p.tab === 'targeting').length + (limitCheck.valid ? 0 : 1);
   const starts = startLabel(form.start_date || null);
   const line = checked?.cost?.items?.[0];
@@ -273,7 +277,8 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
   async function rewrite(step: number | null) {
     if (!form.emails) return;
     setRewriting(step === null ? 'all' : step);
-    const r = await callWizardAi<RewriteResult>('rewrite', { campaign_id: campaign.id, step, emails: form.emails }, client, campaign.client_id);
+    const ask = instruction.trim();
+    const r = await callWizardAi<RewriteResult>('rewrite', { campaign_id: campaign.id, step, emails: form.emails, ...(ask ? { instruction: ask } : {}) }, client, campaign.client_id);
     setRewriting(null);
     if (!r.ok) { toast(wizardErrorMessage(r.error), 'error'); return; }
     const next = [...form.emails];
@@ -389,6 +394,14 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
                     Rewrite all with AI
                   </Button>
                 </div>
+                {rewritesLeft > 0 && (
+                  <div className="-mt-6 flex flex-col gap-2">
+                    <Label htmlFor="ed-rewrite-ask" className="text-[14px] font-semibold">What should the AI change? <span className="font-normal text-muted-foreground">Optional</span></Label>
+                    <Input id="ed-rewrite-ask" className={fieldCls} maxLength={300} placeholder="e.g. Shorter, more formal, mention our 24-hour response"
+                      value={instruction} onChange={(e) => setInstruction(e.target.value)} />
+                    <p className="m-0 text-[13px] text-muted-foreground">Used by "Rewrite all" and each email's Rewrite. Leave empty for a general polish.</p>
+                  </div>
+                )}
                 {form.emails.map((e, i) => {
                   const probs = localEmailProblems.filter((p) => p.step === i);
                   return (
@@ -462,7 +475,14 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
                     <div className="flex flex-col gap-2">
                       <Label htmlFor="ed-start">Start date <span className="font-normal text-muted-foreground">Optional</span></Label>
                       <Input id="ed-start" type="date" className={cn(fieldCls, 'sm:max-w-[260px]')} value={form.start_date} disabled={launched} onChange={(e) => set({ start_date: e.target.value })} />
-                      <p className="m-0 text-[13px] text-muted-foreground">With a future date, launching schedules it: nothing is found, sent or charged before that day.</p>
+                      {noMailbox && !launched ? (
+                        <p className="m-0 flex items-start gap-1.5 text-[13px] text-(--ad-clay)">
+                          <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                          <span>To schedule, <Link className="font-semibold underline underline-offset-4" to={`${basePath}/settings`}>connect your Gmail</Link> first. We send from your address on the start date.</span>
+                        </p>
+                      ) : (
+                        <p className="m-0 text-[13px] text-muted-foreground">With a future date, launching schedules it: nothing is found, sent or charged before that day.</p>
+                      )}
                     </div>
                     <div className="flex flex-col gap-2">
                       <Label htmlFor="ed-desc">Notes <span className="font-normal text-muted-foreground">Optional, only you see these</span></Label>
@@ -487,8 +507,8 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
               <div className="flex flex-col gap-3">
                 <dl className="m-0 grid grid-cols-3 gap-3">
                   {[
-                    { k: launched ? 'Businesses found' : 'Businesses', v: launched ? String(campaign.prospect_count) : (line ? `${line.prospects_lo}–${line.prospects_hi}` : '…') },
-                    { k: 'Hot leads', v: line ? `${line.hot_lo}–${line.hot_hi}` : '…' },
+                    { k: launched ? 'Businesses found' : 'Businesses', v: launched ? String(campaign.prospect_count) : (line ? estimateRange(line.prospects_lo, line.prospects_hi, campaign.max_results) : '…') },
+                    { k: 'Hot leads', v: line ? estimateRange(line.hot_lo, line.hot_hi) : '…' },
                     { k: launched ? 'Each hot lead' : 'Launch', v: launched ? '1 credit' : (line ? (line.launch === 'free' ? 'Free' : '1 credit') : '…') },
                   ].map((s) => (
                     <div key={s.k} className="rounded-2xl border border-border px-4 py-4">
@@ -506,16 +526,23 @@ function DialogBody({ clientId, client, basePath = '/app', canDelete = true, cam
               {launchable && (
                 <section aria-label="Before you launch" className="flex flex-col gap-3">
                   <h3 className="m-0 text-[17px] font-semibold tracking-tight">Before you launch</h3>
+                  {noMailbox && (
+                    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                      <span>
+                        <span className="block text-[15px] font-semibold">First, connect your Gmail</span>
+                        <span className="block text-[14px] text-muted-foreground">{starts ? 'Scheduling' : 'Launching'} needs it: every email is sent from your own address.</span>
+                      </span>
+                      <Button asChild className="h-10 shrink-0 rounded-xl px-4 font-semibold"><Link to={`${basePath}/settings`}>Connect Gmail</Link></Button>
+                    </div>
+                  )}
                   {allProblems.length === 0 ? (
                     <p className="m-0 flex items-center gap-2.5 rounded-2xl bg-(--ad-green-tint)/50 px-5 py-4 text-[15px] font-medium"><Check className="h-4 w-4 text-(--ad-green)" strokeWidth={3} aria-hidden />Everything is ready to launch.</p>
                   ) : (
-                    <ul className="m-0 flex list-none flex-col divide-y divide-border overflow-hidden rounded-2xl border border-border p-0">
-                      {allProblems.map((p) => (
+                    allProblems.some((p) => p.code !== 'no_mailbox') && <ul className="m-0 flex list-none flex-col divide-y divide-border overflow-hidden rounded-2xl border border-border p-0">
+                      {allProblems.filter((p) => p.code !== 'no_mailbox').map((p) => (
                         <li key={`${p.code}-${p.message}`} className="flex items-center justify-between gap-3 px-5 py-3.5 text-[14px]">
                           <span className="flex items-start gap-2.5"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-(--ad-clay)" aria-hidden />{p.message}</span>
-                          {p.code === 'no_mailbox'
-                            ? <Link className="shrink-0 text-[13px] font-semibold text-foreground underline underline-offset-4" to={`${basePath}/settings`}>Connect Gmail</Link>
-                            : p.tab !== 'launch' && <button type="button" className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-foreground underline underline-offset-4" onClick={() => setTab(p.tab === 'emails' ? 'emails' : 'who')}>Fix</button>}
+                          {p.tab !== 'launch' && <button type="button" className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-foreground underline underline-offset-4" onClick={() => setTab(p.tab === 'emails' ? 'emails' : 'who')}>Fix</button>}
                         </li>
                       ))}
                     </ul>

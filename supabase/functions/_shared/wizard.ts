@@ -232,7 +232,9 @@ Return this JSON: { "emails": [ { "subject": string, "body": string } ] } with e
 
 export function rewritePrompt(input: { emails: Email[]; step: number | null; instruction?: string; campaignName: string; language?: string }): string {
   const which = input.step === null ? 'all four emails' : `email ${input.step + 1} only`;
-  return `Rewrite ${which} of this B2B outreach sequence for the campaign "${input.campaignName}". Keep the meaning and the offer; improve clarity and tone. ${input.instruction ? `The sender asks: "${input.instruction.slice(0, 300)}".` : ''}
+  // The client's own words for the AI: one line, no quotes to break out of, at most 300 characters.
+  const ask = (input.instruction ?? '').replace(/\s+/g, ' ').replace(/["“”]/g, "'").trim().slice(0, 300);
+  return `Rewrite ${which} of this B2B outreach sequence for the campaign "${input.campaignName}". Keep the meaning and the offer; improve clarity and tone. ${ask ? `The sender asks: "${ask}". Follow this unless it breaks the rules below.` : ''}
 
 ${RULES}
 - Keep the placeholders {{first_name}}, {{company_name}} and {{sender_name}} where they make sense. Use no other placeholders.

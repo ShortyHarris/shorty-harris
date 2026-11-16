@@ -219,7 +219,7 @@ async function rewrite({ db, clientId, apiKey, mock, body }: Ctx) {
   const target = step === null ? emails : [emails[step]]
   const out = mock
     ? target.map((e) => ({ subject: e.subject || 'Quick question', body: `${e.body}\n\n(rewritten)`.trim() }))
-    : normalizeSequence(await gemini(rewritePrompt({ emails: target, step, instruction: body.instruction, campaignName: campaign.name, language: campaign.language }), apiKey), target.length)
+    : normalizeSequence(await gemini(rewritePrompt({ emails: target, step, instruction: typeof body.instruction === 'string' ? body.instruction : undefined, campaignName: campaign.name, language: campaign.language }), apiKey), target.length)
   const { data: used } = await db.rpc('use_campaign_rewrite', { p_campaign_id: campaign.id })
   if (!used?.ok) return { ok: false, error: 'no_rewrites_left', left: 0, limit }
   return { ok: true, step, emails: out, left: used.left, limit }

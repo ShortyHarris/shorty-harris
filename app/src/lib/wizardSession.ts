@@ -251,3 +251,10 @@ export function ideasFingerprint(a: WizardAnswers): string {
     a.goal?.goal,
   ]);
 }
+
+/** The goal choices with the client's saved goal first, so the one they picked before leads. */
+export function goalsInOrder(saved: WizardGoal | '' | undefined): typeof GOALS {
+  if (!saved) return GOALS;
+  const mine = GOALS.find((g) => g.value === saved);
+  return mine ? [mine, ...GOALS.filter((g) => g !== mine)] : GOALS;
+}
