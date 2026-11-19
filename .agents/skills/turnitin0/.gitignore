@@ -1,0 +1,28 @@
+# Local auth — never commit (skill package or legacy root)
+config.json
+**/config.json
+skills/turnitin0/config.json
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Downloaded reports (keep folder via .gitkeep)
+downloads/*
+!downloads/.gitkeep
+skills/turnitin0/downloads/*
+!skills/turnitin0/downloads/.gitkeep
+
+# Temp clone
+_remote_tmp/
+*.remote.md

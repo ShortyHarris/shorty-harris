@@ -1,0 +1,19 @@
+{
+  "name": "turnitin0",
+  "version": "1.0.0",
+  "description": "Turnitin AI detection, similarity checking, and AI text humanization via turnitin0.com for Codex, Claude Code, and Cursor.",
+  "author": {
+    "name": "pengchenghaoche51"
+  },
+  "homepage": "https://www.turnitin0.com",
+  "repository": "https://github.com/pengchenghaoche51/turnitin0_skill",
+  "license": "MIT",
+  "keywords": [
+    "turnitin",
+    "ai-detection",
+    "plagiarism",
+    "similarity",
+    "humanizer",
+    "academic-writing"
+  ]
+}

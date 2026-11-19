@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "skills": {
+    "turnitin0": {
+      "source": "pengchenghaoche51/turnitin0_skill",
+      "commit": "42e0c07c0bf6f4ca557f0bf16ae6a245f66ea54b",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "611605288edd54da30edb3dde81aa1634ee3e6f27781629378a719e4b6b454d7"
+    }
+  }
+}
