@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { emailHistory } from '../lib/emailHistory';
 import { useQuery } from '@tanstack/react-query';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -100,6 +101,7 @@ export interface ProspectMessage {
   id: string;
   message_type: string;
   subject: string | null;
+  approval_status: string;
   send_status: string;
   sent_at: string | null;
   opened_at: string | null;
@@ -110,9 +112,9 @@ const prospectMessagesKey = (prospectId: string) => ['prospect-messages', prospe
 
 function mockProspectMessages(): ProspectMessage[] {
   return [
-    { id: 'mock-msg-1', message_type: 'initial', subject: 'Quick question about your business', send_status: 'sent', sent_at: new Date(Date.now() - 12 * 86400000).toISOString(), opened_at: new Date(Date.now() - 11 * 86400000).toISOString(), open_count: 3 },
-    { id: 'mock-msg-2', message_type: 'follow_up_d3', subject: 'Following up', send_status: 'sent', sent_at: new Date(Date.now() - 9 * 86400000).toISOString(), opened_at: new Date(Date.now() - 8 * 86400000).toISOString(), open_count: 2 },
-    { id: 'mock-msg-3', message_type: 'follow_up_d7', subject: 'One more thing', send_status: 'sent', sent_at: new Date(Date.now() - 5 * 86400000).toISOString(), opened_at: null, open_count: 0 },
+    { id: 'mock-msg-1', message_type: 'initial', subject: 'Quick question about your business', approval_status: 'approved', send_status: 'sent', sent_at: new Date(Date.now() - 12 * 86400000).toISOString(), opened_at: new Date(Date.now() - 11 * 86400000).toISOString(), open_count: 3 },
+    { id: 'mock-msg-2', message_type: 'follow_up_d3', subject: 'Following up', approval_status: 'approved', send_status: 'sent', sent_at: new Date(Date.now() - 9 * 86400000).toISOString(), opened_at: new Date(Date.now() - 8 * 86400000).toISOString(), open_count: 2 },
+    { id: 'mock-msg-3', message_type: 'follow_up_d7', subject: 'One more thing', approval_status: 'approved', send_status: 'sent', sent_at: new Date(Date.now() - 5 * 86400000).toISOString(), opened_at: null, open_count: 0 },
   ];
 }
 
@@ -127,11 +129,11 @@ export function useProspectMessages(prospectId: string | null, client: SupabaseC
     queryFn: async () => {
       const { data, error } = await client
         .from('messages')
-        .select('id, message_type, subject, send_status, sent_at, opened_at, open_count')
+        .select('id, message_type, subject, approval_status, send_status, sent_at, opened_at, open_count')
         .eq('prospect_id', prospectId as string)
         .order('sent_at', { ascending: true });
       if (error) throw new Error(error.message);
-      return (data ?? []) as ProspectMessage[];
+      return emailHistory((data ?? []) as ProspectMessage[]);
     },
     enabled: !!prospectId && !isPreview,
     staleTime: 2 * 60 * 1000,

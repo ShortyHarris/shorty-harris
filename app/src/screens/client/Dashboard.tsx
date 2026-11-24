@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { useClientDashboard } from '../../hooks/useClientDashboard';
 import { useWarmProspects, useProspectMessages, type WarmProspect, type CallOutcome } from '../../hooks/useWarmProspects';
+import { historyState, type HistoryState } from '../../lib/emailHistory';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
 import type { HotLead, HotLeadStatus, CallOutcomeValue } from '../../types';
 import { RefreshCw, ChevronRight, MessageSquare, Flame, Phone, PhoneCall, Mail, PauseCircle, X, Sparkles, ArrowRight, BellRing, Search, ChevronLeft } from 'lucide-react';
@@ -1073,6 +1074,12 @@ function WarmProspectsModal({
   );
 }
 
+const HISTORY_LABEL: Record<Exclude<HistoryState, 'sent'>, string> = {
+  scheduled: 'scheduled',
+  awaiting_approval: 'waiting for approval',
+  failed: "couldn't send",
+};
+
 const MSG_TYPE_LABEL: Record<string, string> = {
   initial: 'First touch',
   follow_up_d3: 'Follow-up D3',
@@ -1147,7 +1154,8 @@ function WarmProspectHistoryModal({
                 ) : (
                   <ol className="wp-timeline">
                     {messages.map((m) => {
-                      const sent = !!m.sent_at;
+                      const state = historyState(m);
+                      const sent = state === 'sent';
                       const opened = m.open_count > 0;
                       return (
                         <li key={m.id} className="wp-item">
@@ -1158,7 +1166,7 @@ function WarmProspectHistoryModal({
                             </div>
                             <div className="wp-item-meta">
                               {MSG_TYPE_LABEL[m.message_type] ?? m.message_type}
-                              {sent ? ` · sent ${timeAgo(m.sent_at)}` : ' · scheduled'}
+                              {sent ? ` · sent ${timeAgo(m.sent_at)}` : ` · ${HISTORY_LABEL[state]}`}
                             </div>
                           </div>
                           {opened ? (
