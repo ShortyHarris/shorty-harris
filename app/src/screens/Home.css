@@ -1,18 +1,13 @@
-/* Homepage - keyframe animations only */
-
-@keyframes lm-float {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-8px); }
+/* Homepage hero: darker on the left and at the bottom so the white headline
+   reads over any of the rotating photos. On a phone the text sits at the
+   bottom, so the shade there is top-and-bottom only. */
+.home-editorial .hero-shade {
+  background:
+    linear-gradient(90deg, rgba(10, 8, 6, 0.82) 0%, rgba(10, 8, 6, 0.55) 38%, rgba(10, 8, 6, 0.05) 70%),
+    linear-gradient(180deg, rgba(10, 8, 6, 0.5) 0%, rgba(10, 8, 6, 0) 22%, rgba(10, 8, 6, 0.7) 100%);
 }
-@keyframes lm-ping-in {
-  from { opacity: 0; transform: translateY(-10px); }
-  to   { opacity: 1; transform: translateY(0); }
+@media (max-width: 1023px) {
+  .home-editorial .hero-shade {
+    background: linear-gradient(180deg, rgba(10, 8, 6, 0.55) 0%, rgba(10, 8, 6, 0.1) 28%, rgba(10, 8, 6, 0.55) 55%, rgba(10, 8, 6, 0.9) 100%);
+  }
 }
-@keyframes lm-pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.5; transform: scale(1.4); }
-}
-
-.lm-float    { animation: lm-float    6s   ease-in-out 0.6s    infinite; }
-.lm-ping-in  { animation: lm-ping-in  0.55s 0.35s cubic-bezier(0.22,1,0.36,1) both; }
-.lm-pulse-dot{ animation: lm-pulse-dot 1.8s ease-in-out         infinite; }
