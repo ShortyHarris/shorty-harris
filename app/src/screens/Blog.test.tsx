@@ -202,9 +202,11 @@ describe('public blog listing', () => {
     expect(imgs[0].getAttribute('src')).toBe(
       'https://proj.supabase.co/storage/v1/render/image/public/blog-covers/cover-1.png?width=640&quality=70&format=webp',
     );
-    const srcset = imgs[0].getAttribute('srcset')!;
+    const srcset = imgs[1].getAttribute('srcset')!;
     expect(srcset).toContain('width=400');
     expect(srcset).toMatch(/ 400w, .* 640w, .* 960w$/);
+    // The featured post (first on page 1) is shown wide, so it also offers 1280.
+    expect(imgs[0].getAttribute('srcset')).toMatch(/ 400w, .* 640w, .* 960w, .* 1280w$/);
   });
 
   it('shows skeleton cards while the list loads', () => {

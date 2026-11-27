@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { Calendar, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PublicNav } from '../components/PublicNav';
 import { PublicFooter } from '../components/PublicFooter';
 import { useSeo } from '../hooks/useSeo';
@@ -12,7 +11,7 @@ import {
   usePublicBlogPage,
 } from '../hooks/useBlogPosts';
 import type { BlogCardPost, BlogCategory } from '../hooks/useBlogPosts';
-import { responsiveImage } from '../lib/supabaseImage';
+import { CARD_IMAGE_WIDTHS, responsiveImage } from '../lib/supabaseImage';
 
 const CATEGORY_LABEL: Record<BlogCategory, string> = {
   family_business: 'Family Business',
@@ -21,12 +20,17 @@ const CATEGORY_LABEL: Record<BlogCategory, string> = {
   general: 'General',
 };
 
-const FONT: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif" };
-
-// Cards sit in a 1 / 2 / 3 column grid (sm / lg breakpoints).
-const CARD_SIZES = '(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw';
-// The first row is above the fold on desktop - load it straight away.
+// Editorial blog (the "Blog page" artboards of the landing page redesign). Page 1
+// opens with the newest post as a large feature, the next three as "Latest",
+// and the rest as a list; later pages are the list only.
+const FEATURE_SIZES = '(min-width:1024px) 900px, 100vw';
+// The feature runs up to ~1100px wide, so it also offers a sharper size.
+const FEATURE_WIDTHS = [...CARD_IMAGE_WIDTHS, 1280];
+const LATEST_SIZES = '(min-width:1024px) 360px, 280px';
+const ROW_SIZES = '(min-width:640px) 190px, 120px';
+// The feature and the first "Latest" cards are above the fold - load them straight away.
 const EAGER_CARD_COUNT = 3;
+const LATEST_COUNT = 3;
 
 function formatDate(iso: string | null): string {
   if (!iso) return '';
@@ -117,72 +121,92 @@ export function Blog() {
 
   const selectCategory = (c: BlogCategory | 'all') => setSearchParams(searchFor(1, c));
 
-  const pillClass = (active: boolean) =>
-    // Same pill language as the public nav: beige + dark text when active.
-    `cursor-pointer rounded-full border h-9 px-4 text-[13.5px] transition-colors ${
-      active
-        ? 'border-[#e8e3f7] bg-[#f1e9ff] text-[#0e0822] font-semibold'
-        : 'border-[#e8e3f7] bg-white text-[#605978] font-medium hover:bg-[#f9f6ff] hover:text-[#0e0822]'
-    }`;
+  const showFeature = page === 1 && posts.length > 0;
+  const feature = showFeature ? posts[0] : null;
+  const latest = showFeature ? posts.slice(1, 1 + LATEST_COUNT) : [];
+  const rest = showFeature ? posts.slice(1 + LATEST_COUNT) : posts;
+  const options: { key: BlogCategory | 'all'; label: string }[] = [
+    { key: 'all', label: 'All posts' },
+    ...categories.map((c) => ({ key: c, label: CATEGORY_LABEL[c] ?? c })),
+  ];
 
   return (
-    <div style={FONT} className="min-h-screen flex flex-col bg-paper text-[#0e0822]">
+    <div className="min-h-screen flex flex-col bg-white text-ink-strong font-inter antialiased">
       <PublicNav />
 
-      <main className="max-w-[1160px] mx-auto px-6 py-20">
-        {/* Centered eyebrow + heading + divider */}
-        <div className="mx-auto max-w-[640px] text-center">
-          <span className="text-[12px] font-semibold uppercase tracking-[.14em] text-[#7412ef]">Our Blog</span>
-          <h1 className="mt-3 mb-0 text-[34px] sm:text-[40px] font-extrabold leading-[1.15] tracking-tight text-[#0e0822]">
-            Practical advice for growing your small or family business
-          </h1>
-          <div className="mx-auto mt-8 h-px w-16 bg-[#e8e3f7]" />
+      <main className="flex w-full flex-col gap-7 px-5 pb-20 pt-6 lg:flex-row lg:items-start lg:gap-[72px] lg:px-12 lg:pb-28 lg:pt-14">
+        <aside className="lg:sticky lg:top-28 lg:w-[200px] lg:flex-none">
+          <h1 className="m-0 font-serif text-[46px] font-normal leading-none tracking-[-0.02em] lg:mb-7 lg:text-[44px]">Blog</h1>
+          {categories.length > 1 && (
+            <nav aria-label="Blog categories" className="-mx-5 mt-5 flex gap-2 overflow-x-auto px-5 pb-1 lg:mx-0 lg:mt-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:p-0">
+              {options.map((o) => {
+                const active = activeCategory === o.key;
+                return (
+                  <button
+                    key={o.key}
+                    type="button"
+                    onClick={() => selectCategory(o.key)}
+                    onMouseEnter={() => prefetchPublicBlogPage(1, o.key)}
+                    aria-pressed={active}
+                    className={`flex-none cursor-pointer whitespace-nowrap rounded-full border border-solid px-4 py-2.5 text-left text-[14px] transition-colors lg:rounded-lg lg:border-0 lg:px-3 lg:py-[9px] lg:text-[15px] ${
+                      active
+                        ? 'border-brand bg-brand font-semibold text-white lg:bg-[#f3eaff] lg:text-[#5a0bc0]'
+                        : 'border-hairline bg-white text-ink-muted hover:text-ink-strong lg:bg-transparent lg:hover:bg-[#f7f7f7]'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
+            </nav>
+          )}
+        </aside>
+
+        <div className="min-w-0 max-w-[1100px] flex-1">
+          {error && (
+            <div className="mb-10 rounded-xl border border-solid border-hairline bg-[#f9f6ff] px-4 py-3 text-[14px]">{error}</div>
+          )}
+
+          {loading ? (
+            <div className="flex flex-col gap-11">
+              {Array.from({ length: BLOG_PAGE_SIZE }).map((_, i) => <PostCardSkeleton key={i} />)}
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-hairline p-10 text-center text-[15px] text-ink-muted">
+              {activeCategory === 'all' ? 'Nothing published yet - check back soon.' : 'No posts in this category yet.'}
+            </div>
+          ) : (
+            <>
+              {feature && <FeatureCard post={feature} />}
+
+              {latest.length > 0 && (
+                <section className="mt-14 lg:mt-24">
+                  <h2 className="m-0 mb-5 font-serif text-[32px] font-normal tracking-[-0.02em] lg:mb-7 lg:text-[38px]">Latest</h2>
+                  <div className="-mx-5 flex gap-4 overflow-x-auto px-5 pb-1 lg:mx-0 lg:grid lg:grid-cols-3 lg:gap-7 lg:overflow-visible lg:p-0">
+                    {latest.map((post, i) => <LatestCard key={post.id} post={post} index={i + 1} />)}
+                  </div>
+                </section>
+              )}
+
+              {rest.length > 0 && (
+                <section className={showFeature ? 'mt-16 lg:mt-28' : ''}>
+                  {showFeature && (
+                    <h2 className="m-0 mb-7 font-serif text-[32px] font-normal tracking-[-0.02em] lg:mb-9 lg:text-[38px]">More posts</h2>
+                  )}
+                  <div className="flex flex-col gap-8 lg:gap-11">
+                    {rest.map((post, i) => (
+                      <PostRow key={post.id} post={post} index={(showFeature ? 1 + latest.length : 0) + i} />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+
+          {!loading && totalPages > 1 && (
+            <Pagination page={page} totalPages={totalPages} category={activeCategory} />
+          )}
         </div>
-
-        {/* Category filter pills */}
-        {categories.length > 1 && (
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-            <button
-              onClick={() => selectCategory('all')}
-              onMouseEnter={() => prefetchPublicBlogPage(1, 'all')}
-              className={pillClass(activeCategory === 'all')}
-            >
-              All
-            </button>
-            {categories.map((c) => (
-              <button
-                key={c}
-                onClick={() => selectCategory(c)}
-                onMouseEnter={() => prefetchPublicBlogPage(1, c)}
-                className={pillClass(activeCategory === c)}
-              >
-                {CATEGORY_LABEL[c] ?? c}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {error && (
-          <div className="mt-10 rounded-xl border border-[#e8e3f7] bg-[#f9f6ff] px-4 py-3 text-[13px] text-[#0e0822]">{error}</div>
-        )}
-
-        {loading ? (
-          <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
-            {Array.from({ length: BLOG_PAGE_SIZE }).map((_, i) => <PostCardSkeleton key={i} />)}
-          </div>
-        ) : posts.length === 0 ? (
-          <div className="mt-14 rounded-2xl border border-dashed border-[#e8e3f7] bg-white p-10 text-center text-[13px] text-[#605978]">
-            {activeCategory === 'all' ? 'Nothing published yet - check back soon.' : 'No posts in this category yet.'}
-          </div>
-        ) : (
-          <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
-            {posts.map((post, i) => <PostCard key={post.id} post={post} index={i} />)}
-          </div>
-        )}
-
-        {!loading && totalPages > 1 && (
-          <Pagination page={page} totalPages={totalPages} category={activeCategory} />
-        )}
       </main>
 
       <PublicFooter />
@@ -190,55 +214,101 @@ export function Blog() {
   );
 }
 
-function PostCard({ post, index }: { post: BlogCardPost; index: number }) {
+function Byline({ post }: { post: BlogCardPost }) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-ink-muted lg:mt-3.5">
+      <span aria-hidden className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-lilac text-[11px] font-semibold text-brand">S</span>
+      Shorty Harris
+      <span aria-hidden>·</span>
+      {CATEGORY_LABEL[post.category] ?? post.category}
+      {post.published_at && (
+        <>
+          <span aria-hidden>·</span>
+          <time dateTime={post.published_at}>{formatDate(post.published_at)}</time>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* One <img> for every card shape, so loading behaviour stays the same everywhere. */
+function Cover({ post, index, sizes, className, large = false }: {
+  post: BlogCardPost; index: number; sizes: string; className: string; large?: boolean;
+}) {
+  const image = post.cover_image_url
+    ? responsiveImage(post.cover_image_url, 640, large ? FEATURE_WIDTHS : CARD_IMAGE_WIDTHS)
+    : null;
+  return (
+    <div className={`overflow-hidden bg-[#f1e9ff] ${className}`}>
+      {image && (
+        <img
+          src={image.src}
+          srcSet={image.srcSet}
+          sizes={image.srcSet ? sizes : undefined}
+          alt=""
+          width={640}
+          height={320}
+          loading={index < EAGER_CARD_COUNT ? 'eager' : 'lazy'}
+          fetchPriority={index === 0 ? 'high' : undefined}
+          decoding="async"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+        />
+      )}
+    </div>
+  );
+}
+
+function useListState() {
   // Remember which list page/filter the reader came from, for the post page's back link.
   const { search } = useLocation();
-  const eager = index < EAGER_CARD_COUNT;
-  const image = post.cover_image_url ? responsiveImage(post.cover_image_url, 640) : null;
+  return { listSearch: search };
+}
+
+function FeatureCard({ post }: { post: BlogCardPost }) {
+  const state = useListState();
   return (
-    <Link
-      to={`/blog/${post.slug}`}
-      state={{ listSearch: search }}
-      data-testid="blog-card"
-      className="flex flex-col no-underline border pb-4 bg-white border-gray-200 text-inherit group"
-    >
-      {/* Fixed 2:1 box with a light placeholder colour, so nothing jumps while the image loads */}
-      <div className="aspect-[2/1] w-full overflow-hidden bg-[#f9f6ff]">
-        {image && (
-          <img
-            src={image.src}
-            srcSet={image.srcSet}
-            sizes={image.srcSet ? CARD_SIZES : undefined}
-            alt={post.title}
-            width={640}
-            height={320}
-            loading={eager ? 'eager' : 'lazy'}
-            fetchPriority={index === 0 ? 'high' : undefined}
-            decoding="async"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-          />
-        )}
-      </div>
-      <div className="flex flex-1 flex-col pt-5 px-4">
-        <span className="text-[12.5px] font-semibold text-[#7412ef]">
-          {CATEGORY_LABEL[post.category] ?? post.category}
-        </span>
-        <span className="mt-1.5 text-[16px] font-semibold leading-snug text-[#0e0822] transition-colors group-hover:text-[#7412ef]">
+    <Link to={`/blog/${post.slug}`} state={state} data-testid="blog-card" className="group block text-inherit no-underline">
+      <Cover post={post} index={0} large sizes={FEATURE_SIZES} className="aspect-[16/9] rounded-[14px] lg:aspect-[2.4/1]" />
+      <h2 className="m-0 mt-5 font-serif text-[30px] font-normal leading-[1.1] tracking-[-0.02em] group-hover:underline lg:mt-7 lg:text-[46px] lg:leading-[1.08]">
+        {post.title}
+      </h2>
+      {post.excerpt && (
+        <p className="m-0 mt-3 max-w-[760px] text-[16px] leading-[1.55] text-ink-muted lg:mt-3.5 lg:text-[18px]">{post.excerpt}</p>
+      )}
+      <Byline post={post} />
+    </Link>
+  );
+}
+
+function LatestCard({ post, index }: { post: BlogCardPost; index: number }) {
+  const state = useListState();
+  return (
+    <Link to={`/blog/${post.slug}`} state={state} data-testid="blog-card" className="group block w-[280px] flex-none text-inherit no-underline lg:w-auto">
+      <Cover post={post} index={index} sizes={LATEST_SIZES} className="h-[180px] rounded-xl lg:h-[210px]" />
+      <h3 className="m-0 mt-3.5 font-serif text-[21px] font-normal leading-[1.2] tracking-[-0.01em] group-hover:underline lg:mt-[18px] lg:text-[24px] lg:leading-[1.18]">
+        {post.title}
+      </h3>
+      {post.excerpt && (
+        <p className="m-0 mt-2 line-clamp-3 text-[14px] leading-[1.5] text-ink-muted lg:mt-2.5 lg:text-[15px] lg:leading-[1.55]">{post.excerpt}</p>
+      )}
+      <Byline post={post} />
+    </Link>
+  );
+}
+
+function PostRow({ post, index }: { post: BlogCardPost; index: number }) {
+  const state = useListState();
+  return (
+    <Link to={`/blog/${post.slug}`} state={state} data-testid="blog-card" className="group flex items-start gap-4 text-inherit no-underline sm:gap-7">
+      <Cover post={post} index={index} sizes={ROW_SIZES} className="h-[84px] w-[120px] flex-none rounded-[10px] sm:h-[126px] sm:w-[190px]" />
+      <div className="min-w-0">
+        <h3 className="m-0 font-serif text-[19px] font-normal leading-[1.2] tracking-[-0.01em] group-hover:underline sm:text-[26px] sm:leading-[1.18]">
           {post.title}
-        </span>
+        </h3>
         {post.excerpt && (
-          <span className="mt-2 text-[13.5px] leading-relaxed text-[#605978] line-clamp-3">{post.excerpt}</span>
+          <p className="m-0 mt-2 line-clamp-2 hidden text-[15px] leading-[1.5] text-ink-muted sm:[display:-webkit-box]">{post.excerpt}</p>
         )}
-        <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#e8e3f7] pt-4">
-          <span className="flex items-center gap-1.5 text-[12px] text-[#605978]">
-            <Calendar size={13} strokeWidth={2} />
-            {formatDate(post.published_at)}
-          </span>
-          <span className="flex items-center gap-1 text-[12.5px] font-semibold text-[#7412ef]">
-            Read article
-            <ArrowRight size={13} strokeWidth={2.2} className="transition-transform group-hover:translate-x-0.5" />
-          </span>
-        </div>
+        <Byline post={post} />
       </div>
     </Link>
   );
@@ -251,63 +321,41 @@ function Pagination({ page, totalPages, category }: {
 }) {
   const href = (p: number) => ({ pathname: '/blog', search: searchFor(p, category) });
   const prefetch = (p: number) => () => { void prefetchPublicBlogPage(p, category); };
-  const base = 'flex h-9 min-w-9 items-center justify-center gap-1 rounded-full border px-3 text-[13px] font-semibold no-underline transition-colors';
-  const idle = 'border-[#e8e3f7] bg-white text-[#605978] hover:border-[#7412ef] hover:text-[#7412ef]';
-  const disabled = 'border-[#e8e3f7] bg-transparent text-[#8f8aa8] pointer-events-none';
+  const circle = 'flex h-11 w-11 items-center justify-center rounded-full border border-solid text-[14px] no-underline transition-colors';
+  const pill = 'flex h-11 items-center rounded-full border border-solid px-4 text-[14px] no-underline transition-colors';
+  const idle = 'border-hairline bg-white text-ink-strong hover:border-brand hover:text-brand';
+  const disabled = 'border-hairline bg-transparent text-ink-muted pointer-events-none';
 
   return (
-    <nav aria-label="Blog pages" className="mt-16 flex flex-wrap items-center justify-center gap-2">
+    <nav aria-label="Blog pages" className="mt-16 flex flex-wrap items-center gap-2 lg:mt-[72px]">
       {page > 1 ? (
-        <Link
-          to={href(page - 1)}
-          rel="prev"
-          onMouseEnter={prefetch(page - 1)}
-          onFocus={prefetch(page - 1)}
-          className={`${base} ${idle}`}
-        >
-          <ChevronLeft size={14} strokeWidth={2.2} /> Previous
+        <Link to={href(page - 1)} rel="prev" onMouseEnter={prefetch(page - 1)} onFocus={prefetch(page - 1)} className={`${pill} ${idle}`}>
+          Previous
         </Link>
       ) : (
-        <span aria-disabled="true" className={`${base} ${disabled}`}>
-          <ChevronLeft size={14} strokeWidth={2.2} /> Previous
-        </span>
+        <span aria-disabled="true" className={`${pill} ${disabled}`}>Previous</span>
       )}
 
       {pageNumbers(page, totalPages).map((p, i) =>
         p === 'gap' ? (
-          <span key={`gap-${i}`} className="px-1 text-[13px] text-[#605978]">…</span>
+          <span key={`gap-${i}`} className="px-1 text-[14px] text-ink-muted">…</span>
         ) : p === page ? (
-          <span key={p} aria-current="page" className={`${base} border-[#7412ef] bg-[#7412ef] text-white`}>
+          <span key={p} aria-current="page" className={`${circle} border-brand bg-brand font-semibold text-white`}>
             {p}
           </span>
         ) : (
-          <Link
-            key={p}
-            to={href(p)}
-            aria-label={`Page ${p}`}
-            onMouseEnter={prefetch(p)}
-            onFocus={prefetch(p)}
-            className={`${base} ${idle}`}
-          >
+          <Link key={p} to={href(p)} aria-label={`Page ${p}`} onMouseEnter={prefetch(p)} onFocus={prefetch(p)} className={`${circle} ${idle}`}>
             {p}
           </Link>
         ),
       )}
 
       {page < totalPages ? (
-        <Link
-          to={href(page + 1)}
-          rel="next"
-          onMouseEnter={prefetch(page + 1)}
-          onFocus={prefetch(page + 1)}
-          className={`${base} ${idle}`}
-        >
-          Next <ChevronRight size={14} strokeWidth={2.2} />
+        <Link to={href(page + 1)} rel="next" onMouseEnter={prefetch(page + 1)} onFocus={prefetch(page + 1)} className={`${pill} ${idle}`}>
+          Next
         </Link>
       ) : (
-        <span aria-disabled="true" className={`${base} ${disabled}`}>
-          Next <ChevronRight size={14} strokeWidth={2.2} />
-        </span>
+        <span aria-disabled="true" className={`${pill} ${disabled}`}>Next</span>
       )}
     </nav>
   );
@@ -315,18 +363,12 @@ function Pagination({ page, totalPages, category }: {
 
 function PostCardSkeleton() {
   return (
-    <div data-testid="blog-card-skeleton" className="flex flex-col border pb-4 bg-white border-gray-200 animate-pulse">
-      <div className="aspect-[2/1] w-full bg-[#f9f6ff]" />
-      <div className="flex flex-1 flex-col pt-5 px-4">
-        <div className="h-3 w-20 rounded bg-[#f9f6ff]" />
-        <div className="mt-2.5 h-4 w-full rounded bg-[#f9f6ff]" />
-        <div className="mt-1.5 h-4 w-2/3 rounded bg-[#f9f6ff]" />
-        <div className="mt-3 h-3 w-full rounded bg-[#f9f6ff]" />
-        <div className="mt-1.5 h-3 w-4/5 rounded bg-[#f9f6ff]" />
-        <div className="mt-4 flex items-center justify-between border-t border-[#e8e3f7] pt-4">
-          <div className="h-3 w-16 rounded bg-[#f9f6ff]" />
-          <div className="h-3 w-14 rounded bg-[#f9f6ff]" />
-        </div>
+    <div data-testid="blog-card-skeleton" className="flex animate-pulse items-start gap-4 sm:gap-7">
+      <div className="h-[84px] w-[120px] flex-none rounded-[10px] bg-[#f3f0f8] sm:h-[126px] sm:w-[190px]" />
+      <div className="flex-1">
+        <div className="h-5 w-3/4 rounded bg-[#f3f0f8]" />
+        <div className="mt-3 h-3.5 w-full rounded bg-[#f3f0f8]" />
+        <div className="mt-2 h-3.5 w-2/3 rounded bg-[#f3f0f8]" />
       </div>
     </div>
   );

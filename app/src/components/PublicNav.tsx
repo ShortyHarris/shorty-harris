@@ -3,12 +3,13 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
 import { useAuth } from '../auth/AuthProvider';
-import { BrandLockup } from './BrandLockup';
+import { BrandMark } from './BrandLockup';
 import { CTA_LABEL } from "@/lib/marketing";
 
-// The one header for every public page (Home, Blog, BlogPost, legal pages,
-// 404). Same logo, same links, same buttons everywhere - only the active
-// state changes. "How it works" / "FAQ" are home-page sections:
+// The one header for every public page (Home, Pricing, Blog, BlogPost, legal
+// pages, 404). Same logo, same links everywhere - only the active state changes.
+// On the home page it sits over the hero photo (`overlay`): see-through with
+// white text until the page scrolls, then solid white like everywhere else. "How it works" / "FAQ" are home-page sections:
 // clicked from home they smooth-scroll, clicked from anywhere else they go
 // to /#id and scroll once the home page has rendered.
 
@@ -58,12 +59,17 @@ function useActiveSection(enabled: boolean, ids: string[]) {
   return enabled ? active : null;
 }
 
-const linkBase =
-  'relative inline-flex items-center h-9 px-3.5 rounded-full text-[14px] no-underline whitespace-nowrap transition-colors cursor-pointer border-0 bg-transparent';
-const linkIdle = 'font-medium text-[#605978] hover:text-[#0e0822] hover:bg-[#f9f6ff]';
-const linkActive = 'font-semibold text-[#0e0822] bg-[#f1e9ff]';
+/** Bolt + serif wordmark, as in the editorial redesign. */
+export function PublicBrand({ light = false }: { light?: boolean }) {
+  return (
+    <span className={`inline-flex items-center gap-2.5 font-serif text-[22px] lg:text-[26px] font-semibold leading-none tracking-[-0.01em] ${light ? 'text-white' : 'text-ink-strong'}`}>
+      <BrandMark size={28} className="h-[25px] w-auto lg:h-[30px]" />
+      Shorty Harris
+    </span>
+  );
+}
 
-export function PublicNav() {
+export function PublicNav({ overlay = false }: { overlay?: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === '/';
@@ -77,7 +83,7 @@ export function PublicNav() {
   const activeSection = useActiveSection(isHome, NAV_ITEMS.flatMap((i) => (i.kind === 'section' ? [i.id] : [])));
 
   useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 8);
+    const fn = () => setScrolled(window.scrollY > 24);
     fn();
     window.addEventListener('scroll', fn, { passive: true });
     return () => window.removeEventListener('scroll', fn);
@@ -115,14 +121,22 @@ export function PublicNav() {
     }
   }
 
+  // See-through over the hero photo only while nothing is scrolled or open.
+  const clear = overlay && !scrolled && !menuOpen;
+  const link = (active: boolean) =>
+    `relative inline-flex items-center h-11 text-[15px] font-medium no-underline whitespace-nowrap transition-colors cursor-pointer border-0 bg-transparent p-0 ${
+      clear
+        ? `text-white ${active ? '' : 'hover:text-white/75'}`
+        : `${active ? 'text-ink-strong' : 'text-[#4a4a4a] hover:text-ink-strong'}`
+    } ${active ? `after:absolute after:inset-x-0 after:bottom-2 after:h-[1.5px] ${clear ? 'after:bg-white' : 'after:bg-brand'}` : ''}`;
+
   return (
     <header
-      className={`sticky top-0 z-50 transition-[background-color] duration-200 ${
-        scrolled ? 'bg-paper/85 backdrop-blur-xl' : 'bg-paper'
+      className={`${overlay ? 'fixed inset-x-0' : 'sticky'} top-0 z-50 font-inter transition-[background-color,box-shadow] duration-300 ${
+        clear ? 'bg-transparent' : `bg-white/95 backdrop-blur-xl ${scrolled ? 'shadow-[0_1px_0_#ebebeb]' : ''}`
       }`}
     >
-      <div className="max-w-300 mx-auto w-full h-16 px-5 lg:px-12 flex items-center">
-        {/* Logo - same lockup as the login/signup screens */}
+      <div className="mx-auto w-full h-[68px] lg:h-[88px] px-5 lg:px-12 flex items-center gap-6">
         <div className="flex-1 flex items-center">
           <Link
             to="/"
@@ -131,19 +145,17 @@ export function PublicNav() {
               if (isHome) { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); window.history.replaceState(null, '', '/'); }
               setMenuOpen(false);
             }}
-            className="no-underline select-none rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#7412ef]"
+            className="no-underline select-none rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
           >
-            <BrandLockup iconSize={22} noMargin className="public-nav-brand" />
+            <PublicBrand light={clear} />
           </Link>
         </div>
 
-        {/* Links */}
-        <nav aria-label="Main" className="hidden md:flex items-center gap-1">
+        <nav aria-label="Main" className="hidden md:flex items-center gap-8">
           {NAV_ITEMS.map((item) => {
             const active = isActive(item);
-            const cls = `${linkBase} ${active ? linkActive : linkIdle}`;
             return item.kind === 'route' ? (
-              <Link key={item.label} to={item.to} className={cls} aria-current={active ? 'page' : undefined}>
+              <Link key={item.label} to={item.to} className={link(active)} aria-current={active ? 'page' : undefined}>
                 {item.label}
               </Link>
             ) : (
@@ -151,54 +163,42 @@ export function PublicNav() {
                 key={item.label}
                 href={`/#${item.id}`}
                 onClick={(e) => { e.preventDefault(); go(item); }}
-                className={cls}
+                className={link(active)}
                 aria-current={active ? 'location' : undefined}
               >
                 {item.label}
               </a>
             );
           })}
-        </nav>
-
-        {/* Actions */}
-        <div className="flex flex-1 items-center justify-end gap-2">
           {isAuthed ? (
             <Link
               to={dashboardPath}
-              className="hidden md:inline-flex items-center h-10 px-5 rounded-full bg-brand text-white text-[14px] font-semibold no-underline hover:bg-brand-deep transition-colors whitespace-nowrap"
+              className={`inline-flex items-center h-11 px-5 rounded-full text-[15px] font-semibold no-underline whitespace-nowrap transition-colors ${
+                clear ? 'bg-white text-ink-strong hover:bg-white/85' : 'bg-brand text-white hover:bg-brand-deep'
+              }`}
             >
               Go to dashboard
             </Link>
           ) : (
-            <>
-              <Link
-                to="/login"
-                className={`hidden md:inline-flex ${linkBase} ${location.pathname === '/login' ? linkActive : linkIdle}`}
-              >
-                Log in
-              </Link>
-              <Link
-                to="/signup"
-                className="hidden md:inline-flex items-center h-10 px-5 rounded-full bg-brand text-white text-[14px] font-semibold no-underline hover:bg-brand-deep transition-colors whitespace-nowrap"
-              >
-                {CTA_LABEL}
-              </Link>
-            </>
+            <Link to="/login" className={link(location.pathname === '/login')}>Log in</Link>
           )}
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={menuOpen}
-            className="flex md:hidden h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[#e8e3f7] bg-white text-[#0e0822] hover:bg-[#f9f6ff] transition-colors"
-          >
-            <MenuToggleIcon open={menuOpen} className="size-5" />
-          </button>
-        </div>
+        </nav>
+
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={menuOpen}
+          className={`flex md:hidden h-11 w-11 -mr-2 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent transition-colors ${
+            clear ? 'text-white hover:bg-white/10' : 'text-ink-strong hover:bg-[#f5f5f5]'
+          }`}
+        >
+          <MenuToggleIcon open={menuOpen} className="size-6" />
+        </button>
       </div>
 
       {menuOpen && typeof window !== 'undefined' && createPortal(
-        <div className="fixed inset-0 top-16 z-40 flex flex-col bg-paper md:hidden">
-          <nav aria-label="Main" className="flex flex-col gap-1 p-4">
+        <div className="fixed inset-0 top-[68px] z-40 flex flex-col bg-white font-inter md:hidden">
+          <nav aria-label="Main" className="flex flex-col px-5 pt-2">
             {NAV_ITEMS.map((item) => {
               const active = isActive(item);
               return (
@@ -206,22 +206,21 @@ export function PublicNav() {
                   key={item.label}
                   onClick={() => go(item)}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex items-center justify-between rounded-xl px-4 h-13 text-[16px] text-left border-0 cursor-pointer transition-colors ${
-                    active ? 'bg-[#f1e9ff] text-[#0e0822] font-semibold' : 'bg-transparent text-[#605978] font-medium hover:bg-[#f9f6ff]'
+                  className={`flex items-center justify-between h-16 border-0 border-b border-solid border-[#ebebeb] bg-transparent px-0 text-left font-serif text-[26px] cursor-pointer ${
+                    active ? 'text-brand' : 'text-ink-strong'
                   }`}
                 >
                   {item.label}
-                  {active && <span className="h-1.5 w-1.5 rounded-full bg-[#7412ef]" aria-hidden />}
                 </button>
               );
             })}
           </nav>
-          <div className="mt-auto flex flex-col gap-2 border-t border-[#e8e3f7] p-4 pb-[max(16px,env(safe-area-inset-bottom))]">
+          <div className="mt-auto flex flex-col gap-3 p-5 pb-[max(20px,env(safe-area-inset-bottom))]">
             {isAuthed ? (
               <Link
                 to={dashboardPath}
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center justify-center h-12 rounded-full bg-brand text-[15px] font-semibold text-white no-underline hover:bg-brand-deep transition-colors"
+                className="flex items-center justify-center h-14 rounded-full bg-brand text-[16px] font-semibold text-white no-underline hover:bg-brand-deep transition-colors"
               >
                 Go to dashboard
               </Link>
@@ -230,14 +229,14 @@ export function PublicNav() {
                 <Link
                   to="/signup"
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center justify-center h-12 rounded-full bg-brand text-[15px] font-semibold text-white no-underline hover:bg-brand-deep transition-colors"
+                  className="flex items-center justify-center h-14 rounded-full bg-brand text-[16px] font-semibold text-white no-underline hover:bg-brand-deep transition-colors"
                 >
                   {CTA_LABEL}
                 </Link>
                 <Link
                   to="/login"
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center justify-center h-12 rounded-full border border-[#e8e3f7] bg-white text-[15px] font-semibold text-[#0e0822] no-underline hover:bg-[#f9f6ff] transition-colors"
+                  className="flex items-center justify-center h-14 rounded-full border border-solid border-ink-strong bg-white text-[16px] font-semibold text-ink-strong no-underline hover:bg-[#f5f5f5] transition-colors"
                 >
                   Log in
                 </Link>

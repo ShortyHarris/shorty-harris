@@ -1,0 +1,9 @@
+/* Shade over the closing photo so the white headline always reads. */
+.cta-shade {
+  background: radial-gradient(ellipse 55% 60% at 50% 50%, rgba(10, 8, 6, 0.72) 0%, rgba(10, 8, 6, 0.5) 70%, rgba(10, 8, 6, 0.35) 100%);
+}
+@media (max-width: 767px) {
+  .cta-shade {
+    background: radial-gradient(ellipse 90% 60% at 50% 50%, rgba(10, 8, 6, 0.75) 0%, rgba(10, 8, 6, 0.55) 100%);
+  }
+}
