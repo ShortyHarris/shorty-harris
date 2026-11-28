@@ -6,14 +6,19 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ChevronRight, Pencil, Trash2, Megaphone, X, AlertCircle } from 'lucide-react';
+import { ChevronRight, Pencil, Trash2, Megaphone, X, AlertCircle, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import {
   useClientCampaignList, createClientCampaign, updateClientCampaign,
   getClientCampaignDeleteCounts, deleteClientCampaign, useClientCampaignProspects, useClientUsage,
   useClientLaunchUsage, useCampaignPendingProspects, MONTHLY_LAUNCH_LIMIT,
+  useClientCampaignQueue, useAwaitingByCampaign, myCampaignsKey, myCampaignQueueKey,
 } from '../../hooks/useClientCampaigns';
+import { TargetingSummary } from '../../components/TargetingSummary';
+import { ScrapeResultChip } from '../../components/ScrapeResultChip';
+import { clientScrapeState, isInFlight } from '../../lib/campaignScrape';
+import { ClientScrapeCell, ClientScrapeDetailModal } from './CampaignScrapeStatus';
 import type { ClientCampaignRow, ClientCampaignDeleteCounts } from '../../hooks/useClientCampaigns';
 import { queryClient } from '../../lib/queryClient';
 import { useOverlayClose } from '../../hooks/useOverlayClose';
@@ -24,7 +29,7 @@ import { TagInput } from '../../components/TagInput';
 import { LocationAreaInput } from '../../components/LocationAreaInput';
 import { TargetAreaChips } from '../../components/TargetAreaChips';
 import { campaignStatusLabel } from '../../lib/campaignStatus';
-import { areaDisplayLabel, areasToLocationLabels, joinedLocationsError, locationsToAreas, type TargetArea } from '../../lib/targetAreas';
+import { areaDisplayLabel, areasToLocationLabels, campaignAreas, joinedLocationsError, locationsToAreas, type TargetArea } from '../../lib/targetAreas';
 import { useToast, ToastHost } from '../../components/Toast';
 import { RefreshButton } from '../../components/RefreshButton';
 import { useRefreshHandler } from '../../hooks/useRefreshHandler';
@@ -80,6 +85,38 @@ const CAMP_PILL: Record<string, StatusPillStyle> = {
   completed:      { ...PILL.closed,  icon: 'check' },
 };
 
+const LAUNCHING_PILL: StatusPillStyle = { ...PILL.waiting, icon: 'clock' };
+const SCRAPE_POLL_MS = 20000;
+
+const channelLabel = (channel: string) => channel.charAt(0).toUpperCase() + channel.slice(1);
+
+// EU / needs setup on one wrapping line under the name, as on the admin page.
+function CampaignBadges({ campaign: c }: { campaign: ClientCampaignRow }) {
+  const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
+  if (!isEuCountry(c.country) && !needsSetup) return null;
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-1">
+      {isEuCountry(c.country) && <EuBadge />}
+      {needsSetup && <StatusPill pill={{ ...PILL.waiting, icon: 'alert' }}>Needs setup</StatusPill>}
+    </div>
+  );
+}
+
+/** "147 prospects waiting for your approval", linking to Approvals. Nothing when none are. */
+function AwaitingLink({ count, to }: { count: number; to: string }) {
+  if (count <= 0) return null;
+  return (
+    <Link
+      to={to}
+      onClick={(e) => e.stopPropagation()}
+      className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-(--ad-green) no-underline hover:underline"
+    >
+      <Mail size={13} strokeWidth={2.25} aria-hidden />
+      {count} prospect{count === 1 ? '' : 's'} waiting for your approval
+    </Link>
+  );
+}
+
 function lastScrapedLabel(iso: string | null): string {
   return iso
     ? `Last scraped ${new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
@@ -124,7 +161,10 @@ export function Campaigns({
   const { usage: launchUsage } = useClientLaunchUsage(clientId, client);
   const { holds } = useCountrySendHolds(client);
   const { toasts, toast, dismiss } = useToast();
-  const handleRefresh = useRefreshHandler(reload, toast, 'Failed to refresh campaigns.');
+  const reloadAll = async () => {
+    await Promise.all([reload(), queryClient.invalidateQueries({ queryKey: myCampaignQueueKey(clientId) })]);
+  };
+  const handleRefresh = useRefreshHandler(reloadAll, toast, 'Failed to refresh campaigns.');
   const [searchParams, setSearchParams] = useSearchParams();
   // The wizard's "Skip wizard & create manually" lands here with ?new=manual.
   const [showNew, setShowNew] = useState(() => searchParams.get('new') === 'manual' && !readOnly);
@@ -195,6 +235,52 @@ export function Campaigns({
   // Pilot clients go straight to the campaign's own page (targeting, emails, launch).
   const openRow = (c: ClientCampaignRow) => (wizardEnabled && !readOnly ? openEditor(c.id) : setOpenCampaign(c));
 
+  // Queued / searching / done per campaign. The queue entry comes from client_campaign_queue_state;
+  // while anything is waiting or searching the page re-reads both every 20 seconds and stops once
+  // nothing is, the same way the admin Campaigns page polls.
+  const queue = useClientCampaignQueue(clientId, client);
+  const awaitingByCampaign = useAwaitingByCampaign(clientId, client);
+  const [scrapeDetail, setScrapeDetail] = useState<{ campaign: ClientCampaignRow; failed: boolean } | null>(null);
+  const rowView = (c: ClientCampaignRow) => {
+    const state = clientScrapeState(c, queue[c.id]);
+    const isDraft = c.status === 'draft' || c.status === 'pending_review' || c.status === 'scheduled';
+    // An active campaign that has never been searched is still launching, not "running".
+    const launching = c.status === 'active' && !c.last_scraped_at && isInFlight(state);
+    return {
+      state,
+      isDraft,
+      awaiting: awaitingByCampaign[c.id] ?? 0,
+      pill: launching ? LAUNCHING_PILL : CAMP_PILL[c.status] ?? CAMP_PILL.draft,
+      statusLabel: launching ? 'Launching' : campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL),
+    };
+  };
+  const anyInFlight = rows.some((c) => isInFlight(clientScrapeState(c, queue[c.id])));
+  useEffect(() => {
+    if (!anyInFlight) return;
+    // The queue's key sits under myCampaignsKey, so one invalidation refreshes both.
+    const t = setInterval(() => { void queryClient.invalidateQueries({ queryKey: myCampaignsKey(clientId) }); }, SCRAPE_POLL_MS);
+    return () => clearInterval(t);
+  }, [anyInFlight, clientId]);
+  const rowActions = (c: ClientCampaignRow, isDraft: boolean) => (
+    <div className="flex items-center justify-end gap-2">
+      {wizardEnabled && !readOnly ? (
+        <button onClick={(e) => { e.stopPropagation(); openEditor(c.id); }} className={btn(isDraft ? 'primary' : 'secondary', 'sm')}>
+          {isDraft ? 'Edit & launch' : 'Open'}
+        </button>
+      ) : isDraft && !readOnly && (
+        <button onClick={(e) => { e.stopPropagation(); setOpenCampaign(c, true); }} className={btn('secondary', 'sm')}>Edit</button>
+      )}
+      {wizardEnabled && !readOnly && canDelete ? (
+        <RowMenu label={`Actions for ${c.name}`} items={[
+          { type: 'action', label: 'Open', onClick: () => openEditor(c.id) },
+          { type: 'action', label: 'Review emails', onClick: () => openEditor(c.id, 'emails') },
+          { type: 'separator' },
+          { type: 'action', label: 'Delete campaign', destructive: true, onClick: () => setDeleteTarget({ id: c.id, name: c.name }) },
+        ]} />
+      ) : <ChevronRight size={15} className="text-(--ad-ink-ghost)" />}
+    </div>
+  );
+
   // One banner per held country that at least one of this client's campaigns targets.
   const heldGroups = holds
     .map((h) => ({ hold: h, campaigns: rows.filter((c) => findCountryHold([h], c.country)) }))
@@ -219,6 +305,12 @@ export function Campaigns({
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 md:gap-2.5">
           <HelpButton content={HELP} />
+          {anyInFlight && (
+            <span role="status" className="inline-flex items-center gap-1.5 text-[12px] text-(--ad-ink-soft)">
+              <span aria-hidden className="h-2 w-2 animate-pulse rounded-full bg-(--ad-green)" />
+              Updating automatically
+            </span>
+          )}
           <RefreshButton onRefresh={handleRefresh} isFetching={isFetching} dataUpdatedAt={dataUpdatedAt} className={ghostCls} />
           {!readOnly && (
             <button
@@ -328,78 +420,51 @@ export function Campaigns({
         </div>
       ) : (
         <>
-          {/* Desktop table */}
+          {/* Desktop table: the admin Campaigns layout, without the admin's actions. Every row is
+              the same height however many search terms or areas a campaign has: targeting is a
+              two-line summary with the full list in a popover. */}
           <div className="atbl hidden md:block">
             <table className="table-fixed">
               <colgroup>
-                <col className="w-[44%]" />
-                <col className="w-[18%]" />
-                <col className="w-[16%]" />
-                <col className="w-[22%]" />
+                <col />
+                <col className="w-[130px]" />
+                <col className="w-[140px]" />
+                <col className="w-[200px]" />
+                <col className="w-[170px]" />
               </colgroup>
               <thead>
                 <tr>
-                  {['Campaign', 'Prospects', 'Status', ''].map((h, i) => (
-                    <th key={i}>{h}</th>
-                  ))}
+                  <th>Campaign</th>
+                  <th>Prospects</th>
+                  <th>Status</th>
+                  <th>Finding prospects</th>
+                  <th aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
                 {rows.map((c) => {
-                  const pill = CAMP_PILL[c.status] ?? CAMP_PILL.draft;
-                  const needsSetup = c.search_queries.length === 0 || c.target_locations.length === 0;
-                  const isDraft = c.status === 'draft' || c.status === 'pending_review' || c.status === 'scheduled';
+                  const v = rowView(c);
                   return (
                     <tr key={c.id} onClick={() => openRow(c)} className="group cursor-pointer">
                       <td className="min-w-0">
-                        <div className="line-clamp-2 font-semibold leading-snug text-(--ad-ink) group-hover:underline" title={c.name}>{c.name}</div>
-                        {isEuCountry(c.country) && <div className="mt-1"><EuBadge /></div>}
-                        {needsSetup && (
-                          <StatusPill pill={{ ...PILL.waiting, icon: 'alert' }} className="mt-1">Needs setup</StatusPill>
-                        )}
-                        <div className="mt-1 text-[11px] text-(--ad-ink-soft)">
-                          {c.scrape_status === 'running'
-                            ? <span className="font-semibold text-(--ad-green)">Finding prospects…</span>
-                            : lastScrapedLabel(c.last_scraped_at)} · {c.language}
+                        <div className="truncate font-semibold leading-snug text-(--ad-ink) group-hover:underline" title={c.name}>{c.name}</div>
+                        <CampaignBadges campaign={c} />
+                        <div className="mt-1.5">
+                          <TargetingSummary terms={c.search_queries} areas={campaignAreas(c)} />
                         </div>
-                        {c.target_areas && (
-                          <TargetAreaChips areas={c.target_areas} radiusOnly className="mt-1.5 flex flex-wrap gap-1" chipClassName="px-2 py-0.5 text-[11px]" />
-                        )}
+                        <AwaitingLink count={v.awaiting} to={`${basePath}/approvals`} />
+                      </td>
+                      <td className="min-w-0">
+                        <ScrapeResultChip campaign={c} onOpenDetail={() => setScrapeDetail({ campaign: c, failed: false })} />
                       </td>
                       <td>
-                        <span className="atbl-pill" style={{ background: 'var(--ad-surface-2)', color: 'var(--ad-ink-soft)' }}>
-                          {c.prospectCount} prospect{c.prospectCount === 1 ? '' : 's'}
-                        </span>
+                        <StatusPill pill={v.pill}>{v.statusLabel}</StatusPill>
                       </td>
-                      <td>
-                        <StatusPill pill={pill}>{campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}</StatusPill>
+                      <td className="min-w-0">
+                        <ClientScrapeCell state={v.state} launched={!v.isDraft} onOpenFailure={() => setScrapeDetail({ campaign: c, failed: true })} />
                       </td>
-                      <td className="px-3">
-                        <div className="flex items-center justify-end gap-2">
-                          {wizardEnabled && !readOnly ? (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); openEditor(c.id); }}
-                              className={btn(isDraft ? 'primary' : 'secondary', 'sm')}
-                            >
-                              {isDraft ? 'Edit & launch' : 'Open'}
-                            </button>
-                          ) : isDraft && !readOnly && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setOpenCampaign(c, true); }}
-                              className={btn('secondary', 'sm')}
-                            >
-                              Edit
-                            </button>
-                          )}
-                          {wizardEnabled && !readOnly && canDelete ? (
-                            <RowMenu label={`Actions for ${c.name}`} items={[
-                              { type: 'action', label: 'Open', onClick: () => openEditor(c.id) },
-                              { type: 'action', label: 'Review emails', onClick: () => openEditor(c.id, 'emails') },
-                              { type: 'separator' },
-                              { type: 'action', label: 'Delete campaign', destructive: true, onClick: () => setDeleteTarget({ id: c.id, name: c.name }) },
-                            ]} />
-                          ) : <ChevronRight size={15} className="text-(--ad-ink-ghost)" />}
-                        </div>
+                      <td className="px-3" onClick={(e) => e.stopPropagation()}>
+                        {rowActions(c, v.isDraft)}
                       </td>
                     </tr>
                   );
@@ -408,35 +473,39 @@ export function Campaigns({
             </table>
           </div>
 
-          {/* Mobile cards */}
+          {/* Mobile cards: the admin card layout, without the admin's actions. */}
           <div className="md:hidden flex flex-col gap-3">
             {rows.map((c) => {
-              const pill = CAMP_PILL[c.status] ?? CAMP_PILL.draft;
+              const v = rowView(c);
               return (
-                <button
+                <div
                   key={c.id}
                   onClick={() => openRow(c)}
-                  className="cursor-pointer rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4 text-left"
+                  className="cursor-pointer rounded-xl border border-(--ad-line) bg-(--ad-surface) p-4"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="min-w-0">
-                      <span className="line-clamp-2 block text-[14px] font-semibold leading-snug text-(--ad-ink)" title={c.name}>{c.name}</span>
-                      {isEuCountry(c.country) && <span className="mt-1 block"><EuBadge /></span>}
-                    </span>
-                    <StatusPill pill={pill} className="shrink-0">{campaignStatusLabel(c.status, c.prospectCount, CAMP_STATUS_LABEL)}</StatusPill>
+                    <span className="line-clamp-2 min-w-0 text-[14px] font-semibold leading-snug text-(--ad-ink)" title={c.name}>{c.name}</span>
+                    <StatusPill pill={v.pill} className="shrink-0">{v.statusLabel}</StatusPill>
                   </div>
-                  {(c.search_queries.length === 0 || c.target_locations.length === 0) && (
-                    <StatusPill pill={{ ...PILL.waiting, icon: 'alert' }} className="mt-1.5">Needs setup</StatusPill>
-                  )}
-                  <p className="mt-1.5 text-[12px] text-(--ad-ink-soft)">
-                    {c.prospectCount} prospect{c.prospectCount === 1 ? '' : 's'} · {c.language}
-                  </p>
-                  <p className="mt-0.5 text-[11.5px] text-(--ad-ink-soft)">
-                    {c.scrape_status === 'running'
-                      ? <span className="font-semibold text-(--ad-green)">Finding prospects…</span>
-                      : lastScrapedLabel(c.last_scraped_at)}
-                  </p>
-                </button>
+                  <CampaignBadges campaign={c} />
+                  <p className="m-0 mt-1.5 truncate text-[12px] text-(--ad-ink-soft)">{channelLabel(c.channel)} · {c.language}</p>
+                  <div className="mt-2">
+                    <TargetingSummary terms={c.search_queries} areas={campaignAreas(c)} />
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <ScrapeResultChip campaign={c} onOpenDetail={() => setScrapeDetail({ campaign: c, failed: false })} />
+                    {v.state.kind === 'done' && <span className="truncate text-[11px] text-(--ad-ink-faint)">{lastScrapedLabel(c.last_scraped_at)}</span>}
+                  </div>
+                  <AwaitingLink count={v.awaiting} to={`${basePath}/approvals`} />
+                  <div className="mt-3 flex items-center gap-2 border-t border-(--ad-fill) pt-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="min-w-0 flex-1">
+                      {v.state.kind === 'done'
+                        ? null
+                        : <ClientScrapeCell state={v.state} launched={!v.isDraft} onOpenFailure={() => setScrapeDetail({ campaign: c, failed: true })} />}
+                    </div>
+                    {rowActions(c, v.isDraft)}
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -457,6 +526,17 @@ export function Campaigns({
       )}
 
       <AnimatePresence>
+        {scrapeDetail && (
+          <ClientScrapeDetailModal
+            key="scrape-detail"
+            campaign={scrapeDetail.campaign}
+            failed={scrapeDetail.failed}
+            awaiting={awaitingByCampaign[scrapeDetail.campaign.id] ?? 0}
+            approvalsPath={`${basePath}/approvals`}
+            onEditCampaign={readOnly ? undefined : () => (wizardEnabled ? openEditor(scrapeDetail.campaign.id) : setOpenCampaign(scrapeDetail.campaign, true))}
+            onClose={() => setScrapeDetail(null)}
+          />
+        )}
         {choosing && (
           <NewCampaignChooser
             key="new-campaign-chooser"

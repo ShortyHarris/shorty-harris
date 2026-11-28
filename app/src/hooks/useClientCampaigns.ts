@@ -5,6 +5,7 @@ import { useApprovedQueueCounts, awaitingInCampaign } from './useClientApprovals
 import { buildAreaColumns, type TargetArea } from '../lib/targetAreas';
 import { campaignLimitsError } from '../lib/campaignLimits';
 import { fetchWizardOn } from './useWizardRollout';
+import type { QueueEntry, ScrapeSummary } from '../lib/campaignScrape';
 
 export const myCampaignsKey = (clientId: string) => ['my-campaigns', clientId] as const;
 const myCampaignProspectsKey = (campaignId: string) => ['my-campaign-prospects', campaignId] as const;
@@ -24,6 +25,10 @@ export interface ClientCampaignRow {
   created_at: string;
   last_scraped_at: string | null;
   scrape_status: string | null;
+  scrape_started_at: string | null;
+  scrape_failure_reason: string | null;
+  last_scrape_summary: ScrapeSummary | null;
+  channel: string;
   prospectCount: number;
   /** "Write follow-ups now": all three follow-ups are drafted for approval upfront. */
   upfrontSequence: boolean;
@@ -37,7 +42,7 @@ async function fetchClientCampaigns(clientId: string, client: SupabaseClient): P
     // single shared definition instead of each side running its own
     // `prospects` count query, which is what let the two numbers drift
     // apart after a scrape.
-    .select('id, name, description, status, language, country, search_queries, target_locations, target_areas, max_results, created_at, last_scraped_at, scrape_status, prospect_count, upfront_sequence')
+    .select('id, name, description, status, language, country, search_queries, target_locations, target_areas, max_results, created_at, last_scraped_at, scrape_status, scrape_started_at, scrape_failure_reason, last_scrape_summary, channel, prospect_count, upfront_sequence')
     .eq('client_id', clientId)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
@@ -52,6 +57,10 @@ async function fetchClientCampaigns(clientId: string, client: SupabaseClient): P
     country: (r.country as string | null) ?? null,
     last_scraped_at: (r.last_scraped_at as string | null) ?? null,
     scrape_status: (r.scrape_status as string | null) ?? null,
+    scrape_started_at: (r.scrape_started_at as string | null) ?? null,
+    scrape_failure_reason: (r.scrape_failure_reason as string | null) ?? null,
+    last_scrape_summary: (r.last_scrape_summary as ScrapeSummary | null) ?? null,
+    channel: (r.channel as string | null) ?? 'email',
     prospectCount: (r.prospect_count as number | null) ?? 0,
     upfrontSequence: r.upfront_sequence === true,
   })) as ClientCampaignRow[];
@@ -222,6 +231,39 @@ export function useClientCampaignProspects(campaignId: string | null, client: Su
 // disagree with them. It covers only drafts the viewer may see: a client's count leaves out drafts
 // held by the send rules. Deliberately ignores prospects.pipeline_status 'message_pending', which
 // means "email not written yet" and never clears once the draft exists.
+// Under myCampaignsKey on purpose: anything that refreshes the campaign list (a launch, the
+// Refresh button) refreshes the queue state with it.
+export const myCampaignQueueKey = (clientId: string) => [...myCampaignsKey(clientId), 'queue'] as const;
+
+/**
+ * This client's campaigns that are waiting in, or being worked by, the scrape queue, keyed by
+ * campaign id. The queue table is admin-only; client_campaign_queue_state returns just these
+ * rows for the client (or an admin viewing as them).
+ */
+export function useClientCampaignQueue(clientId: string, client: SupabaseClient = supabase) {
+  const { data = {} } = useQuery({
+    queryKey: myCampaignQueueKey(clientId),
+    queryFn: async () => {
+      const { data, error } = await client.rpc('client_campaign_queue_state', { p_client_id: clientId });
+      if (error) throw new Error(error.message);
+      const out: Record<string, QueueEntry> = {};
+      for (const r of (data ?? []) as (QueueEntry & { campaign_id: string })[]) {
+        out[r.campaign_id] = { status: r.status, requested_at: r.requested_at, started_at: r.started_at, ahead: r.ahead };
+      }
+      return out;
+    },
+    enabled: !!clientId && clientId !== '__preview__',
+    staleTime: 15 * 1000,
+  });
+  return data;
+}
+
+/** Prospects with an email waiting for approval, per campaign (the Approvals page's own count). */
+export function useAwaitingByCampaign(clientId: string, client: SupabaseClient = supabase) {
+  const { counts } = useApprovedQueueCounts(clientId, client);
+  return counts.awaitingProspectsByCampaign;
+}
+
 export function useCampaignPendingProspects(clientId: string, campaignId: string | null, client: SupabaseClient = supabase) {
   const { counts } = useApprovedQueueCounts(clientId, client);
   return campaignId ? awaitingInCampaign(counts, campaignId) : 0;

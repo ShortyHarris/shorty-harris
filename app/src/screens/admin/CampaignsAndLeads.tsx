@@ -33,6 +33,8 @@ import { useCampaignLimits } from '../../hooks/useClientIcp';
 import { getActiveCampaignLimits, validateCampaignLimits } from '../../lib/campaignLimits';
 import { areasToLocationLabels, campaignAreas, joinedLocationsError, type TargetArea } from '../../lib/targetAreas';
 import { getScrapeStatusDisplay } from '../../lib/scrapeFailures';
+import { isStaleRun, lastScrapedLabel, scrapeSummaryLabel } from '../../lib/campaignScrape';
+import { ScrapeResultChip } from '../../components/ScrapeResultChip';
 import { useCountrySendHolds } from '../../hooks/useCountrySendHolds';
 import { CountryHoldBanner, EuBadge } from '../../components/CountryHoldBanner';
 import { COUNTRY_OPTIONS, countryName, defaultCampaignCountry, findCountryHold, isEuCountry } from '../../lib/countries';
@@ -139,92 +141,6 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
         <button onClick={() => onChange(page + 1)} disabled={page >= totalPages} className="cursor-pointer rounded-lg border border-(--ad-line-strong) bg-transparent px-3.5 py-1.5 text-[12.5px] font-semibold text-(--ad-ink) transition-colors hover:bg-(--ad-surface-2) disabled:cursor-not-allowed disabled:opacity-40">Next</button>
       </div>
     </div>
-  );
-}
-
-// A scrape stuck in 'running' this long almost certainly means n8n crashed
-// before it could write 'complete'/'failed' - treat it as failed in the UI
-// (with a Retry) rather than showing "Scraping…" forever.
-const STALE_RUN_MS = 45 * 60 * 1000;
-
-function isStaleRun(scrapeStatus: string, scrapeStartedAt: string | null): boolean {
-  return scrapeStatus === 'running' && !!scrapeStartedAt
-    && Date.now() - new Date(scrapeStartedAt).getTime() > STALE_RUN_MS;
-}
-
-function lastScrapedLabel(c: Pick<CampaignRow, 'last_scraped_at' | 'scrape_status' | 'scrape_started_at'>): string {
-  if (c.scrape_status === 'running' && !isStaleRun(c.scrape_status, c.scrape_started_at)) {
-    return c.scrape_started_at
-      ? `Scraping since ${new Date(c.scrape_started_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
-      : 'Scraping…';
-  }
-  return c.last_scraped_at
-    ? `Last scraped ${new Date(c.last_scraped_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-    : 'Never scraped';
-}
-
-// Turns the last scrape's result breakdown into a one-line summary, so
-// "nothing new because it was all duplicates" reads differently from
-// "nothing new because the scrape came up empty" - both are successful
-// outcomes (tone: 'neutral'), distinct from an actual scrape failure, which
-// ScrapeCell already renders separately in red with a retry affordance.
-function scrapeSummaryLabel(
-  c: Pick<CampaignRow, 'scrape_status' | 'last_scrape_summary' | 'prospectCount'>,
-): { text: string; tone: 'positive' | 'neutral' } {
-  const s = c.last_scrape_summary;
-  if (c.scrape_status !== 'complete' || !s) {
-    return { text: `${c.prospectCount} prospect${c.prospectCount === 1 ? '' : 's'}`, tone: 'neutral' };
-  }
-  if (s.new_prospects > 0) {
-    return { text: `${s.new_prospects} new prospect${s.new_prospects === 1 ? '' : 's'} added`, tone: 'positive' };
-  }
-  if (s.total_with_email === 0) {
-    return { text: 'No results found for this search', tone: 'neutral' };
-  }
-  if (s.skipped_duplicate === s.total_with_email) {
-    return { text: `0 new - all ${s.skipped_duplicate} already in your database`, tone: 'neutral' };
-  }
-  if (s.skipped_dnc === s.total_with_email) {
-    return { text: '0 new - all matched your do-not-contact list', tone: 'neutral' };
-  }
-  return { text: `0 new - ${s.skipped_duplicate} already known, ${s.skipped_dnc} on do-not-contact list`, tone: 'neutral' };
-}
-
-// Short version for tight table/card space - the full sentence from
-// scrapeSummaryLabel goes in ScrapeSummaryModal instead of being truncated.
-function scrapeChipLabel(c: Pick<CampaignRow, 'scrape_status' | 'last_scrape_summary' | 'prospectCount'>): string {
-  const s = c.last_scrape_summary;
-  if (c.scrape_status !== 'complete' || !s) {
-    return `${c.prospectCount} prospect${c.prospectCount === 1 ? '' : 's'}`;
-  }
-  if (s.new_prospects > 0) return `+${s.new_prospects} new`;
-  if (s.total_with_email === 0) return 'No results';
-  if (s.skipped_duplicate === s.total_with_email) return '0 new · dupes';
-  if (s.skipped_dnc === s.total_with_email) return '0 new · DNC';
-  return '0 new · skipped';
-}
-
-// Compact chip shown in the table/card - tappable when there's a full
-// breakdown behind it, so the one-line summary never has to be truncated
-// to fit a narrow column; the detail lives in ScrapeSummaryModal instead.
-function ScrapeResultChip({ campaign, onOpenDetail }: { campaign: CampaignRow; onOpenDetail: () => void }) {
-  const sr = scrapeSummaryLabel(campaign);
-  const hasDetail = campaign.scrape_status === 'complete' && !!campaign.last_scrape_summary;
-  const toneCls = sr.tone === 'positive' ? 'bg-(--ad-green-tint) text-(--ad-green)' : 'bg-(--ad-fill) text-(--ad-ink-soft)';
-  if (!hasDetail) {
-    return <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${toneCls}`}>{scrapeChipLabel(campaign)}</span>;
-  }
-  return (
-    <button
-      // Rows/cards open Edit campaign on click - don't let this bubble up
-      // and stack that modal under the scrape breakdown.
-      onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
-      title="View full scrape breakdown"
-      className={`inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold transition-opacity hover:opacity-75 ${toneCls}`}
-    >
-      {scrapeChipLabel(campaign)}
-      <Info size={11} strokeWidth={2.5} className="opacity-60" />
-    </button>
   );
 }
 

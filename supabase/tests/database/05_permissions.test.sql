@@ -24,7 +24,7 @@ select tests.user(null, 'admin') as admin_user \gset
 -- run as signed-in users too, so admin functions are included.
 select is_empty($$
   select f from unnest(array['admin_adjust_credits','admin_create_sandbox_client','admin_prospect_categories',
-    'approvals_schedule','approve_sequences','approved_queue','client_analytics','client_pipeline',
+    'approvals_schedule','approve_sequences','approved_queue','client_analytics','client_campaign_queue_state','client_pipeline',
     'client_result_insights','client_targeting_performance','hot_lead_queue','is_domain_blacklisted',
     'prospect_sequence','purge_blacklisted_prospects','sandbox_simulate_purchase','save_client_icp',
     'send_pacing','set_campaign_upfront_sequence','set_hot_lead_outcome','set_prospect_note',
