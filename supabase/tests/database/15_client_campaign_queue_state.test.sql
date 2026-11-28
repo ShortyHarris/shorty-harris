@@ -1,4 +1,4 @@
--- client_campaign_queue_state (migration 20261128180000): a client's Campaigns page can see
+-- client_campaign_queue_state (migration 20261128185024): a client's Campaigns page can see
 -- that its own launched campaigns are queued or running, how many jobs are ahead, and nothing
 -- about any other client's campaigns. Finished jobs are not "in flight" and are left out.
 begin;

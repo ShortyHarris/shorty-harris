@@ -1,3 +1,5 @@
+-- Applied live as 20261128185024.
+
 -- Clients can see whether their own campaigns are waiting in, or being worked by, the scrape queue.
 --
 -- discovery_queue is readable by admins only (20261031040936), so a client's Campaigns page
