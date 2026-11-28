@@ -180,13 +180,8 @@ export async function deleteProspect(prospectId: string): Promise<{ error: strin
 // "found nothing new because the search genuinely came up empty" from an
 // actual failure, instead of showing an identical bare prospect count for
 // all three.
-export interface ScrapeSummary {
-  total_scraped: number;
-  total_with_email: number;
-  skipped_dnc: number;
-  skipped_duplicate: number;
-  new_prospects: number;
-}
+import type { ScrapeSummary } from '../lib/campaignScrape';
+export type { ScrapeSummary };
 
 export interface CampaignRow {
   id: string;
